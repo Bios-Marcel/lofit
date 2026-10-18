@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.LayerDrawable
 import android.media.AudioManager
 import android.media.ToneGenerator
@@ -24,6 +25,7 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.GridLayout
 import android.widget.ImageView
 import android.widget.CheckBox
 import android.widget.LinearLayout
@@ -47,6 +49,13 @@ import androidx.drawerlayout.widget.DrawerLayout
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import java.text.DateFormat
+import java.time.DayOfWeek
+import java.time.Instant
+import java.time.LocalDate
+import java.time.YearMonth
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
@@ -67,7 +76,6 @@ class MainActivity : AppCompatActivity() {
         data class ExercisePicker(val target: PickerTarget) : Route()
         data class RoutineEditor(val originalId: String?) : Route()
         data class ExerciseEditor(val exerciseId: String?) : Route()
-        data class HoldTimer(val workoutExerciseId: String, val plannedSetId: String) : Route()
         data class Confirm(val action: ConfirmAction, val targetId: String? = null) : Route()
     }
 
@@ -82,10 +90,17 @@ class MainActivity : AppCompatActivity() {
     private var routineDraft: Routine? = null
     private var timerText: TextView? = null
     private var holdTimerText: TextView? = null
+    private var holdTimerButton: MaterialButton? = null
+    private var holdDoneCheckBox: CheckBox? = null
+    private var activeHoldWorkoutExerciseId: String? = null
+    private var activeHoldPlannedSetId: String? = null
     private var holdStartedAt = 0L
     private var holdCuePlayed = false
+    private var updatingHoldTimer = false
+    private var completingHoldAutomatically = false
     private var restEndsAt = 0L
     private var lastWorkoutNotification = ""
+    private val drawableIds = mutableMapOf<String, Int>()
     private val handler = Handler(Looper.getMainLooper())
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) updateWorkoutNotification(force = true)
@@ -181,16 +196,20 @@ class MainActivity : AppCompatActivity() {
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         } else {
             window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            restEndsAt = 0L
+            if (::restBar.isInitialized) restBar.visibility = View.GONE
+            clearActiveHold()
         }
         content.removeAllViews()
         timerText = null
         holdTimerText = null
+        holdTimerButton = null
+        holdDoneCheckBox = null
         val view = when (val activeRoute = route) {
             Route.Root -> rootScreen()
             is Route.ExercisePicker -> exercisePickerScreen(activeRoute.target)
             is Route.RoutineEditor -> routineEditorScreen(activeRoute.originalId)
             is Route.ExerciseEditor -> exerciseEditorScreen(activeRoute.exerciseId)
-            is Route.HoldTimer -> holdTimerScreen(activeRoute.workoutExerciseId, activeRoute.plannedSetId)
             is Route.Confirm -> confirmationScreen(activeRoute)
         }
         content.addView(view)
@@ -211,6 +230,7 @@ class MainActivity : AppCompatActivity() {
             ensureWorkoutNotification()
             render()
         })
+        body.addView(workoutCalendar())
         body.addView(sectionTitle("Saved routines"))
         if (repository.data.routines.isEmpty()) {
             body.addView(emptyText("No routines yet. Build one in the Routines tab, or start empty and add exercises as you go."))
@@ -252,13 +272,28 @@ class MainActivity : AppCompatActivity() {
         })
         body.addView(divider())
         body.addView(actionButton("Finish workout") {
-            route = Route.Confirm(ConfirmAction.FINISH_WORKOUT)
-            render()
+            endWorkout(ConfirmAction.FINISH_WORKOUT)
         })
         body.addView(actionButton("Discard workout", secondary = true) {
-            route = Route.Confirm(ConfirmAction.DISCARD_WORKOUT)
-            render()
+            endWorkout(ConfirmAction.DISCARD_WORKOUT)
         })
+    }
+
+    private fun endWorkout(action: ConfirmAction) {
+        if (repository.data.activeWorkout?.setCount() == 0) {
+            discardActiveWorkout()
+            repository.save()
+            route = Route.Root
+        } else {
+            route = Route.Confirm(action)
+        }
+        render()
+    }
+
+    private fun discardActiveWorkout() {
+        repository.data.activeWorkout = null
+        restEndsAt = 0L
+        clearActiveHold()
     }
 
     private fun workoutExerciseCard(
@@ -273,10 +308,35 @@ class MainActivity : AppCompatActivity() {
             canMoveDown = index < workout.exercises.lastIndex,
             onMoveUp = { workout.moveExercise(index, index - 1); persistAndRender() },
             onMoveDown = { workout.moveExercise(index, index + 1); persistAndRender() },
-            onRemove = { workout.exercises.remove(item); persistAndRender() },
+            onRemove = {
+                if (activeHoldWorkoutExerciseId == item.id) clearActiveHold()
+                workout.exercises.remove(item)
+                persistAndRender()
+            },
         )))
         val rest = item.restSecondsOverride ?: exercise.defaultRestSeconds.takeIf { it > 0 } ?: workout.defaultRestSeconds
-        addView(plannedSetHeader(exercise, "Done", endWidth = 52))
+        val actionWidth = if (exercise.type.tracksDuration) 100 else 52
+        addView(plannedSetHeader(
+            exercise,
+            if (exercise.type.tracksDuration) "Start  Done" else "Done",
+            endWidth = actionWidth,
+            showActiveHold = exercise.type.tracksDuration,
+        ))
+        fun removeWorkoutSets(fromIndex: Int, allBelow: Boolean) {
+            val endIndex = if (allBelow) item.plannedSets.size else fromIndex + 1
+            val indices = fromIndex until endIndex
+            val loggedIds = indices.mapNotNull { setIndex ->
+                item.plannedSets.getOrNull(setIndex)?.let { set -> loggedSetFor(item, set, setIndex)?.id }
+            }.toSet()
+            if (activeHoldWorkoutExerciseId == item.id && indices.any { item.plannedSets.getOrNull(it)?.id == activeHoldPlannedSetId }) {
+                clearActiveHold()
+            }
+            item.sets.removeAll { it.id in loggedIds }
+            item.plannedSets.subList(fromIndex, endIndex).clear()
+            item.targetSets = item.plannedSets.size
+            repository.save()
+            render()
+        }
         item.plannedSets.forEachIndexed { setIndex, plannedSet ->
             val loggedSet = loggedSetFor(item, plannedSet, setIndex)
             val done = CheckBox(this@MainActivity).apply {
@@ -289,14 +349,46 @@ class MainActivity : AppCompatActivity() {
                 }
                 contentDescription = "Set ${setIndex + 1} done"
             }
+            lateinit var activeHoldAmount: EditText
+            val holdButton = if (exercise.type.tracksDuration) smallButton(
+                if (isActiveHold(item, plannedSet)) "■" else "▶",
+            ) {}.apply {
+                textSize = 18f
+                contentDescription = if (isActiveHold(item, plannedSet)) "Stop set ${setIndex + 1} hold" else "Start set ${setIndex + 1} hold"
+                setOnClickListener {
+                    if (isActiveHold(item, plannedSet)) {
+                        stopActiveHold()
+                    } else {
+                        startInlineHold(item, plannedSet, activeHoldAmount, this, done)
+                    }
+                }
+            } else null
+            val rowActions = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                holdButton?.let { addView(it, LinearLayout.LayoutParams(dp(48), dp(48))) }
+                addView(done, LinearLayout.LayoutParams(dp(52), dp(48)))
+            }
             val setRow = plannedSetEditor(
                 exercise = exercise,
                 plannedSet = plannedSet,
                 setIndex = setIndex,
-                endAction = done,
-                endActionWidth = 52,
+                endAction = rowActions,
+                endActionWidth = actionWidth,
                 endActionHeight = 48,
                 completed = loggedSet != null,
+                onRemove = { removeWorkoutSets(setIndex, false) },
+                onRemoveAndBelow = { removeWorkoutSets(setIndex, true) },
+                showActiveHold = exercise.type.tracksDuration,
+                activeHoldRunning = isActiveHold(item, plannedSet),
+                onActiveAmountReady = { amount ->
+                    activeHoldAmount = amount
+                    if (isActiveHold(item, plannedSet)) {
+                        holdTimerText = amount
+                        holdTimerButton = holdButton
+                        holdDoneCheckBox = done
+                    }
+                },
                 onChanged = {
                     loggedSetFor(item, plannedSet, setIndex)?.let { syncLoggedSet(it, plannedSet, exercise) }
                     repository.save()
@@ -304,8 +396,11 @@ class MainActivity : AppCompatActivity() {
             )
             done.setOnCheckedChangeListener { _, checked ->
                 if (checked) {
-                    item.sets.add(loggedSetFrom(plannedSet, exercise))
-                    startRest(item, exercise, workout)
+                    if (isActiveHold(item, plannedSet) && !completingHoldAutomatically) stopActiveHold()
+                    val loggedSet = loggedSetFor(item, plannedSet, setIndex)
+                    if (loggedSet == null) item.sets.add(loggedSetFrom(plannedSet, exercise))
+                    else syncLoggedSet(loggedSet, plannedSet, exercise)
+                    if (!completingHoldAutomatically) startRest(item, exercise, workout)
                 } else {
                     loggedSetFor(item, plannedSet, setIndex)?.let(item.sets::remove)
                 }
@@ -316,24 +411,11 @@ class MainActivity : AppCompatActivity() {
             addView(setRow)
         }
         addView(actionButton("Add set", secondary = true) {
-            val next = item.plannedSets.lastOrNull()?.copy(id = UUID.randomUUID().toString())
+            val next = item.plannedSets.lastOrNull()?.copy(id = UUID.randomUUID().toString(), actualHoldSeconds = null)
                 ?: PlannedSet(holdSeconds = exercise.minimumHoldSeconds)
             item.plannedSets.add(next)
             item.targetSets = item.plannedSets.size
             repository.save()
-            render()
-        })
-        if (exercise.type == ExerciseType.WEIGHTED_HOLD) addView(actionButton("Start next hold") {
-            val next = item.plannedSets.withIndex().firstOrNull { (setIndex, set) ->
-                loggedSetFor(item, set, setIndex) == null
-            }?.value ?: item.plannedSets.lastOrNull()?.copy(id = UUID.randomUUID().toString())
-                ?.also { item.plannedSets.add(it) }
-                ?: PlannedSet(holdSeconds = exercise.minimumHoldSeconds).also { item.plannedSets.add(it) }
-            item.targetSets = item.plannedSets.size
-            repository.save()
-            holdStartedAt = SystemClock.elapsedRealtime()
-            holdCuePlayed = false
-            route = Route.HoldTimer(item.id, next.id)
             render()
         })
         addView(restInput(rest) { seconds ->
@@ -392,13 +474,26 @@ class MainActivity : AppCompatActivity() {
                         onRemove = { draft.exercises.remove(item); render() },
                     )))
                     addView(plannedSetHeader(movement, if (item.plannedSets.size > 1) "" else null))
+                    fun removeRoutineSets(fromIndex: Int, allBelow: Boolean) {
+                        val endIndex = if (allBelow) item.plannedSets.size else fromIndex + 1
+                        item.plannedSets.subList(fromIndex, endIndex).clear()
+                        item.targetSets = item.plannedSets.size
+                        render()
+                    }
                     item.plannedSets.forEachIndexed { setIndex, plannedSet ->
                         val remove = if (item.plannedSets.size > 1) smallButton("×") {
                             item.plannedSets.removeAt(setIndex)
                             item.targetSets = item.plannedSets.size
                             render()
                         } else null
-                        addView(plannedSetEditor(movement, plannedSet, setIndex, remove) {
+                        addView(plannedSetEditor(
+                            movement,
+                            plannedSet,
+                            setIndex,
+                            remove,
+                            onRemove = { removeRoutineSets(setIndex, false) },
+                            onRemoveAndBelow = { removeRoutineSets(setIndex, true) },
+                        ) {
                             if (setIndex == 0) {
                                 item.targetReps = plannedSet.reps
                                 item.targetHoldSeconds = plannedSet.holdSeconds
@@ -406,7 +501,7 @@ class MainActivity : AppCompatActivity() {
                         })
                     }
                     addView(actionButton("Add set", secondary = true) {
-                        val next = item.plannedSets.lastOrNull()?.copy(id = UUID.randomUUID().toString())
+                        val next = item.plannedSets.lastOrNull()?.copy(id = UUID.randomUUID().toString(), actualHoldSeconds = null)
                             ?: PlannedSet(reps = item.targetReps, holdSeconds = item.targetHoldSeconds)
                         item.plannedSets.add(next)
                         item.targetSets = item.plannedSets.size
@@ -442,19 +537,28 @@ class MainActivity : AppCompatActivity() {
         fun updateResults(query: String) {
             results.removeAllViews()
             val normalized = query.trim().lowercase(Locale.getDefault())
-            val matches = repository.data.exercises.filter { exercise ->
-                normalized.isBlank() || listOf(exercise.name, exercise.primaryMuscle, exercise.secondaryMuscles)
+            val allMatches = repository.data.exercises.filter { exercise ->
+                normalized.isBlank() || listOf(exercise.name, exercise.primaryMuscle, exercise.secondaryMuscles, exercise.equipment, exercise.type.label)
                     .any { it.lowercase(Locale.getDefault()).contains(normalized) }
             }
+            val matches = allMatches.take(40)
             if (matches.isEmpty()) results.addView(emptyText("No matching exercises."))
+            if (allMatches.size > matches.size) results.addView(metaText("Showing 40 of ${allMatches.size}. Search to narrow the list."))
             matches.forEach { movement ->
                 results.addView(card {
                     addView(exerciseHeading(movement, large = true))
-                    addView(metaText("${movement.type.label}${if (movement.asymmetric) " · left / right" else ""}"))
+                    addView(metaText(listOf(movement.type.label, movement.equipment.takeIf(String::isNotBlank), if (movement.asymmetric) "left / right" else null).filterNotNull().joinToString(" · ")))
                     addView(metaText("Primary: ${movement.primaryMuscle} · Secondary: ${movement.secondaryMuscles}"))
                     addView(actionButton("Add ${movement.name}") {
                         if (target == PickerTarget.WORKOUT) {
-                            repository.data.activeWorkout?.exercises?.add(WorkoutExercise(exerciseId = movement.id))
+                            val lastKnownSets = repository.data.lastKnownSets(movement.id)
+                            repository.data.activeWorkout?.exercises?.add(WorkoutExercise(
+                                exerciseId = movement.id,
+                                targetSets = lastKnownSets?.size,
+                                targetReps = lastKnownSets?.firstOrNull()?.reps,
+                                targetHoldSeconds = lastKnownSets?.firstOrNull()?.holdSeconds,
+                                plannedSets = lastKnownSets ?: mutableListOf(),
+                            ))
                             repository.save()
                             route = Route.Root
                         } else {
@@ -485,13 +589,16 @@ class MainActivity : AppCompatActivity() {
         fun updateResults(query: String) {
             results.removeAllViews()
             val normalized = query.trim().lowercase(Locale.getDefault())
-            repository.data.exercises.filter { movement ->
-                normalized.isBlank() || listOf(movement.name, movement.primaryMuscle, movement.secondaryMuscles)
+            val allMatches = repository.data.exercises.filter { movement ->
+                normalized.isBlank() || listOf(movement.name, movement.primaryMuscle, movement.secondaryMuscles, movement.equipment, movement.type.label)
                     .any { it.lowercase(Locale.getDefault()).contains(normalized) }
-            }.forEach { movement ->
+            }
+            val matches = allMatches.take(40)
+            if (allMatches.size > matches.size) results.addView(metaText("Showing 40 of ${allMatches.size}. Search to narrow the list."))
+            matches.forEach { movement ->
                 results.addView(card {
                     addView(exerciseHeading(movement, large = true))
-                    addView(metaText("${movement.type.label}${if (movement.asymmetric) " · left / right" else ""}"))
+                    addView(metaText(listOf(movement.type.label, movement.equipment.takeIf(String::isNotBlank), if (movement.asymmetric) "left / right" else null).filterNotNull().joinToString(" · ")))
                     addView(metaText("Primary: ${movement.primaryMuscle} · Secondary: ${movement.secondaryMuscles}"))
                     recordFor(movement)?.let { addView(accentText(it)) }
                     if (movement.custom) addView(horizontalActions(
@@ -519,6 +626,7 @@ class MainActivity : AppCompatActivity() {
             val name = textField("Exercise name").apply { setText(existing?.name.orEmpty()) }
             val primary = textField("Primary muscle").apply { setText(existing?.primaryMuscle.orEmpty()) }
             val secondary = textField("Secondary muscles").apply { setText(existing?.secondaryMuscles.orEmpty()) }
+            val equipment = textField("Equipment").apply { setText(existing?.equipment.orEmpty()) }
             val typeGroup = choiceGroup(ExerciseType.entries.map { it.label }, existing?.type?.ordinal ?: 0)
             val trackingGroup = choiceGroup(listOf("Track both sides together", "Track left and right"), if (existing?.asymmetric == true) 1 else 0)
             var restSeconds = existing?.defaultRestSeconds ?: 90
@@ -528,6 +636,7 @@ class MainActivity : AppCompatActivity() {
             body.addView(fieldLabel("Side tracking")); body.addView(trackingGroup)
             body.addView(fieldLabel("Primary muscle")); body.addView(primary)
             body.addView(fieldLabel("Secondary muscles")); body.addView(secondary)
+            body.addView(fieldLabel("Equipment")); body.addView(equipment)
             body.addView(restInput(restSeconds) { restSeconds = it })
             body.addView(fieldLabel("Hold cue")); body.addView(hold)
             body.addView(actionButton("Save exercise") {
@@ -549,6 +658,7 @@ class MainActivity : AppCompatActivity() {
                 movement.asymmetric = selectedChoice(trackingGroup) == 1
                 movement.primaryMuscle = primary.text.toString().trim()
                 movement.secondaryMuscles = secondary.text.toString().trim()
+                movement.equipment = equipment.text.toString().trim()
                 movement.defaultRestSeconds = restSeconds
                 movement.minimumHoldSeconds = hold.text.toString().toIntOrNull()?.coerceIn(1, 3_600) ?: 30
                 if (existing == null) repository.data.exercises.add(movement)
@@ -558,53 +668,6 @@ class MainActivity : AppCompatActivity() {
                 render()
             })
             body.addView(actionButton("Cancel", secondary = true) { navigateBack() })
-        }
-    }
-
-    private fun holdTimerScreen(workoutExerciseId: String, plannedSetId: String): View {
-        val workout = repository.data.activeWorkout ?: return workoutHome()
-        val item = workout.exercises.firstOrNull { it.id == workoutExerciseId } ?: return activeWorkoutScreen(workout)
-        val movement = exercise(item.exerciseId) ?: return activeWorkoutScreen(workout)
-        val plannedSet = item.plannedSets.firstOrNull { it.id == plannedSetId } ?: return activeWorkoutScreen(workout)
-        return page(movement.name, "The cue sounds at ${movement.minimumHoldSeconds} seconds.", back = true) { body ->
-            body.addView(exerciseHeading(movement, large = true))
-            holdTimerText = titleText("0:00").apply {
-                textSize = 54f
-                gravity = Gravity.CENTER
-                setPadding(0, dp(24), 0, dp(24))
-                contentDescription = "Hold timer"
-            }
-            body.addView(holdTimerText)
-            val typeGroup = choiceGroup(SetType.entries.map { it.label }, plannedSet.type.ordinal)
-            val sideGroup = choiceGroup(Side.entries.map { it.label }, plannedSet.side.ordinal)
-            val weight = decimalField("Weight in kg (0 for bodyweight)")
-            weight.setText(formatWeight(plannedSet.weightKg))
-            body.addView(fieldLabel("Set type")); body.addView(typeGroup)
-            if (movement.asymmetric) { body.addView(fieldLabel("Side")); body.addView(sideGroup) }
-            body.addView(fieldLabel("Weight")); body.addView(weight)
-            body.addView(actionButton("Stop and save hold") {
-                val elapsed = max(1, ((SystemClock.elapsedRealtime() - holdStartedAt) / 1_000).toInt())
-                plannedSet.type = SetType.entries[selectedChoice(typeGroup)]
-                plannedSet.weightKg = max(0.0, weight.text.toString().toDoubleOrNull() ?: 0.0)
-                plannedSet.holdSeconds = elapsed
-                plannedSet.side = if (movement.asymmetric) Side.entries[selectedChoice(sideGroup)] else Side.BOTH
-                loggedSetFor(item, plannedSet, item.plannedSets.indexOf(plannedSet))?.let(item.sets::remove)
-                item.sets.add(LoggedSet(
-                    type = plannedSet.type,
-                    weightKg = plannedSet.weightKg,
-                    holdSeconds = elapsed,
-                    side = plannedSet.side,
-                    plannedSetId = plannedSet.id,
-                ))
-                repository.save()
-                startRest(item, movement, workout)
-                route = Route.Root
-                render()
-            })
-            body.addView(actionButton("Cancel hold", secondary = true) {
-                route = Route.Root
-                render()
-            })
         }
     }
 
@@ -631,6 +694,79 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
+    private fun workoutCalendar(): View {
+        val zone = ZoneId.systemDefault()
+        val today = LocalDate.now(zone)
+        val month = YearMonth.from(today)
+        val trainingDays = repository.data.history.mapNotNull { it.completedAt }
+            .map { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() }
+            .groupingBy { it }
+            .eachCount()
+        val monthTitle = month.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault()))
+
+        return card {
+            addView(titleText("Training calendar"))
+            addView(metaText(monthTitle))
+            addView(LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                DayOfWeek.entries.forEach { weekday ->
+                    addView(metaText(weekday.getDisplayName(TextStyle.NARROW, Locale.getDefault())).apply {
+                        gravity = Gravity.CENTER
+                        setTypeface(typeface, Typeface.BOLD)
+                    }, LinearLayout.LayoutParams(0, dp(30), 1f))
+                }
+            })
+
+            val firstOffset = month.atDay(1).dayOfWeek.value - DayOfWeek.MONDAY.value
+            var day = 1 - firstOffset
+            while (day <= month.lengthOfMonth()) {
+                addView(LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    repeat(7) {
+                        val date = day.takeIf { it in 1..month.lengthOfMonth() }?.let(month::atDay)
+                        addView(TextView(this@MainActivity).apply {
+                            text = date?.dayOfMonth?.toString().orEmpty()
+                            textSize = 14f
+                            gravity = Gravity.CENTER
+                            setTextColor(color(R.color.cream))
+                            if (date != null) {
+                                val workoutCount = trainingDays[date] ?: 0
+                                val trained = workoutCount > 0
+                                contentDescription = "$date, ${when (workoutCount) {
+                                    0 -> "no workout"
+                                    1 -> "workout completed"
+                                    else -> "$workoutCount workouts completed"
+                                }}"
+                                if (trained || date == today) {
+                                    textSize = 16f
+                                    setTypeface(typeface, Typeface.BOLD)
+                                    setTextColor(color(R.color.charcoal))
+                                }
+                                if (trained) {
+                                    elevation = dp(4).toFloat()
+                                }
+                                background = GradientDrawable().apply {
+                                    shape = GradientDrawable.RECTANGLE
+                                    cornerRadius = dp(10).toFloat()
+                                    setColor(when {
+                                        trained -> color(R.color.coral)
+                                        date == today -> color(R.color.sage)
+                                        else -> Color.TRANSPARENT
+                                    })
+                                }
+                            }
+                        }, LinearLayout.LayoutParams(0, dp(40), 1f).apply {
+                            marginStart = dp(2)
+                            marginEnd = dp(2)
+                        })
+                        day++
+                    }
+                })
+            }
+            addView(metaText("Coral days have completed workouts. Today has a sage background."))
+        }.apply { contentDescription = "Workout calendar" }
+    }
+
     private fun confirmationScreen(confirm: Route.Confirm): View {
         val (title, message, buttonLabel) = when (confirm.action) {
             ConfirmAction.FINISH_WORKOUT -> Triple("Finish workout?", "The workout and all logged sets will be saved to history.", "Finish and save")
@@ -643,15 +779,15 @@ class MainActivity : AppCompatActivity() {
             body.addView(actionButton(buttonLabel) {
                 when (confirm.action) {
                     ConfirmAction.FINISH_WORKOUT -> repository.data.activeWorkout?.let { workout ->
-                        workout.completedAt = System.currentTimeMillis()
-                        repository.data.history.add(workout)
-                        repository.data.activeWorkout = null
-                        restEndsAt = 0L
+                        if (workout.setCount() == 0) {
+                            discardActiveWorkout()
+                        } else {
+                            workout.completedAt = System.currentTimeMillis()
+                            repository.data.history.add(workout)
+                            discardActiveWorkout()
+                        }
                     }
-                    ConfirmAction.DISCARD_WORKOUT -> {
-                        repository.data.activeWorkout = null
-                        restEndsAt = 0L
-                    }
+                    ConfirmAction.DISCARD_WORKOUT -> discardActiveWorkout()
                     ConfirmAction.DELETE_EXERCISE -> confirm.targetId?.let { id ->
                         repository.data.exercises.removeAll { it.id == id && it.custom }
                         repository.data.routines.forEach { routine -> routine.exercises.removeAll { it.exerciseId == id } }
@@ -661,6 +797,7 @@ class MainActivity : AppCompatActivity() {
                         repository.reset()
                         routineDraft = null
                         restEndsAt = 0L
+                        clearActiveHold()
                         currentScreen = Screen.WORKOUT
                     }
                 }
@@ -675,7 +812,7 @@ class MainActivity : AppCompatActivity() {
     private fun openRoutineEditor(existing: Routine?) {
         routineDraft = existing?.copy(
             exercises = existing.exercises.map { item ->
-                item.copy(plannedSets = item.plannedSets.map { it.copy() }.toMutableList())
+                item.copy(plannedSets = item.plannedSets.map { it.copy(actualHoldSeconds = null) }.toMutableList())
             }.toMutableList(),
         ) ?: Routine(name = "")
         route = Route.RoutineEditor(existing?.id)
@@ -723,13 +860,17 @@ class MainActivity : AppCompatActivity() {
             name = routine.name,
             defaultRestSeconds = routine.defaultRestSeconds,
             exercises = routine.exercises.map { item ->
+                val plannedSets = repository.data.lastKnownSets(item.exerciseId)
+                    ?: item.plannedSets.map {
+                        it.copy(id = UUID.randomUUID().toString(), actualHoldSeconds = null)
+                    }.toMutableList()
                 WorkoutExercise(
                     exerciseId = item.exerciseId,
                     restSecondsOverride = item.restSecondsOverride,
-                    targetSets = item.plannedSets.size,
-                    targetReps = item.plannedSets.firstOrNull()?.reps,
-                    targetHoldSeconds = item.plannedSets.firstOrNull()?.holdSeconds,
-                    plannedSets = item.plannedSets.map { it.copy() }.toMutableList(),
+                    targetSets = plannedSets.size,
+                    targetReps = plannedSets.firstOrNull()?.reps,
+                    targetHoldSeconds = plannedSets.firstOrNull()?.holdSeconds,
+                    plannedSets = plannedSets,
                 )
             }.toMutableList(),
         )
@@ -763,7 +904,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateWorkoutTimer() {
-        val workout = repository.data.activeWorkout ?: return
+        val workout = repository.data.activeWorkout
+        if (workout == null) {
+            restEndsAt = 0L
+            updateRestBar()
+            return
+        }
         val elapsed = max(0, ((System.currentTimeMillis() - workout.startedAt) / 1_000).toInt())
         timerText?.text = "Workout ${formatSeconds(elapsed)}"
         updateRestBar()
@@ -775,6 +921,7 @@ class MainActivity : AppCompatActivity() {
         gravity = Gravity.CENTER_VERTICAL
         setPadding(dp(14), dp(10), dp(10), dp(10))
         setBackgroundColor(color(R.color.coral_dark))
+        contentDescription = "Rest timer overlay"
         visibility = View.GONE
         restTimeText = TextView(this@MainActivity).apply {
             textSize = 18f
@@ -798,6 +945,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateRestBar() {
         if (!::restBar.isInitialized) return
+        if (repository.data.activeWorkout == null) restEndsAt = 0L
         if (restEndsAt <= 0L) {
             restBar.visibility = View.GONE
             return
@@ -814,16 +962,107 @@ class MainActivity : AppCompatActivity() {
         restBar.visibility = View.VISIBLE
     }
 
+    private fun isActiveHold(item: WorkoutExercise, set: PlannedSet): Boolean =
+        activeHoldWorkoutExerciseId == item.id && activeHoldPlannedSetId == set.id
+
+    private fun startInlineHold(
+        item: WorkoutExercise,
+        set: PlannedSet,
+        amount: EditText,
+        button: MaterialButton,
+        done: CheckBox,
+    ) {
+        stopActiveHold()
+        restEndsAt = 0L
+        updateRestBar()
+        if (done.isChecked) done.isChecked = false
+        activeHoldWorkoutExerciseId = item.id
+        activeHoldPlannedSetId = set.id
+        holdStartedAt = SystemClock.elapsedRealtime()
+        holdCuePlayed = false
+        set.actualHoldSeconds = 0
+        holdTimerText = amount
+        holdTimerButton = button
+        holdDoneCheckBox = done
+        updatingHoldTimer = true
+        amount.setText("0")
+        updatingHoldTimer = false
+        amount.isEnabled = false
+        button.text = "■"
+        button.contentDescription = button.contentDescription.toString().replace("Start", "Stop")
+        repository.save()
+        updateWorkoutNotification(force = true)
+    }
+
+    private fun stopActiveHold() {
+        val itemId = activeHoldWorkoutExerciseId ?: return
+        val setId = activeHoldPlannedSetId ?: return
+        val elapsed = max(1, ((SystemClock.elapsedRealtime() - holdStartedAt) / 1_000L).toInt())
+        val workout = repository.data.activeWorkout ?: run { clearActiveHold(); return }
+        val item = workout.exercises.firstOrNull { it.id == itemId } ?: run { clearActiveHold(); return }
+        val plannedSet = item.plannedSets.firstOrNull { it.id == setId } ?: run { clearActiveHold(); return }
+        plannedSet.actualHoldSeconds = elapsed
+        val loggedSet = item.sets.firstOrNull { it.plannedSetId == plannedSet.id }
+        val movement = exercise(item.exerciseId)
+        if (loggedSet != null && movement != null) {
+            syncLoggedSet(loggedSet, plannedSet, movement)
+        }
+        updatingHoldTimer = true
+        holdTimerText?.setText(elapsed.toString())
+        updatingHoldTimer = false
+        holdTimerText?.isEnabled = true
+        holdTimerButton?.apply {
+            text = "▶"
+            contentDescription = contentDescription.toString().replace("Stop", "Start")
+        }
+        repository.save()
+        clearActiveHold()
+        if (loggedSet != null && movement != null) {
+            startRest(item, movement, workout)
+        }
+        updateWorkoutNotification(force = true)
+    }
+
+    private fun clearActiveHold() {
+        activeHoldWorkoutExerciseId = null
+        activeHoldPlannedSetId = null
+        holdStartedAt = 0L
+        holdCuePlayed = false
+        holdTimerText = null
+        holdTimerButton = null
+        holdDoneCheckBox = null
+    }
+
     private fun updateHoldTimer() {
-        if (route !is Route.HoldTimer || holdStartedAt == 0L) return
+        val itemId = activeHoldWorkoutExerciseId ?: return
+        val setId = activeHoldPlannedSetId ?: return
+        if (holdStartedAt == 0L) return
         val elapsed = max(0, ((SystemClock.elapsedRealtime() - holdStartedAt) / 1_000).toInt())
-        holdTimerText?.text = formatSeconds(elapsed)
-        val itemId = (route as Route.HoldTimer).workoutExerciseId
+        val elapsedText = elapsed.toString()
+        if (holdTimerText?.text?.toString() != elapsedText) {
+            updatingHoldTimer = true
+            holdTimerText?.setText(elapsedText)
+            updatingHoldTimer = false
+            updateWorkoutNotification()
+        }
         val item = repository.data.activeWorkout?.exercises?.firstOrNull { it.id == itemId }
+        if (item?.plannedSets?.none { it.id == setId } != false) {
+            clearActiveHold()
+            return
+        }
+        val plannedSet = item?.plannedSets?.firstOrNull { it.id == setId }
         val movement = item?.let { exercise(it.exerciseId) }
-        if (!holdCuePlayed && movement != null && elapsed >= movement.minimumHoldSeconds) {
+        if (!holdCuePlayed && plannedSet != null && movement != null && elapsed >= plannedSet.holdSeconds) {
             holdCuePlayed = true
-            playCue(ToneGenerator.TONE_PROP_BEEP2)
+            plannedSet.actualHoldSeconds = elapsed
+            val setIndex = item.plannedSets.indexOf(plannedSet)
+            loggedSetFor(item, plannedSet, setIndex)?.let { syncLoggedSet(it, plannedSet, movement) }
+                ?: item.sets.add(loggedSetFrom(plannedSet, movement))
+            repository.save()
+            completingHoldAutomatically = true
+            holdDoneCheckBox?.isChecked = true
+            completingHoldAutomatically = false
+            playCue(ToneGenerator.TONE_PROP_ACK, durationMs = 500, volume = 100)
         }
     }
 
@@ -885,7 +1124,14 @@ class MainActivity : AppCompatActivity() {
             else -> "All ${workout.setCount()} sets done"
         }
         val restSeconds = ((restEndsAt - SystemClock.elapsedRealtime() + 999L) / 1_000L).toInt().coerceAtLeast(0)
-        val detail = if (restSeconds > 0) "$setText · Rest ${formatSeconds(restSeconds)}" else setText
+        val holdSeconds = if (holdStartedAt > 0L && activeHoldWorkoutExerciseId != null) {
+            ((SystemClock.elapsedRealtime() - holdStartedAt) / 1_000L).toInt().coerceAtLeast(0)
+        } else 0
+        val detail = when {
+            restSeconds > 0 -> "$setText · Rest ${formatSeconds(restSeconds)}"
+            activeHoldWorkoutExerciseId != null -> "$setText · Hold ${formatSeconds(holdSeconds)}"
+            else -> setText
+        }
         val state = "$title|$detail"
         if (!force && state == lastWorkoutNotification) return
         lastWorkoutNotification = state
@@ -932,7 +1178,7 @@ class MainActivity : AppCompatActivity() {
             workout.exercises.filter { it.exerciseId == exercise.id }.flatMap { it.sets }
         }
         if (sets.isEmpty()) return null
-        return if (exercise.type == ExerciseType.WEIGHTED_HOLD) {
+        return if (exercise.type.tracksDuration) {
             "Best: ${sets.maxOf { it.holdSeconds }}s hold · ${formatWeight(sets.maxOf { it.weightKg })} kg"
         } else {
             "Best: ${formatWeight(sets.maxOf { it.weightKg })} kg · ${sets.maxOf { it.reps }} reps"
@@ -1013,9 +1259,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun exerciseThumbnail(exercise: Exercise, width: Int, height: Int): View {
-        return exercise.imageResource?.let { resource ->
+        val resource = exercise.imageResource ?: exercise.imageName?.let { name ->
+            drawableIds.getOrPut(name) { resources.getIdentifier(name, "drawable", packageName) }
+        }?.takeIf { it != 0 }
+        return resource?.let {
             ImageView(this).apply {
-                setImageResource(resource)
+                setImageResource(it)
                 scaleType = ImageView.ScaleType.CENTER_CROP
                 contentDescription = "${exercise.name} illustration"
             }
@@ -1169,6 +1418,12 @@ class MainActivity : AppCompatActivity() {
         endActionWidth: Int = 48,
         endActionHeight: Int = 42,
         completed: Boolean = false,
+        onRemove: (() -> Unit)? = null,
+        onRemoveAndBelow: (() -> Unit)? = null,
+        showActiveHold: Boolean = false,
+        activeHoldRunning: Boolean = false,
+        onAmountReady: (EditText) -> Unit = {},
+        onActiveAmountReady: (EditText) -> Unit = {},
         onChanged: () -> Unit = {},
     ): View = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
@@ -1182,10 +1437,19 @@ class MainActivity : AppCompatActivity() {
             }
             contentDescription = "Set ${setIndex + 1} type: ${plannedSet.type.label}"
             setOnClickListener {
+                val typeCount = SetType.entries.size
+                val choices = SetType.entries.map { it.label } + listOfNotNull(
+                    "Remove set".takeIf { onRemove != null },
+                    "Remove set and all below".takeIf { onRemoveAndBelow != null },
+                )
                 AlertDialog.Builder(this@MainActivity)
                     .setTitle("Set ${setIndex + 1} type")
-                    .setItems(SetType.entries.map { it.label }.toTypedArray()) { dialog, choice ->
-                        updateType(SetType.entries[choice])
+                    .setItems(choices.toTypedArray()) { dialog, choice ->
+                        when {
+                            choice < typeCount -> updateType(SetType.entries[choice])
+                            choice == typeCount -> onRemove?.invoke()
+                            else -> onRemoveAndBelow?.invoke()
+                        }
                         dialog.dismiss()
                     }
                     .create()
@@ -1206,29 +1470,62 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        val amountLabel = if (exercise.type == ExerciseType.WEIGHTED_REPS) "Repetitions" else "Hold duration in seconds"
-        val amountValue = if (exercise.type == ExerciseType.WEIGHTED_REPS) plannedSet.reps else plannedSet.holdSeconds
+        val amountLabel = when {
+            !exercise.type.tracksDuration -> "Repetitions"
+            showActiveHold -> "Target time in seconds"
+            else -> "Hold duration in seconds"
+        }
+        val amountValue = if (!exercise.type.tracksDuration) plannedSet.reps else plannedSet.holdSeconds
         val amount = numberField(amountLabel).apply {
             setText(formatInteger(amountValue))
             contentDescription = "Set ${setIndex + 1} $amountLabel"
             setPadding(dp(6), 0, dp(6), 0)
             doAfterTextChanged { value ->
+                if (updatingHoldTimer) return@doAfterTextChanged
                 value.toString().toIntOrNull()?.takeIf { it > 0 }?.let {
-                    if (exercise.type == ExerciseType.WEIGHTED_REPS) plannedSet.reps = it else plannedSet.holdSeconds = it
+                    if (!exercise.type.tracksDuration) plannedSet.reps = it else plannedSet.holdSeconds = it
                     onChanged()
                 }
             }
         }
-        addView(LinearLayout(this@MainActivity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
+        onAmountReady(amount)
+        val activeAmount = if (exercise.type.tracksDuration && showActiveHold) {
+            numberField("Active time in seconds").apply {
+                setText(formatInteger(plannedSet.actualHoldSeconds ?: 0))
+                contentDescription = "Set ${setIndex + 1} Active time in seconds"
+                setPadding(dp(6), 0, dp(6), 0)
+                isEnabled = !activeHoldRunning
+                doAfterTextChanged { value ->
+                    if (updatingHoldTimer) return@doAfterTextChanged
+                    value.toString().toIntOrNull()?.takeIf { it >= 0 }?.let {
+                        plannedSet.actualHoldSeconds = it
+                        onChanged()
+                    }
+                }
+            }.also(onActiveAmountReady)
+        } else null
+        addView(GridLayout(this@MainActivity).apply {
+            val activeGrid = activeAmount != null
+            val columns = setGridColumnWidths(activeGrid, endAction?.let { endActionWidth } ?: 0)
+            columnCount = columns.size
+            rowCount = 1
+            alignmentMode = GridLayout.ALIGN_BOUNDS
+            useDefaultMargins = false
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(52))
             setPadding(0, dp(2), 0, dp(2))
-            addView(setNumber, LinearLayout.LayoutParams(dp(48), dp(42)))
-            addView(weight, LinearLayout.LayoutParams(0, dp(42), 1f))
-            addView(metaText("kg ×").apply { gravity = Gravity.CENTER }, LinearLayout.LayoutParams(dp(44), dp(42)))
-            addView(amount, LinearLayout.LayoutParams(0, dp(42), 1f))
-            addView(metaText(if (exercise.type == ExerciseType.WEIGHTED_REPS) "reps" else "sec").apply { gravity = Gravity.CENTER }, LinearLayout.LayoutParams(dp(40), dp(42)))
-            endAction?.let { addView(it, LinearLayout.LayoutParams(dp(endActionWidth), dp(endActionHeight))) }
+            addView(setNumber, setGridCell(columns[0], heightDp = 42))
+            if (activeGrid) {
+                addView(weight, setGridCell(columns[1], heightDp = 42))
+                addView(amount, setGridCell(columns[2], heightDp = 42))
+                addView(activeAmount, setGridCell(columns[3], heightDp = 42))
+                endAction?.let { addView(it, setGridCell(columns[4], heightDp = endActionHeight)) }
+            } else {
+                addView(weight, setGridCell(columns[1], heightDp = 42))
+                addView(metaText("kg ×").apply { gravity = Gravity.CENTER }, setGridCell(columns[2], heightDp = 42))
+                addView(amount, setGridCell(columns[3], heightDp = 42))
+                addView(metaText(if (!exercise.type.tracksDuration) "reps" else "sec").apply { gravity = Gravity.CENTER }, setGridCell(columns[4], heightDp = 42))
+                endAction?.let { addView(it, setGridCell(columns[5], heightDp = endActionHeight)) }
+            }
         })
         if (exercise.asymmetric) addView(choiceGroup(Side.entries.map { it.label }, plannedSet.side.ordinal).apply {
             contentDescription = "Set ${setIndex + 1} side"
@@ -1239,17 +1536,60 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    private fun plannedSetHeader(exercise: Exercise, endLabel: String?, endWidth: Int = 48): View = LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL
-        gravity = Gravity.CENTER_VERTICAL
-        addView(metaText("Set").apply { gravity = Gravity.CENTER }, LinearLayout.LayoutParams(dp(48), ViewGroup.LayoutParams.WRAP_CONTENT))
-        addView(metaText("Weight").apply { gravity = Gravity.CENTER }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        addView(View(this@MainActivity), LinearLayout.LayoutParams(dp(44), 1))
-        addView(metaText(if (exercise.type == ExerciseType.WEIGHTED_REPS) "Reps" else "Hold").apply { gravity = Gravity.CENTER }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        addView(View(this@MainActivity), LinearLayout.LayoutParams(dp(40), 1))
-        endLabel?.let {
-            addView(metaText(it).apply { gravity = Gravity.CENTER }, LinearLayout.LayoutParams(dp(endWidth), ViewGroup.LayoutParams.WRAP_CONTENT))
+    private fun plannedSetHeader(
+        exercise: Exercise,
+        endLabel: String?,
+        endWidth: Int = 48,
+        showActiveHold: Boolean = false,
+    ): View = GridLayout(this).apply {
+        val activeGrid = exercise.type.tracksDuration && showActiveHold
+        val columns = setGridColumnWidths(activeGrid, endLabel?.let { endWidth } ?: 0)
+        columnCount = columns.size
+        rowCount = 1
+        alignmentMode = GridLayout.ALIGN_BOUNDS
+        useDefaultMargins = false
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(30))
+        addView(setGridHeader("Set"), setGridCell(columns[0]))
+        if (activeGrid) {
+            addView(setGridHeader("Weight"), setGridCell(columns[1]))
+            addView(setGridHeader("Target"), setGridCell(columns[2]))
+            addView(setGridHeader("Active"), setGridCell(columns[3]))
+            endLabel?.let {
+                addView(LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    addView(setGridHeader("Start"), LinearLayout.LayoutParams(dp(48), ViewGroup.LayoutParams.MATCH_PARENT))
+                    addView(setGridHeader("Done"), LinearLayout.LayoutParams(dp((endWidth - 48).coerceAtLeast(0)), ViewGroup.LayoutParams.MATCH_PARENT))
+                }, setGridCell(columns[4]))
+            }
+        } else {
+            addView(setGridHeader("Weight"), setGridCell(columns[1]))
+            addView(View(this@MainActivity), setGridCell(columns[2]))
+            addView(setGridHeader(if (!exercise.type.tracksDuration) "Reps" else "Hold"), setGridCell(columns[3]))
+            addView(View(this@MainActivity), setGridCell(columns[4]))
+            endLabel?.let { addView(setGridHeader(it), setGridCell(columns[5])) }
         }
+    }
+
+    private fun setGridHeader(value: String) = metaText(value).apply {
+        gravity = Gravity.START or Gravity.CENTER_VERTICAL
+        setPadding(dp(6), dp(3), 0, dp(3))
+    }
+
+    private fun setGridColumnWidths(activeHold: Boolean, endWidth: Int): IntArray {
+        val totalWidth = (resources.configuration.screenWidthDp - 48).coerceAtLeast(280)
+        return if (activeHold) {
+            val fieldWidth = ((totalWidth - 48 - endWidth) / 3).coerceAtLeast(40)
+            intArrayOf(48, fieldWidth, fieldWidth, totalWidth - 48 - endWidth - fieldWidth * 2, endWidth)
+        } else {
+            val fieldWidth = ((totalWidth - 48 - 44 - 40 - endWidth) / 2).coerceAtLeast(48)
+            intArrayOf(48, fieldWidth, 44, totalWidth - 48 - 44 - 40 - endWidth - fieldWidth, 40, endWidth)
+        }
+    }
+
+    private fun setGridCell(widthDp: Int, heightDp: Int? = null) = GridLayout.LayoutParams().apply {
+        width = dp(widthDp)
+        height = heightDp?.let(::dp) ?: ViewGroup.LayoutParams.WRAP_CONTENT
+        setMargins(0, 0, 0, 0)
     }
 
     private fun loggedSetFor(item: WorkoutExercise, plannedSet: PlannedSet, setIndex: Int): LoggedSet? =
@@ -1259,8 +1599,8 @@ class MainActivity : AppCompatActivity() {
     private fun loggedSetFrom(plannedSet: PlannedSet, exercise: Exercise) = LoggedSet(
         type = plannedSet.type,
         weightKg = plannedSet.weightKg,
-        reps = if (exercise.type == ExerciseType.WEIGHTED_REPS) plannedSet.reps else 0,
-        holdSeconds = if (exercise.type == ExerciseType.WEIGHTED_HOLD) plannedSet.holdSeconds else 0,
+        reps = if (!exercise.type.tracksDuration) plannedSet.reps else 0,
+        holdSeconds = if (exercise.type.tracksDuration) plannedSet.actualHoldSeconds ?: 0 else 0,
         side = plannedSet.side,
         plannedSetId = plannedSet.id,
     )
@@ -1268,8 +1608,8 @@ class MainActivity : AppCompatActivity() {
     private fun syncLoggedSet(loggedSet: LoggedSet, plannedSet: PlannedSet, exercise: Exercise) {
         loggedSet.type = plannedSet.type
         loggedSet.weightKg = plannedSet.weightKg
-        loggedSet.reps = if (exercise.type == ExerciseType.WEIGHTED_REPS) plannedSet.reps else 0
-        loggedSet.holdSeconds = if (exercise.type == ExerciseType.WEIGHTED_HOLD) plannedSet.holdSeconds else 0
+        loggedSet.reps = if (!exercise.type.tracksDuration) plannedSet.reps else 0
+        loggedSet.holdSeconds = if (exercise.type.tracksDuration) plannedSet.actualHoldSeconds ?: 0 else 0
         loggedSet.side = plannedSet.side
     }
 
@@ -1279,7 +1619,7 @@ class MainActivity : AppCompatActivity() {
         SetType.FAILURE -> "F"
     }
 
-    private fun describePlannedSet(exercise: Exercise, set: PlannedSet): String = if (exercise.type == ExerciseType.WEIGHTED_HOLD) {
+    private fun describePlannedSet(exercise: Exercise, set: PlannedSet): String = if (exercise.type.tracksDuration) {
         "${formatWeight(set.weightKg)} kg × ${set.holdSeconds}s"
     } else {
         "${formatWeight(set.weightKg)} kg × ${set.reps} reps"

@@ -53,14 +53,23 @@ class WorkoutSessionTest {
     }
 
     @Test
-    fun defaultLibrary_coversRepsHoldsAndAsymmetry() {
+    fun defaultLibrary_hasFullBalancedCatalog() {
         val exercises = DefaultData.exercises()
 
-        assertEquals(8, exercises.size)
+        assertEquals(408, exercises.size)
         assert(exercises.any { it.type == ExerciseType.WEIGHTED_HOLD })
         assert(exercises.any { it.type == ExerciseType.WEIGHTED_REPS })
-        assert(exercises.any { it.asymmetric })
+        assert(exercises.count { it.type == ExerciseType.ISOMETRIC } >= 10)
+        assert(exercises.count { it.type == ExerciseType.STRETCH } >= 60)
+        assert(exercises.count { it.asymmetric } >= 50)
+        assert(exercises.count { it.equipment in setOf("Barbell", "Dumbbell", "Dumbbells", "Kettlebells", "EZ Curl Bar") } >= 150)
+        assert(exercises.count { it.equipment in setOf("Machine", "Cable") } >= 90)
+        val shoulderRotations = exercises.filter { it.name.contains("Rotation", ignoreCase = true) && it.primaryMuscle == "Rotator cuff" }
+        assert(shoulderRotations.size >= 8)
+        assert(shoulderRotations.count { it.equipment == "Bands" } >= 6)
         assert(exercises.all { it.primaryMuscle.isNotBlank() })
+        assert(exercises.all { it.imageResource != null || it.imageName != null })
+        assertEquals(exercises.size, exercises.map { it.id }.distinct().size)
     }
 
     @Test
@@ -92,5 +101,63 @@ class WorkoutSessionTest {
         assertEquals(listOf(20.0, 60.0, 65.0), prescription.plannedSets.map { it.weightKg })
         assertEquals(listOf(10, 5, 3), prescription.plannedSets.map { it.reps })
         assertEquals(listOf(SetType.WARMUP, SetType.NORMAL, SetType.FAILURE), prescription.plannedSets.map { it.type })
+    }
+
+    @Test
+    fun lastKnownSets_usesNewestLoggedSetsAndCopiesAllValues() {
+        val older = WorkoutSession(
+            name = "Older",
+            startedAt = 100,
+            completedAt = 200,
+            exercises = mutableListOf(WorkoutExercise(
+                exerciseId = "bench",
+                sets = mutableListOf(LoggedSet(type = SetType.NORMAL, weightKg = 40.0, reps = 10)),
+            )),
+        )
+        val newer = WorkoutSession(
+            name = "Newer",
+            startedAt = 300,
+            completedAt = 400,
+            exercises = mutableListOf(WorkoutExercise(
+                exerciseId = "bench",
+                sets = mutableListOf(
+                    LoggedSet(type = SetType.WARMUP, weightKg = 20.0, reps = 12, side = Side.LEFT),
+                    LoggedSet(type = SetType.FAILURE, weightKg = 62.5, reps = 4, side = Side.RIGHT),
+                ),
+            )),
+        )
+
+        val sets = AppData(history = mutableListOf(newer, older)).lastKnownSets("bench")!!
+
+        assertEquals(2, sets.size)
+        assertEquals(listOf(SetType.WARMUP, SetType.FAILURE), sets.map { it.type })
+        assertEquals(listOf(20.0, 62.5), sets.map { it.weightKg })
+        assertEquals(listOf(12, 4), sets.map { it.reps })
+        assertEquals(listOf(Side.LEFT, Side.RIGHT), sets.map { it.side })
+    }
+
+    @Test
+    fun lastKnownSets_skipsNewerWorkoutWithoutLoggedSetsForExercise() {
+        val data = AppData(history = mutableListOf(
+            WorkoutSession(
+                name = "Known",
+                startedAt = 100,
+                exercises = mutableListOf(WorkoutExercise(
+                    exerciseId = "plank",
+                    sets = mutableListOf(LoggedSet(type = SetType.NORMAL, weightKg = 5.0, holdSeconds = 45)),
+                )),
+            ),
+            WorkoutSession(
+                name = "No plank sets",
+                startedAt = 200,
+                exercises = mutableListOf(WorkoutExercise(exerciseId = "plank")),
+            ),
+        ))
+
+        val sets = data.lastKnownSets("plank")!!
+
+        assertEquals(1, sets.size)
+        assertEquals(5.0, sets.single().weightKg, 0.001)
+        assertEquals(45, sets.single().holdSeconds)
     }
 }

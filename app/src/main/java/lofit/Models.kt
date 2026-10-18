@@ -3,8 +3,14 @@ package lofit
 import java.util.UUID
 
 enum class ExerciseType(val label: String) {
-    WEIGHTED_REPS("Weighted reps"),
-    WEIGHTED_HOLD("Weighted hold"),
+    WEIGHTED_REPS("Repetitions"),
+    WEIGHTED_HOLD("Timed hold"),
+    ISOMETRIC("Isometric hold"),
+    STRETCH("Stretch"),
+    ;
+
+    val tracksDuration: Boolean
+        get() = this != WEIGHTED_REPS
 }
 
 enum class SetType(val label: String) {
@@ -30,6 +36,8 @@ data class Exercise(
     var minimumHoldSeconds: Int = 30,
     val custom: Boolean = false,
     val imageResource: Int? = null,
+    var equipment: String = "",
+    val imageName: String? = null,
 )
 
 data class LoggedSet(
@@ -57,12 +65,14 @@ data class PlannedSet(
     var weightKg: Double = 0.0,
     var reps: Int = 8,
     var holdSeconds: Int = 30,
+    var actualHoldSeconds: Int? = null,
     var side: Side = Side.BOTH,
 ) {
     init {
         require(weightKg >= 0) { "Weight cannot be negative" }
         require(reps >= 0) { "Repetitions cannot be negative" }
         require(holdSeconds >= 0) { "Hold duration cannot be negative" }
+        require(actualHoldSeconds == null || actualHoldSeconds!! >= 0) { "Active hold duration cannot be negative" }
     }
 }
 
@@ -122,17 +132,29 @@ data class AppData(
     val routines: MutableList<Routine> = mutableListOf(),
     val history: MutableList<WorkoutSession> = mutableListOf(),
     var activeWorkout: WorkoutSession? = null,
-)
+) {
+    fun lastKnownSets(exerciseId: String): MutableList<PlannedSet>? = history
+        .withIndex()
+        .sortedWith(
+            compareByDescending<IndexedValue<WorkoutSession>> { it.value.completedAt ?: it.value.startedAt }
+                .thenByDescending { it.index },
+        )
+        .firstNotNullOfOrNull { (_, workout) ->
+            workout.exercises.lastOrNull { it.exerciseId == exerciseId && it.sets.isNotEmpty() }
+        }
+        ?.sets
+        ?.map { set ->
+            PlannedSet(
+                type = set.type,
+                weightKg = set.weightKg,
+                reps = set.reps,
+                holdSeconds = set.holdSeconds,
+                side = set.side,
+            )
+        }
+        ?.toMutableList()
+}
 
 object DefaultData {
-    fun exercises(): List<Exercise> = listOf(
-        Exercise("back-squat", "Back squat", ExerciseType.WEIGHTED_REPS, false, "Quadriceps", "Glutes, hamstrings", 120, imageResource = R.drawable.exercise_squat),
-        Exercise("bench-press", "Bench press", ExerciseType.WEIGHTED_REPS, false, "Chest", "Triceps, front delts", 120, imageResource = R.drawable.exercise_bench),
-        Exercise("deadlift", "Deadlift", ExerciseType.WEIGHTED_REPS, false, "Posterior chain", "Back, grip", 150, imageResource = R.drawable.exercise_deadlift),
-        Exercise("pull-up", "Pull-up", ExerciseType.WEIGHTED_REPS, false, "Lats", "Biceps, upper back", 90, imageResource = R.drawable.exercise_pullup),
-        Exercise("overhead-press", "Overhead press", ExerciseType.WEIGHTED_REPS, false, "Shoulders", "Triceps, upper chest", 120, imageResource = R.drawable.exercise_press),
-        Exercise("plank", "Plank", ExerciseType.WEIGHTED_HOLD, false, "Core", "Glutes, shoulders", 60, 45, imageResource = R.drawable.exercise_plank),
-        Exercise("farmer-carry", "Farmer carry", ExerciseType.WEIGHTED_HOLD, true, "Grip", "Traps, core", 90, 30, imageResource = R.drawable.exercise_carry),
-        Exercise("dumbbell-curl", "Dumbbell curl", ExerciseType.WEIGHTED_REPS, true, "Biceps", "Forearms", 60, imageResource = R.drawable.exercise_curl),
-    )
+    fun exercises(): List<Exercise> = ExerciseCatalog.exercises()
 }

@@ -14,8 +14,10 @@ import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.action.ViewActions.scrollTo
 import androidx.test.espresso.action.ViewActions.typeText
 import androidx.test.espresso.assertion.ViewAssertions.matches
+import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.isChecked
+import androidx.test.espresso.matcher.ViewMatchers.isEnabled
 import androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom
 import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
 import androidx.test.espresso.matcher.ViewMatchers.withHint
@@ -25,7 +27,9 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import android.view.View
+import java.time.LocalDate
 import org.hamcrest.Matcher
+import org.hamcrest.Matchers.not
 import org.junit.Before
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -84,6 +88,34 @@ class WorkoutFlowTest {
         onView(withText("Finish and save")).perform(click())
         assertEquals(0, activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         assertEquals(0, notificationManager.activeNotifications.size)
+        onView(withContentDescription("Rest timer overlay")).check(matches(not(isDisplayed())))
+        onView(withContentDescription("${LocalDate.now()}, workout completed")).perform(scrollTo()).check(matches(isDisplayed()))
+    }
+
+    @Test
+    fun finishingWorkoutWithNoDoneSets_discardsWithoutConfirmation() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val repository = LofitRepository(instrumentation.targetContext)
+        repository.data.routines.add(Routine(
+            name = "Strength",
+            exercises = mutableListOf(RoutineExercise(
+                exerciseId = "bench-press",
+                plannedSets = MutableList(3) { PlannedSet(weightKg = 60.0, reps = 5) },
+            )),
+        ))
+        repository.save()
+        val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        instrumentation.startActivitySync(intent)
+
+        onView(withText("Start routine")).perform(scrollTo(), click())
+        onView(withText("Finish workout")).perform(scrollTo(), click())
+
+        onView(withText("Finish and save")).check(doesNotExist())
+        onView(withText(R.string.start_workout)).check(matches(isDisplayed()))
+        val savedData = LofitRepository(instrumentation.targetContext).data
+        assertEquals(null, savedData.activeWorkout)
+        assertEquals(0, savedData.history.size)
     }
 
     @Test
@@ -94,7 +126,7 @@ class WorkoutFlowTest {
             name = "Strength",
             exercises = mutableListOf(RoutineExercise(
                 exerciseId = "bench-press",
-                plannedSets = mutableListOf(PlannedSet(weightKg = 60.0, reps = 5)),
+                plannedSets = MutableList(3) { PlannedSet(weightKg = 60.0, reps = 5) },
             )),
         ))
         repository.save()
@@ -112,6 +144,127 @@ class WorkoutFlowTest {
         onView(withContentDescription("Set 1 type: Failure")).check(matches(isDisplayed()))
         onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
         onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
+        onView(withContentDescription("Set 2 type: Normal")).perform(scrollTo(), click())
+        onView(withText("Remove set and all below")).perform(click())
+        onView(withContentDescription("Set 2 type: Normal")).check(doesNotExist())
+        onView(withContentDescription("Set 1 type: Failure")).perform(click())
+        onView(withText("Remove set")).perform(click())
+        onView(withContentDescription("Set 1 type: Failure")).check(doesNotExist())
+    }
+
+    @Test
+    fun startingRoutine_usesLastKnownSetsForEachExercise() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val repository = LofitRepository(instrumentation.targetContext)
+        repository.data.history.add(WorkoutSession(
+            name = "Previous",
+            startedAt = 100,
+            completedAt = 200,
+            exercises = mutableListOf(WorkoutExercise(
+                exerciseId = "bench-press",
+                sets = mutableListOf(
+                    LoggedSet(type = SetType.WARMUP, weightKg = 20.0, reps = 10),
+                    LoggedSet(type = SetType.NORMAL, weightKg = 67.5, reps = 6),
+                ),
+            )),
+        ))
+        repository.data.routines.add(Routine(
+            name = "Strength",
+            exercises = mutableListOf(RoutineExercise(
+                exerciseId = "bench-press",
+                plannedSets = MutableList(3) { PlannedSet(weightKg = 60.0, reps = 5) },
+            )),
+        ))
+        repository.save()
+        val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        instrumentation.startActivitySync(intent)
+
+        onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+        onView(withText(R.string.nav_routines)).perform(click())
+        onView(withText("Start")).perform(scrollTo(), click())
+
+        val plannedSets = LofitRepository(instrumentation.targetContext).data.activeWorkout
+            ?.exercises?.single()?.plannedSets!!
+        assertEquals(2, plannedSets.size)
+        assertEquals(listOf(20.0, 67.5), plannedSets.map { it.weightKg })
+        assertEquals(listOf(10, 6), plannedSets.map { it.reps })
+        assertEquals(listOf(SetType.WARMUP, SetType.NORMAL), plannedSets.map { it.type })
+    }
+
+    @Test
+    fun holdTimer_runsInsideWorkoutSetRow() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val repository = LofitRepository(instrumentation.targetContext)
+        repository.data.routines.add(Routine(
+            name = "Hold",
+            exercises = mutableListOf(RoutineExercise(
+                exerciseId = "plank",
+                plannedSets = mutableListOf(PlannedSet(holdSeconds = 45)),
+            )),
+        ))
+        repository.save()
+        val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        instrumentation.startActivitySync(intent)
+
+        onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+        onView(withText(R.string.nav_routines)).perform(click())
+        onView(withText("Start")).perform(scrollTo(), click())
+        onView(withContentDescription("Set 1 Target time in seconds")).check(matches(withText("45")))
+        onView(withContentDescription("Set 1 Active time in seconds")).check(matches(withText("0")))
+        onView(withContentDescription("Start set 1 hold")).perform(scrollTo(), click())
+        onView(withContentDescription("Stop set 1 hold")).check(matches(isDisplayed()))
+        onView(withContentDescription("Stop set 1 hold")).perform(click())
+        onView(withContentDescription("Start set 1 hold")).check(matches(isDisplayed()))
+        onView(withContentDescription("Set 1 Target time in seconds")).check(matches(withText("45")))
+        onView(withContentDescription("Set 1 Active time in seconds"))
+            .check(matches(isEnabled()))
+            .perform(replaceText("12"), closeSoftKeyboard())
+            .check(matches(withText("12")))
+        assertEquals(12, LofitRepository(instrumentation.targetContext).data.activeWorkout
+            ?.exercises?.single()?.plannedSets?.single()?.actualHoldSeconds)
+    }
+
+    @Test
+    fun holdTimer_reachingTargetCompletesSetButKeepsRunning() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val repository = LofitRepository(instrumentation.targetContext)
+        repository.data.routines.add(Routine(
+            name = "Short hold",
+            exercises = mutableListOf(RoutineExercise(
+                exerciseId = "plank",
+                plannedSets = mutableListOf(PlannedSet(holdSeconds = 1)),
+            )),
+        ))
+        repository.save()
+        val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        instrumentation.startActivitySync(intent)
+
+        onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+        onView(withText(R.string.nav_routines)).perform(click())
+        onView(withText("Start")).perform(scrollTo(), click())
+        onView(withContentDescription("Start set 1 hold")).perform(scrollTo(), click())
+        onView(withContentDescription("Stop set 1 hold")).perform(waitFor(1_300))
+        onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
+        onView(withContentDescription("Stop set 1 hold")).check(matches(isDisplayed())).perform(click())
+        onView(withContentDescription("Set 1 Active time in seconds")).check(matches(isEnabled()))
+        val savedSet = LofitRepository(instrumentation.targetContext).data.activeWorkout
+            ?.exercises?.single()?.sets?.single()
+        assert(savedSet != null && savedSet.holdSeconds >= 1)
+        onView(withContentDescription("Rest timer overlay")).check(matches(isDisplayed()))
+        onView(withContentDescription("Start set 1 hold")).perform(click())
+        onView(withContentDescription("Rest timer overlay")).check(matches(not(isDisplayed())))
+        onView(withContentDescription("Stop set 1 hold")).perform(click())
+    }
+
+    private fun waitFor(milliseconds: Long) = object : ViewAction {
+        override fun getDescription() = "wait for $milliseconds milliseconds"
+        override fun getConstraints(): Matcher<View> = isDisplayed()
+        override fun perform(uiController: UiController, view: View) {
+            uiController.loopMainThreadForAtLeast(milliseconds)
+        }
     }
 
     private fun openDrawer() = object : ViewAction {

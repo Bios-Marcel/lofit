@@ -42,6 +42,8 @@ class LofitRepository(context: Context) {
         put("minimumHoldSeconds", exercise.minimumHoldSeconds)
         put("custom", exercise.custom)
         put("imageResource", exercise.imageResource ?: JSONObject.NULL)
+        put("equipment", exercise.equipment)
+        put("imageName", exercise.imageName ?: JSONObject.NULL)
     }
 
     private fun encodeRoutine(routine: Routine) = JSONObject().apply {
@@ -99,7 +101,10 @@ class LofitRepository(context: Context) {
     }
 
     private fun decode(root: JSONObject): AppData {
-        val exercises = root.getJSONArray("exercises").mapObjects(::decodeExercise).toMutableList()
+        val savedExercises = root.getJSONArray("exercises").mapObjects(::decodeExercise)
+        val defaults = DefaultData.exercises()
+        val defaultIds = defaults.mapTo(mutableSetOf()) { it.id }
+        val exercises = (defaults + savedExercises.filter { it.custom && it.id !in defaultIds }).toMutableList()
         val routines = root.optJSONArray("routines")?.mapObjects(::decodeRoutine)?.toMutableList() ?: mutableListOf()
         val history = root.optJSONArray("history")?.mapObjects(::decodeWorkout)?.toMutableList() ?: mutableListOf()
         val active = root.optJSONObject("activeWorkout")?.let(::decodeWorkout)
@@ -117,6 +122,8 @@ class LofitRepository(context: Context) {
         value.optInt("minimumHoldSeconds", 30),
         value.optBoolean("custom"),
         value.optInt("imageResource").takeIf { !value.isNull("imageResource") },
+        value.optString("equipment"),
+        value.optString("imageName").takeIf { !value.isNull("imageName") },
     )
 
     private fun decodeRoutine(value: JSONObject) = Routine(
@@ -180,6 +187,11 @@ class LofitRepository(context: Context) {
             }
             loggedSets.forEachIndexed { index, set ->
                 if (set.plannedSetId == null) set.plannedSetId = plannedSets.getOrNull(index)?.id
+                plannedSets.getOrNull(index)?.let { plannedSet ->
+                    if (plannedSet.actualHoldSeconds == null && set.holdSeconds > 0) {
+                        plannedSet.actualHoldSeconds = set.holdSeconds
+                    }
+                }
             }
             WorkoutExercise(
                 id = item.getString("id"),
@@ -202,6 +214,7 @@ class LofitRepository(context: Context) {
                 put("weightKg", set.weightKg)
                 put("reps", set.reps)
                 put("holdSeconds", set.holdSeconds)
+                put("actualHoldSeconds", set.actualHoldSeconds ?: JSONObject.NULL)
                 put("side", set.side.name)
             })
         }
@@ -216,6 +229,7 @@ class LofitRepository(context: Context) {
                 weightKg = set.optDouble("weightKg"),
                 reps = set.optInt("reps", 8),
                 holdSeconds = set.optInt("holdSeconds", 30),
+                actualHoldSeconds = set.optInt("actualHoldSeconds").takeIf { !set.isNull("actualHoldSeconds") },
                 side = runCatching { Side.valueOf(set.optString("side", Side.BOTH.name)) }
                     .getOrDefault(Side.BOTH),
             )
