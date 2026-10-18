@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="charcoal">#171A1A</color>
+    <color name="charcoal_light">#242828</color>
+    <color name="coral">#E8755E</color>
+    <color name="coral_dark">#B34E3E</color>
+    <color name="sage">#8EA89B</color>
+    <color name="done_green">#665FAF75</color>
+    <color name="cream">#F5F0E6</color>
+    <color name="white">#FFFFFFFF</color>
+</resources>

@@ -1,0 +1,14 @@
+<resources>
+    <style name="Theme.Lofit" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/coral</item>
+        <item name="colorPrimaryVariant">@color/coral_dark</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">@color/sage</item>
+        <item name="colorSecondaryVariant">@color/sage</item>
+        <item name="colorOnSecondary">@color/charcoal</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:navigationBarColor">@color/charcoal</item>
+        <item name="android:statusBarColor">@color/charcoal</item>
+    </style>
+</resources>
