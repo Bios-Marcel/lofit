@@ -245,38 +245,43 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun activeWorkoutScreen(workout: WorkoutSession): View = page(workout.name, "Workout in progress") { body ->
-        timerText = TextView(this).apply {
+    private fun activeWorkoutScreen(workout: WorkoutSession): View {
+        val workoutTimer = TextView(this).apply {
             textSize = 18f
             setTextColor(color(R.color.cream))
-            setPadding(0, 0, 0, dp(8))
+            setTypeface(typeface, Typeface.BOLD)
+            gravity = Gravity.END or Gravity.CENTER_VERTICAL
+            contentDescription = "Workout timer"
         }
-        body.addView(timerText)
-        updateWorkoutTimer()
-        body.addView(restInput(workout.defaultRestSeconds) { seconds ->
-            workout.defaultRestSeconds = seconds
-            repository.save()
-        })
+        timerText = workoutTimer
+        val view = page(workout.name, "Workout in progress", headerEnd = workoutTimer) { body ->
+            updateWorkoutTimer()
+            body.addView(restInput(workout.defaultRestSeconds) { seconds ->
+                workout.defaultRestSeconds = seconds
+                repository.save()
+            })
 
-        if (workout.exercises.isEmpty()) {
-            body.addView(emptyText("This workout is empty. Add any exercise when you’re ready."))
-        }
-        workout.exercises.forEachIndexed { index, item ->
-            exercise(item.exerciseId)?.let { movement ->
-                body.addView(workoutExerciseCard(workout, item, movement, index))
+            if (workout.exercises.isEmpty()) {
+                body.addView(emptyText("This workout is empty. Add any exercise when you’re ready."))
             }
+            workout.exercises.forEachIndexed { index, item ->
+                exercise(item.exerciseId)?.let { movement ->
+                    body.addView(workoutExerciseCard(workout, item, movement, index))
+                }
+            }
+            body.addView(actionButton("Add exercise") {
+                route = Route.ExercisePicker(PickerTarget.WORKOUT)
+                render()
+            })
+            body.addView(divider())
+            body.addView(actionButton("Finish workout") {
+                endWorkout(ConfirmAction.FINISH_WORKOUT)
+            })
+            body.addView(actionButton("Discard workout", secondary = true) {
+                endWorkout(ConfirmAction.DISCARD_WORKOUT)
+            })
         }
-        body.addView(actionButton("Add exercise") {
-            route = Route.ExercisePicker(PickerTarget.WORKOUT)
-            render()
-        })
-        body.addView(divider())
-        body.addView(actionButton("Finish workout") {
-            endWorkout(ConfirmAction.FINISH_WORKOUT)
-        })
-        body.addView(actionButton("Discard workout", secondary = true) {
-            endWorkout(ConfirmAction.DISCARD_WORKOUT)
-        })
+        return view
     }
 
     private fun endWorkout(action: ConfirmAction) {
@@ -911,7 +916,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         val elapsed = max(0, ((System.currentTimeMillis() - workout.startedAt) / 1_000).toInt())
-        timerText?.text = "Workout ${formatSeconds(elapsed)}"
+        timerText?.text = formatSeconds(elapsed)
         updateRestBar()
         updateWorkoutNotification()
     }
@@ -1185,7 +1190,13 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun page(title: String, subtitle: String, back: Boolean = false, build: (LinearLayout) -> Unit): View {
+    private fun page(
+        title: String,
+        subtitle: String,
+        back: Boolean = false,
+        headerEnd: View? = null,
+        build: (LinearLayout) -> Unit,
+    ): View {
         val scroll = ScrollView(this).apply { isFillViewport = true }
         val body = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -1194,8 +1205,21 @@ class MainActivity : AppCompatActivity() {
         if (back) {
             body.addView(actionButton("← Back", secondary = true) { navigateBack() }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(40)))
         }
-        body.addView(titleText(title).apply { textSize = 26f; setPadding(0, dp(5), 0, 0) })
-        body.addView(metaText(subtitle).apply { setPadding(0, 0, 0, dp(10)) })
+        body.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(titleText(title).apply { textSize = 26f; setPadding(0, dp(5), 0, 0) })
+                addView(metaText(subtitle).apply { setPadding(0, 0, 0, dp(10)) })
+            }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            headerEnd?.let {
+                addView(it, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    marginStart = dp(12)
+                    bottomMargin = dp(5)
+                })
+            }
+        })
         build(body)
         scroll.addView(body)
         return scroll
