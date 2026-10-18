@@ -451,7 +451,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun routineEditorScreen(originalId: String?): View {
         val draft = routineDraft ?: return routinesScreen()
-        return page(if (originalId == null) "New routine" else "Edit routine", "Set the exact work you intend to do.", back = true) { body ->
+        return page(
+            if (originalId == null) "New routine" else "Edit routine",
+            if (originalId == null) null else "Set the exact work you intend to do.",
+            back = originalId != null,
+        ) { body ->
             val name = textField("Routine name").apply {
                 setText(draft.name)
                 doAfterTextChanged { draft.name = it.toString() }
@@ -529,11 +533,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun exercisePickerScreen(target: PickerTarget): View = page(
-        "Add exercise",
-        if (target == PickerTarget.ROUTINE) "Add a movement to this routine." else "Add a movement to this workout.",
-        back = true,
-    ) { body ->
+    private fun exercisePickerScreen(target: PickerTarget): View = page("Add exercise") { body ->
         val search = textField("Search name or muscle").apply {
             inputType = InputType.TYPE_CLASS_TEXT
             contentDescription = "Search exercises"
@@ -1192,7 +1192,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun page(
         title: String,
-        subtitle: String,
+        subtitle: String? = null,
         back: Boolean = false,
         headerEnd: View? = null,
         build: (LinearLayout) -> Unit,
@@ -1211,7 +1211,7 @@ class MainActivity : AppCompatActivity() {
             addView(LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.VERTICAL
                 addView(titleText(title).apply { textSize = 26f; setPadding(0, dp(5), 0, 0) })
-                addView(metaText(subtitle).apply { setPadding(0, 0, 0, dp(10)) })
+                subtitle?.let { addView(metaText(it).apply { setPadding(0, 0, 0, dp(10)) }) }
             }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
             headerEnd?.let {
                 addView(it, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
@@ -1425,8 +1425,17 @@ class MainActivity : AppCompatActivity() {
         setHintTextColor(color(R.color.sage))
     }
 
-    private fun numberField(hint: String): EditText = textField(hint).apply { inputType = InputType.TYPE_CLASS_NUMBER }
-    private fun decimalField(hint: String): EditText = textField(hint).apply { inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL }
+    private fun numberField(hint: String): EditText = textField(hint).apply {
+        inputType = InputType.TYPE_CLASS_NUMBER
+        setSelectAllOnFocus(true)
+        setOnClickListener { selectAll() }
+    }
+
+    private fun decimalField(hint: String): EditText = textField(hint).apply {
+        inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+        setSelectAllOnFocus(true)
+        setOnClickListener { selectAll() }
+    }
     private fun exercise(id: String): Exercise? = repository.data.exercises.firstOrNull { it.id == id }
 
     private fun persistAndRender() {

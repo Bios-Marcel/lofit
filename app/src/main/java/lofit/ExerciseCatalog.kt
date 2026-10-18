@@ -7,6 +7,8 @@ object ExerciseCatalog {
         Exercise("bench-press", "Bench press", ExerciseType.WEIGHTED_REPS, false, "Chest", "Triceps, front delts", 120, 30, imageResource = R.drawable.exercise_bench, equipment = "Barbell"),
         Exercise("deadlift", "Deadlift", ExerciseType.WEIGHTED_REPS, false, "Posterior chain", "Back, grip", 150, 30, imageResource = R.drawable.exercise_deadlift, equipment = "Barbell"),
         Exercise("pull-up", "Pull-up", ExerciseType.WEIGHTED_REPS, false, "Lats", "Biceps, upper back", 90, 30, imageResource = R.drawable.exercise_pullup, equipment = "Bodyweight"),
+        Exercise("machine-assisted-pull-up", "Machine-assisted pull-up", ExerciseType.WEIGHTED_REPS, false, "Lats", "Biceps, upper back", 90, 30, imageResource = R.drawable.exercise_pullup, equipment = "Machine"),
+        Exercise("band-assisted-pull-up", "Band-assisted pull-up", ExerciseType.WEIGHTED_REPS, false, "Lats", "Biceps, upper back", 90, 30, imageResource = R.drawable.exercise_pullup, equipment = "Bands"),
         Exercise("overhead-press", "Overhead press", ExerciseType.WEIGHTED_REPS, false, "Shoulders", "Triceps, upper chest", 120, 30, imageResource = R.drawable.exercise_press, equipment = "Barbell"),
         Exercise("plank", "Plank", ExerciseType.ISOMETRIC, false, "Core", "Glutes, shoulders", 60, 45, imageResource = R.drawable.exercise_plank, equipment = "Bodyweight"),
         Exercise("farmer-carry", "Farmer carry", ExerciseType.WEIGHTED_HOLD, true, "Grip", "Traps, core", 90, 30, imageResource = R.drawable.exercise_carry, equipment = "Dumbbells"),

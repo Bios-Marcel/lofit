@@ -64,11 +64,19 @@ class WorkoutFlowTest {
         )
         onView(withText("This workout is empty. Add any exercise when you’re ready.")).check(matches(isDisplayed()))
         onView(withText("Add exercise")).perform(scrollTo(), click())
+        onView(withText("← Back")).check(doesNotExist())
+        onView(withText("Add a movement to this workout.")).check(doesNotExist())
         onView(withHint("Search name or muscle")).perform(typeText("squat"), closeSoftKeyboard())
         onView(withContentDescription("Back squat illustration")).check(matches(isDisplayed()))
         onView(withText("Add Back squat")).perform(scrollTo(), click())
         onView(withText("Back squat")).check(matches(isDisplayed()))
         onView(withText("Add set")).perform(scrollTo(), click())
+        onView(withContentDescription("Set 1 weight"))
+            .perform(click(), typeText("7"), closeSoftKeyboard())
+            .check(matches(withText("7")))
+        onView(withContentDescription("Set 1 Repetitions"))
+            .perform(click(), typeText("8"), closeSoftKeyboard())
+            .check(matches(withText("8")))
         val notificationManager = instrumentation.targetContext.getSystemService(NotificationManager::class.java)
         val activeNotification = notificationManager.activeNotifications.single().notification
         assertEquals("Back squat", activeNotification.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
@@ -90,6 +98,22 @@ class WorkoutFlowTest {
         assertEquals(0, notificationManager.activeNotifications.size)
         onView(withContentDescription("Rest timer overlay")).check(matches(not(isDisplayed())))
         onView(withContentDescription("${LocalDate.now()}, workout completed")).perform(scrollTo()).check(matches(isDisplayed()))
+    }
+
+    @Test
+    fun newRoutine_hasNoBackButton() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        instrumentation.startActivitySync(intent)
+
+        onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+        onView(withText(R.string.nav_routines)).perform(click())
+        onView(withText("Create routine")).perform(click())
+
+        onView(withText("New routine")).check(matches(isDisplayed()))
+        onView(withText("← Back")).check(doesNotExist())
+        onView(withText("Set the exact work you intend to do.")).check(doesNotExist())
     }
 
     @Test

@@ -56,7 +56,7 @@ class WorkoutSessionTest {
     fun defaultLibrary_hasFullBalancedCatalog() {
         val exercises = DefaultData.exercises()
 
-        assertEquals(408, exercises.size)
+        assertEquals(410, exercises.size)
         assert(exercises.any { it.type == ExerciseType.WEIGHTED_HOLD })
         assert(exercises.any { it.type == ExerciseType.WEIGHTED_REPS })
         assert(exercises.count { it.type == ExerciseType.ISOMETRIC } >= 10)
@@ -70,6 +70,9 @@ class WorkoutSessionTest {
         assert(exercises.all { it.primaryMuscle.isNotBlank() })
         assert(exercises.all { it.imageResource != null || it.imageName != null })
         assertEquals(exercises.size, exercises.map { it.id }.distinct().size)
+        val pullUpImage = exercises.single { it.id == "pull-up" }.imageResource
+        assertEquals(pullUpImage, exercises.single { it.id == "machine-assisted-pull-up" }.imageResource)
+        assertEquals(pullUpImage, exercises.single { it.id == "band-assisted-pull-up" }.imageResource)
     }
 
     @Test
