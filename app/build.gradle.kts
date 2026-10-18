@@ -23,6 +23,7 @@ android {
             applicationIdSuffix = ".test"
         }
         release {
+            signingConfig = signingConfigs.getByName("debug")
             optimization {
                 enable = true
                 packageScope = setOf("androidx.**", "kotlinx.**")
