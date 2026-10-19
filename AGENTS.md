@@ -18,6 +18,7 @@
 - Restart: [`scripts/restart.sh`](scripts/restart.sh)
 - Stop: [`scripts/stop.sh`](scripts/stop.sh)
 - Set `ANDROID_SERIAL` when more than one device is connected.
+- For physical device, always deploy prod build, never debug build
 
 Run:
 

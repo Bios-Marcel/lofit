@@ -163,4 +163,44 @@ class WorkoutSessionTest {
         assertEquals(5.0, sets.single().weightKg, 0.001)
         assertEquals(45, sets.single().holdSeconds)
     }
+
+    @Test
+    fun oneRepMaxes_useHighestWeightOrLongestHoldFromHistory() {
+        val bench = Exercise("bench", "Bench", ExerciseType.WEIGHTED_REPS, false, "Chest", "")
+        val plank = Exercise("plank-test", "Plank", ExerciseType.ISOMETRIC, false, "Core", "")
+        val data = AppData(
+            exercises = mutableListOf(bench, plank),
+            history = mutableListOf(WorkoutSession(
+                name = "Records",
+                exercises = mutableListOf(
+                    WorkoutExercise(
+                        exerciseId = bench.id,
+                        sets = mutableListOf(
+                            LoggedSet(type = SetType.NORMAL, weightKg = 60.0, reps = 8),
+                            LoggedSet(type = SetType.NORMAL, weightKg = 75.0, reps = 2),
+                        ),
+                    ),
+                    WorkoutExercise(
+                        exerciseId = plank.id,
+                        sets = mutableListOf(
+                            LoggedSet(type = SetType.NORMAL, weightKg = 10.0, holdSeconds = 20),
+                            LoggedSet(type = SetType.NORMAL, weightKg = 0.0, holdSeconds = 55),
+                        ),
+                    ),
+                ),
+            )),
+            activeWorkout = WorkoutSession(
+                name = "Not finished",
+                exercises = mutableListOf(WorkoutExercise(
+                    exerciseId = bench.id,
+                    sets = mutableListOf(LoggedSet(type = SetType.NORMAL, weightKg = 100.0, reps = 1)),
+                )),
+            ),
+        )
+
+        val records = data.oneRepMaxes().associateBy { it.exercise.id }
+
+        assertEquals(75.0, records.getValue(bench.id).set.weightKg, 0.001)
+        assertEquals(55, records.getValue(plank.id).set.holdSeconds)
+    }
 }

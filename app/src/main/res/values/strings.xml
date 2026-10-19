@@ -4,5 +4,6 @@
     <string name="nav_workout">Workout</string>
     <string name="nav_routines">Routines</string>
     <string name="nav_exercises">Exercises</string>
+    <string name="nav_records">Records</string>
     <string name="nav_history">History</string>
 </resources>

@@ -127,6 +127,11 @@ data class RoutineExercise(
     },
 )
 
+data class ExerciseRecord(
+    val exercise: Exercise,
+    val set: LoggedSet,
+)
+
 data class AppData(
     val exercises: MutableList<Exercise> = DefaultData.exercises().toMutableList(),
     val routines: MutableList<Routine> = mutableListOf(),
@@ -153,6 +158,20 @@ data class AppData(
             )
         }
         ?.toMutableList()
+
+    fun oneRepMaxes(): List<ExerciseRecord> = exercises.mapNotNull { exercise ->
+        val sets = history.flatMap { workout ->
+            workout.exercises
+                .filter { it.exerciseId == exercise.id }
+                .flatMap { it.sets }
+        }
+        val best = sets.maxWithOrNull(
+            compareBy<LoggedSet> {
+                if (exercise.type.tracksDuration) it.holdSeconds.toDouble() else it.weightKg
+            }.thenBy { it.completedAt },
+        ) ?: return@mapNotNull null
+        ExerciseRecord(exercise, best)
+    }.sortedBy { it.exercise.name.lowercase() }
 }
 
 object DefaultData {
