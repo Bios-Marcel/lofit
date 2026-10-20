@@ -89,7 +89,9 @@ data class WorkoutExercise(
             PlannedSet(reps = targetReps ?: 8, holdSeconds = targetHoldSeconds ?: 30)
         }
     } ?: mutableListOf(),
-)
+) {
+    fun restSeconds(defaultRestSeconds: Int): Int = restSecondsOverride ?: defaultRestSeconds
+}
 
 data class WorkoutSession(
     val id: String = UUID.randomUUID().toString(),

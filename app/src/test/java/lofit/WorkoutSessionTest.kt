@@ -91,6 +91,16 @@ class WorkoutSessionTest {
     }
 
     @Test
+    fun workoutExercise_usesWorkoutRestWhenOverrideIsEmpty() {
+        val exercise = WorkoutExercise(exerciseId = "bench")
+
+        assertEquals(75, exercise.restSeconds(75))
+
+        exercise.restSecondsOverride = 45
+        assertEquals(45, exercise.restSeconds(75))
+    }
+
+    @Test
     fun routineExercise_allowsDifferentWeightAndRepsForEachSet() {
         val prescription = RoutineExercise(
             exerciseId = "bench",

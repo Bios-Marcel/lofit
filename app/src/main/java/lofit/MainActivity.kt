@@ -375,7 +375,6 @@ class MainActivity : AppCompatActivity() {
             onRemove = onRemove,
             onStateUpdaterReady = onActionStateUpdaterReady,
         )))
-        val rest = item.restSecondsOverride ?: exercise.defaultRestSeconds.takeIf { it > 0 } ?: workout.defaultRestSeconds
         val actionWidth = if (exercise.type.tracksDuration) 100 else 52
         addView(plannedSetHeader(
             exercise,
@@ -495,7 +494,7 @@ class MainActivity : AppCompatActivity() {
                     val loggedSet = loggedSetFor(item, plannedSet, currentIndex)
                     if (loggedSet == null) item.sets.add(loggedSetFrom(plannedSet, exercise))
                     else syncLoggedSet(loggedSet, plannedSet, exercise)
-                    if (!completingHoldAutomatically) startRest(item, exercise, workout)
+                    if (!completingHoldAutomatically) startRest(item, workout)
                 } else {
                     loggedSetFor(item, plannedSet, currentIndex)?.let(item.sets::remove)
                 }
@@ -517,7 +516,7 @@ class MainActivity : AppCompatActivity() {
             addWorkoutSetRow(next, item.plannedSets.lastIndex)
             updateWorkoutNotification(force = true)
         })
-        addView(restInput(rest) { seconds ->
+        addView(restOverrideInput(item.restSecondsOverride, workout.defaultRestSeconds) { seconds ->
             item.restSecondsOverride = seconds
             repository.save()
         })
@@ -659,8 +658,7 @@ class MainActivity : AppCompatActivity() {
                         item.targetSets = item.plannedSets.size
                         addRoutineSetRow(next, item.plannedSets.lastIndex)
                     })
-                    val defaultRest = item.restSecondsOverride ?: movement.defaultRestSeconds
-                    addView(restInput(defaultRest) { seconds ->
+                    addView(restOverrideInput(item.restSecondsOverride, draft.defaultRestSeconds) { seconds ->
                         item.restSecondsOverride = seconds
                     })
                 }
@@ -1059,8 +1057,8 @@ class MainActivity : AppCompatActivity() {
         render()
     }
 
-    private fun startRest(item: WorkoutExercise, movement: Exercise, workout: WorkoutSession) {
-        val seconds = item.restSecondsOverride ?: movement.defaultRestSeconds.takeIf { it > 0 } ?: workout.defaultRestSeconds
+    private fun startRest(item: WorkoutExercise, workout: WorkoutSession) {
+        val seconds = item.restSeconds(workout.defaultRestSeconds)
         restEndsAt = if (seconds > 0) SystemClock.elapsedRealtime() + seconds * 1_000L else 0L
         updateRestBar()
         updateWorkoutNotification(force = true)
@@ -1181,7 +1179,7 @@ class MainActivity : AppCompatActivity() {
         repository.save()
         clearActiveHold()
         if (loggedSet != null && movement != null) {
-            startRest(item, movement, workout)
+            startRest(item, workout)
         }
         updateWorkoutNotification(force = true)
     }
@@ -1498,6 +1496,28 @@ class MainActivity : AppCompatActivity() {
             doAfterTextChanged { text -> text.toString().toIntOrNull()?.let { onChange(it.coerceIn(0, 3_600)) } }
         }, LinearLayout.LayoutParams(dp(82), dp(42)))
         addView(metaText("seconds").apply { setPadding(dp(8), 0, 0, 0) })
+    }
+
+    private fun restOverrideInput(value: Int?, defaultSeconds: Int, onChange: (Int?) -> Unit): View = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(0, dp(3), 0, dp(3))
+        addView(TextView(this@MainActivity).apply {
+            text = "Rest override"
+            textSize = 16f
+            setTextColor(color(R.color.cream))
+            setTypeface(typeface, Typeface.BOLD)
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        addView(numberField("Seconds").apply {
+            setText(value?.let(::formatInteger).orEmpty())
+            contentDescription = "Rest override in seconds"
+            gravity = Gravity.CENTER
+            setPadding(dp(6), 0, dp(6), 0)
+            doAfterTextChanged { text ->
+                onChange(text.toString().toIntOrNull()?.coerceIn(0, 3_600))
+            }
+        }, LinearLayout.LayoutParams(dp(82), dp(42)))
+        addView(metaText("seconds (default $defaultSeconds)").apply { setPadding(dp(8), 0, 0, 0) })
     }
 
     private fun choiceGroup(values: List<String>, selected: Int): RadioGroup = RadioGroup(this).apply {
