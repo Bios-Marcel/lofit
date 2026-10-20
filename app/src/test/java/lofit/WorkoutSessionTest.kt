@@ -126,7 +126,21 @@ class WorkoutSessionTest {
     fun defaultLibrary_hasFullBalancedCatalog() {
         val exercises = DefaultData.exercises()
 
-        assertEquals(410, exercises.size)
+        assertEquals(422, exercises.size)
+        assert(exercises.map { it.id }.containsAll(listOf(
+            "push-up",
+            "close-grip-push-up",
+            "wide-grip-push-up",
+            "diamond-push-up",
+            "knee-push-up",
+            "decline-push-up",
+            "wall-push-up",
+            "pike-push-up",
+            "archer-push-up",
+            "one-arm-push-up",
+            "clap-push-up",
+            "spiderman-push-up",
+        )))
         assert(exercises.any { it.type == ExerciseType.WEIGHTED_HOLD })
         assert(exercises.any { it.type == ExerciseType.WEIGHTED_REPS })
         assert(exercises.count { it.type == ExerciseType.ISOMETRIC } >= 10)
