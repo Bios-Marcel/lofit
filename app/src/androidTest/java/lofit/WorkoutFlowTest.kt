@@ -27,6 +27,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
+import com.google.android.material.card.MaterialCardView
 import android.view.View
 import android.widget.ScrollView
 import java.time.LocalDate
@@ -73,7 +74,28 @@ class WorkoutFlowTest {
         onView(withContentDescription("Back squat illustration")).check(matches(isDisplayed()))
         onView(withText("Add Back squat")).perform(scrollTo(), click())
         onView(withText("Back squat")).check(matches(isDisplayed()))
+        onView(withText("Quadriceps")).check(doesNotExist())
+        onView(withText("Add set")).check { view, _ ->
+            var ancestor = view.parent
+            while (ancestor !is MaterialCardView) ancestor = ancestor.parent
+            val buttonLocation = IntArray(2)
+            val cardLocation = IntArray(2)
+            view.getLocationOnScreen(buttonLocation)
+            ancestor.getLocationOnScreen(cardLocation)
+            assertEquals(cardLocation[0], buttonLocation[0])
+            assertEquals(cardLocation[0] + ancestor.width, buttonLocation[0] + view.width)
+        }
         onView(withText("Add set")).perform(scrollTo(), click())
+        onView(withContentDescription("Set 1 row")).check { view, _ ->
+            var ancestor = view.parent
+            while (ancestor !is MaterialCardView) ancestor = ancestor.parent
+            val rowLocation = IntArray(2)
+            val cardLocation = IntArray(2)
+            view.getLocationOnScreen(rowLocation)
+            ancestor.getLocationOnScreen(cardLocation)
+            assertEquals(cardLocation[0], rowLocation[0])
+            assertEquals(cardLocation[0] + ancestor.width, rowLocation[0] + view.width)
+        }
         onView(withContentDescription("Set 1 weight"))
             .perform(click(), typeText("7"), closeSoftKeyboard())
             .check(matches(withText("7")))

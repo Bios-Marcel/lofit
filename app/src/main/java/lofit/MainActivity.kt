@@ -368,8 +368,8 @@ class MainActivity : AppCompatActivity() {
         onMoveDown: () -> Unit,
         onRemove: () -> Unit,
         onActionStateUpdaterReady: ((Boolean, Boolean) -> Unit) -> Unit,
-    ): View = card {
-        addView(exerciseHeading(exercise, large = true, actions = exerciseActions(
+    ): View = card(horizontalPadding = 0) {
+        addView(exerciseHeading(exercise, large = true, showMuscle = false, actions = exerciseActions(
             exercise = exercise,
             canMoveUp = index > 0,
             canMoveDown = index < workout.exercises.lastIndex,
@@ -377,7 +377,7 @@ class MainActivity : AppCompatActivity() {
             onMoveDown = onMoveDown,
             onRemove = onRemove,
             onStateUpdaterReady = onActionStateUpdaterReady,
-        )))
+        )), insetCardLayoutParams())
         val actionWidth = if (exercise.type.tracksDuration) 100 else 52
         addView(plannedSetHeader(
             exercise,
@@ -522,7 +522,7 @@ class MainActivity : AppCompatActivity() {
         addView(restOverrideInput(item.restSecondsOverride, workout.defaultRestSeconds) { seconds ->
             item.restSecondsOverride = seconds
             repository.save()
-        })
+        }, insetCardLayoutParams())
     }
 
     private fun routinesScreen(): View = page("Routines", "Prescribe each movement before you train.") { body ->
@@ -600,7 +600,7 @@ class MainActivity : AppCompatActivity() {
             body.addView(exerciseCards)
             draft.exercises.forEachIndexed { index, item ->
                 val movement = exercise(item.exerciseId) ?: return@forEachIndexed
-                val exerciseCard = card {
+                val exerciseCard = card(horizontalPadding = 0) {
                     addView(exerciseHeading(movement, large = true, actions = exerciseActions(
                         exercise = movement,
                         canMoveUp = index > 0,
@@ -609,7 +609,7 @@ class MainActivity : AppCompatActivity() {
                         onMoveDown = { moveExercise(item, 1) },
                         onRemove = { removeExercise(item) },
                         onStateUpdaterReady = { updater -> updateActionStates[item.id] = updater },
-                    )))
+                    )), insetCardLayoutParams())
                     val setRows = LinearLayout(this@MainActivity).apply {
                         orientation = LinearLayout.VERTICAL
                     }
@@ -663,7 +663,7 @@ class MainActivity : AppCompatActivity() {
                     })
                     addView(restOverrideInput(item.restSecondsOverride, draft.defaultRestSeconds) { seconds ->
                         item.restSecondsOverride = seconds
-                    })
+                    }, insetCardLayoutParams())
                 }
                 cardViews[item.id] = exerciseCard
                 exerciseCards.addView(exerciseCard)
@@ -932,11 +932,11 @@ class MainActivity : AppCompatActivity() {
                                     setTextColor(color(R.color.charcoal))
                                 }
                                 if (trained) {
-                                    elevation = dp(4).toFloat()
+                                    elevation = 0f
                                 }
                                 background = GradientDrawable().apply {
                                     shape = GradientDrawable.RECTANGLE
-                                    cornerRadius = dp(10).toFloat()
+                                    cornerRadius = dp(2).toFloat()
                                     setColor(when {
                                         trained -> color(R.color.coral)
                                         date == today -> color(R.color.sage)
@@ -1414,21 +1414,33 @@ class MainActivity : AppCompatActivity() {
         return scroll
     }
 
-    private fun card(build: LinearLayout.() -> Unit): View = MaterialCardView(this).apply {
-        radius = dp(14).toFloat()
+    private fun card(horizontalPadding: Int = 10, build: LinearLayout.() -> Unit): View = MaterialCardView(this).apply {
+        radius = dp(3).toFloat()
         cardElevation = 0f
-        strokeWidth = dp(1)
-        strokeColor = Color.rgb(59, 65, 64)
+        strokeWidth = 0
         setCardBackgroundColor(color(R.color.charcoal_light))
         addView(LinearLayout(this@MainActivity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(10), dp(10), dp(10), dp(10))
+            setPadding(dp(horizontalPadding), dp(10), dp(horizontalPadding), dp(10))
             build()
         })
         layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { bottomMargin = dp(8) }
     }
 
-    private fun exerciseHeading(exercise: Exercise, large: Boolean, actions: View? = null): View = LinearLayout(this).apply {
+    private fun insetCardLayoutParams() = LinearLayout.LayoutParams(
+        ViewGroup.LayoutParams.MATCH_PARENT,
+        ViewGroup.LayoutParams.WRAP_CONTENT,
+    ).apply {
+        marginStart = dp(10)
+        marginEnd = dp(10)
+    }
+
+    private fun exerciseHeading(
+        exercise: Exercise,
+        large: Boolean,
+        showMuscle: Boolean = true,
+        actions: View? = null,
+    ): View = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
         val width = if (large) dp(84) else dp(68)
@@ -1437,7 +1449,7 @@ class MainActivity : AppCompatActivity() {
         addView(LinearLayout(this@MainActivity).apply {
             orientation = LinearLayout.VERTICAL
             addView(titleText(exercise.name))
-            addView(metaText(exercise.primaryMuscle))
+            if (showMuscle) addView(metaText(exercise.primaryMuscle))
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         actions?.let(::addView)
     }
@@ -1579,13 +1591,16 @@ class MainActivity : AppCompatActivity() {
         text = label
         isAllCaps = false
         textSize = 14f
-        cornerRadius = dp(12)
+        cornerRadius = dp(3)
+        elevation = 0f
+        stateListAnimator = null
+        insetTop = 0
+        insetBottom = 0
+        strokeWidth = 0
         minHeight = dp(42)
         if (secondary) {
-            setBackgroundColor(color(R.color.charcoal_light))
+            setBackgroundColor(color(R.color.charcoal_surface_high))
             setTextColor(color(R.color.cream))
-            strokeColor = ContextCompat.getColorStateList(this@MainActivity, R.color.sage)
-            strokeWidth = dp(1)
         }
         setOnClickListener { action() }
     }
@@ -1875,7 +1890,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setGridColumnWidths(activeHold: Boolean, endWidth: Int): IntArray {
-        val totalWidth = (resources.configuration.screenWidthDp - 48).coerceAtLeast(280)
+        val totalWidth = (resources.configuration.screenWidthDp - 28).coerceAtLeast(280)
         return if (activeHold) {
             val fieldWidth = ((totalWidth - 48 - endWidth) / 3).coerceAtLeast(40)
             intArrayOf(48, fieldWidth, fieldWidth, totalWidth - 48 - endWidth - fieldWidth * 2, endWidth)

@@ -2,6 +2,7 @@
 <resources>
     <color name="charcoal">#171A1A</color>
     <color name="charcoal_light">#242828</color>
+    <color name="charcoal_surface_high">#303535</color>
     <color name="coral">#E8755E</color>
     <color name="coral_dark">#B34E3E</color>
     <color name="sage">#8EA89B</color>

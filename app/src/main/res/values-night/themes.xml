@@ -6,9 +6,17 @@
         <item name="colorSecondary">@color/sage</item>
         <item name="colorSecondaryVariant">@color/sage</item>
         <item name="colorOnSecondary">@color/charcoal</item>
+        <item name="shapeAppearanceSmallComponent">@style/ShapeAppearance.Lofit.Flat</item>
+        <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.Lofit.Flat</item>
+        <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.Lofit.Flat</item>
         <item name="android:fontFamily">sans</item>
         <item name="android:windowAnimationStyle">@null</item>
         <item name="android:navigationBarColor">@color/charcoal</item>
         <item name="android:statusBarColor">@color/charcoal</item>
+    </style>
+
+    <style name="ShapeAppearance.Lofit.Flat" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">3dp</item>
     </style>
 </resources>
