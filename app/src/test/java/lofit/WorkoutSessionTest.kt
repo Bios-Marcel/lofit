@@ -1,10 +1,24 @@
 package lofit
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class WorkoutSessionTest {
+    @Test
+    fun muscleGroups_coverCatalogAndNormalizeSelections() {
+        val catalogGroups = DefaultData.exercises().flatMap {
+            listOf(it.primaryMuscle) + it.secondaryMuscles.split(',')
+        }.map(String::trim).filter { it.isNotBlank() && it != "—" }
+
+        assert(catalogGroups.all { MuscleGroups.canonical(it) != null })
+        assertEquals(MuscleGroups.all.size, MuscleGroups.all.distinctBy(String::lowercase).size)
+        assertEquals("Glutes, Hamstrings", MuscleGroups.canonicalList("glutes, hamstrings"))
+        assertEquals("Glutes, Hamstrings", MuscleGroups.canonicalList("Glutes, Hamstrings, "))
+        assertNull(MuscleGroups.canonicalList("Not a muscle"))
+    }
+
     @Test
     fun moveExercise_reordersItemsAndIgnoresInvalidMoves() {
         val workout = WorkoutSession(

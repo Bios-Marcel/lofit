@@ -30,6 +30,9 @@ import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.CheckBox
 import android.widget.LinearLayout
+import android.widget.ArrayAdapter
+import android.widget.AutoCompleteTextView
+import android.widget.MultiAutoCompleteTextView
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.ScrollView
@@ -772,8 +775,8 @@ class MainActivity : AppCompatActivity() {
         val existing = exerciseId?.let(::exercise)
         return page(if (existing == null) "New exercise" else "Edit exercise", "Define how this movement is tracked.", back = true) { body ->
             val name = textField("Exercise name").apply { setText(existing?.name.orEmpty()) }
-            val primary = textField("Primary muscle").apply { setText(existing?.primaryMuscle.orEmpty()) }
-            val secondary = textField("Secondary muscles").apply { setText(existing?.secondaryMuscles.orEmpty()) }
+            val primary = muscleGroupField("Search primary muscle", existing?.primaryMuscle.orEmpty())
+            val secondary = muscleGroupField("Search secondary muscles", existing?.secondaryMuscles.orEmpty(), multiple = true)
             val equipment = textField("Equipment").apply { setText(existing?.equipment.orEmpty()) }
             val typeGroup = choiceGroup(ExerciseType.entries.map { it.label }, existing?.type?.ordinal ?: 0)
             val trackingGroup = choiceGroup(listOf("Track both sides together", "Track left and right"), if (existing?.asymmetric == true) 1 else 0)
@@ -788,8 +791,14 @@ class MainActivity : AppCompatActivity() {
             body.addView(restInput(restSeconds) { restSeconds = it })
             body.addView(fieldLabel("Hold cue")); body.addView(hold)
             body.addView(actionButton("Save exercise") {
-                if (name.text.isBlank() || primary.text.isBlank()) {
-                    Toast.makeText(this, "Name and primary muscle are required", Toast.LENGTH_SHORT).show()
+                val primaryMuscle = MuscleGroups.canonical(primary.text.toString())
+                val secondaryMuscles = MuscleGroups.canonicalList(secondary.text.toString())
+                if (name.text.isBlank() || primaryMuscle == null) {
+                    Toast.makeText(this, "Add a name and choose a primary muscle", Toast.LENGTH_SHORT).show()
+                    return@actionButton
+                }
+                if (secondaryMuscles == null) {
+                    Toast.makeText(this, "Choose secondary muscles from the list", Toast.LENGTH_SHORT).show()
                     return@actionButton
                 }
                 val movement = existing ?: Exercise(
@@ -797,15 +806,15 @@ class MainActivity : AppCompatActivity() {
                     name = name.text.toString().trim(),
                     type = ExerciseType.WEIGHTED_REPS,
                     asymmetric = false,
-                    primaryMuscle = primary.text.toString().trim(),
-                    secondaryMuscles = secondary.text.toString().trim(),
+                    primaryMuscle = primaryMuscle,
+                    secondaryMuscles = secondaryMuscles,
                     custom = true,
                 )
                 movement.name = name.text.toString().trim()
                 movement.type = ExerciseType.entries[selectedChoice(typeGroup)]
                 movement.asymmetric = selectedChoice(trackingGroup) == 1
-                movement.primaryMuscle = primary.text.toString().trim()
-                movement.secondaryMuscles = secondary.text.toString().trim()
+                movement.primaryMuscle = primaryMuscle
+                movement.secondaryMuscles = secondaryMuscles
                 movement.equipment = equipment.text.toString().trim()
                 movement.defaultRestSeconds = restSeconds
                 movement.minimumHoldSeconds = hold.text.toString().toIntOrNull()?.coerceIn(1, 3_600) ?: 30
@@ -1608,6 +1617,24 @@ class MainActivity : AppCompatActivity() {
         isSingleLine = true
         setTextColor(color(R.color.cream))
         setHintTextColor(color(R.color.sage))
+    }
+
+    private fun muscleGroupField(hint: String, value: String, multiple: Boolean = false): AutoCompleteTextView {
+        val field = if (multiple) MultiAutoCompleteTextView(this) else AutoCompleteTextView(this)
+        return field.apply {
+            this.hint = hint
+            isSingleLine = true
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
+            threshold = 0
+            setTextColor(color(R.color.cream))
+            setHintTextColor(color(R.color.sage))
+            setCompoundDrawablesWithIntrinsicBounds(0, 0, android.R.drawable.arrow_down_float, 0)
+            setAdapter(ArrayAdapter(this@MainActivity, android.R.layout.simple_dropdown_item_1line, MuscleGroups.all))
+            if (this is MultiAutoCompleteTextView) setTokenizer(MultiAutoCompleteTextView.CommaTokenizer())
+            setText(value, false)
+            contentDescription = hint
+            setOnClickListener { showDropDown() }
+        }
     }
 
     private fun numberField(hint: String): EditText = textField(hint).apply {
