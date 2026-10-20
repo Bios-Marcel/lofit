@@ -399,6 +399,85 @@ class WorkoutFlowTest {
     }
 
     @Test
+    fun historyEntry_canCreatePrefilledRoutine() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val repository = LofitRepository(instrumentation.targetContext)
+        repository.data.history.add(WorkoutSession(
+            name = "Push day",
+            completedAt = 200,
+            defaultRestSeconds = 120,
+            exercises = mutableListOf(WorkoutExercise(
+                exerciseId = "bench-press",
+                restSecondsOverride = 75,
+                sets = mutableListOf(
+                    LoggedSet(type = SetType.WARMUP, weightKg = 20.0, reps = 10),
+                    LoggedSet(type = SetType.NORMAL, weightKg = 67.5, reps = 6),
+                ),
+            )),
+        ))
+        repository.save()
+        val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        instrumentation.startActivitySync(intent)
+
+        onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+        onView(withText(R.string.nav_history)).perform(click())
+        onView(withContentDescription("Create routine from Push day")).perform(scrollTo(), click())
+
+        onView(withText("New routine")).check(matches(isDisplayed()))
+        onView(withHint("Routine name")).check(matches(withText("Push day")))
+        onView(withContentDescription("Set 1 weight")).check(matches(withText("20")))
+        onView(withContentDescription("Set 2 weight")).check(matches(withText("67.5")))
+        onView(withText("Save routine")).perform(scrollTo(), click())
+
+        val routine = LofitRepository(instrumentation.targetContext).data.routines.single()
+        assertEquals("Push day", routine.name)
+        assertEquals(120, routine.defaultRestSeconds)
+        assertEquals(75, routine.exercises.single().restSecondsOverride)
+        assertEquals(listOf(20.0, 67.5), routine.exercises.single().plannedSets.map { it.weightKg })
+        assertEquals(listOf(10, 6), routine.exercises.single().plannedSets.map { it.reps })
+    }
+
+    @Test
+    fun historyEntry_canContinueFinishedWorkout() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val repository = LofitRepository(instrumentation.targetContext)
+        val plannedSet = PlannedSet(weightKg = 67.5, reps = 6)
+        val workout = WorkoutSession(
+            name = "Push day",
+            startedAt = 100,
+            completedAt = 200,
+            exercises = mutableListOf(WorkoutExercise(
+                exerciseId = "bench-press",
+                sets = mutableListOf(LoggedSet(
+                    type = SetType.NORMAL,
+                    weightKg = 67.5,
+                    reps = 6,
+                    plannedSetId = plannedSet.id,
+                )),
+                plannedSets = mutableListOf(plannedSet),
+            )),
+        )
+        repository.data.history.add(workout)
+        repository.save()
+        val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        instrumentation.startActivitySync(intent)
+
+        onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+        onView(withText(R.string.nav_history)).perform(click())
+        onView(withContentDescription("Continue Push day")).perform(scrollTo(), click())
+
+        onView(withText("Workout in progress")).check(matches(isDisplayed()))
+        onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
+        onView(withContentDescription("Set 1 weight")).check(matches(withText("67.5")))
+        val savedData = LofitRepository(instrumentation.targetContext).data
+        assertEquals(workout.id, savedData.activeWorkout?.id)
+        assertEquals(null, savedData.activeWorkout?.completedAt)
+        assertEquals(0, savedData.history.size)
+    }
+
+    @Test
     fun holdTimer_runsInsideWorkoutSetRow() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val repository = LofitRepository(instrumentation.targetContext)

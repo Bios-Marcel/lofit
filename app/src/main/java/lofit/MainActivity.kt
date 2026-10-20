@@ -841,6 +841,18 @@ class MainActivity : AppCompatActivity() {
                         addView(horizontalActions(exerciseThumbnail(movement, dp(64), dp(48)), metaText("${movement.name}: ${item.sets.size} sets")))
                     }
                 }
+                addView(actionButton("Continue workout") {
+                    continueHistoryWorkout(workout)
+                }.apply {
+                    contentDescription = "Continue ${workout.name}"
+                })
+                addView(actionButton("Create routine", secondary = true) {
+                    routineDraft = workout.toRoutine()
+                    route = Route.RoutineEditor(null)
+                    render()
+                }.apply {
+                    contentDescription = "Create routine from ${workout.name}"
+                })
             })
         }
         body.addView(sectionTitle("App data"))
@@ -1013,7 +1025,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun cancelRoutineEditor() {
         routineDraft = null
-        currentScreen = Screen.ROUTINES
         route = Route.Root
         render()
     }
@@ -1046,6 +1057,19 @@ class MainActivity : AppCompatActivity() {
         )
         repository.save()
         ensureWorkoutNotification()
+        currentScreen = Screen.WORKOUT
+        route = Route.Root
+        render()
+    }
+
+    private fun continueHistoryWorkout(workout: WorkoutSession) {
+        if (repository.data.activeWorkout != null) {
+            Toast.makeText(this, "Finish or discard the active workout first", Toast.LENGTH_SHORT).show()
+        } else {
+            repository.data.resumeWorkout(workout.id)
+            repository.save()
+            ensureWorkoutNotification()
+        }
         currentScreen = Screen.WORKOUT
         route = Route.Root
         render()

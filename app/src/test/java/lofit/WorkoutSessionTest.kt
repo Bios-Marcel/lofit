@@ -37,6 +37,62 @@ class WorkoutSessionTest {
     }
 
     @Test
+    fun historyWorkout_convertsCompletedWorkToRoutine() {
+        val firstPlannedSet = PlannedSet(weightKg = 60.0, reps = 8)
+        val secondPlannedSet = PlannedSet(type = SetType.FAILURE, weightKg = 70.0, reps = 4, side = Side.RIGHT)
+        val workout = WorkoutSession(
+            name = "Push day",
+            defaultRestSeconds = 120,
+            exercises = mutableListOf(
+                WorkoutExercise(
+                    exerciseId = "bench-press",
+                    restSecondsOverride = 75,
+                    plannedSets = mutableListOf(firstPlannedSet, secondPlannedSet),
+                    sets = mutableListOf(
+                        LoggedSet(type = secondPlannedSet.type, weightKg = 72.5, reps = 3, side = secondPlannedSet.side, plannedSetId = secondPlannedSet.id),
+                        LoggedSet(type = firstPlannedSet.type, weightKg = 62.5, reps = 7, plannedSetId = firstPlannedSet.id),
+                    ),
+                ),
+                WorkoutExercise(exerciseId = "plank"),
+            ),
+        )
+
+        val routine = workout.toRoutine()
+
+        assertEquals("Push day", routine.name)
+        assertEquals(120, routine.defaultRestSeconds)
+        assertEquals(1, routine.exercises.size)
+        assertEquals(75, routine.exercises.single().restSecondsOverride)
+        assertEquals(listOf(62.5, 72.5), routine.exercises.single().plannedSets.map { it.weightKg })
+        assertEquals(listOf(7, 3), routine.exercises.single().plannedSets.map { it.reps })
+        assertEquals(listOf(SetType.NORMAL, SetType.FAILURE), routine.exercises.single().plannedSets.map { it.type })
+        assertEquals(listOf(Side.BOTH, Side.RIGHT), routine.exercises.single().plannedSets.map { it.side })
+    }
+
+    @Test
+    fun finishedWorkout_resumesAtItsPreviousElapsedTime() {
+        val finished = WorkoutSession(
+            name = "Paused",
+            startedAt = 1_000,
+            completedAt = 6_000,
+            exercises = mutableListOf(WorkoutExercise(
+                exerciseId = "bench-press",
+                sets = mutableListOf(LoggedSet(type = SetType.NORMAL, weightKg = 60.0, reps = 8)),
+            )),
+        )
+        val data = AppData(history = mutableListOf(finished))
+
+        val resumed = data.resumeWorkout(finished.id, resumedAt = 20_000)
+
+        assertEquals(finished.id, resumed?.id)
+        assertEquals(15_000L, resumed?.startedAt)
+        assertEquals(null, resumed?.completedAt)
+        assertEquals(1, resumed?.setCount())
+        assertEquals(resumed, data.activeWorkout)
+        assertEquals(0, data.history.size)
+    }
+
+    @Test
     fun totals_includeAllLoggedSets() {
         val workout = WorkoutSession(
             name = "Volume",

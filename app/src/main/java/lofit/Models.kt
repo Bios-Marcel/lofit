@@ -108,6 +108,33 @@ data class WorkoutSession(
 
     fun totalVolume(): Double = exercises.sumOf { item -> item.sets.sumOf(LoggedSet::volume) }
     fun setCount(): Int = exercises.sumOf { it.sets.size }
+
+    fun toRoutine(): Routine = Routine(
+        name = name,
+        defaultRestSeconds = defaultRestSeconds,
+        exercises = exercises.mapNotNull { item ->
+            val plannedSetOrder = item.plannedSets.mapIndexed { index, set -> set.id to index }.toMap()
+            val sets = item.sets.sortedBy { plannedSetOrder[it.plannedSetId] ?: Int.MAX_VALUE }
+            if (sets.isEmpty()) return@mapNotNull null
+            val plannedSets = sets.map { set ->
+                PlannedSet(
+                    type = set.type,
+                    weightKg = set.weightKg,
+                    reps = set.reps,
+                    holdSeconds = set.holdSeconds,
+                    side = set.side,
+                )
+            }.toMutableList()
+            RoutineExercise(
+                exerciseId = item.exerciseId,
+                targetSets = plannedSets.size,
+                targetReps = plannedSets.first().reps,
+                targetHoldSeconds = plannedSets.first().holdSeconds,
+                restSecondsOverride = item.restSecondsOverride,
+                plannedSets = plannedSets,
+            )
+        }.toMutableList(),
+    )
 }
 
 data class Routine(
@@ -140,6 +167,18 @@ data class AppData(
     val history: MutableList<WorkoutSession> = mutableListOf(),
     var activeWorkout: WorkoutSession? = null,
 ) {
+    fun resumeWorkout(workoutId: String, resumedAt: Long = System.currentTimeMillis()): WorkoutSession? {
+        if (activeWorkout != null) return null
+        val historyIndex = history.indexOfFirst { it.id == workoutId }
+        if (historyIndex < 0) return null
+        val finishedWorkout = history.removeAt(historyIndex)
+        val elapsed = ((finishedWorkout.completedAt ?: resumedAt) - finishedWorkout.startedAt).coerceAtLeast(0)
+        return finishedWorkout.copy(
+            startedAt = resumedAt - elapsed,
+            completedAt = null,
+        ).also { activeWorkout = it }
+    }
+
     fun lastKnownSets(exerciseId: String): MutableList<PlannedSet>? = history
         .withIndex()
         .sortedWith(
