@@ -113,8 +113,15 @@ class WorkoutFlowTest {
         onView(withContentDescription("Set 1 Repetitions")).perform(replaceText("10"), closeSoftKeyboard())
         onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
         onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
-        assert(notificationManager.activeNotifications.single().notification.extras
-            .getCharSequence(Notification.EXTRA_TEXT).toString().contains("Rest"))
+        val restNotification = notificationManager.activeNotifications.single().notification
+        assert(restNotification.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains("Rest"))
+        assertEquals(listOf("−15s", "+15s", "Skip"), restNotification.actions.map { it.title.toString() })
+        restNotification.actions.single { it.title.toString() == "Skip" }.actionIntent.send()
+        instrumentation.waitForIdleSync()
+        val skippedNotification = notificationManager.activeNotifications.single().notification
+        assert(!skippedNotification.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains("Rest"))
+        assertEquals(0, skippedNotification.actions?.size ?: 0)
+        onView(withContentDescription("Rest timer overlay")).check(matches(not(isDisplayed())))
         onView(withText("Add set")).perform(scrollTo(), click())
         onView(withContentDescription("Set 2 weight")).check(matches(withText("20")))
         onView(withContentDescription("Set 2 Repetitions")).check(matches(withText("10")))

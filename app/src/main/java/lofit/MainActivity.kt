@@ -5,8 +5,10 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
@@ -69,6 +71,9 @@ class MainActivity : AppCompatActivity() {
     private companion object {
         const val WORKOUT_NOTIFICATION_CHANNEL = "active-workout"
         const val WORKOUT_NOTIFICATION_ID = 1
+        const val ACTION_SUBTRACT_REST = "lofit.action.SUBTRACT_REST"
+        const val ACTION_ADD_REST = "lofit.action.ADD_REST"
+        const val ACTION_SKIP_REST = "lofit.action.SKIP_REST"
     }
 
     private enum class Screen { WORKOUT, ROUTINES, EXERCISES, RECORDS, HISTORY }
@@ -109,6 +114,15 @@ class MainActivity : AppCompatActivity() {
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) updateWorkoutNotification(force = true)
     }
+    private val notificationActionReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                ACTION_SUBTRACT_REST -> subtractRest()
+                ACTION_ADD_REST -> addRest()
+                ACTION_SKIP_REST -> skipRest()
+            }
+        }
+    }
 
     private val tick = object : Runnable {
         override fun run() {
@@ -133,6 +147,16 @@ class MainActivity : AppCompatActivity() {
             }
         })
         createWorkoutNotificationChannel()
+        ContextCompat.registerReceiver(
+            this,
+            notificationActionReceiver,
+            IntentFilter().apply {
+                addAction(ACTION_SUBTRACT_REST)
+                addAction(ACTION_ADD_REST)
+                addAction(ACTION_SKIP_REST)
+            },
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
         buildShell()
         render()
         if (repository.data.activeWorkout != null) ensureWorkoutNotification()
@@ -141,6 +165,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         handler.removeCallbacks(tick)
+        unregisterReceiver(notificationActionReceiver)
         super.onDestroy()
     }
 
@@ -1124,18 +1149,30 @@ class MainActivity : AppCompatActivity() {
             setTypeface(typeface, Typeface.BOLD)
         }
         addView(restTimeText, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        addView(smallButton("−15") {
-            restEndsAt = max(SystemClock.elapsedRealtime(), restEndsAt - 15_000L)
-            updateRestBar()
-        }, LinearLayout.LayoutParams(dp(64), dp(48)))
-        addView(smallButton("+15") {
-            if (restEndsAt > 0L) restEndsAt += 15_000L
-            updateRestBar()
-        }, LinearLayout.LayoutParams(dp(64), dp(48)).apply { marginStart = dp(6) })
-        addView(smallButton("Skip") {
-            restEndsAt = 0L
-            updateRestBar()
-        }, LinearLayout.LayoutParams(dp(72), dp(48)).apply { marginStart = dp(6) })
+        addView(smallButton("−15", ::subtractRest), LinearLayout.LayoutParams(dp(64), dp(48)))
+        addView(smallButton("+15", ::addRest), LinearLayout.LayoutParams(dp(64), dp(48)).apply { marginStart = dp(6) })
+        addView(smallButton("Skip", ::skipRest), LinearLayout.LayoutParams(dp(72), dp(48)).apply { marginStart = dp(6) })
+    }
+
+    private fun subtractRest() {
+        if (restEndsAt <= 0L) return
+        restEndsAt = max(SystemClock.elapsedRealtime(), restEndsAt - 15_000L)
+        updateRestBar()
+        updateWorkoutNotification(force = true)
+    }
+
+    private fun addRest() {
+        if (restEndsAt <= 0L) return
+        restEndsAt += 15_000L
+        updateRestBar()
+        updateWorkoutNotification(force = true)
+    }
+
+    private fun skipRest() {
+        if (restEndsAt <= 0L) return
+        restEndsAt = 0L
+        updateRestBar()
+        updateWorkoutNotification(force = true)
     }
 
     private fun updateRestBar() {
@@ -1337,7 +1374,7 @@ class MainActivity : AppCompatActivity() {
             Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        manager.notify(WORKOUT_NOTIFICATION_ID, NotificationCompat.Builder(this, WORKOUT_NOTIFICATION_CHANNEL)
+        val notification = NotificationCompat.Builder(this, WORKOUT_NOTIFICATION_CHANNEL)
             .setSmallIcon(R.drawable.ic_workout_notification)
             .setContentTitle(title)
             .setContentText(detail)
@@ -1348,8 +1385,21 @@ class MainActivity : AppCompatActivity() {
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setWhen(workout.startedAt)
             .setUsesChronometer(restSeconds == 0)
-            .build())
+        if (restSeconds > 0) {
+            notification
+                .addAction(0, "−15s", restAction(ACTION_SUBTRACT_REST, 1))
+                .addAction(0, "+15s", restAction(ACTION_ADD_REST, 2))
+                .addAction(0, "Skip", restAction(ACTION_SKIP_REST, 3))
+        }
+        manager.notify(WORKOUT_NOTIFICATION_ID, notification.build())
     }
+
+    private fun restAction(action: String, requestCode: Int): PendingIntent = PendingIntent.getBroadcast(
+        this,
+        requestCode,
+        Intent(action).setPackage(packageName),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
 
     private fun prescriptionSummary(routine: Routine): View = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
