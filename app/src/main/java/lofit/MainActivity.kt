@@ -562,10 +562,6 @@ class MainActivity : AppCompatActivity() {
                 draft.defaultRestSeconds = seconds
             })
             body.addView(sectionTitle("Exercises"))
-            body.addView(actionButton("Search and add exercise") {
-                route = Route.ExercisePicker(PickerTarget.ROUTINE)
-                render()
-            })
             val exerciseCards = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
             val cardViews = mutableMapOf<String, View>()
             val updateActionStates = mutableMapOf<String, (Boolean, Boolean) -> Unit>()
@@ -668,6 +664,11 @@ class MainActivity : AppCompatActivity() {
                 cardViews[item.id] = exerciseCard
                 exerciseCards.addView(exerciseCard)
             }
+            body.addView(actionButton("Add Exercise") {
+                route = Route.ExercisePicker(PickerTarget.ROUTINE)
+                render()
+            })
+            body.addView(divider("Routine actions separator"))
             body.addView(actionButton("Save routine") {
                 if (draft.name.isBlank()) {
                     Toast.makeText(this, "Give the routine a name", Toast.LENGTH_SHORT).show()
@@ -1619,10 +1620,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun sectionTitle(value: String): TextView = titleText(value).apply { setPadding(0, dp(14), 0, dp(6)) }
-    private fun divider(): View = View(this).apply {
+    private fun divider(description: String = "Workout actions separator"): View = View(this).apply {
         setBackgroundColor(color(R.color.sage))
         alpha = 0.45f
-        contentDescription = "Workout actions separator"
+        contentDescription = description
         layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1)).apply {
             topMargin = dp(14)
             bottomMargin = dp(14)

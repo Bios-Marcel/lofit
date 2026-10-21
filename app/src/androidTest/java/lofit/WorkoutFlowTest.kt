@@ -36,6 +36,7 @@ import org.hamcrest.Matchers.not
 import org.junit.Before
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -450,6 +451,21 @@ class WorkoutFlowTest {
         onView(withHint("Routine name")).check(matches(withText("Push day")))
         onView(withContentDescription("Set 1 weight")).check(matches(withText("20")))
         onView(withContentDescription("Set 2 weight")).check(matches(withText("67.5")))
+        onView(withText("Add Exercise")).perform(scrollTo())
+        var exerciseCardBottom = 0
+        onView(withText("Bench press")).check { view, _ ->
+            var ancestor = view.parent
+            while (ancestor !is MaterialCardView) ancestor = ancestor.parent
+            val cardLocation = IntArray(2)
+            ancestor.getLocationOnScreen(cardLocation)
+            exerciseCardBottom = cardLocation[1] + ancestor.height
+        }
+        onView(withText("Add Exercise")).check { view, _ ->
+            val buttonLocation = IntArray(2)
+            view.getLocationOnScreen(buttonLocation)
+            assertTrue(buttonLocation[1] >= exerciseCardBottom)
+        }
+        onView(withContentDescription("Routine actions separator")).check(matches(isDisplayed()))
         onView(withText("Save routine")).perform(scrollTo(), click())
 
         val routine = LofitRepository(instrumentation.targetContext).data.routines.single()
