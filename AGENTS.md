@@ -15,6 +15,7 @@
 ## Android Device
 
 - Deploy: [`scripts/deploy.sh`](scripts/deploy.sh)
+- Deploy release to physical phone: [`scripts/deploy-release.sh`](scripts/deploy-release.sh)
 - Restart: [`scripts/restart.sh`](scripts/restart.sh)
 - Stop: [`scripts/stop.sh`](scripts/stop.sh)
 - Set `ANDROID_SERIAL` when more than one device is connected.
@@ -24,6 +25,7 @@ Run:
 
 ```sh
 ./scripts/deploy.sh
+./scripts/deploy-release.sh
 ./scripts/restart.sh
 ./scripts/stop.sh
 ```

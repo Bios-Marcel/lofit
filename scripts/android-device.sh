@@ -5,8 +5,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SDK_DIR="$(sed -n 's/^sdk.dir=//p' "$ROOT_DIR/local.properties")"
 ADB="$SDK_DIR/platform-tools/adb"
-PACKAGE_NAME="lofit.app.test"
-ACTIVITY_NAME="$PACKAGE_NAME/lofit.MainActivity"
+PACKAGE_NAME="${PACKAGE_NAME:-lofit.app.test}"
+ACTIVITY_NAME="${ACTIVITY_NAME:-$PACKAGE_NAME/lofit.MainActivity}"
 
 if [[ ! -x "$ADB" ]]; then
     echo "adb not found: $ADB" >&2
