@@ -23,6 +23,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.text.InputType
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -83,6 +84,41 @@ class MainActivity : AppCompatActivity() {
     private enum class Screen { WORKOUT, ROUTINES, EXERCISES, RECORDS, HISTORY, SETTINGS }
     private enum class PickerTarget { WORKOUT, ROUTINE }
     private enum class ConfirmAction { FINISH_WORKOUT, DISCARD_WORKOUT, DELETE_EXERCISE, DELETE_ROUTINE, RESET_DATA }
+
+    private inner class SwipeRevealRow(
+        private val revealWidth: Int,
+    ) : HorizontalScrollView(this@MainActivity) {
+        private var touchStartX = 0f
+
+        init {
+            isHorizontalScrollBarEnabled = false
+            overScrollMode = View.OVER_SCROLL_NEVER
+        }
+
+        override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
+            if (event.actionMasked == MotionEvent.ACTION_DOWN) touchStartX = event.x
+            return super.onInterceptTouchEvent(event)
+        }
+
+        override fun onTouchEvent(event: MotionEvent): Boolean {
+            if (event.actionMasked == MotionEvent.ACTION_DOWN) touchStartX = event.x
+            val handled = super.onTouchEvent(event)
+            if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) {
+                val swipeDistance = touchStartX - event.x
+                val open = when {
+                    swipeDistance > dp(24) -> true
+                    swipeDistance < -dp(24) -> false
+                    else -> scrollX >= revealWidth / 2
+                }
+                post { smoothScrollTo(if (open) revealWidth else 0, 0) }
+            }
+            return handled
+        }
+
+        override fun fling(velocityX: Int) {
+            smoothScrollTo(if (velocityX > 0) revealWidth else 0, 0)
+        }
+    }
 
     private sealed class Route {
         data object Root : Route()
@@ -1926,7 +1962,7 @@ class MainActivity : AppCompatActivity() {
             rowCount = 1
             alignmentMode = GridLayout.ALIGN_BOUNDS
             useDefaultMargins = false
-            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(64))
+            layoutParams = LinearLayout.LayoutParams(setTableWidth(), dp(64))
             setPadding(
                 dp(SET_ROW_PADDING_DP),
                 dp(SET_ROW_PADDING_DP),
@@ -1951,10 +1987,10 @@ class MainActivity : AppCompatActivity() {
         var deleteButton: MaterialButton? = null
         var deleteBelowButton: MaterialButton? = null
         if (onRemove != null || onRemoveAndBelow != null) {
-            val row = HorizontalScrollView(this@MainActivity).apply {
+            val revealWidth = (if (onRemove != null) dp(92) else 0) +
+                (if (onRemoveAndBelow != null) dp(128) else 0)
+            val row = SwipeRevealRow(revealWidth).apply {
                 contentDescription = "Set ${currentSetIndex + 1} row"
-                isHorizontalScrollBarEnabled = false
-                overScrollMode = View.OVER_SCROLL_NEVER
                 addView(LinearLayout(this@MainActivity).apply {
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.CENTER_VERTICAL
@@ -2026,7 +2062,7 @@ class MainActivity : AppCompatActivity() {
             dp(SET_ROW_PADDING_DP),
             dp(SET_ROW_PADDING_DP),
         )
-        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(38)).apply {
+        layoutParams = LinearLayout.LayoutParams(setTableWidth(), dp(38)).apply {
             topMargin = dp(8)
         }
         addView(setGridHeader("Set"), setGridCell(columns[0]))
@@ -2065,6 +2101,8 @@ class MainActivity : AppCompatActivity() {
             intArrayOf(48, fieldWidth, 44, totalWidth - 48 - 44 - 40 - endWidth - fieldWidth, 40, endWidth)
         }
     }
+
+    private fun setTableWidth(): Int = resources.displayMetrics.widthPixels - dp(14) * 2
 
     private fun setGridCell(widthDp: Int, heightDp: Int? = null) = GridLayout.LayoutParams().apply {
         width = dp(widthDp)
