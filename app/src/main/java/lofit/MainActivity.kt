@@ -2026,7 +2026,9 @@ class MainActivity : AppCompatActivity() {
             dp(SET_ROW_PADDING_DP),
             dp(SET_ROW_PADDING_DP),
         )
-        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(38))
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(38)).apply {
+            topMargin = dp(8)
+        }
         addView(setGridHeader("Set"), setGridCell(columns[0]))
         if (activeGrid) {
             addView(setGridHeader("Weight"), setGridCell(columns[1]))
