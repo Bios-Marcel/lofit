@@ -94,7 +94,7 @@ data class WorkoutSession(
     val name: String,
     val startedAt: Long = System.currentTimeMillis(),
     var completedAt: Long? = null,
-    var defaultRestSeconds: Int = 90,
+    var defaultRestSeconds: Int = 120,
     val exercises: MutableList<WorkoutExercise> = mutableListOf(),
 ) {
     fun moveExercise(from: Int, to: Int) {
@@ -136,7 +136,7 @@ data class WorkoutSession(
 data class Routine(
     val id: String = UUID.randomUUID().toString(),
     var name: String,
-    var defaultRestSeconds: Int = 90,
+    var defaultRestSeconds: Int = 120,
     val exercises: MutableList<RoutineExercise> = mutableListOf(),
 )
 

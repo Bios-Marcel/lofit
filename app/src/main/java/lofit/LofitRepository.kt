@@ -132,7 +132,7 @@ class LofitRepository(context: Context) {
     private fun decodeRoutine(value: JSONObject) = Routine(
         value.getString("id"),
         value.getString("name"),
-        value.optInt("defaultRestSeconds", 90),
+        value.optInt("defaultRestSeconds", 120),
         value.getJSONArray("exercises").mapObjects { item ->
             val targetSets = item.optInt("targetSets", 3)
             val targetReps = item.optInt("targetReps", 8)
@@ -156,7 +156,7 @@ class LofitRepository(context: Context) {
         value.getString("name"),
         value.getLong("startedAt"),
         value.optLong("completedAt").takeIf { !value.isNull("completedAt") },
-        value.optInt("defaultRestSeconds", 90),
+        value.optInt("defaultRestSeconds", 120),
         value.getJSONArray("exercises").mapObjects { item ->
             val loggedSets = item.optJSONArray("sets")?.mapObjects { set ->
                 LoggedSet(
