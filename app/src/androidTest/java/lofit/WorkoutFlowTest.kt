@@ -188,6 +188,21 @@ class WorkoutFlowTest {
     }
 
     @Test
+    fun exerciseSearch_matchesEveryPartialWordIgnoringCase() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val activity = instrumentation.startActivitySync(intent)
+
+        onView(withText(R.string.start_workout)).perform(click())
+        onView(withText("Add exercise")).perform(scrollTo(), click())
+        onView(withHint("Search name or muscle")).perform(replaceText("SqUa BACK"), closeSoftKeyboard())
+        onView(withText("Add Back squat")).check(matches(isDisplayed()))
+
+        activity.finish()
+    }
+
+    @Test
     fun addingExercise_keepsWorkoutScrollPosition() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val intent = Intent(instrumentation.targetContext, MainActivity::class.java)

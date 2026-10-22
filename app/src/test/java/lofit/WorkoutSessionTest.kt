@@ -7,6 +7,15 @@ import org.junit.Test
 
 class WorkoutSessionTest {
     @Test
+    fun search_matchesEachWordAcrossFieldsIgnoringCase() {
+        assert(matchesSearchQuery("CURL dumb", "Dumbbell curl", "Biceps"))
+        assert(matchesSearchQuery("dumb bic", "Dumbbell curl", "Biceps"))
+        assert(matchesSearchQuery("  dumb   BIC  ", "Dumbbell curl", "Biceps"))
+        assert(!matchesSearchQuery("dumb tri", "Dumbbell curl", "Biceps"))
+        assert(matchesSearchQuery("", "Dumbbell curl", "Biceps"))
+    }
+
+    @Test
     fun muscleGroups_coverCatalogAndNormalizeSelections() {
         val catalogGroups = DefaultData.exercises().flatMap {
             listOf(it.primaryMuscle) + it.secondaryMuscles.split(',')

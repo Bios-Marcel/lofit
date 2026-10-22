@@ -27,6 +27,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.EditText
+import android.widget.Filter
 import android.widget.FrameLayout
 import android.widget.GridLayout
 import android.widget.HorizontalScrollView
@@ -751,10 +752,8 @@ class MainActivity : AppCompatActivity() {
         val results = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         fun updateResults(query: String) {
             results.removeAllViews()
-            val normalized = query.trim().lowercase(Locale.getDefault())
             val allMatches = repository.data.exercises.filter { exercise ->
-                normalized.isBlank() || listOf(exercise.name, exercise.primaryMuscle, exercise.secondaryMuscles, exercise.type.label)
-                    .any { it.lowercase(Locale.getDefault()).contains(normalized) }
+                matchesSearchQuery(query, exercise.name, exercise.primaryMuscle, exercise.secondaryMuscles, exercise.type.label)
             }
             val matches = allMatches.take(40)
             if (matches.isEmpty()) results.addView(emptyText("No matching exercises."))
@@ -803,10 +802,8 @@ class MainActivity : AppCompatActivity() {
         val results = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         fun updateResults(query: String) {
             results.removeAllViews()
-            val normalized = query.trim().lowercase(Locale.getDefault())
             val allMatches = repository.data.exercises.filter { movement ->
-                normalized.isBlank() || listOf(movement.name, movement.primaryMuscle, movement.secondaryMuscles, movement.type.label)
-                    .any { it.lowercase(Locale.getDefault()).contains(normalized) }
+                matchesSearchQuery(query, movement.name, movement.primaryMuscle, movement.secondaryMuscles, movement.type.label)
             }
             val matches = allMatches.take(40)
             if (allMatches.size > matches.size) results.addView(metaText("Showing 40 of ${allMatches.size}. Search to narrow the list."))
@@ -1773,13 +1770,37 @@ class MainActivity : AppCompatActivity() {
             setPadding(dp(12), 0, dp(12), 0)
             setOnFocusChangeListener { view, focused -> view.background = fieldBackground(focused) }
             setCompoundDrawablesWithIntrinsicBounds(0, 0, android.R.drawable.arrow_down_float, 0)
-            setAdapter(ArrayAdapter(this@MainActivity, android.R.layout.simple_dropdown_item_1line, MuscleGroups.all))
+            setAdapter(searchAdapter(MuscleGroups.all))
             if (this is MultiAutoCompleteTextView) setTokenizer(MultiAutoCompleteTextView.CommaTokenizer())
             setText(value, false)
             contentDescription = hint
             setOnClickListener { showDropDown() }
         }
     }
+
+    private fun searchAdapter(sourceValues: List<String>): ArrayAdapter<String> =
+        object : ArrayAdapter<String>(this, android.R.layout.simple_dropdown_item_1line, sourceValues.toMutableList()) {
+            private val wordFilter = object : Filter() {
+                override fun performFiltering(constraint: CharSequence?): FilterResults {
+                    val matches = sourceValues.filter { matchesSearchQuery(constraint?.toString().orEmpty(), it) }
+                    return FilterResults().apply {
+                        values = matches
+                        count = matches.size
+                    }
+                }
+
+                override fun publishResults(constraint: CharSequence?, results: FilterResults?) {
+                    @Suppress("UNCHECKED_CAST")
+                    val matches = results?.values as? List<String> ?: emptyList()
+                    setNotifyOnChange(false)
+                    clear()
+                    addAll(matches)
+                    notifyDataSetChanged()
+                }
+            }
+
+            override fun getFilter(): Filter = wordFilter
+        }
 
     private fun numberField(hint: String): EditText = textField(hint).apply {
         inputType = InputType.TYPE_CLASS_NUMBER
