@@ -29,3 +29,11 @@ Run:
 ./scripts/restart.sh
 ./scripts/stop.sh
 ```
+
+## UI / UX
+
+Unless asked otherwise, follow these rules:
+
+* No `back` buttons
+* No useless explanation labels
+

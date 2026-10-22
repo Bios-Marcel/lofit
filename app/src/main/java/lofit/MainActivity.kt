@@ -613,7 +613,6 @@ class MainActivity : AppCompatActivity() {
         return page(
             if (originalId == null) "New routine" else "Edit routine",
             if (originalId == null) null else "Set the exact work you intend to do.",
-            back = originalId != null,
         ) { body ->
             val name = textField("Routine name").apply {
                 setText(draft.name)
@@ -834,7 +833,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun exerciseEditorScreen(exerciseId: String?): View {
         val existing = exerciseId?.let(::exercise)
-        return page(if (existing == null) "New exercise" else "Edit exercise", "Define how this movement is tracked.", back = true) { body ->
+        return page(if (existing == null) "New exercise" else "Edit exercise", "Define how this movement is tracked.") { body ->
             val name = textField("Exercise name").apply { setText(existing?.name.orEmpty()) }
             val primary = muscleGroupField("Search primary muscle", existing?.primaryMuscle.orEmpty())
             val secondary = muscleGroupField("Search secondary muscles", existing?.secondaryMuscles.orEmpty(), multiple = true)
@@ -1019,7 +1018,7 @@ class MainActivity : AppCompatActivity() {
             ConfirmAction.DELETE_ROUTINE -> Triple("Delete routine?", "The routine will be removed. Workout history is unaffected.", "Delete routine")
             ConfirmAction.RESET_DATA -> Triple("Reset all app data?", "This permanently removes workout history, routines, custom exercises, and the active workout.", "Reset everything")
         }
-        return page(title, message, back = true) { body ->
+        return page(title, message) { body ->
             body.addView(actionButton(buttonLabel) {
                 when (confirm.action) {
                     ConfirmAction.FINISH_WORKOUT -> repository.data.activeWorkout?.let { workout ->
@@ -1466,7 +1465,6 @@ class MainActivity : AppCompatActivity() {
     private fun page(
         title: String,
         subtitle: String? = null,
-        back: Boolean = false,
         headerEnd: View? = null,
         build: (LinearLayout) -> Unit,
     ): View {
@@ -1474,9 +1472,6 @@ class MainActivity : AppCompatActivity() {
         val body = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(14), dp(10), dp(14), dp(20))
-        }
-        if (back) {
-            body.addView(actionButton("← Back", secondary = true) { navigateBack() }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(40)))
         }
         body.addView(LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
