@@ -39,6 +39,7 @@ import android.widget.MultiAutoCompleteTextView
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.ScrollView
+import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
@@ -78,7 +79,7 @@ class MainActivity : AppCompatActivity() {
         const val SET_ROW_PADDING_DP = 4
     }
 
-    private enum class Screen { WORKOUT, ROUTINES, EXERCISES, RECORDS, HISTORY }
+    private enum class Screen { WORKOUT, ROUTINES, EXERCISES, RECORDS, HISTORY, SETTINGS }
     private enum class PickerTarget { WORKOUT, ROUTINE }
     private enum class ConfirmAction { FINISH_WORKOUT, DISCARD_WORKOUT, DELETE_EXERCISE, DELETE_ROUTINE, RESET_DATA }
 
@@ -212,6 +213,7 @@ class MainActivity : AppCompatActivity() {
             Screen.EXERCISES to getString(R.string.nav_exercises),
             Screen.RECORDS to getString(R.string.nav_records),
             Screen.HISTORY to getString(R.string.nav_history),
+            Screen.SETTINGS to getString(R.string.nav_settings),
         ).forEach { (screen, label) ->
             addView(actionButton(label, secondary = true) {
                 currentScreen = screen
@@ -262,6 +264,47 @@ class MainActivity : AppCompatActivity() {
         Screen.EXERCISES -> exercisesScreen()
         Screen.RECORDS -> recordsScreen()
         Screen.HISTORY -> historyScreen()
+        Screen.SETTINGS -> settingsScreen()
+    }
+
+    private fun settingsScreen(): View = page("Settings", "Control how Lofit behaves.") { body ->
+        body.addView(card {
+            addView(LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                addView(LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    addView(titleText("Sound cues"))
+                    addView(metaText("Play rest and hold cues, even in silent or vibration mode."))
+                }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                    marginEnd = dp(12)
+                })
+                addView(Switch(this@MainActivity).apply {
+                    isChecked = repository.data.soundCuesEnabled
+                    showText = false
+                    textOn = "On"
+                    textOff = "Off"
+                    isClickable = true
+                    isFocusable = true
+                    minWidth = dp(72)
+                    textSize = 14f
+                    setTextColor(color(R.color.cream))
+                    thumbTintList = ColorStateList.valueOf(color(R.color.cream))
+                    trackTintList = ColorStateList(
+                        arrayOf(
+                            intArrayOf(android.R.attr.state_checked),
+                            intArrayOf(),
+                        ),
+                        intArrayOf(color(R.color.coral_dark), color(R.color.sage)),
+                    )
+                    contentDescription = "Sound cues"
+                    setOnCheckedChangeListener { _, enabled ->
+                        repository.data.soundCuesEnabled = enabled
+                        repository.save()
+                    }
+                })
+            })
+        })
     }
 
     private fun workoutHome(): View = page("Ready to move?", "Local, focused, yours.") { body ->
@@ -1295,7 +1338,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun playCue(tone: Int, durationMs: Int = 300, volume: Int = 80) {
-        val generator = ToneGenerator(AudioManager.STREAM_NOTIFICATION, volume)
+        if (!repository.data.soundCuesEnabled) return
+        val generator = ToneGenerator(AudioManager.STREAM_ALARM, volume)
         generator.startTone(tone, durationMs)
         handler.postDelayed({ generator.release() }, durationMs + 200L)
     }

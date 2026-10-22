@@ -166,6 +166,7 @@ data class AppData(
     val routines: MutableList<Routine> = mutableListOf(),
     val history: MutableList<WorkoutSession> = mutableListOf(),
     var activeWorkout: WorkoutSession? = null,
+    var soundCuesEnabled: Boolean = true,
 ) {
     fun resumeWorkout(workoutId: String, resumedAt: Long = System.currentTimeMillis()): WorkoutSession? {
         if (activeWorkout != null) return null

@@ -29,6 +29,7 @@ class LofitRepository(context: Context) {
         put("routines", JSONArray().apply { data.routines.forEach { put(encodeRoutine(it)) } })
         put("history", JSONArray().apply { data.history.forEach { put(encodeWorkout(it)) } })
         put("activeWorkout", data.activeWorkout?.let(::encodeWorkout) ?: JSONObject.NULL)
+        put("soundCuesEnabled", data.soundCuesEnabled)
     }
 
     private fun encodeExercise(exercise: Exercise) = JSONObject().apply {
@@ -108,7 +109,13 @@ class LofitRepository(context: Context) {
         val routines = root.optJSONArray("routines")?.mapObjects(::decodeRoutine)?.toMutableList() ?: mutableListOf()
         val history = root.optJSONArray("history")?.mapObjects(::decodeWorkout)?.toMutableList() ?: mutableListOf()
         val active = root.optJSONObject("activeWorkout")?.let(::decodeWorkout)
-        return AppData(exercises.ifEmpty { DefaultData.exercises().toMutableList() }, routines, history, active)
+        return AppData(
+            exercises = exercises.ifEmpty { DefaultData.exercises().toMutableList() },
+            routines = routines,
+            history = history,
+            activeWorkout = active,
+            soundCuesEnabled = root.optBoolean("soundCuesEnabled", true),
+        )
     }
 
     private fun decodeExercise(value: JSONObject) = Exercise(

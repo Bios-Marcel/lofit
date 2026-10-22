@@ -36,6 +36,7 @@ import org.hamcrest.Matcher
 import org.hamcrest.Matchers.not
 import org.junit.Before
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -54,6 +55,24 @@ class WorkoutFlowTest {
             .edit()
             .clear()
             .commit()
+    }
+
+    @Test
+    fun settings_soundCuesAreOnByDefaultAndPersistOff() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val activity = instrumentation.startActivitySync(intent)
+
+        onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+        onView(withText(R.string.nav_settings)).perform(click())
+        onView(withContentDescription("Sound cues"))
+            .check(matches(isChecked()))
+            .perform(click())
+            .check(matches(not(isChecked())))
+
+        assertFalse(LofitRepository(instrumentation.targetContext).data.soundCuesEnabled)
+        activity.finish()
     }
 
     @Test
