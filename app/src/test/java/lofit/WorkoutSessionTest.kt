@@ -7,6 +7,14 @@ import org.junit.Test
 
 class WorkoutSessionTest {
     @Test
+    fun workoutTime_usesHoursAndMinutesFromOneHour() {
+        assertEquals("59:59", formatWorkoutTime(3_599))
+        assertEquals("1h 0m", formatWorkoutTime(3_600))
+        assertEquals("1h 5m", formatWorkoutTime(3_901))
+        assertEquals("2h 17m", formatWorkoutTime(8_279))
+    }
+
+    @Test
     fun search_matchesEachWordAcrossFieldsIgnoringCase() {
         assert(matchesSearchQuery("CURL dumb", "Dumbbell curl", "Biceps"))
         assert(matchesSearchQuery("dumb bic", "Dumbbell curl", "Biceps"))

@@ -1198,7 +1198,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         val elapsed = max(0, ((System.currentTimeMillis() - workout.startedAt) / 1_000).toInt())
-        timerText?.text = formatSeconds(elapsed)
+        timerText?.text = formatWorkoutTime(elapsed)
         updateRestBar()
         updateWorkoutNotification()
     }
@@ -2163,7 +2163,7 @@ class MainActivity : AppCompatActivity() {
     private fun formatWeight(value: Double): String = String.format(Locale.getDefault(), if (value % 1.0 == 0.0) "%.0f" else "%.1f", value)
     private fun formatInteger(value: Int): String = String.format(Locale.getDefault(), "%d", value)
     private fun formatSeconds(total: Int): String = String.format(Locale.getDefault(), "%d:%02d", total / 60, total % 60)
-    private fun formatDuration(milliseconds: Long): String = formatSeconds((milliseconds / 1_000).toInt())
+    private fun formatDuration(milliseconds: Long): String = formatWorkoutTime((milliseconds / 1_000).toInt())
     private fun color(resource: Int): Int = ContextCompat.getColor(this, resource)
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 }
