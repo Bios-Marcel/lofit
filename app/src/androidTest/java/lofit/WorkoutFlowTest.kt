@@ -29,6 +29,7 @@ import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import com.google.android.material.card.MaterialCardView
 import android.view.View
+import android.widget.CheckBox
 import android.widget.ScrollView
 import java.time.LocalDate
 import org.hamcrest.Matcher
@@ -103,6 +104,24 @@ class WorkoutFlowTest {
         onView(withContentDescription("Set 1 Repetitions"))
             .perform(click(), typeText("8"), closeSoftKeyboard())
             .check(matches(withText("8")))
+        var setTypeRight = 0
+        onView(withContentDescription("Set 1 type: Normal")).check { view, _ ->
+            val location = IntArray(2)
+            view.getLocationOnScreen(location)
+            setTypeRight = location[0] + view.width
+        }
+        onView(withContentDescription("Set 1 weight")).check { view, _ ->
+            val location = IntArray(2)
+            view.getLocationOnScreen(location)
+            assertTrue(location[0] > setTypeRight)
+        }
+        onView(withContentDescription("Set 1 done")).check { view, _ ->
+            val density = view.resources.displayMetrics.density
+            val checkbox = view as CheckBox
+            assertTrue(view.width >= (56 * density).toInt())
+            assertTrue(view.height >= (56 * density).toInt())
+            assertTrue((checkbox.buttonDrawable?.intrinsicWidth ?: 0) >= (40 * density).toInt())
+        }
         val notificationManager = instrumentation.targetContext.getSystemService(NotificationManager::class.java)
         val activeNotification = notificationManager.activeNotifications.single().notification
         assertEquals("Back squat", activeNotification.extras.getCharSequence(Notification.EXTRA_TITLE).toString())

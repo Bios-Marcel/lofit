@@ -6,6 +6,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
+import android.content.res.ColorStateList
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -74,6 +75,7 @@ class MainActivity : AppCompatActivity() {
         const val ACTION_SUBTRACT_REST = "lofit.action.SUBTRACT_REST"
         const val ACTION_ADD_REST = "lofit.action.ADD_REST"
         const val ACTION_SKIP_REST = "lofit.action.SKIP_REST"
+        const val SET_ROW_PADDING_DP = 4
     }
 
     private enum class Screen { WORKOUT, ROUTINES, EXERCISES, RECORDS, HISTORY }
@@ -403,7 +405,7 @@ class MainActivity : AppCompatActivity() {
             onRemove = onRemove,
             onStateUpdaterReady = onActionStateUpdaterReady,
         )), insetCardLayoutParams())
-        val actionWidth = if (exercise.type.tracksDuration) 100 else 52
+        val actionWidth = if (exercise.type.tracksDuration) 108 else 60
         addView(plannedSetHeader(
             exercise,
             if (exercise.type.tracksDuration) "Start  Done" else "Done",
@@ -440,14 +442,8 @@ class MainActivity : AppCompatActivity() {
         }
         fun addWorkoutSetRow(plannedSet: PlannedSet, setIndex: Int) {
             val loggedSet = loggedSetFor(item, plannedSet, setIndex)
-            val done = CheckBox(this@MainActivity).apply {
+            val done = largeCheckBox().apply {
                 isChecked = loggedSet != null
-                buttonDrawable?.let { drawable ->
-                    buttonDrawable = LayerDrawable(arrayOf(drawable)).apply {
-                        setLayerSize(0, dp(32), dp(32))
-                        setLayerGravity(0, Gravity.CENTER)
-                    }
-                }
                 contentDescription = "Set ${setIndex + 1} done"
             }
             lateinit var activeHoldAmount: EditText
@@ -468,7 +464,7 @@ class MainActivity : AppCompatActivity() {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
                 holdButton?.let { addView(it, LinearLayout.LayoutParams(dp(48), dp(48))) }
-                addView(done, LinearLayout.LayoutParams(dp(52), dp(48)))
+                addView(done, LinearLayout.LayoutParams(dp(60), dp(56)))
             }
             val setRow = plannedSetEditor(
                 exercise = exercise,
@@ -476,7 +472,7 @@ class MainActivity : AppCompatActivity() {
                 setIndex = setIndex,
                 endAction = rowActions,
                 endActionWidth = actionWidth,
-                endActionHeight = 48,
+                endActionHeight = 56,
                 completed = loggedSet != null,
                 onRemove = {
                     item.plannedSets.indexOf(plannedSet).takeIf { it >= 0 }
@@ -1622,9 +1618,13 @@ class MainActivity : AppCompatActivity() {
             addView(RadioButton(this@MainActivity).apply {
                 id = index + 1
                 text = value
+                textSize = 15f
                 setTextColor(color(R.color.cream))
+                buttonTintList = toggleTint()
+                buttonDrawable = sizedButtonDrawable(buttonDrawable, 30)
                 isChecked = index == selected
-                setPadding(dp(2), dp(4), dp(8), dp(4))
+                minHeight = dp(48)
+                setPadding(dp(4), dp(4), dp(10), dp(4))
             }, if (orientation == RadioGroup.HORIZONTAL) RadioGroup.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f) else RadioGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         }
     }
@@ -1642,16 +1642,21 @@ class MainActivity : AppCompatActivity() {
         text = label
         isAllCaps = false
         textSize = 14f
+        letterSpacing = 0f
+        setTypeface(typeface, Typeface.NORMAL)
         cornerRadius = dp(3)
         elevation = 0f
         stateListAnimator = null
         insetTop = 0
         insetBottom = 0
         strokeWidth = 0
-        minHeight = dp(42)
+        minHeight = dp(46)
         if (secondary) {
-            setBackgroundColor(color(R.color.charcoal_surface_high))
+            backgroundTintList = ColorStateList.valueOf(color(R.color.charcoal_surface_high))
             setTextColor(color(R.color.cream))
+        } else {
+            backgroundTintList = ColorStateList.valueOf(color(R.color.coral))
+            setTextColor(color(R.color.white))
         }
         setOnClickListener { action() }
     }
@@ -1705,8 +1710,13 @@ class MainActivity : AppCompatActivity() {
     private fun textField(hint: String): EditText = EditText(this).apply {
         this.hint = hint
         isSingleLine = true
+        textSize = 16f
+        minHeight = dp(48)
         setTextColor(color(R.color.cream))
         setHintTextColor(color(R.color.sage))
+        background = fieldBackground(focused = false)
+        setPadding(dp(12), 0, dp(12), 0)
+        setOnFocusChangeListener { view, focused -> view.background = fieldBackground(focused) }
     }
 
     private fun muscleGroupField(hint: String, value: String, multiple: Boolean = false): AutoCompleteTextView {
@@ -1716,8 +1726,13 @@ class MainActivity : AppCompatActivity() {
             isSingleLine = true
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_WORDS
             threshold = 0
+            textSize = 16f
+            minHeight = dp(48)
             setTextColor(color(R.color.cream))
             setHintTextColor(color(R.color.sage))
+            background = fieldBackground(focused = false)
+            setPadding(dp(12), 0, dp(12), 0)
+            setOnFocusChangeListener { view, focused -> view.background = fieldBackground(focused) }
             setCompoundDrawablesWithIntrinsicBounds(0, 0, android.R.drawable.arrow_down_float, 0)
             setAdapter(ArrayAdapter(this@MainActivity, android.R.layout.simple_dropdown_item_1line, MuscleGroups.all))
             if (this is MultiAutoCompleteTextView) setTokenizer(MultiAutoCompleteTextView.CommaTokenizer())
@@ -1737,6 +1752,37 @@ class MainActivity : AppCompatActivity() {
         inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
         setSelectAllOnFocus(true)
         setOnClickListener { selectAll() }
+    }
+
+    private fun fieldBackground(focused: Boolean) = GradientDrawable().apply {
+        shape = GradientDrawable.RECTANGLE
+        cornerRadius = dp(3).toFloat()
+        setColor(color(R.color.charcoal_input))
+        if (focused) setStroke(dp(1), color(R.color.coral))
+    }
+
+    private fun toggleTint() = ColorStateList(
+        arrayOf(
+            intArrayOf(android.R.attr.state_checked),
+            intArrayOf(),
+        ),
+        intArrayOf(color(R.color.coral), color(R.color.sage)),
+    )
+
+    private fun sizedButtonDrawable(drawable: android.graphics.drawable.Drawable?, sizeDp: Int) = drawable?.let {
+        LayerDrawable(arrayOf(it)).apply {
+            setLayerSize(0, dp(sizeDp), dp(sizeDp))
+            setLayerGravity(0, Gravity.CENTER)
+        }
+    }
+
+    private fun largeCheckBox(): CheckBox = CheckBox(this).apply {
+        buttonDrawable = sizedButtonDrawable(buttonDrawable, 40)
+        buttonTintList = toggleTint()
+        gravity = Gravity.CENTER
+        minWidth = dp(56)
+        minHeight = dp(56)
+        setPadding(0, 0, 0, 0)
     }
     private fun exercise(id: String): Exercise? = repository.data.exercises.firstOrNull { it.id == id }
 
@@ -1825,19 +1871,24 @@ class MainActivity : AppCompatActivity() {
             rowCount = 1
             alignmentMode = GridLayout.ALIGN_BOUNDS
             useDefaultMargins = false
-            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(52))
-            setPadding(0, dp(2), 0, dp(2))
-            addView(setNumber, setGridCell(columns[0], heightDp = 42))
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(64))
+            setPadding(
+                dp(SET_ROW_PADDING_DP),
+                dp(SET_ROW_PADDING_DP),
+                dp(SET_ROW_PADDING_DP),
+                dp(SET_ROW_PADDING_DP),
+            )
+            addView(setGridControl(setNumber), setGridCell(columns[0], heightDp = 48))
             if (activeGrid) {
-                addView(weight, setGridCell(columns[1], heightDp = 42))
-                addView(amount, setGridCell(columns[2], heightDp = 42))
-                addView(activeAmount, setGridCell(columns[3], heightDp = 42))
+                addView(setGridControl(weight), setGridCell(columns[1], heightDp = 48))
+                addView(setGridControl(amount), setGridCell(columns[2], heightDp = 48))
+                addView(setGridControl(activeAmount), setGridCell(columns[3], heightDp = 48))
                 endAction?.let { addView(it, setGridCell(columns[4], heightDp = endActionHeight)) }
             } else {
-                addView(weight, setGridCell(columns[1], heightDp = 42))
-                addView(metaText("kg ×").apply { gravity = Gravity.CENTER }, setGridCell(columns[2], heightDp = 42))
-                addView(amount, setGridCell(columns[3], heightDp = 42))
-                addView(metaText(if (!exercise.type.tracksDuration) "reps" else "sec").apply { gravity = Gravity.CENTER }, setGridCell(columns[4], heightDp = 42))
+                addView(setGridControl(weight), setGridCell(columns[1], heightDp = 48))
+                addView(metaText("kg ×").apply { gravity = Gravity.CENTER }, setGridCell(columns[2], heightDp = 48))
+                addView(setGridControl(amount), setGridCell(columns[3], heightDp = 48))
+                addView(metaText(if (!exercise.type.tracksDuration) "reps" else "sec").apply { gravity = Gravity.CENTER }, setGridCell(columns[4], heightDp = 48))
                 endAction?.let { addView(it, setGridCell(columns[5], heightDp = endActionHeight)) }
             }
         }
@@ -1851,23 +1902,24 @@ class MainActivity : AppCompatActivity() {
                 overScrollMode = View.OVER_SCROLL_NEVER
                 addView(LinearLayout(this@MainActivity).apply {
                     orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
                     addView(fields)
                     onRemove?.let { remove ->
                         val button = swipeDeleteButton("Delete", "Delete set ${currentSetIndex + 1}", remove)
                         deleteButton = button
-                        addView(button, LinearLayout.LayoutParams(dp(92), dp(52)))
+                        addView(button, LinearLayout.LayoutParams(dp(92), dp(64)))
                     }
                     onRemoveAndBelow?.let { remove ->
                         val button = swipeDeleteButton("Delete below", "Delete set ${currentSetIndex + 1} and all below", remove)
                         deleteBelowButton = button
-                        addView(button, LinearLayout.LayoutParams(dp(124), dp(52)).apply {
+                        addView(button, LinearLayout.LayoutParams(dp(124), dp(64)).apply {
                             marginStart = dp(4)
                         })
                     }
                 })
             }
             swipeRow = row
-            addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52)))
+            addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(64)))
         } else {
             addView(fields)
         }
@@ -1913,7 +1965,13 @@ class MainActivity : AppCompatActivity() {
         rowCount = 1
         alignmentMode = GridLayout.ALIGN_BOUNDS
         useDefaultMargins = false
-        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(30))
+        setPadding(
+            dp(SET_ROW_PADDING_DP),
+            dp(SET_ROW_PADDING_DP),
+            dp(SET_ROW_PADDING_DP),
+            dp(SET_ROW_PADDING_DP),
+        )
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(38))
         addView(setGridHeader("Set"), setGridCell(columns[0]))
         if (activeGrid) {
             addView(setGridHeader("Weight"), setGridCell(columns[1]))
@@ -1941,7 +1999,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setGridColumnWidths(activeHold: Boolean, endWidth: Int): IntArray {
-        val totalWidth = (resources.configuration.screenWidthDp - 28).coerceAtLeast(280)
+        val totalWidth = (resources.configuration.screenWidthDp - 28 - SET_ROW_PADDING_DP * 2).coerceAtLeast(280)
         return if (activeHold) {
             val fieldWidth = ((totalWidth - 48 - endWidth) / 3).coerceAtLeast(40)
             intArrayOf(48, fieldWidth, fieldWidth, totalWidth - 48 - endWidth - fieldWidth * 2, endWidth)
@@ -1954,7 +2012,18 @@ class MainActivity : AppCompatActivity() {
     private fun setGridCell(widthDp: Int, heightDp: Int? = null) = GridLayout.LayoutParams().apply {
         width = dp(widthDp)
         height = heightDp?.let(::dp) ?: ViewGroup.LayoutParams.WRAP_CONTENT
+        setGravity(Gravity.CENTER_VERTICAL)
         setMargins(0, 0, 0, 0)
+    }
+
+    private fun setGridControl(control: View): View = FrameLayout(this).apply {
+        addView(control, FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT,
+        ).apply {
+            marginStart = dp(3)
+            marginEnd = dp(3)
+        })
     }
 
     private fun loggedSetFor(item: WorkoutExercise, plannedSet: PlannedSet, setIndex: Int): LoggedSet? =
