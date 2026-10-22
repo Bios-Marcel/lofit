@@ -502,7 +502,9 @@ class MainActivity : AppCompatActivity() {
             val rowActions = LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                holdButton?.let { addView(it, LinearLayout.LayoutParams(dp(48), dp(48))) }
+                holdButton?.let {
+                    addView(setGridControl(it), LinearLayout.LayoutParams(dp(48), dp(48)))
+                }
                 addView(done, LinearLayout.LayoutParams(dp(60), dp(56)))
             }
             val setRow = plannedSetEditor(
