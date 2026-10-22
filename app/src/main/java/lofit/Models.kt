@@ -32,11 +32,9 @@ data class Exercise(
     var asymmetric: Boolean,
     var primaryMuscle: String,
     var secondaryMuscles: String,
-    var defaultRestSeconds: Int = 90,
     var minimumHoldSeconds: Int = 30,
     val custom: Boolean = false,
     val imageResource: Int? = null,
-    var equipment: String = "",
     val imageName: String? = null,
 )
 

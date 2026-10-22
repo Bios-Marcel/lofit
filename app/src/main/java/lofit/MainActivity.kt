@@ -844,14 +844,12 @@ class MainActivity : AppCompatActivity() {
             val secondary = muscleGroupField("Search secondary muscles", existing?.secondaryMuscles.orEmpty(), multiple = true)
             val typeGroup = choiceGroup(ExerciseType.entries.map { it.label }, existing?.type?.ordinal ?: 0)
             val trackingGroup = choiceGroup(listOf("Track both sides together", "Track left and right"), if (existing?.asymmetric == true) 1 else 0)
-            var restSeconds = existing?.defaultRestSeconds ?: 90
             val hold = numberField("Minimum hold cue seconds").apply { setText(formatInteger(existing?.minimumHoldSeconds ?: 30)) }
             body.addView(fieldLabel("Exercise name")); body.addView(name)
             body.addView(fieldLabel("Exercise type")); body.addView(typeGroup)
             body.addView(fieldLabel("Side tracking")); body.addView(trackingGroup)
             body.addView(fieldLabel("Primary muscle")); body.addView(primary)
             body.addView(fieldLabel("Secondary muscles")); body.addView(secondary)
-            body.addView(restInput(restSeconds) { restSeconds = it })
             body.addView(fieldLabel("Hold cue")); body.addView(hold)
             body.addView(actionButton("Save exercise") {
                 val primaryMuscle = MuscleGroups.canonical(primary.text.toString())
@@ -878,7 +876,6 @@ class MainActivity : AppCompatActivity() {
                 movement.asymmetric = selectedChoice(trackingGroup) == 1
                 movement.primaryMuscle = primaryMuscle
                 movement.secondaryMuscles = secondaryMuscles
-                movement.defaultRestSeconds = restSeconds
                 movement.minimumHoldSeconds = hold.text.toString().toIntOrNull()?.coerceIn(1, 3_600) ?: 30
                 if (existing == null) repository.data.exercises.add(movement)
                 repository.save()

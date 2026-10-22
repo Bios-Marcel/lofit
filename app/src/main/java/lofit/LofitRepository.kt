@@ -39,11 +39,9 @@ class LofitRepository(context: Context) {
         put("asymmetric", exercise.asymmetric)
         put("primaryMuscle", exercise.primaryMuscle)
         put("secondaryMuscles", exercise.secondaryMuscles)
-        put("defaultRestSeconds", exercise.defaultRestSeconds)
         put("minimumHoldSeconds", exercise.minimumHoldSeconds)
         put("custom", exercise.custom)
         put("imageResource", exercise.imageResource ?: JSONObject.NULL)
-        put("equipment", exercise.equipment)
         put("imageName", exercise.imageName ?: JSONObject.NULL)
     }
 
@@ -125,11 +123,9 @@ class LofitRepository(context: Context) {
         value.optBoolean("asymmetric"),
         value.optString("primaryMuscle"),
         value.optString("secondaryMuscles"),
-        value.optInt("defaultRestSeconds", 90),
         value.optInt("minimumHoldSeconds", 30),
         value.optBoolean("custom"),
         value.optInt("imageResource").takeIf { !value.isNull("imageResource") },
-        value.optString("equipment"),
         value.optString("imageName").takeIf { !value.isNull("imageName") },
     )
 

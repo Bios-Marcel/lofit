@@ -146,11 +146,8 @@ class WorkoutSessionTest {
         assert(exercises.count { it.type == ExerciseType.ISOMETRIC } >= 10)
         assert(exercises.count { it.type == ExerciseType.STRETCH } >= 60)
         assert(exercises.count { it.asymmetric } >= 50)
-        assert(exercises.count { it.equipment in setOf("Barbell", "Dumbbell", "Dumbbells", "Kettlebells", "EZ Curl Bar") } >= 150)
-        assert(exercises.count { it.equipment in setOf("Machine", "Cable") } >= 90)
         val shoulderRotations = exercises.filter { it.name.contains("Rotation", ignoreCase = true) && it.primaryMuscle == "Rotator cuff" }
         assert(shoulderRotations.size >= 8)
-        assert(shoulderRotations.count { it.equipment == "Bands" } >= 6)
         assert(exercises.all { it.primaryMuscle.isNotBlank() })
         assert(exercises.all { it.imageResource != null || it.imageName != null })
         assertEquals(exercises.size, exercises.map { it.id }.distinct().size)
