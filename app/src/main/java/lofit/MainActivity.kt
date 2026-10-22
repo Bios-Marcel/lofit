@@ -754,7 +754,7 @@ class MainActivity : AppCompatActivity() {
             results.removeAllViews()
             val normalized = query.trim().lowercase(Locale.getDefault())
             val allMatches = repository.data.exercises.filter { exercise ->
-                normalized.isBlank() || listOf(exercise.name, exercise.primaryMuscle, exercise.secondaryMuscles, exercise.equipment, exercise.type.label)
+                normalized.isBlank() || listOf(exercise.name, exercise.primaryMuscle, exercise.secondaryMuscles, exercise.type.label)
                     .any { it.lowercase(Locale.getDefault()).contains(normalized) }
             }
             val matches = allMatches.take(40)
@@ -763,7 +763,7 @@ class MainActivity : AppCompatActivity() {
             matches.forEach { movement ->
                 results.addView(card {
                     addView(exerciseHeading(movement, large = true))
-                    addView(metaText(listOf(movement.type.label, movement.equipment.takeIf(String::isNotBlank), if (movement.asymmetric) "left / right" else null).filterNotNull().joinToString(" · ")))
+                    addView(metaText(listOf(movement.type.label, if (movement.asymmetric) "left / right" else null).filterNotNull().joinToString(" · ")))
                     addView(metaText("Primary: ${movement.primaryMuscle} · Secondary: ${movement.secondaryMuscles}"))
                     addView(actionButton("Add ${movement.name}") {
                         if (target == PickerTarget.WORKOUT) {
@@ -806,7 +806,7 @@ class MainActivity : AppCompatActivity() {
             results.removeAllViews()
             val normalized = query.trim().lowercase(Locale.getDefault())
             val allMatches = repository.data.exercises.filter { movement ->
-                normalized.isBlank() || listOf(movement.name, movement.primaryMuscle, movement.secondaryMuscles, movement.equipment, movement.type.label)
+                normalized.isBlank() || listOf(movement.name, movement.primaryMuscle, movement.secondaryMuscles, movement.type.label)
                     .any { it.lowercase(Locale.getDefault()).contains(normalized) }
             }
             val matches = allMatches.take(40)
@@ -814,7 +814,7 @@ class MainActivity : AppCompatActivity() {
             matches.forEach { movement ->
                 results.addView(card {
                     addView(exerciseHeading(movement, large = true))
-                    addView(metaText(listOf(movement.type.label, movement.equipment.takeIf(String::isNotBlank), if (movement.asymmetric) "left / right" else null).filterNotNull().joinToString(" · ")))
+                    addView(metaText(listOf(movement.type.label, if (movement.asymmetric) "left / right" else null).filterNotNull().joinToString(" · ")))
                     addView(metaText("Primary: ${movement.primaryMuscle} · Secondary: ${movement.secondaryMuscles}"))
                     recordFor(movement)?.let { addView(accentText(it)) }
                     if (movement.custom) addView(horizontalActions(
@@ -842,7 +842,6 @@ class MainActivity : AppCompatActivity() {
             val name = textField("Exercise name").apply { setText(existing?.name.orEmpty()) }
             val primary = muscleGroupField("Search primary muscle", existing?.primaryMuscle.orEmpty())
             val secondary = muscleGroupField("Search secondary muscles", existing?.secondaryMuscles.orEmpty(), multiple = true)
-            val equipment = textField("Equipment").apply { setText(existing?.equipment.orEmpty()) }
             val typeGroup = choiceGroup(ExerciseType.entries.map { it.label }, existing?.type?.ordinal ?: 0)
             val trackingGroup = choiceGroup(listOf("Track both sides together", "Track left and right"), if (existing?.asymmetric == true) 1 else 0)
             var restSeconds = existing?.defaultRestSeconds ?: 90
@@ -852,7 +851,6 @@ class MainActivity : AppCompatActivity() {
             body.addView(fieldLabel("Side tracking")); body.addView(trackingGroup)
             body.addView(fieldLabel("Primary muscle")); body.addView(primary)
             body.addView(fieldLabel("Secondary muscles")); body.addView(secondary)
-            body.addView(fieldLabel("Equipment")); body.addView(equipment)
             body.addView(restInput(restSeconds) { restSeconds = it })
             body.addView(fieldLabel("Hold cue")); body.addView(hold)
             body.addView(actionButton("Save exercise") {
@@ -880,7 +878,6 @@ class MainActivity : AppCompatActivity() {
                 movement.asymmetric = selectedChoice(trackingGroup) == 1
                 movement.primaryMuscle = primaryMuscle
                 movement.secondaryMuscles = secondaryMuscles
-                movement.equipment = equipment.text.toString().trim()
                 movement.defaultRestSeconds = restSeconds
                 movement.minimumHoldSeconds = hold.text.toString().toIntOrNull()?.coerceIn(1, 3_600) ?: 30
                 if (existing == null) repository.data.exercises.add(movement)
