@@ -119,7 +119,7 @@ class LofitRepository(context: Context) {
     private fun decodeExercise(value: JSONObject) = Exercise(
         value.getString("id"),
         value.getString("name"),
-        ExerciseType.valueOf(value.getString("type")),
+        decodeExerciseType(value.getString("type")),
         value.optBoolean("asymmetric"),
         value.optString("primaryMuscle"),
         value.optString("secondaryMuscles"),
@@ -237,6 +237,11 @@ class LofitRepository(context: Context) {
                     .getOrDefault(Side.BOTH),
             )
         }?.toMutableList() ?: mutableListOf()
+
+    private fun decodeExerciseType(value: String): ExerciseType = when (value) {
+        "WEIGHTED_HOLD", "ISOMETRIC", "STRETCH" -> ExerciseType.TIMED
+        else -> ExerciseType.valueOf(value)
+    }
 }
 
 private fun <T> JSONArray.mapObjects(transform: (JSONObject) -> T): List<T> =

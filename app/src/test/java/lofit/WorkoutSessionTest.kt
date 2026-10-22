@@ -126,6 +126,7 @@ class WorkoutSessionTest {
     fun defaultLibrary_hasFullBalancedCatalog() {
         val exercises = DefaultData.exercises()
 
+        assertEquals(listOf("Repetitions", "Timed"), ExerciseType.entries.map { it.label })
         assertEquals(422, exercises.size)
         assert(exercises.map { it.id }.containsAll(listOf(
             "push-up",
@@ -141,10 +142,8 @@ class WorkoutSessionTest {
             "clap-push-up",
             "spiderman-push-up",
         )))
-        assert(exercises.any { it.type == ExerciseType.WEIGHTED_HOLD })
         assert(exercises.any { it.type == ExerciseType.WEIGHTED_REPS })
-        assert(exercises.count { it.type == ExerciseType.ISOMETRIC } >= 10)
-        assert(exercises.count { it.type == ExerciseType.STRETCH } >= 60)
+        assert(exercises.count { it.type == ExerciseType.TIMED } >= 80)
         assert(exercises.count { it.asymmetric } >= 50)
         val shoulderRotations = exercises.filter { it.name.contains("Rotation", ignoreCase = true) && it.primaryMuscle == "Rotator cuff" }
         assert(shoulderRotations.size >= 8)
@@ -258,7 +257,7 @@ class WorkoutSessionTest {
     @Test
     fun oneRepMaxes_useHighestWeightOrLongestHoldFromHistory() {
         val bench = Exercise("bench", "Bench", ExerciseType.WEIGHTED_REPS, false, "Chest", "")
-        val plank = Exercise("plank-test", "Plank", ExerciseType.ISOMETRIC, false, "Core", "")
+        val plank = Exercise("plank-test", "Plank", ExerciseType.TIMED, false, "Core", "")
         val data = AppData(
             exercises = mutableListOf(bench, plank),
             history = mutableListOf(WorkoutSession(

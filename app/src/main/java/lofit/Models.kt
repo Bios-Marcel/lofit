@@ -4,9 +4,7 @@ import java.util.UUID
 
 enum class ExerciseType(val label: String) {
     WEIGHTED_REPS("Repetitions"),
-    WEIGHTED_HOLD("Timed hold"),
-    ISOMETRIC("Isometric hold"),
-    STRETCH("Stretch"),
+    TIMED("Timed"),
     ;
 
     val tracksDuration: Boolean

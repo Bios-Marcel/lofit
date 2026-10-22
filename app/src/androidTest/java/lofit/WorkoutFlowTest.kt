@@ -78,6 +78,23 @@ class WorkoutFlowTest {
     }
 
     @Test
+    fun oldDurationTypes_migrateToTimed() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val legacyTypes = listOf("WEIGHTED_HOLD", "ISOMETRIC", "STRETCH")
+        val exercises = legacyTypes.mapIndexed { index, type ->
+            """{"id":"legacy-$index","name":"Legacy $index","type":"$type","asymmetric":false,"primaryMuscle":"Core","secondaryMuscles":"","custom":true}"""
+        }.joinToString(",")
+        context.getSharedPreferences("lofit-data", 0).edit()
+            .putString("state", """{"exercises":[$exercises],"routines":[],"history":[],"activeWorkout":null}""")
+            .commit()
+
+        val migrated = LofitRepository(context).data.exercises.filter { it.id.startsWith("legacy-") }
+
+        assertEquals(3, migrated.size)
+        assertTrue(migrated.all { it.type == ExerciseType.TIMED })
+    }
+
+    @Test
     fun emptyWorkout_canStartAddExerciseAndLogWarmupSet() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
