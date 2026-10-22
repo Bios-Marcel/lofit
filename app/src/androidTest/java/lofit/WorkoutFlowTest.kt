@@ -15,8 +15,10 @@ import androidx.test.espresso.action.ViewActions.scrollTo
 import androidx.test.espresso.action.ViewActions.swipeLeft
 import androidx.test.espresso.action.ViewActions.typeText
 import androidx.test.espresso.assertion.ViewAssertions.matches
+import androidx.test.espresso.matcher.ViewMatchers.hasDescendant
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.isChecked
+import androidx.test.espresso.matcher.ViewMatchers.isDescendantOfA
 import androidx.test.espresso.matcher.ViewMatchers.isEnabled
 import androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom
 import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
@@ -32,6 +34,7 @@ import android.widget.CheckBox
 import android.widget.ScrollView
 import java.time.LocalDate
 import org.hamcrest.Matcher
+import org.hamcrest.Matchers.allOf
 import org.hamcrest.Matchers.not
 import org.junit.Before
 import org.junit.Assert.assertEquals
@@ -165,6 +168,46 @@ class WorkoutFlowTest {
         assertEquals(0, notificationManager.activeNotifications.size)
         onView(withContentDescription("Rest timer overlay")).check(matches(not(isDisplayed())))
         onView(withContentDescription("${LocalDate.now()}, workout completed")).perform(scrollTo()).check(matches(isDisplayed()))
+    }
+
+    @Test
+    fun addingExercise_keepsWorkoutScrollPosition() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        instrumentation.startActivitySync(intent)
+
+        onView(withText(R.string.start_workout)).perform(click())
+        onView(withText("Add exercise")).perform(scrollTo(), click())
+        onView(withHint("Search name or muscle")).perform(typeText("squat"), closeSoftKeyboard())
+        onView(withText("Add Back squat")).perform(scrollTo(), click())
+        repeat(2) { onView(withText("Add set")).perform(scrollTo(), click()) }
+
+        onView(withText("Add exercise")).perform(scrollTo(), click())
+        onView(withHint("Search name or muscle")).perform(typeText("plank"), closeSoftKeyboard())
+        onView(withText("Add Plank")).perform(scrollTo(), click())
+        val plankAddSet = allOf(
+            withText("Add set"),
+            isDescendantOfA(allOf(
+                isAssignableFrom(MaterialCardView::class.java),
+                hasDescendant(withText("Plank")),
+            )),
+        )
+        repeat(2) { onView(plankAddSet).perform(scrollTo(), click()) }
+
+        var scrollBeforeAdd = 0
+        onView(withText("Add exercise")).perform(scrollTo())
+        onView(isAssignableFrom(ScrollView::class.java)).check { view, _ ->
+            scrollBeforeAdd = view.scrollY
+            assertTrue(scrollBeforeAdd > 0)
+        }
+        onView(withText("Add exercise")).perform(click())
+        onView(withHint("Search name or muscle")).perform(typeText("dumbbell curl"), closeSoftKeyboard())
+        onView(withText("Add Dumbbell curl")).perform(scrollTo(), click())
+
+        onView(isAssignableFrom(ScrollView::class.java)).check { view, _ ->
+            assertEquals(scrollBeforeAdd, view.scrollY)
+        }
     }
 
     @Test

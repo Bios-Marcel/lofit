@@ -85,7 +85,7 @@ class MainActivity : AppCompatActivity() {
 
     private sealed class Route {
         data object Root : Route()
-        data class ExercisePicker(val target: PickerTarget) : Route()
+        data class ExercisePicker(val target: PickerTarget, val returnScrollY: Int? = null) : Route()
         data class RoutineEditor(val originalId: String?) : Route()
         data class ExerciseEditor(val exerciseId: String?) : Route()
         data class Confirm(val action: ConfirmAction, val targetId: String? = null) : Route()
@@ -225,12 +225,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun render(preserveScrollPosition: Boolean = false) {
-        val previousScrollY = if (preserveScrollPosition) {
-            (content.getChildAt(0) as? ScrollView)?.scrollY
-        } else {
-            null
-        }
+    private fun render(restoreScrollY: Int? = null) {
         if (repository.data.activeWorkout != null) {
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         } else {
@@ -246,13 +241,13 @@ class MainActivity : AppCompatActivity() {
         holdDoneCheckBox = null
         val view = when (val activeRoute = route) {
             Route.Root -> rootScreen()
-            is Route.ExercisePicker -> exercisePickerScreen(activeRoute.target)
+            is Route.ExercisePicker -> exercisePickerScreen(activeRoute)
             is Route.RoutineEditor -> routineEditorScreen(activeRoute.originalId)
             is Route.ExerciseEditor -> exerciseEditorScreen(activeRoute.exerciseId)
             is Route.Confirm -> confirmationScreen(activeRoute)
         }
         content.addView(view)
-        previousScrollY?.let { scrollY ->
+        restoreScrollY?.let { scrollY ->
             (view as? ScrollView)?.post { view.scrollTo(0, scrollY) }
         }
         updateWorkoutNotification()
@@ -398,7 +393,8 @@ class MainActivity : AppCompatActivity() {
             }
             body.addView(exerciseCards)
             body.addView(actionButton("Add exercise") {
-                route = Route.ExercisePicker(PickerTarget.WORKOUT)
+                val scrollY = (content.getChildAt(0) as? ScrollView)?.scrollY
+                route = Route.ExercisePicker(PickerTarget.WORKOUT, scrollY)
                 render()
             })
             body.addView(divider())
@@ -744,7 +740,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun exercisePickerScreen(target: PickerTarget): View = page("Add exercise") { body ->
+    private fun exercisePickerScreen(picker: Route.ExercisePicker): View = page("Add exercise") { body ->
+        val target = picker.target
         val search = textField("Search name or muscle").apply {
             inputType = InputType.TYPE_CLASS_TEXT
             contentDescription = "Search exercises"
@@ -784,7 +781,7 @@ class MainActivity : AppCompatActivity() {
                             ))
                             route = Route.RoutineEditor(repository.data.routines.firstOrNull { it.id == routineDraft?.id }?.id)
                         }
-                        render()
+                        render(if (target == PickerTarget.WORKOUT) picker.returnScrollY else null)
                     })
                 })
             }
@@ -1135,8 +1132,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun navigateBack() {
-        route = when (route) {
-            is Route.ExercisePicker -> if ((route as Route.ExercisePicker).target == PickerTarget.ROUTINE) {
+        val previousRoute = route
+        route = when (previousRoute) {
+            is Route.ExercisePicker -> if (previousRoute.target == PickerTarget.ROUTINE) {
                 Route.RoutineEditor(repository.data.routines.firstOrNull { it.id == routineDraft?.id }?.id)
             } else Route.Root
             is Route.Confirm -> Route.Root
@@ -1146,7 +1144,9 @@ class MainActivity : AppCompatActivity() {
             }
             else -> Route.Root
         }
-        render()
+        render((previousRoute as? Route.ExercisePicker)
+            ?.takeIf { it.target == PickerTarget.WORKOUT }
+            ?.returnScrollY)
     }
 
     private fun startRest(item: WorkoutExercise, workout: WorkoutSession) {
