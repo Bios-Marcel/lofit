@@ -581,7 +581,7 @@ class MainActivity : AppCompatActivity() {
             addWorkoutSetRow(next, item.plannedSets.lastIndex)
             updateWorkoutNotification(force = true)
         })
-        addView(restOverrideInput(item.restSecondsOverride, workout.defaultRestSeconds) { seconds ->
+        addView(restOverrideInput(item.restSecondsOverride) { seconds ->
             item.restSecondsOverride = seconds
             repository.save()
         }, insetCardLayoutParams())
@@ -719,7 +719,7 @@ class MainActivity : AppCompatActivity() {
                         item.targetSets = item.plannedSets.size
                         addRoutineSetRow(next, item.plannedSets.lastIndex)
                     })
-                    addView(restOverrideInput(item.restSecondsOverride, draft.defaultRestSeconds) { seconds ->
+                    addView(restOverrideInput(item.restSecondsOverride) { seconds ->
                         item.restSecondsOverride = seconds
                     }, insetCardLayoutParams())
                 }
@@ -1630,7 +1630,7 @@ class MainActivity : AppCompatActivity() {
         addView(metaText("seconds").apply { setPadding(dp(8), 0, 0, 0) })
     }
 
-    private fun restOverrideInput(value: Int?, defaultSeconds: Int, onChange: (Int?) -> Unit): View = LinearLayout(this).apply {
+    private fun restOverrideInput(value: Int?, onChange: (Int?) -> Unit): View = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
         setPadding(0, dp(3), 0, dp(3))
@@ -1649,7 +1649,6 @@ class MainActivity : AppCompatActivity() {
                 onChange(text.toString().toIntOrNull()?.coerceIn(0, 3_600))
             }
         }, LinearLayout.LayoutParams(dp(82), dp(42)))
-        addView(metaText("seconds (default $defaultSeconds)").apply { setPadding(dp(8), 0, 0, 0) })
     }
 
     private fun choiceGroup(values: List<String>, selected: Int): RadioGroup = RadioGroup(this).apply {
