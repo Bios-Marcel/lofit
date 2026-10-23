@@ -292,7 +292,7 @@ class WorkoutFlowTest {
     }
 
     @Test
-    fun unweightedExercise_skipsWeightColumnAndLogsRepetitions() {
+    fun bodyweightExercise_skipsWeightColumnAndLogsRepetitions() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val repository = LofitRepository(instrumentation.targetContext)
         repository.data.activeWorkout = WorkoutSession(

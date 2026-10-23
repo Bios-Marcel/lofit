@@ -346,7 +346,7 @@ class WorkoutSessionTest {
     }
 
     @Test
-    fun oneRepMaxes_useRepetitionsForUnweightedExercise() {
+    fun oneRepMaxes_useRepetitionsForBodyweightExercise() {
         val pushUp = Exercise("push-up-test", "Push-up", ExerciseType.REPETITIONS, false, "Chest", "", weighted = false)
         val data = AppData(
             exercises = mutableListOf(pushUp),
@@ -369,7 +369,7 @@ class WorkoutSessionTest {
     }
 
     @Test
-    fun recordSetIds_markRepetitionRecordsForUnweightedExercise() {
+    fun recordSetIds_markRepetitionRecordsForBodyweightExercise() {
         val pushUp = Exercise("push-up-test", "Push-up", ExerciseType.REPETITIONS, false, "Chest", "", weighted = false)
         val data = AppData(
             exercises = mutableListOf(pushUp),

@@ -427,7 +427,7 @@ object ExerciseCatalog {
             Exercise("fedb-backward-drag", "Backward Drag", ExerciseType.REPETITIONS, false, "Quadriceps", "Calves, Forearms, Glutes, Hamstrings, Lower Back", 30, imageName = "exercise_db_383"),
             Exercise("fedb-backward-medicine-ball-throw", "Backward Medicine Ball Throw", ExerciseType.REPETITIONS, false, "Shoulders", "—", 30, imageName = "exercise_db_384"),
         ).onEach { exercise ->
-            if (exercise.id in unweightedRepetitionIds) exercise.weighted = false
+            if (exercise.id in bodyweightRepetitionIds) exercise.weighted = false
         }
         val exercisesById = baseExercises.associateBy { it.id }
         val weightedCopies = weightedVariantSourceIds.map { sourceId ->
@@ -482,7 +482,7 @@ object ExerciseCatalog {
         "fedb-leg-pull-in",
     )
 
-    private val unweightedRepetitionIds = setOf(
+    private val bodyweightRepetitionIds = setOf(
         "push-up",
         "close-grip-push-up",
         "wide-grip-push-up",

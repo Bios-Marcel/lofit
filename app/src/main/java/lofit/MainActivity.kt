@@ -930,7 +930,7 @@ class MainActivity : AppCompatActivity() {
             val primary = muscleGroupField("Search primary muscle", existing?.primaryMuscle.orEmpty())
             val secondary = muscleGroupField("Search secondary muscles", existing?.secondaryMuscles.orEmpty(), multiple = true)
             val typeGroup = choiceGroup(ExerciseType.entries.map { it.label }, existing?.type?.ordinal ?: 0)
-            val weightGroup = choiceGroup(listOf("Unweighted", "Weighted"), if (existing?.weighted == true) 1 else 0)
+            val weightGroup = choiceGroup(listOf("Bodyweight", "Weighted"), if (existing?.weighted == true) 1 else 0)
             val trackingGroup = choiceGroup(listOf("Track both sides together", "Track left and right"), if (existing?.asymmetric == true) 1 else 0)
             val hold = numberField("Minimum hold cue seconds").apply { setText(formatInteger(existing?.minimumHoldSeconds ?: 30)) }
             body.addView(fieldLabel("Exercise name")); body.addView(name)
@@ -1684,7 +1684,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun exerciseTrackingLabel(exercise: Exercise): String =
-        "${exercise.type.label} · ${if (exercise.weighted) "Weighted" else "Unweighted"}"
+        "${exercise.type.label} · ${if (exercise.weighted) "Weighted" else "Bodyweight"}"
 
     private fun exerciseSearchTerms(exercise: Exercise): String =
         listOf(exercise.type.label, "Weighted".takeIf { exercise.weighted }).filterNotNull().joinToString(" ")
