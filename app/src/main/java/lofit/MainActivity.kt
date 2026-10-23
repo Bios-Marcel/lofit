@@ -370,7 +370,7 @@ class MainActivity : AppCompatActivity() {
             body.addView(card {
                 addView(titleText(routine.name))
                 addView(metaText("${routine.exercises.size} exercises · ${routine.defaultRestSeconds}s default rest"))
-                addView(prescriptionSummary(routine))
+                addView(exerciseMuscleMaps(routine.exercises.map { it.exerciseId }))
                 addView(actionButton("Start routine") { startRoutine(routine) })
             })
         }
@@ -682,7 +682,7 @@ class MainActivity : AppCompatActivity() {
             body.addView(card {
                 addView(titleText(routine.name))
                 addView(metaText("Default rest ${routine.defaultRestSeconds}s"))
-                addView(prescriptionSummary(routine))
+                addView(exerciseMuscleMaps(routine.exercises.map { it.exerciseId }))
                 addView(horizontalActions(
                     actionButton("Start") { startRoutine(routine) },
                     actionButton("Edit", secondary = true) { openRoutineEditor(routine) },
@@ -990,7 +990,7 @@ class MainActivity : AppCompatActivity() {
                 addView(titleText(workout.name))
                 addView(metaText(DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(workout.completedAt ?: workout.startedAt))))
                 addView(metaText("${workout.setCount()} sets · ${formatWeight(workout.totalVolume())} kg volume · ${formatDuration((workout.completedAt ?: workout.startedAt) - workout.startedAt)}"))
-                addView(workoutMuscleMaps(workout))
+                addView(exerciseMuscleMaps(workout.exercises.map { it.exerciseId }))
                 if (index == 0) {
                     addView(actionButton("Continue workout") {
                         continueHistoryWorkout(workout)
@@ -1083,8 +1083,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun workoutMuscleMaps(workout: WorkoutSession): View {
-        val muscleGroups = workout.exercises.mapNotNull { exercise(it.exerciseId) }.flatMap { movement ->
+    private fun exerciseMuscleMaps(exerciseIds: List<String>): View {
+        val muscleGroups = exerciseIds.mapNotNull(::exercise).flatMap { movement ->
             listOf(movement.primaryMuscle) + movement.secondaryMuscles.split(',')
         }.map(String::trim).filter(String::isNotBlank).toSet()
 
@@ -1647,23 +1647,6 @@ class MainActivity : AppCompatActivity() {
         Intent(action).setPackage(packageName),
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
     )
-
-    private fun prescriptionSummary(routine: Routine): View = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        routine.exercises.forEach { item ->
-            exercise(item.exerciseId)?.let { movement ->
-                val sets = item.plannedSets.mapIndexed { index, set ->
-                    "${index + 1}. ${set.type.label} · ${describePlannedSet(movement, set)}"
-                }.joinToString(" · ")
-                addView(LinearLayout(this@MainActivity).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    gravity = Gravity.CENTER_VERTICAL
-                    addView(exerciseThumbnail(movement, dp(72), dp(52)))
-                    addView(metaText("${movement.name}\n$sets"), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(10) })
-                }.apply { setPadding(0, dp(5), 0, dp(5)) })
-            }
-        }
-    }
 
     private fun recordFor(exercise: Exercise): String? {
         val sets = repository.data.history.flatMap { workout ->
@@ -2402,11 +2385,6 @@ class MainActivity : AppCompatActivity() {
         SetType.NORMAL -> SetType.WARMUP
         SetType.WARMUP -> SetType.FAILURE
         SetType.FAILURE -> SetType.NORMAL
-    }
-
-    private fun describePlannedSet(exercise: Exercise, set: PlannedSet): String {
-        val amount = if (exercise.type.tracksDuration) "${set.holdSeconds}s" else "${set.reps} reps"
-        return if (exercise.weighted) "${formatWeight(set.weightKg)} kg × $amount" else amount
     }
 
     private fun formatWeight(value: Double): String = String.format(Locale.getDefault(), if (value % 1.0 == 0.0) "%.0f" else "%.1f", value)
