@@ -684,6 +684,9 @@ class WorkoutFlowTest {
 
         onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
         onView(withText(R.string.nav_history)).perform(click())
+        onView(withContentDescription("Front muscle map")).perform(scrollTo()).check(matches(isDisplayed()))
+        onView(withContentDescription("Back muscle map")).check(matches(isDisplayed()))
+        onView(withText("Bench press")).check(doesNotExist())
         onView(withContentDescription("Create routine from Push day")).perform(scrollTo(), click())
 
         onView(withText("New routine")).check(matches(isDisplayed()))

@@ -966,11 +966,7 @@ class MainActivity : AppCompatActivity() {
                 addView(titleText(workout.name))
                 addView(metaText(DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(workout.completedAt ?: workout.startedAt))))
                 addView(metaText("${workout.setCount()} sets · ${formatWeight(workout.totalVolume())} kg volume · ${formatDuration((workout.completedAt ?: workout.startedAt) - workout.startedAt)}"))
-                workout.exercises.forEach { item ->
-                    exercise(item.exerciseId)?.let { movement ->
-                        addView(horizontalActions(exerciseThumbnail(movement, dp(64), dp(48)), metaText("${movement.name}: ${item.sets.size} sets")))
-                    }
-                }
+                addView(workoutMuscleMaps(workout))
                 addView(actionButton("Continue workout") {
                     continueHistoryWorkout(workout)
                 }.apply {
@@ -991,6 +987,26 @@ class MainActivity : AppCompatActivity() {
             route = Route.Confirm(ConfirmAction.RESET_DATA)
             render()
         })
+    }
+
+    private fun workoutMuscleMaps(workout: WorkoutSession): View {
+        val muscleGroups = workout.exercises.mapNotNull { exercise(it.exerciseId) }.flatMap { movement ->
+            listOf(movement.primaryMuscle) + movement.secondaryMuscles.split(',')
+        }.map(String::trim).filter(String::isNotBlank).toSet()
+
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(0, dp(10), 0, dp(10))
+            listOf("Front" to MuscleMapSide.FRONT, "Back" to MuscleMapSide.BACK).forEach { (label, side) ->
+                addView(LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    gravity = Gravity.CENTER
+                    addView(metaText(label).apply { gravity = Gravity.CENTER })
+                    addView(MuscleMapView(this@MainActivity, side, muscleGroups))
+                }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            }
+        }
     }
 
     private fun recordsScreen(): View = page("Records", "Your best logged set for each exercise.") { body ->
