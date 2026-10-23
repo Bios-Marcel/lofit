@@ -15,6 +15,7 @@ import androidx.test.espresso.action.ViewActions.scrollTo
 import androidx.test.espresso.action.ViewActions.swipeLeft
 import androidx.test.espresso.action.ViewActions.typeText
 import androidx.test.espresso.assertion.ViewAssertions.matches
+import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
 import androidx.test.espresso.matcher.ViewMatchers.hasDescendant
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.isChecked
@@ -206,6 +207,53 @@ class WorkoutFlowTest {
     }
 
     @Test
+    fun unweightedExercise_skipsWeightColumnAndLogsRepetitions() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val repository = LofitRepository(instrumentation.targetContext)
+        repository.data.activeWorkout = WorkoutSession(
+            name = "Bodyweight workout",
+            exercises = mutableListOf(WorkoutExercise(
+                exerciseId = "push-up",
+                plannedSets = mutableListOf(PlannedSet(reps = 8)),
+            )),
+        )
+        repository.save()
+        val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        instrumentation.startActivitySync(intent)
+
+        onView(withContentDescription("Set 1 weight")).check(doesNotExist())
+        onView(withContentDescription("Set 1 Repetitions")).perform(replaceText("12"), closeSoftKeyboard())
+        onView(withContentDescription("Set 1 done")).perform(click())
+
+        val loggedSet = LofitRepository(instrumentation.targetContext).data.activeWorkout!!
+            .exercises.single().sets.single()
+        assertEquals(0.0, loggedSet.weightKg, 0.001)
+        assertEquals(12, loggedSet.reps)
+    }
+
+    @Test
+    fun weightedBodyweightCopy_showsWeightColumn() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val repository = LofitRepository(instrumentation.targetContext)
+        repository.data.activeWorkout = WorkoutSession(
+            name = "Weighted bodyweight workout",
+            exercises = mutableListOf(WorkoutExercise(
+                exerciseId = "weighted-push-up",
+                plannedSets = mutableListOf(PlannedSet(weightKg = 10.0, reps = 8)),
+            )),
+        )
+        repository.save()
+        val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        instrumentation.startActivitySync(intent)
+
+        onView(withText("Weighted Push-up")).check(matches(isDisplayed()))
+        onView(withContentDescription("Set 1 weight")).check(matches(withText("10")))
+        onView(withContentDescription("Set 1 Repetitions")).check(matches(withText("8")))
+    }
+
+    @Test
     fun exerciseSearch_matchesEveryPartialWordIgnoringCase() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
@@ -216,6 +264,9 @@ class WorkoutFlowTest {
         onView(withText("Add exercise")).perform(scrollTo(), click())
         onView(withHint("Search name or muscle")).perform(replaceText("SqUa BACK"), closeSoftKeyboard())
         onView(withText("Add Back squat")).check(matches(isDisplayed()))
+        onView(withHint("Search name or muscle")).perform(replaceText("weighted push"), closeSoftKeyboard())
+        onView(withText("Add Weighted Push-up")).perform(scrollTo()).check(matches(isDisplayed()))
+        onView(withText("Add Push-up")).check(doesNotExist())
 
         activity.finish()
     }
@@ -496,7 +547,7 @@ class WorkoutFlowTest {
     }
 
     @Test
-    fun records_listsHighestWeightAndLongestHold() {
+    fun records_listsHighestWeightLongestHoldAndSetVolume() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val repository = LofitRepository(instrumentation.targetContext)
         repository.data.history.add(WorkoutSession(
@@ -529,7 +580,78 @@ class WorkoutFlowTest {
 
         onView(withText("Your best logged set for each exercise.")).check(matches(isDisplayed()))
         onView(withText("82.5 kg")).perform(scrollTo()).check(matches(isDisplayed()))
+        onView(withText("480 kg")).perform(scrollTo()).check(matches(isDisplayed()))
+        onView(withText("Highest set volume")).perform(scrollTo()).check(matches(isDisplayed()))
         onView(withText("65s")).perform(scrollTo()).check(matches(isDisplayed()))
+    }
+
+    @Test
+    fun completedSets_withoutEarlierWorkoutDoNotShowCrown() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val repository = LofitRepository(instrumentation.targetContext)
+        repository.data.activeWorkout = WorkoutSession(
+            name = "Record attempt",
+            exercises = mutableListOf(WorkoutExercise(
+                exerciseId = "bench-press",
+                plannedSets = mutableListOf(
+                    PlannedSet(weightKg = 50.0, reps = 5),
+                    PlannedSet(weightKg = 55.0, reps = 5),
+                ),
+            )),
+        )
+        repository.save()
+        val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        instrumentation.startActivitySync(intent)
+
+        onView(withContentDescription("Set 1 record")).check(matches(not(isDisplayed())))
+        onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
+        onView(withContentDescription("Set 1 record")).check(matches(not(isDisplayed())))
+        onView(withContentDescription("Set 2 done")).perform(scrollTo(), click())
+        onView(withContentDescription("Set 2 record")).check(matches(not(isDisplayed())))
+    }
+
+    @Test
+    fun completedRecordSet_withEarlierWorkoutShowsCrownImmediately() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val repository = LofitRepository(instrumentation.targetContext)
+        repository.data.history.add(WorkoutSession(
+            name = "Old record",
+            completedAt = 100,
+            exercises = mutableListOf(WorkoutExercise(
+                exerciseId = "bench-press",
+                sets = mutableListOf(LoggedSet(type = SetType.NORMAL, weightKg = 60.0, reps = 5)),
+            )),
+        ))
+        repository.data.activeWorkout = WorkoutSession(
+            name = "Record attempt",
+            exercises = mutableListOf(WorkoutExercise(
+                exerciseId = "bench-press",
+                plannedSets = mutableListOf(
+                    PlannedSet(weightKg = 61.0, reps = 5),
+                    PlannedSet(weightKg = 62.0, reps = 5),
+                ),
+            )),
+        )
+        repository.save()
+        val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        instrumentation.startActivitySync(intent)
+
+        onView(withContentDescription("Set 1 record")).check(matches(not(isDisplayed())))
+        onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
+        onView(withContentDescription("Set 1 record")).check(matches(isDisplayed()))
+        val doneLocation = IntArray(2)
+        val crownLocation = IntArray(2)
+        onView(withContentDescription("Set 1 done")).check { view, _ ->
+            view.getLocationOnScreen(doneLocation)
+            assertTrue(view.width <= (48 * view.resources.displayMetrics.density).toInt())
+        }
+        onView(withContentDescription("Set 1 record")).check { view, _ -> view.getLocationOnScreen(crownLocation) }
+        assertTrue(doneLocation[0] < crownLocation[0])
+        onView(withContentDescription("Set 2 done")).perform(scrollTo(), click())
+        onView(withContentDescription("Set 1 record")).check(matches(not(isDisplayed())))
+        onView(withContentDescription("Set 2 record")).check(matches(isDisplayed()))
     }
 
     @Test

@@ -3,12 +3,12 @@ package lofit
 import java.util.UUID
 
 enum class ExerciseType(val label: String) {
-    WEIGHTED_REPS("Repetitions"),
+    REPETITIONS("Repetitions"),
     TIMED("Timed"),
     ;
 
     val tracksDuration: Boolean
-        get() = this != WEIGHTED_REPS
+        get() = this == TIMED
 }
 
 enum class SetType(val label: String) {
@@ -34,6 +34,7 @@ data class Exercise(
     val custom: Boolean = false,
     val imageResource: Int? = null,
     val imageName: String? = null,
+    var weighted: Boolean = type == ExerciseType.REPETITIONS,
 )
 
 data class LoggedSet(
@@ -155,6 +156,7 @@ data class RoutineExercise(
 data class ExerciseRecord(
     val exercise: Exercise,
     val set: LoggedSet,
+    val volumeSet: LoggedSet?,
 )
 
 data class AppData(
@@ -205,11 +207,53 @@ data class AppData(
         }
         val best = sets.maxWithOrNull(
             compareBy<LoggedSet> {
-                if (exercise.type.tracksDuration) it.holdSeconds.toDouble() else it.weightKg
+                when {
+                    exercise.type.tracksDuration -> it.holdSeconds.toDouble()
+                    exercise.weighted -> it.weightKg
+                    else -> it.reps.toDouble()
+                }
             }.thenBy { it.completedAt },
         ) ?: return@mapNotNull null
-        ExerciseRecord(exercise, best)
+        val volumeSet = sets.takeIf { exercise.weighted && !exercise.type.tracksDuration }?.maxWithOrNull(
+            compareBy<LoggedSet> { it.volume() }.thenBy { it.completedAt },
+        )
+        ExerciseRecord(exercise, best, volumeSet)
     }.sortedBy { it.exercise.name.lowercase() }
+
+    fun recordSetIds(workout: WorkoutSession): Set<String> {
+        val records = oneRepMaxes().associateBy { it.exercise.id }
+        val exercisesById = exercises.associateBy { it.id }
+        val recordIds = mutableSetOf<String>()
+
+        workout.exercises
+            .flatMap { item -> item.sets.map { item.exerciseId to it } }
+            .groupBy({ it.first }, { it.second })
+            .forEach { (exerciseId, sets) ->
+                val exercise = exercisesById[exerciseId] ?: return@forEach
+                val previousRecord = records[exerciseId] ?: return@forEach
+                if (exercise.type.tracksDuration) {
+                    sets.maxWithOrNull(compareBy<LoggedSet> { it.holdSeconds }.thenBy { it.completedAt })
+                        ?.takeIf { it.holdSeconds > previousRecord.set.holdSeconds }
+                        ?.let { recordIds.add(it.id) }
+                } else if (exercise.weighted) {
+                    sets.maxWithOrNull(compareBy<LoggedSet> { it.weightKg }.thenBy { it.completedAt })
+                        ?.takeIf { it.weightKg > previousRecord.set.weightKg }
+                        ?.let { recordIds.add(it.id) }
+                    val previousVolume = previousRecord.volumeSet?.volume()
+                    if (previousVolume != null) {
+                        sets.maxWithOrNull(compareBy<LoggedSet> { it.volume() }.thenBy { it.completedAt })
+                            ?.takeIf { it.volume() > previousVolume }
+                            ?.let { recordIds.add(it.id) }
+                    }
+                } else {
+                    sets.maxWithOrNull(compareBy<LoggedSet> { it.reps }.thenBy { it.completedAt })
+                        ?.takeIf { it.reps > previousRecord.set.reps }
+                        ?.let { recordIds.add(it.id) }
+                }
+            }
+
+        return recordIds
+    }
 }
 
 object DefaultData {

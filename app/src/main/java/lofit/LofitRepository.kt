@@ -40,6 +40,7 @@ class LofitRepository(context: Context) {
         put("primaryMuscle", exercise.primaryMuscle)
         put("secondaryMuscles", exercise.secondaryMuscles)
         put("minimumHoldSeconds", exercise.minimumHoldSeconds)
+        put("weighted", exercise.weighted)
         put("custom", exercise.custom)
         put("imageResource", exercise.imageResource ?: JSONObject.NULL)
         put("imageName", exercise.imageName ?: JSONObject.NULL)
@@ -117,16 +118,17 @@ class LofitRepository(context: Context) {
     }
 
     private fun decodeExercise(value: JSONObject) = Exercise(
-        value.getString("id"),
-        value.getString("name"),
-        decodeExerciseType(value.getString("type")),
-        value.optBoolean("asymmetric"),
-        value.optString("primaryMuscle"),
-        value.optString("secondaryMuscles"),
-        value.optInt("minimumHoldSeconds", 30),
-        value.optBoolean("custom"),
-        value.optInt("imageResource").takeIf { !value.isNull("imageResource") },
-        value.optString("imageName").takeIf { !value.isNull("imageName") },
+        id = value.getString("id"),
+        name = value.getString("name"),
+        type = decodeExerciseType(value.getString("type")),
+        asymmetric = value.optBoolean("asymmetric"),
+        primaryMuscle = value.optString("primaryMuscle"),
+        secondaryMuscles = value.optString("secondaryMuscles"),
+        minimumHoldSeconds = value.optInt("minimumHoldSeconds", 30),
+        custom = value.optBoolean("custom"),
+        imageResource = value.optInt("imageResource").takeIf { !value.isNull("imageResource") },
+        imageName = value.optString("imageName").takeIf { !value.isNull("imageName") },
+        weighted = value.optBoolean("weighted", true),
     )
 
     private fun decodeRoutine(value: JSONObject) = Routine(
@@ -239,6 +241,7 @@ class LofitRepository(context: Context) {
         }?.toMutableList() ?: mutableListOf()
 
     private fun decodeExerciseType(value: String): ExerciseType = when (value) {
+        "WEIGHTED_REPS" -> ExerciseType.REPETITIONS
         "WEIGHTED_HOLD", "ISOMETRIC", "STRETCH" -> ExerciseType.TIMED
         else -> ExerciseType.valueOf(value)
     }

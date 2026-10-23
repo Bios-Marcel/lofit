@@ -1,8 +1,10 @@
 package lofit
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WorkoutSessionTest {
@@ -144,7 +146,7 @@ class WorkoutSessionTest {
         val exercises = DefaultData.exercises()
 
         assertEquals(listOf("Repetitions", "Timed"), ExerciseType.entries.map { it.label })
-        assertEquals(422, exercises.size)
+        assertEquals(460, exercises.size)
         assert(exercises.map { it.id }.containsAll(listOf(
             "push-up",
             "close-grip-push-up",
@@ -159,8 +161,27 @@ class WorkoutSessionTest {
             "clap-push-up",
             "spiderman-push-up",
         )))
-        assert(exercises.any { it.type == ExerciseType.WEIGHTED_REPS })
+        assert(exercises.any { it.type == ExerciseType.REPETITIONS })
         assert(exercises.count { it.type == ExerciseType.TIMED } >= 80)
+        assertFalse(exercises.single { it.id == "push-up" }.weighted)
+        assertTrue(exercises.single { it.id == "bench-press" }.weighted)
+        assertFalse(exercises.single { it.id == "plank" }.weighted)
+        assertTrue(exercises.single { it.id == "farmer-carry" }.weighted)
+        assertFalse(exercises.single { it.id == "fedb-bodyweight-flyes" }.weighted)
+        val weightedCopies = exercises.filter { it.id.startsWith("weighted-") }
+        assertEquals(38, weightedCopies.size)
+        weightedCopies.forEach { copy ->
+            val original = exercises.single { it.id == copy.id.removePrefix("weighted-") }
+            assertFalse(original.weighted)
+            assertTrue(copy.weighted)
+            assertEquals("Weighted ${original.name}", copy.name)
+            assertEquals(original.type, copy.type)
+            assertEquals(original.asymmetric, copy.asymmetric)
+            assertEquals(original.primaryMuscle, copy.primaryMuscle)
+            assertEquals(original.secondaryMuscles, copy.secondaryMuscles)
+            assertEquals(original.imageResource, copy.imageResource)
+            assertEquals(original.imageName, copy.imageName)
+        }
         assert(exercises.count { it.asymmetric } >= 50)
         val shoulderRotations = exercises.filter { it.name.contains("Rotation", ignoreCase = true) && it.primaryMuscle == "Rotator cuff" }
         assert(shoulderRotations.size >= 8)
@@ -272,8 +293,8 @@ class WorkoutSessionTest {
     }
 
     @Test
-    fun oneRepMaxes_useHighestWeightOrLongestHoldFromHistory() {
-        val bench = Exercise("bench", "Bench", ExerciseType.WEIGHTED_REPS, false, "Chest", "")
+    fun oneRepMaxes_useHighestWeightLongestHoldAndSetVolumeFromHistory() {
+        val bench = Exercise("bench", "Bench", ExerciseType.REPETITIONS, false, "Chest", "")
         val plank = Exercise("plank-test", "Plank", ExerciseType.TIMED, false, "Core", "")
         val data = AppData(
             exercises = mutableListOf(bench, plank),
@@ -308,6 +329,120 @@ class WorkoutSessionTest {
         val records = data.oneRepMaxes().associateBy { it.exercise.id }
 
         assertEquals(75.0, records.getValue(bench.id).set.weightKg, 0.001)
+        assertEquals(480.0, records.getValue(bench.id).volumeSet!!.volume(), 0.001)
         assertEquals(55, records.getValue(plank.id).set.holdSeconds)
+        assertNull(records.getValue(plank.id).volumeSet)
+    }
+
+    @Test
+    fun oneRepMaxes_useRepetitionsForUnweightedExercise() {
+        val pushUp = Exercise("push-up-test", "Push-up", ExerciseType.REPETITIONS, false, "Chest", "", weighted = false)
+        val data = AppData(
+            exercises = mutableListOf(pushUp),
+            history = mutableListOf(WorkoutSession(
+                name = "Bodyweight records",
+                exercises = mutableListOf(WorkoutExercise(
+                    exerciseId = pushUp.id,
+                    sets = mutableListOf(
+                        LoggedSet(type = SetType.NORMAL, weightKg = 50.0, reps = 5),
+                        LoggedSet(type = SetType.NORMAL, weightKg = 0.0, reps = 20),
+                    ),
+                )),
+            )),
+        )
+
+        val record = data.oneRepMaxes().single()
+
+        assertEquals(20, record.set.reps)
+        assertNull(record.volumeSet)
+    }
+
+    @Test
+    fun recordSetIds_markRepetitionRecordsForUnweightedExercise() {
+        val pushUp = Exercise("push-up-test", "Push-up", ExerciseType.REPETITIONS, false, "Chest", "", weighted = false)
+        val data = AppData(
+            exercises = mutableListOf(pushUp),
+            history = mutableListOf(WorkoutSession(
+                name = "Old record",
+                exercises = mutableListOf(WorkoutExercise(
+                    exerciseId = pushUp.id,
+                    sets = mutableListOf(LoggedSet(type = SetType.NORMAL, weightKg = 0.0, reps = 10)),
+                )),
+            )),
+        )
+        val record = LoggedSet(id = "rep-record", type = SetType.NORMAL, weightKg = 0.0, reps = 12, completedAt = 10)
+        val noRecord = LoggedSet(id = "no-record", type = SetType.NORMAL, weightKg = 0.0, reps = 11, completedAt = 20)
+        val workout = WorkoutSession(
+            name = "New record",
+            exercises = mutableListOf(WorkoutExercise(exerciseId = pushUp.id, sets = mutableListOf(record, noRecord))),
+        )
+
+        assertEquals(setOf("rep-record"), data.recordSetIds(workout))
+    }
+
+    @Test
+    fun recordSetIds_markRecordsInCompletionOrder() {
+        val bench = Exercise("bench", "Bench", ExerciseType.REPETITIONS, false, "Chest", "")
+        val plank = Exercise("plank-test", "Plank", ExerciseType.TIMED, false, "Core", "")
+        val weightRecord = LoggedSet(id = "weight-record", type = SetType.NORMAL, weightKg = 65.0, reps = 4, completedAt = 10)
+        val volumeRecord = LoggedSet(id = "volume-record", type = SetType.NORMAL, weightKg = 60.0, reps = 6, completedAt = 20)
+        val noRecord = LoggedSet(id = "no-record", type = SetType.NORMAL, weightKg = 62.0, reps = 5, completedAt = 30)
+        val holdRecord = LoggedSet(id = "hold-record", type = SetType.NORMAL, weightKg = 0.0, holdSeconds = 50, completedAt = 40)
+        val data = AppData(
+            exercises = mutableListOf(bench, plank),
+            history = mutableListOf(WorkoutSession(
+                name = "Old records",
+                exercises = mutableListOf(
+                    WorkoutExercise(exerciseId = bench.id, sets = mutableListOf(LoggedSet(type = SetType.NORMAL, weightKg = 60.0, reps = 5))),
+                    WorkoutExercise(exerciseId = plank.id, sets = mutableListOf(LoggedSet(type = SetType.NORMAL, weightKg = 0.0, holdSeconds = 45))),
+                ),
+            )),
+        )
+        val workout = WorkoutSession(
+            name = "New records",
+            exercises = mutableListOf(
+                WorkoutExercise(exerciseId = bench.id, sets = mutableListOf(weightRecord, volumeRecord, noRecord)),
+                WorkoutExercise(exerciseId = plank.id, sets = mutableListOf(holdRecord)),
+            ),
+        )
+
+        assertEquals(setOf("weight-record", "volume-record", "hold-record"), data.recordSetIds(workout))
+    }
+
+    @Test
+    fun recordSetIds_keepOnlyLatestBestSetForSameRecordType() {
+        val squat = Exercise("squat", "Squat", ExerciseType.REPETITIONS, false, "Quadriceps", "")
+        val data = AppData(
+            exercises = mutableListOf(squat),
+            history = mutableListOf(WorkoutSession(
+                name = "Old record",
+                exercises = mutableListOf(WorkoutExercise(
+                    exerciseId = squat.id,
+                    sets = mutableListOf(LoggedSet(type = SetType.NORMAL, weightKg = 0.5, reps = 5)),
+                )),
+            )),
+        )
+        val firstRecord = LoggedSet(id = "first-record", type = SetType.NORMAL, weightKg = 1.0, reps = 5, completedAt = 10)
+        val secondRecord = LoggedSet(id = "second-record", type = SetType.NORMAL, weightKg = 2.0, reps = 5, completedAt = 20)
+        val workout = WorkoutSession(
+            name = "New records",
+            exercises = mutableListOf(WorkoutExercise(exerciseId = squat.id, sets = mutableListOf(firstRecord, secondRecord))),
+        )
+
+        assertEquals(setOf("second-record"), data.recordSetIds(workout))
+    }
+
+    @Test
+    fun recordSetIds_requireEarlierWorkoutWithExercise() {
+        val bench = Exercise("bench", "Bench", ExerciseType.REPETITIONS, false, "Chest", "")
+        val first = LoggedSet(id = "first", type = SetType.NORMAL, weightKg = 50.0, reps = 5, completedAt = 10)
+        val second = LoggedSet(id = "second", type = SetType.NORMAL, weightKg = 55.0, reps = 5, completedAt = 20)
+        val data = AppData(exercises = mutableListOf(bench))
+        val workout = WorkoutSession(
+            name = "First workout",
+            exercises = mutableListOf(WorkoutExercise(exerciseId = bench.id, sets = mutableListOf(first, second))),
+        )
+
+        assertEquals(emptySet<String>(), data.recordSetIds(workout))
     }
 }
