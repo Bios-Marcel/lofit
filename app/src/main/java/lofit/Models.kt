@@ -109,24 +109,29 @@ data class WorkoutSession(
     fun toRoutine(): Routine = Routine(
         name = name,
         defaultRestSeconds = defaultRestSeconds,
-        exercises = exercises.mapNotNull { item ->
+        exercises = exercises.map { item ->
             val plannedSetOrder = item.plannedSets.mapIndexed { index, set -> set.id to index }.toMap()
             val sets = item.sets.sortedBy { plannedSetOrder[it.plannedSetId] ?: Int.MAX_VALUE }
-            if (sets.isEmpty()) return@mapNotNull null
-            val plannedSets = sets.map { set ->
-                PlannedSet(
-                    type = set.type,
-                    weightKg = set.weightKg,
-                    reps = set.reps,
-                    holdSeconds = set.holdSeconds,
-                    side = set.side,
-                )
-            }.toMutableList()
+            val plannedSets = if (sets.isNotEmpty()) {
+                sets.map { set ->
+                    PlannedSet(
+                        type = set.type,
+                        weightKg = set.weightKg,
+                        reps = set.reps,
+                        holdSeconds = set.holdSeconds,
+                        side = set.side,
+                    )
+                }.toMutableList()
+            } else {
+                item.plannedSets.map { set ->
+                    set.copy(id = UUID.randomUUID().toString(), actualHoldSeconds = null)
+                }.toMutableList()
+            }
             RoutineExercise(
                 exerciseId = item.exerciseId,
                 targetSets = plannedSets.size,
-                targetReps = plannedSets.first().reps,
-                targetHoldSeconds = plannedSets.first().holdSeconds,
+                targetReps = plannedSets.firstOrNull()?.reps ?: item.targetReps ?: 8,
+                targetHoldSeconds = plannedSets.firstOrNull()?.holdSeconds ?: item.targetHoldSeconds ?: 30,
                 restSecondsOverride = item.restSecondsOverride,
                 plannedSets = plannedSets,
             )

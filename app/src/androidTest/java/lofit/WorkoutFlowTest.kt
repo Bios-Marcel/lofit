@@ -655,21 +655,27 @@ class WorkoutFlowTest {
     }
 
     @Test
-    fun historyEntry_canCreatePrefilledRoutine() {
+    fun historyEntry_canCreatePrefilledRoutineWithEveryExercise() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val repository = LofitRepository(instrumentation.targetContext)
         repository.data.history.add(WorkoutSession(
             name = "Push day",
             completedAt = 200,
             defaultRestSeconds = 120,
-            exercises = mutableListOf(WorkoutExercise(
-                exerciseId = "bench-press",
-                restSecondsOverride = 75,
-                sets = mutableListOf(
-                    LoggedSet(type = SetType.WARMUP, weightKg = 20.0, reps = 10),
-                    LoggedSet(type = SetType.NORMAL, weightKg = 67.5, reps = 6),
+            exercises = mutableListOf(
+                WorkoutExercise(
+                    exerciseId = "bench-press",
+                    restSecondsOverride = 75,
+                    sets = mutableListOf(
+                        LoggedSet(type = SetType.WARMUP, weightKg = 20.0, reps = 10),
+                        LoggedSet(type = SetType.NORMAL, weightKg = 67.5, reps = 6),
+                    ),
                 ),
-            )),
+                WorkoutExercise(
+                    exerciseId = "plank",
+                    plannedSets = mutableListOf(PlannedSet(holdSeconds = 45)),
+                ),
+            ),
         ))
         repository.save()
         val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
@@ -682,6 +688,7 @@ class WorkoutFlowTest {
 
         onView(withText("New routine")).check(matches(isDisplayed()))
         onView(withHint("Routine name")).check(matches(withText("Push day")))
+        onView(withText("Plank")).perform(scrollTo()).check(matches(isDisplayed()))
         onView(withContentDescription("Set 1 weight")).check(matches(withText("20")))
         onView(withContentDescription("Set 2 weight")).check(matches(withText("67.5")))
         onView(withText("Add Exercise")).perform(scrollTo())
@@ -698,15 +705,17 @@ class WorkoutFlowTest {
             view.getLocationOnScreen(buttonLocation)
             assertTrue(buttonLocation[1] >= exerciseCardBottom)
         }
-        onView(withContentDescription("Routine actions separator")).check(matches(isDisplayed()))
+        onView(withContentDescription("Routine actions separator")).perform(scrollTo()).check(matches(isDisplayed()))
         onView(withText("Save routine")).perform(scrollTo(), click())
 
         val routine = LofitRepository(instrumentation.targetContext).data.routines.single()
         assertEquals("Push day", routine.name)
         assertEquals(120, routine.defaultRestSeconds)
-        assertEquals(75, routine.exercises.single().restSecondsOverride)
-        assertEquals(listOf(20.0, 67.5), routine.exercises.single().plannedSets.map { it.weightKg })
-        assertEquals(listOf(10, 6), routine.exercises.single().plannedSets.map { it.reps })
+        assertEquals(listOf("bench-press", "plank"), routine.exercises.map { it.exerciseId })
+        assertEquals(75, routine.exercises[0].restSecondsOverride)
+        assertEquals(listOf(20.0, 67.5), routine.exercises[0].plannedSets.map { it.weightKg })
+        assertEquals(listOf(10, 6), routine.exercises[0].plannedSets.map { it.reps })
+        assertEquals(listOf(45), routine.exercises[1].plannedSets.map { it.holdSeconds })
     }
 
     @Test

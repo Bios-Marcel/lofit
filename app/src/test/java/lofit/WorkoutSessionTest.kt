@@ -59,6 +59,7 @@ class WorkoutSessionTest {
     fun historyWorkout_convertsCompletedWorkToRoutine() {
         val firstPlannedSet = PlannedSet(weightKg = 60.0, reps = 8)
         val secondPlannedSet = PlannedSet(type = SetType.FAILURE, weightKg = 70.0, reps = 4, side = Side.RIGHT)
+        val unloggedPlankSet = PlannedSet(weightKg = 10.0, holdSeconds = 45)
         val workout = WorkoutSession(
             name = "Push day",
             defaultRestSeconds = 120,
@@ -72,7 +73,11 @@ class WorkoutSessionTest {
                         LoggedSet(type = firstPlannedSet.type, weightKg = 62.5, reps = 7, plannedSetId = firstPlannedSet.id),
                     ),
                 ),
-                WorkoutExercise(exerciseId = "plank"),
+                WorkoutExercise(
+                    exerciseId = "plank",
+                    restSecondsOverride = 30,
+                    plannedSets = mutableListOf(unloggedPlankSet),
+                ),
             ),
         )
 
@@ -80,12 +85,18 @@ class WorkoutSessionTest {
 
         assertEquals("Push day", routine.name)
         assertEquals(120, routine.defaultRestSeconds)
-        assertEquals(1, routine.exercises.size)
-        assertEquals(75, routine.exercises.single().restSecondsOverride)
-        assertEquals(listOf(62.5, 72.5), routine.exercises.single().plannedSets.map { it.weightKg })
-        assertEquals(listOf(7, 3), routine.exercises.single().plannedSets.map { it.reps })
-        assertEquals(listOf(SetType.NORMAL, SetType.FAILURE), routine.exercises.single().plannedSets.map { it.type })
-        assertEquals(listOf(Side.BOTH, Side.RIGHT), routine.exercises.single().plannedSets.map { it.side })
+        assertEquals(listOf("bench-press", "plank"), routine.exercises.map { it.exerciseId })
+        val bench = routine.exercises[0]
+        assertEquals(75, bench.restSecondsOverride)
+        assertEquals(listOf(62.5, 72.5), bench.plannedSets.map { it.weightKg })
+        assertEquals(listOf(7, 3), bench.plannedSets.map { it.reps })
+        assertEquals(listOf(SetType.NORMAL, SetType.FAILURE), bench.plannedSets.map { it.type })
+        assertEquals(listOf(Side.BOTH, Side.RIGHT), bench.plannedSets.map { it.side })
+        val plank = routine.exercises[1]
+        assertEquals(30, plank.restSecondsOverride)
+        assertEquals(listOf(45), plank.plannedSets.map { it.holdSeconds })
+        assertEquals(listOf(10.0), plank.plannedSets.map { it.weightKg })
+        assertTrue(plank.plannedSets.single().id != unloggedPlankSet.id)
     }
 
     @Test
