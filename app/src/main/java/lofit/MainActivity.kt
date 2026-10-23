@@ -128,6 +128,7 @@ class MainActivity : AppCompatActivity() {
         data class ExercisePicker(val target: PickerTarget, val returnScrollY: Int? = null) : Route()
         data class RoutineEditor(val originalId: String?) : Route()
         data class ExerciseEditor(val exerciseId: String?) : Route()
+        data class WorkoutHistory(val workoutId: String, val returnScrollY: Int) : Route()
         data class Confirm(val action: ConfirmAction, val targetId: String? = null) : Route()
     }
 
@@ -285,6 +286,8 @@ class MainActivity : AppCompatActivity() {
             is Route.ExercisePicker -> exercisePickerScreen(activeRoute)
             is Route.RoutineEditor -> routineEditorScreen(activeRoute.originalId)
             is Route.ExerciseEditor -> exerciseEditorScreen(activeRoute.exerciseId)
+            is Route.WorkoutHistory -> repository.data.history.firstOrNull { it.id == activeRoute.workoutId }
+                ?.let(::pastWorkoutScreen) ?: historyScreen()
             is Route.Confirm -> confirmationScreen(activeRoute)
         }
         content.addView(view)
@@ -340,6 +343,12 @@ class MainActivity : AppCompatActivity() {
                     }
                 })
             })
+        })
+        body.addView(sectionTitle("App data"))
+        body.addView(metaText("Remove workout history, routines, custom exercises, and any active workout. Default exercises will be restored."))
+        body.addView(actionButton("Reset all app data", secondary = true) {
+            route = Route.Confirm(ConfirmAction.RESET_DATA)
+            render()
         })
     }
 
@@ -961,32 +970,102 @@ class MainActivity : AppCompatActivity() {
     private fun historyScreen(): View = page("History", "Your training stays on this device.") { body ->
         val history = repository.data.history.sortedByDescending { it.completedAt }
         if (history.isEmpty()) body.addView(emptyText("Complete a workout and it will appear here."))
-        history.forEach { workout ->
+        history.forEachIndexed { index, workout ->
             body.addView(card {
                 addView(titleText(workout.name))
                 addView(metaText(DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(workout.completedAt ?: workout.startedAt))))
                 addView(metaText("${workout.setCount()} sets · ${formatWeight(workout.totalVolume())} kg volume · ${formatDuration((workout.completedAt ?: workout.startedAt) - workout.startedAt)}"))
                 addView(workoutMuscleMaps(workout))
-                addView(actionButton("Continue workout") {
-                    continueHistoryWorkout(workout)
-                }.apply {
-                    contentDescription = "Continue ${workout.name}"
-                })
-                addView(actionButton("Create routine", secondary = true) {
-                    routineDraft = workout.toRoutine()
-                    route = Route.RoutineEditor(null)
-                    render()
-                }.apply {
-                    contentDescription = "Create routine from ${workout.name}"
+                if (index == 0) {
+                    addView(actionButton("Continue workout") {
+                        continueHistoryWorkout(workout)
+                    }.apply {
+                        contentDescription = "Continue ${workout.name}"
+                    }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                        topMargin = dp(12)
+                    })
+                }
+                addView(LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    addView(actionButton("View workout") {
+                        route = Route.WorkoutHistory(workout.id, (content.getChildAt(0) as? ScrollView)?.scrollY ?: 0)
+                        render()
+                    }.apply {
+                        contentDescription = "View ${workout.name}"
+                    }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                        marginEnd = dp(12)
+                    })
+                    addView(actionButton("Create routine", secondary = true) {
+                        routineDraft = workout.toRoutine()
+                        route = Route.RoutineEditor(null)
+                        render()
+                    }.apply {
+                        contentDescription = "Create routine from ${workout.name}"
+                    }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    topMargin = dp(12)
                 })
             })
         }
-        body.addView(sectionTitle("App data"))
-        body.addView(metaText("Remove workout history, routines, custom exercises, and any active workout. Default exercises will be restored."))
-        body.addView(actionButton("Reset all app data", secondary = true) {
-            route = Route.Confirm(ConfirmAction.RESET_DATA)
-            render()
-        })
+    }
+
+    private fun pastWorkoutScreen(workout: WorkoutSession): View = page(
+        workout.name,
+        DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
+            .format(Date(workout.completedAt ?: workout.startedAt)),
+        headerEnd = titleText(formatDuration((workout.completedAt ?: workout.startedAt) - workout.startedAt)).apply {
+            contentDescription = "Workout duration"
+        },
+    ) { body ->
+        body.addView(metaText("${workout.setCount()} sets · ${formatWeight(workout.totalVolume())} kg volume"))
+        body.addView(metaText("Set Rest: ${workout.defaultRestSeconds}s"))
+        workout.exercises.forEach { item ->
+            exercise(item.exerciseId)?.let { movement ->
+                body.addView(card(horizontalPadding = 0) {
+                    addView(exerciseHeading(movement, large = true, showMuscle = false), insetCardLayoutParams())
+                    val actionWidth = SET_DONE_ACTION_WIDTH_DP + SET_RECORD_ACTION_WIDTH_DP
+                    addView(plannedSetHeader(movement, "Done", endWidth = actionWidth,
+                        showActiveHold = movement.type.tracksDuration, showHoldAction = false))
+                    val displayedSetIds = mutableSetOf<String>()
+                    fun addSet(plannedSet: PlannedSet, loggedSet: LoggedSet?, index: Int) {
+                        loggedSet?.let { displayedSetIds.add(it.id) }
+                        val displaySet = plannedSet.copy(
+                            type = loggedSet?.type ?: plannedSet.type,
+                            weightKg = loggedSet?.weightKg ?: plannedSet.weightKg,
+                            reps = loggedSet?.reps ?: plannedSet.reps,
+                            actualHoldSeconds = loggedSet?.holdSeconds ?: plannedSet.actualHoldSeconds,
+                            side = loggedSet?.side ?: plannedSet.side,
+                        )
+                        addView(plannedSetEditor(
+                            exercise = movement,
+                            plannedSet = displaySet,
+                            setIndex = index,
+                            endAction = LinearLayout(this@MainActivity).apply {
+                                addView(largeCheckBox().apply {
+                                    isChecked = loggedSet != null
+                                    isEnabled = false
+                                    isClickable = false
+                                    isFocusable = false
+                                    contentDescription = "Set ${index + 1} done"
+                                }, LinearLayout.LayoutParams(dp(SET_DONE_ACTION_WIDTH_DP), dp(56)))
+                            },
+                            endActionWidth = actionWidth,
+                            endActionHeight = 56,
+                            completed = loggedSet != null,
+                            showActiveHold = movement.type.tracksDuration,
+                            readOnly = true,
+                        ))
+                    }
+                    item.plannedSets.forEachIndexed { index, set -> addSet(set, loggedSetFor(item, set, index), index) }
+                    var nextIndex = item.plannedSets.size
+                    item.sets.filter { it.id !in displayedSetIds }.forEach { set ->
+                        addSet(PlannedSet(holdSeconds = set.holdSeconds), set, nextIndex++)
+                    }
+                    addView(metaText("Set Rest: ${item.restSeconds(workout.defaultRestSeconds)}s"), insetCardLayoutParams())
+                })
+            }
+        }
     }
 
     private fun workoutMuscleMaps(workout: WorkoutSession): View {
@@ -1261,9 +1340,11 @@ class MainActivity : AppCompatActivity() {
             }
             else -> Route.Root
         }
-        render((previousRoute as? Route.ExercisePicker)
-            ?.takeIf { it.target == PickerTarget.WORKOUT }
-            ?.returnScrollY)
+        render(when (previousRoute) {
+            is Route.ExercisePicker -> previousRoute.takeIf { it.target == PickerTarget.WORKOUT }?.returnScrollY
+            is Route.WorkoutHistory -> previousRoute.returnScrollY
+            else -> null
+        })
     }
 
     private fun startRest(item: WorkoutExercise, workout: WorkoutSession) {
@@ -1980,6 +2061,7 @@ class MainActivity : AppCompatActivity() {
         onRemoveAndBelow: (() -> Unit)? = null,
         showActiveHold: Boolean = false,
         activeHoldRunning: Boolean = false,
+        readOnly: Boolean = false,
         onAmountReady: (EditText) -> Unit = {},
         onActiveAmountReady: (EditText) -> Unit = {},
         onIndexUpdaterReady: ((Int) -> Unit) -> Unit = {},
@@ -1989,7 +2071,9 @@ class MainActivity : AppCompatActivity() {
         return LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         if (completed) setBackgroundColor(color(R.color.done_green))
-        val setNumber = smallButton(setKindMarker(setIndex, plannedSet.type)) {}.apply {
+        val setNumber = if (readOnly) readOnlySetField(
+            setKindMarker(setIndex, plannedSet.type), "Set ${setIndex + 1} type: ${plannedSet.type.label}",
+        ).apply { gravity = Gravity.CENTER } else smallButton(setKindMarker(setIndex, plannedSet.type)) {}.apply {
             fun updateType(type: SetType) {
                 plannedSet.type = type
                 text = setKindMarker(currentSetIndex, type)
@@ -2002,7 +2086,8 @@ class MainActivity : AppCompatActivity() {
             }
         }
         val weight = if (exercise.weighted) {
-            decimalField("Weight in kg").apply {
+            if (readOnly) readOnlySetField(formatWeight(plannedSet.weightKg), "Set ${setIndex + 1} weight")
+            else decimalField("Weight in kg").apply {
                 setText(formatWeight(plannedSet.weightKg))
                 contentDescription = "Set ${currentSetIndex + 1} weight"
                 setPadding(dp(6), 0, dp(6), 0)
@@ -2020,7 +2105,8 @@ class MainActivity : AppCompatActivity() {
             else -> "Hold duration in seconds"
         }
         val amountValue = if (!exercise.type.tracksDuration) plannedSet.reps else plannedSet.holdSeconds
-        val amount = numberField(amountLabel).apply {
+        val amount = if (readOnly) readOnlySetField(formatInteger(amountValue), "Set ${setIndex + 1} $amountLabel")
+        else numberField(amountLabel).apply {
             setText(formatInteger(amountValue))
             contentDescription = "Set ${currentSetIndex + 1} $amountLabel"
             setPadding(dp(6), 0, dp(6), 0)
@@ -2032,9 +2118,10 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        onAmountReady(amount)
+        if (amount is EditText) onAmountReady(amount)
         val activeAmount = if (exercise.type.tracksDuration && showActiveHold) {
-            numberField("Active time in seconds").apply {
+            if (readOnly) readOnlySetField(formatInteger(plannedSet.actualHoldSeconds ?: 0), "Set ${setIndex + 1} Active time in seconds")
+            else numberField("Active time in seconds").apply {
                 setText(formatInteger(plannedSet.actualHoldSeconds ?: 0))
                 contentDescription = "Set ${currentSetIndex + 1} Active time in seconds"
                 setPadding(dp(6), 0, dp(6), 0)
@@ -2120,7 +2207,9 @@ class MainActivity : AppCompatActivity() {
         } else {
             addView(fields)
         }
-        val sideChoice = if (exercise.asymmetric) choiceGroup(Side.entries.map { it.label }, plannedSet.side.ordinal).apply {
+        val sideChoice = if (exercise.asymmetric && readOnly) {
+            readOnlySetField(plannedSet.side.label, "Set ${currentSetIndex + 1} side")
+        } else if (exercise.asymmetric) choiceGroup(Side.entries.map { it.label }, plannedSet.side.ordinal).apply {
             contentDescription = "Set ${currentSetIndex + 1} side"
             setOnCheckedChangeListener { _, checkedId ->
                 plannedSet.side = Side.entries[(checkedId - 1).coerceAtLeast(0)]
@@ -2143,6 +2232,15 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun readOnlySetField(value: String, description: String): TextView = TextView(this).apply {
+        text = value
+        textSize = 16f
+        setTextColor(color(R.color.cream))
+        gravity = Gravity.START or Gravity.CENTER_VERTICAL
+        setPadding(dp(6), 0, dp(6), 0)
+        contentDescription = description
+    }
+
     private fun swipeDeleteButton(label: String, description: String, action: () -> Unit): MaterialButton =
         smallButton(label, action).apply {
             contentDescription = description
@@ -2155,6 +2253,7 @@ class MainActivity : AppCompatActivity() {
         endLabel: String?,
         endWidth: Int = 48,
         showActiveHold: Boolean = false,
+        showHoldAction: Boolean = true,
     ): View = GridLayout(this).apply {
         val activeGrid = exercise.type.tracksDuration && showActiveHold
         val columns = setGridColumnWidths(exercise.weighted, activeGrid, endLabel?.let { endWidth } ?: 0)
@@ -2177,12 +2276,12 @@ class MainActivity : AppCompatActivity() {
                 addView(setGridHeader("Weight"), setGridCell(columns[1]))
                 addView(setGridHeader("Target"), setGridCell(columns[2]))
                 addView(setGridHeader("Active"), setGridCell(columns[3]))
-                endLabel?.let { addView(timedSetActionHeader(endWidth), setGridCell(columns[4])) }
+                endLabel?.let { addView(if (showHoldAction) timedSetActionHeader(endWidth) else doneSetActionHeader(), setGridCell(columns[4])) }
             }
             activeGrid -> {
                 addView(setGridHeader("Target"), setGridCell(columns[1]))
                 addView(setGridHeader("Active"), setGridCell(columns[2]))
-                endLabel?.let { addView(timedSetActionHeader(endWidth), setGridCell(columns[3])) }
+                endLabel?.let { addView(if (showHoldAction) timedSetActionHeader(endWidth) else doneSetActionHeader(), setGridCell(columns[3])) }
             }
             exercise.weighted -> {
                 addView(setGridHeader("Weight"), setGridCell(columns[1]))
