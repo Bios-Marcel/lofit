@@ -30,6 +30,7 @@ import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import com.google.android.material.card.MaterialCardView
 import android.view.View
+import android.view.ViewGroup
 import android.widget.CheckBox
 import android.widget.ScrollView
 import java.time.LocalDate
@@ -57,6 +58,23 @@ class WorkoutFlowTest {
             .edit()
             .clear()
             .commit()
+    }
+
+    @Test
+    fun home_placesStartWorkoutInRoutinesSection() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        instrumentation.startActivitySync(intent)
+
+        val routinesTitle = arrayOfNulls<View>(1)
+        val startButton = arrayOfNulls<View>(1)
+        onView(allOf(withText("Routines"), isDisplayed())).check { view, _ -> routinesTitle[0] = view }
+        onView(withText(R.string.start_workout)).check { view, _ -> startButton[0] = view }
+
+        val parent = routinesTitle[0]?.parent as ViewGroup
+        assertSame(parent, startButton[0]?.parent)
+        assertEquals(parent.indexOfChild(routinesTitle[0]) + 1, parent.indexOfChild(startButton[0]))
     }
 
     @Test

@@ -341,14 +341,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun workoutHome(): View = page("Ready to move?", "Local, focused, yours.") { body ->
+        body.addView(workoutCalendar())
+        body.addView(sectionTitle("Routines"))
         body.addView(actionButton(getString(R.string.start_workout)) {
             repository.data.activeWorkout = WorkoutSession(name = "Open workout")
             repository.save()
             ensureWorkoutNotification()
             render()
         })
-        body.addView(workoutCalendar())
-        body.addView(sectionTitle("Saved routines"))
         if (repository.data.routines.isEmpty()) {
             body.addView(emptyText("No routines yet. Build one in the Routines tab, or start empty and add exercises as you go."))
         }
