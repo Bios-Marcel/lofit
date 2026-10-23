@@ -360,6 +360,8 @@ class MainActivity : AppCompatActivity() {
             repository.save()
             ensureWorkoutNotification()
             render()
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            bottomMargin = dp(16)
         })
         if (repository.data.routines.isEmpty()) {
             body.addView(emptyText("No routines yet. Build one in the Routines tab, or start empty and add exercises as you go."))
@@ -671,7 +673,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun routinesScreen(): View = page("Routines", "Prescribe each movement before you train.") { body ->
-        body.addView(actionButton("Create routine") { openRoutineEditor(null) })
+        body.addView(actionButton("Create routine") { openRoutineEditor(null) },
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                bottomMargin = dp(16)
+            })
         if (repository.data.routines.isEmpty()) body.addView(emptyText("No routines saved."))
         repository.data.routines.forEach { routine ->
             body.addView(card {
@@ -820,7 +825,10 @@ class MainActivity : AppCompatActivity() {
                     saveRoutineDraft(originalId)
                 }
             })
-            body.addView(actionButton("Cancel", secondary = true) { cancelRoutineEditor() })
+            body.addView(actionButton("Cancel", secondary = true) { cancelRoutineEditor() },
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    topMargin = dp(16)
+                })
         }
     }
 
@@ -878,6 +886,8 @@ class MainActivity : AppCompatActivity() {
         body.addView(actionButton("Create custom exercise") {
             route = Route.ExerciseEditor(null)
             render()
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            bottomMargin = dp(16)
         })
         val search = textField("Search name or muscle")
         val results = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -962,8 +972,13 @@ class MainActivity : AppCompatActivity() {
                 route = Route.Root
                 currentScreen = Screen.EXERCISES
                 render()
+            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                topMargin = dp(16)
             })
-            body.addView(actionButton("Cancel", secondary = true) { navigateBack() })
+            body.addView(actionButton("Cancel", secondary = true) { navigateBack() },
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    topMargin = dp(16)
+                })
         }
     }
 
