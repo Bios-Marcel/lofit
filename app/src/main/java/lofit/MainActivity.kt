@@ -136,6 +136,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var restTimeText: TextView
     private var currentScreen = Screen.WORKOUT
     private var route: Route = Route.Root
+    private var calendarMonth = YearMonth.now()
     private var routineDraft: Routine? = null
     private var timerText: TextView? = null
     private var holdTimerText: TextView? = null
@@ -976,7 +977,7 @@ class MainActivity : AppCompatActivity() {
     private fun workoutCalendar(): View {
         val zone = ZoneId.systemDefault()
         val today = LocalDate.now(zone)
-        val month = YearMonth.from(today)
+        val month = calendarMonth
         val trainingDays = repository.data.history.mapNotNull { it.completedAt }
             .map { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() }
             .groupingBy { it }
@@ -984,8 +985,30 @@ class MainActivity : AppCompatActivity() {
         val monthTitle = month.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault()))
 
         return card {
-            addView(titleText("Training calendar"))
-            addView(metaText(monthTitle))
+            addView(LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                addView(metaText(monthTitle).apply {
+                    gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                    textSize = 18f
+                    setTextColor(color(R.color.white))
+                    setTypeface(typeface, Typeface.BOLD)
+                }, LinearLayout.LayoutParams(0, dp(42), 1f))
+                addView(smallButton("‹") {
+                    calendarMonth = calendarMonth.minusMonths(1)
+                    render()
+                }.apply {
+                    contentDescription = "Previous month"
+                }, LinearLayout.LayoutParams(dp(44), dp(42)).apply {
+                    marginEnd = dp(6)
+                })
+                addView(smallButton("›") {
+                    calendarMonth = calendarMonth.plusMonths(1)
+                    render()
+                }.apply {
+                    contentDescription = "Next month"
+                }, LinearLayout.LayoutParams(dp(44), dp(42)))
+            })
             addView(LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 DayOfWeek.entries.forEach { weekday ->
@@ -997,52 +1020,49 @@ class MainActivity : AppCompatActivity() {
             })
 
             val firstOffset = month.atDay(1).dayOfWeek.value - DayOfWeek.MONDAY.value
-            var day = 1 - firstOffset
-            while (day <= month.lengthOfMonth()) {
+            var date = month.atDay(1).minusDays(firstOffset.toLong())
+            repeat(6) {
                 addView(LinearLayout(this@MainActivity).apply {
                     orientation = LinearLayout.HORIZONTAL
                     repeat(7) {
-                        val date = day.takeIf { it in 1..month.lengthOfMonth() }?.let(month::atDay)
+                        val cellDate = date
+                        val isInMonth = YearMonth.from(cellDate) == month
                         addView(TextView(this@MainActivity).apply {
-                            text = date?.dayOfMonth?.toString().orEmpty()
+                            text = cellDate.dayOfMonth.toString()
                             textSize = 14f
                             gravity = Gravity.CENTER
-                            setTextColor(color(R.color.cream))
-                            if (date != null) {
-                                val workoutCount = trainingDays[date] ?: 0
-                                val trained = workoutCount > 0
-                                contentDescription = "$date, ${when (workoutCount) {
-                                    0 -> "no workout"
-                                    1 -> "workout completed"
-                                    else -> "$workoutCount workouts completed"
-                                }}"
-                                if (trained || date == today) {
-                                    textSize = 16f
-                                    setTypeface(typeface, Typeface.BOLD)
-                                    setTextColor(color(R.color.charcoal))
-                                }
-                                if (trained) {
-                                    elevation = 0f
-                                }
-                                background = GradientDrawable().apply {
-                                    shape = GradientDrawable.RECTANGLE
-                                    cornerRadius = dp(2).toFloat()
-                                    setColor(when {
-                                        trained -> color(R.color.coral)
-                                        date == today -> color(R.color.sage)
-                                        else -> Color.TRANSPARENT
-                                    })
+                            setTextColor(color(if (isInMonth) R.color.cream else R.color.sage))
+                            val workoutCount = trainingDays[cellDate] ?: 0
+                            val trained = workoutCount > 0
+                            contentDescription = "$cellDate, ${when (workoutCount) {
+                                0 -> "no workout"
+                                1 -> "workout completed"
+                                else -> "$workoutCount workouts completed"
+                            }}"
+                            if (trained || cellDate == today) {
+                                textSize = 16f
+                                setTypeface(typeface, Typeface.BOLD)
+                            }
+                            if (trained) {
+                                setTextColor(color(R.color.charcoal))
+                                elevation = 0f
+                            }
+                            background = GradientDrawable().apply {
+                                shape = GradientDrawable.RECTANGLE
+                                cornerRadius = dp(2).toFloat()
+                                setColor(if (trained) color(R.color.coral) else Color.TRANSPARENT)
+                                if (cellDate == today) {
+                                    setStroke(dp(1), color(R.color.sage))
                                 }
                             }
                         }, LinearLayout.LayoutParams(0, dp(40), 1f).apply {
                             marginStart = dp(2)
                             marginEnd = dp(2)
                         })
-                        day++
+                        date = date.plusDays(1)
                     }
                 })
             }
-            addView(metaText("Coral days have completed workouts. Today has a sage background."))
         }.apply { contentDescription = "Workout calendar" }
     }
 
