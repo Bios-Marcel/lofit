@@ -1004,8 +1004,7 @@ class MainActivity : AppCompatActivity() {
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.CENTER_VERTICAL
                     addView(actionButton("View workout") {
-                        route = Route.WorkoutHistory(workout.id, (content.getChildAt(0) as? ScrollView)?.scrollY ?: 0)
-                        render()
+                        openWorkoutHistory(workout)
                     }.apply {
                         contentDescription = "View ${workout.name}"
                     }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
@@ -1023,6 +1022,11 @@ class MainActivity : AppCompatActivity() {
                 })
             })
         }
+    }
+
+    private fun openWorkoutHistory(workout: WorkoutSession) {
+        route = Route.WorkoutHistory(workout.id, (content.getChildAt(0) as? ScrollView)?.scrollY ?: 0)
+        render()
     }
 
     private fun pastWorkoutScreen(workout: WorkoutSession): View = page(
@@ -1135,10 +1139,9 @@ class MainActivity : AppCompatActivity() {
         val zone = ZoneId.systemDefault()
         val today = LocalDate.now(zone)
         val month = calendarMonth
-        val trainingDays = repository.data.history.mapNotNull { it.completedAt }
-            .map { Instant.ofEpochMilli(it).atZone(zone).toLocalDate() }
-            .groupingBy { it }
-            .eachCount()
+        val trainingDays = repository.data.history.filter { it.completedAt != null }
+            .sortedByDescending { it.completedAt }
+            .groupBy { Instant.ofEpochMilli(it.completedAt!!).atZone(zone).toLocalDate() }
         val monthTitle = month.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault()))
 
         return card {
@@ -1189,7 +1192,8 @@ class MainActivity : AppCompatActivity() {
                             textSize = 14f
                             gravity = Gravity.CENTER
                             setTextColor(color(if (isInMonth) R.color.cream else R.color.sage))
-                            val workoutCount = trainingDays[cellDate] ?: 0
+                            val workouts = trainingDays[cellDate].orEmpty()
+                            val workoutCount = workouts.size
                             val trained = workoutCount > 0
                             contentDescription = "$cellDate, ${when (workoutCount) {
                                 0 -> "no workout"
@@ -1203,6 +1207,23 @@ class MainActivity : AppCompatActivity() {
                             if (trained) {
                                 setTextColor(color(R.color.charcoal))
                                 elevation = 0f
+                                isFocusable = true
+                                setOnClickListener {
+                                    if (workouts.size == 1) {
+                                        openWorkoutHistory(workouts.single())
+                                    } else {
+                                        val timeFormat = DateFormat.getTimeInstance(DateFormat.SHORT)
+                                        AlertDialog.Builder(this@MainActivity)
+                                            .setTitle(DateFormat.getDateInstance(DateFormat.MEDIUM)
+                                                .format(Date(workouts.first().completedAt!!)))
+                                            .setItems(workouts.map { workout ->
+                                                "${workout.name} · ${timeFormat.format(Date(workout.completedAt!!))}"
+                                            }.toTypedArray()) { _, index ->
+                                                openWorkoutHistory(workouts[index])
+                                            }
+                                            .show()
+                                    }
+                                }
                             }
                             background = GradientDrawable().apply {
                                 shape = GradientDrawable.RECTANGLE

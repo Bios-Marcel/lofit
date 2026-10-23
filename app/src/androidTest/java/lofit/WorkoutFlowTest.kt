@@ -20,6 +20,7 @@ import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
 import androidx.test.espresso.matcher.ViewMatchers.hasDescendant
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.isChecked
+import androidx.test.espresso.matcher.ViewMatchers.isClickable
 import androidx.test.espresso.matcher.ViewMatchers.isDescendantOfA
 import androidx.test.espresso.matcher.ViewMatchers.isEnabled
 import androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom
@@ -36,9 +37,13 @@ import android.view.ViewGroup
 import android.widget.CheckBox
 import android.widget.ScrollView
 import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import org.hamcrest.Matcher
 import org.hamcrest.Matchers.allOf
 import org.hamcrest.Matchers.not
+import org.hamcrest.Matchers.startsWith
 import org.junit.Before
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -77,6 +82,78 @@ class WorkoutFlowTest {
         val parent = routinesTitle[0]?.parent as ViewGroup
         assertSame(parent, startButton[0]?.parent)
         assertEquals(parent.indexOfChild(routinesTitle[0]) + 1, parent.indexOfChild(startButton[0]))
+    }
+
+    @Test
+    fun calendar_loggedDayOpensReadOnlyWorkoutAndReturnsToSameMonth() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val repository = LofitRepository(context)
+        val day = LocalDate.now().minusMonths(1).withDayOfMonth(15)
+        val completedAt = day.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        repository.data.history.add(WorkoutSession(
+            name = "Calendar workout", startedAt = completedAt - 120_000, completedAt = completedAt,
+            exercises = mutableListOf(WorkoutExercise(
+                exerciseId = "bench-press",
+                sets = mutableListOf(LoggedSet(type = SetType.NORMAL, weightKg = 67.5, reps = 6)),
+            )),
+        ))
+        repository.save()
+        val storedState = context.getSharedPreferences("lofit-data", 0).getString("state", null)
+        val activity = instrumentation.startActivitySync(
+            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+
+        onView(withContentDescription("Previous month")).perform(click())
+        onView(withContentDescription("${day.minusDays(1)}, no workout"))
+            .check(matches(not(isClickable())))
+        onView(withContentDescription("$day, workout completed"))
+            .check(matches(isClickable())).perform(scrollTo(), click())
+        onView(withText("Calendar workout")).check(matches(isDisplayed()))
+        onView(withContentDescription("Workout duration")).check(matches(withText("2:00")))
+        onView(withContentDescription("Set 1 weight")).perform(scrollTo(), click())
+            .check(matches(withText("67.5")))
+        onView(withContentDescription("Set 1 done"))
+            .check(matches(isChecked())).check(matches(not(isEnabled())))
+        onView(isAssignableFrom(android.widget.EditText::class.java)).check(doesNotExist())
+        onView(withText("Finish workout")).check(doesNotExist())
+
+        pressBack()
+        onView(withContentDescription("Workout calendar")).check(matches(isDisplayed()))
+        onView(withText(day.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault()))))
+            .check(matches(isDisplayed()))
+        assertEquals(storedState, context.getSharedPreferences("lofit-data", 0).getString("state", null))
+        instrumentation.runOnMainSync { activity.finish() }
+    }
+
+    @Test
+    fun calendar_multipleWorkoutsOnSameDayCanEachBeViewed() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val repository = LofitRepository(context)
+        val day = LocalDate.now()
+        listOf("Morning" to 9, "Evening" to 17).forEach { (name, hour) ->
+            val completedAt = day.atTime(hour, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            repository.data.history.add(WorkoutSession(
+                name = name, startedAt = completedAt - 60_000, completedAt = completedAt,
+            ))
+        }
+        repository.save()
+        val storedState = context.getSharedPreferences("lofit-data", 0).getString("state", null)
+        val activity = instrumentation.startActivitySync(
+            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+
+        listOf("Morning", "Evening").forEach { name ->
+            onView(withContentDescription("$day, 2 workouts completed")).perform(scrollTo(), click())
+            onView(withText(startsWith("$name · "))).perform(click())
+            onView(withText(name)).check(matches(isDisplayed()))
+            onView(withContentDescription("Workout duration")).check(matches(withText("1:00")))
+            pressBack()
+            onView(withContentDescription("Workout calendar")).check(matches(isDisplayed()))
+        }
+        assertEquals(storedState, context.getSharedPreferences("lofit-data", 0).getString("state", null))
+        instrumentation.runOnMainSync { activity.finish() }
     }
 
     @Test
