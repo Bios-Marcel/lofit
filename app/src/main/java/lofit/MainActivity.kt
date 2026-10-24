@@ -133,6 +133,12 @@ class MainActivity : AppCompatActivity() {
         data class RoutineEditor(val originalId: String?) : Route()
         data class ExerciseEditor(val exerciseId: String?) : Route()
         data class WorkoutHistory(val workoutId: String, val returnScrollY: Int) : Route()
+        data class ExerciseTrend(
+            val exerciseId: String,
+            val returnRoute: Route,
+            val returnScrollY: Int,
+            val span: TrendSpan = TrendSpan.YEAR,
+        ) : Route()
         data class Confirm(val action: ConfirmAction, val targetId: String? = null) : Route()
     }
 
@@ -334,6 +340,7 @@ class MainActivity : AppCompatActivity() {
             is Route.ExerciseEditor -> exerciseEditorScreen(activeRoute.exerciseId)
             is Route.WorkoutHistory -> repository.data.history.firstOrNull { it.id == activeRoute.workoutId }
                 ?.let(::pastWorkoutScreen) ?: historyScreen()
+            is Route.ExerciseTrend -> exerciseTrendScreen(activeRoute)
             is Route.Confirm -> confirmationScreen(activeRoute)
         }
         content.addView(view)
@@ -1129,7 +1136,10 @@ class MainActivity : AppCompatActivity() {
         workout.exercises.forEach { item ->
             exercise(item.exerciseId)?.let { movement ->
                 body.addView(card(horizontalPadding = 0) {
-                    addView(exerciseHeading(movement, large = true, showMuscle = false), insetCardLayoutParams())
+                    addView(exerciseHeading(movement, large = true, showMuscle = false).apply {
+                        contentDescription = "View ${movement.name} trend"
+                        setOnClickListener { openExerciseTrend(movement.id) }
+                    }, insetCardLayoutParams())
                     val actionWidth = SET_DONE_ACTION_WIDTH_DP + SET_RECORD_ACTION_WIDTH_DP
                     addView(plannedSetHeader(movement, "Done", endWidth = actionWidth,
                         showActiveHold = movement.type.tracksDuration, showHoldAction = false))
@@ -1212,7 +1222,58 @@ class MainActivity : AppCompatActivity() {
                     addView(accentText("${formatWeight(set.volume())} kg").apply { textSize = 22f })
                     addView(metaText("Highest set volume"))
                 }
+            }.apply {
+                contentDescription = "View ${record.exercise.name} trend"
+                setOnClickListener { openExerciseTrend(record.exercise.id) }
             })
+        }
+    }
+
+    private fun openExerciseTrend(exerciseId: String) {
+        route = Route.ExerciseTrend(exerciseId, route, (content.getChildAt(0) as? ScrollView)?.scrollY ?: 0)
+        render()
+    }
+
+    private fun exerciseTrendScreen(activeRoute: Route.ExerciseTrend): View {
+        val movement = exercise(activeRoute.exerciseId) ?: return recordsScreen()
+        val trend = repository.data.exerciseTrend(movement.id, activeRoute.span)
+        return page(movement.name) { body ->
+            body.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                TrendSpan.entries.forEachIndexed { index, span ->
+                    addView(smallButton(span.label) {
+                        route = activeRoute.copy(span = span)
+                        render()
+                    }.apply {
+                        isSelected = span == activeRoute.span
+                        contentDescription = when (span) {
+                            TrendSpan.MONTH -> "1 month"
+                            TrendSpan.THREE_MONTHS -> "3 months"
+                            TrendSpan.SIX_MONTHS -> "6 months"
+                            TrendSpan.YEAR -> "1 year"
+                            TrendSpan.ALL -> "All time"
+                        }
+                        if (isSelected) {
+                            backgroundTintList = ColorStateList.valueOf(color(R.color.coral))
+                            setTextColor(color(R.color.white))
+                        }
+                    }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                        if (index > 0) marginStart = dp(8)
+                    })
+                }
+            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                topMargin = dp(12)
+                bottomMargin = dp(16)
+            })
+            if (trend.series.all { it.points.isEmpty() }) {
+                body.addView(emptyText("No records in this span."))
+            } else trend.series.filter { it.points.isNotEmpty() }.forEach { series ->
+                body.addView(card {
+                    addView(titleText(series.metric.label))
+                    addView(accentText("${formatWeight(series.points.last().value)} ${series.metric.unit}"))
+                    addView(TrendGraphView(this@MainActivity, series, trend.startedAt, trend.endedAt))
+                })
+            }
         }
     }
 
@@ -1511,6 +1572,7 @@ class MainActivity : AppCompatActivity() {
     private fun navigateBack() {
         val previousRoute = route
         route = when (previousRoute) {
+            is Route.ExerciseTrend -> previousRoute.returnRoute
             is Route.ExercisePicker -> if (previousRoute.target == PickerTarget.ROUTINE) {
                 Route.RoutineEditor(repository.data.routines.firstOrNull { it.id == routineDraft?.id }?.id)
             } else Route.Root
@@ -1524,6 +1586,7 @@ class MainActivity : AppCompatActivity() {
         render(when (previousRoute) {
             is Route.ExercisePicker -> previousRoute.takeIf { it.target == PickerTarget.WORKOUT }?.returnScrollY
             is Route.WorkoutHistory -> previousRoute.returnScrollY
+            is Route.ExerciseTrend -> previousRoute.returnScrollY
             else -> null
         })
     }

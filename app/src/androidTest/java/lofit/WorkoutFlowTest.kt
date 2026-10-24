@@ -24,6 +24,7 @@ import androidx.test.espresso.matcher.ViewMatchers.isChecked
 import androidx.test.espresso.matcher.ViewMatchers.isClickable
 import androidx.test.espresso.matcher.ViewMatchers.isDescendantOfA
 import androidx.test.espresso.matcher.ViewMatchers.isEnabled
+import androidx.test.espresso.matcher.ViewMatchers.isSelected
 import androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom
 import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
 import androidx.test.espresso.matcher.ViewMatchers.withHint
@@ -38,6 +39,7 @@ import android.view.ViewGroup
 import android.widget.CheckBox
 import android.widget.ScrollView
 import java.time.LocalDate
+import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.text.DateFormat
@@ -784,6 +786,63 @@ class WorkoutFlowTest {
         assertEquals(listOf(20.0, 67.5), plannedSets.map { it.weightKg })
         assertEquals(listOf(10, 6), plannedSets.map { it.reps })
         assertEquals(listOf(SetType.WARMUP, SetType.NORMAL), plannedSets.map { it.type })
+    }
+
+    @Test
+    fun recordTrend_opensFromRecordsAndWorkoutHistoryAndChangesSpan() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val zone = ZoneId.systemDefault()
+        val now = java.time.ZonedDateTime.now(zone)
+        fun logged(monthsAgo: Long, weight: Double, reps: Int = 5) = LoggedSet(
+            type = SetType.NORMAL, weightKg = weight, reps = reps,
+            completedAt = now.minusMonths(monthsAgo).toInstant().toEpochMilli(),
+        )
+        val first = logged(18, 40.0)
+        val repository = LofitRepository(context)
+        repository.data.history.add(WorkoutSession(
+            name = "Trend workout", completedAt = now.toInstant().toEpochMilli(),
+            exercises = mutableListOf(loggedWorkoutExercise("bench-press", mutableListOf(
+                first, logged(6, 60.0), logged(0, 80.0), logged(0, 200.0, reps = 0), logged(0, 0.0, reps = 100),
+            ))),
+        ))
+        repository.save()
+        instrumentation.startActivitySync(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+        onView(withText(R.string.nav_records)).perform(click())
+        val name = repository.data.exercises.first { it.id == "bench-press" }.name
+        onView(withContentDescription("View $name trend")).perform(scrollTo(), click())
+
+        onView(withContentDescription("1 year")).check(matches(isSelected()))
+        onView(withContentDescription("Highest weight trend")).check { view, _ ->
+            val graph = view as TrendGraphView
+            assertEquals(now.toLocalDate().minusYears(1), Instant.ofEpochMilli(graph.startedAt).atZone(zone).toLocalDate())
+            assertEquals(listOf(40.0, 60.0, 80.0), graph.series.points.map { it.value })
+        }
+        onView(withContentDescription("Highest set volume trend")).perform(scrollTo()).check { view, _ ->
+            assertEquals(listOf(200.0, 300.0, 400.0), (view as TrendGraphView).series.points.map { it.value })
+        }
+        listOf("1 month" to 1L, "3 months" to 3L, "6 months" to 6L).forEach { (label, months) ->
+            onView(withContentDescription(label)).perform(scrollTo(), click()).check(matches(isSelected()))
+            onView(withContentDescription("Highest weight trend")).check { view, _ ->
+                assertEquals(now.toLocalDate().minusMonths(months),
+                    Instant.ofEpochMilli((view as TrendGraphView).startedAt).atZone(zone).toLocalDate())
+            }
+        }
+        onView(withContentDescription("All time")).perform(click()).check(matches(isSelected()))
+        onView(withContentDescription("Highest weight trend")).check { view, _ ->
+            assertEquals(first.completedAt, (view as TrendGraphView).startedAt)
+        }
+        pressBack()
+        onView(withText("Your best logged set for each exercise.")).check(matches(isDisplayed()))
+        onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+        onView(withText(R.string.nav_history)).perform(click())
+        onView(withContentDescription("View Trend workout")).perform(scrollTo(), click())
+        onView(withContentDescription("View $name trend")).perform(scrollTo(), click())
+        onView(withContentDescription("1 year")).check(matches(isSelected()))
+        pressBack()
+        onView(withContentDescription("Workout duration")).check(matches(isDisplayed()))
+        onView(withContentDescription("View $name trend")).perform(scrollTo(), click())
     }
 
     @Test

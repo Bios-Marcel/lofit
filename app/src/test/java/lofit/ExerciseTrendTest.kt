@@ -1,0 +1,106 @@
+package lofit
+
+import java.time.ZoneId
+import java.time.ZonedDateTime
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class ExerciseTrendTest {
+    private val zone = ZoneId.of("Europe/Berlin")
+    private val now = ZonedDateTime.of(2026, 10, 24, 12, 0, 0, 0, zone)
+    private val bench = Exercise("bench", "Bench", ExerciseType.REPETITIONS, false, "Chest", "")
+
+    private fun set(monthsAgo: Long, weight: Double, reps: Int = 5) = LoggedSet(
+        type = SetType.NORMAL, weightKg = weight, reps = reps,
+        completedAt = now.minusMonths(monthsAgo).toInstant().toEpochMilli(),
+    )
+
+    private fun data(vararg sets: LoggedSet) = AppData(
+        exercises = mutableListOf(bench),
+        history = mutableListOf(WorkoutSession(name = "Records", exercises = mutableListOf(
+            WorkoutExercise(exerciseId = bench.id, sets = sets.toMutableList()),
+        ))),
+    )
+
+    @Test
+    fun defaultSpan_isCalendarYearWithEarlierBaseline() {
+        val data = data(set(18, 40.0), set(6, 60.0), set(0, 80.0))
+
+        val trend = data.exerciseTrend(bench.id, now = now.toInstant().toEpochMilli(), zone = zone)
+
+        assertEquals(now.minusYears(1).toInstant().toEpochMilli(), trend.startedAt)
+        assertEquals(listOf(40.0, 60.0, 80.0), trend.series.first().points.map { it.value })
+        assertEquals(trend.startedAt, trend.series.first().points.first().completedAt)
+        assertEquals(listOf(200.0, 300.0, 400.0), trend.series.last().points.map { it.value })
+    }
+
+    @Test
+    fun spans_limitPointsAndAllIncludesEarliestRecord() {
+        val first = set(18, 40.0)
+        val data = data(first, set(6, 60.0), set(0, 80.0))
+        val month = data.exerciseTrend(bench.id, TrendSpan.MONTH, now.toInstant().toEpochMilli(), zone)
+        val all = data.exerciseTrend(bench.id, TrendSpan.ALL, now.toInstant().toEpochMilli(), zone)
+
+        assertEquals(now.minusMonths(1).toInstant().toEpochMilli(), month.startedAt)
+        assertEquals(listOf(60.0, 80.0), month.series.first().points.map { it.value })
+        assertEquals(first.completedAt, all.startedAt)
+        assertEquals(3, all.series.first().points.size)
+        assertEquals(listOf(1L, 3L, 6L, 12L), TrendSpan.entries.mapNotNull { it.months })
+        val leapDay = ZonedDateTime.of(2024, 2, 29, 12, 0, 0, 0, zone)
+        assertEquals(leapDay.minusYears(1).toInstant().toEpochMilli(), TrendSpan.YEAR.startedAt(leapDay.toInstant().toEpochMilli(), zone))
+    }
+
+    @Test
+    fun zeroRepsAndZeroWeight_cannotHideValidRecords() {
+        val data = data(set(6, 60.0), set(3, 200.0, reps = 0), set(2, 0.0, reps = 100), set(0, 80.0))
+        val trend = data.exerciseTrend(bench.id, TrendSpan.ALL, now.toInstant().toEpochMilli(), zone)
+
+        assertEquals(listOf(60.0, 80.0), trend.series.first().points.map { it.value })
+        assertEquals(listOf(300.0, 400.0), trend.series.last().points.map { it.value })
+        assertEquals(80.0, data.oneRepMaxes().single().set.weightKg, 0.0)
+        val workout = WorkoutSession(name = "Invalid attempt", exercises = mutableListOf(
+            WorkoutExercise(exerciseId = bench.id, sets = mutableListOf(set(0, 200.0, reps = 0))),
+        ))
+        assertTrue(data.recordSetIds(workout).isEmpty())
+    }
+
+    @Test
+    fun independentRecords_doNotDuplicatePointsAndFutureSetsAreExcluded() {
+        val data = data(set(6, 60.0), set(3, 80.0, reps = 2), set(1, 50.0, reps = 10), set(-1, 100.0))
+        val trend = data.exerciseTrend(bench.id, TrendSpan.ALL, now.toInstant().toEpochMilli(), zone)
+
+        assertEquals(listOf(60.0, 80.0), trend.series.first().points.map { it.value })
+        assertEquals(listOf(300.0, 500.0), trend.series.last().points.map { it.value })
+        assertTrue(trend.series.flatMap { it.points }.all { it.completedAt <= trend.endedAt })
+    }
+
+    @Test
+    fun bodyweightAndHolds_allowZeroWeightAndIgnoreUnusedReps() {
+        val pushUp = bench.copy(id = "push-up", weighted = false)
+        val plank = bench.copy(id = "plank", type = ExerciseType.TIMED, weighted = false)
+        val reps = set(0, 0.0, reps = 20)
+        val hold = set(0, 0.0, reps = 0).copy(holdSeconds = 45)
+        val data = AppData(exercises = mutableListOf(pushUp, plank), history = mutableListOf(
+            WorkoutSession(name = "Bodyweight", exercises = mutableListOf(
+                WorkoutExercise(exerciseId = pushUp.id, sets = mutableListOf(reps)),
+                WorkoutExercise(exerciseId = plank.id, sets = mutableListOf(hold)),
+            )),
+        ))
+
+        assertTrue(reps.isRecordEligible(pushUp))
+        assertTrue(hold.isRecordEligible(plank))
+        assertFalse(reps.copy(reps = 0).isRecordEligible(pushUp))
+        assertFalse(hold.copy(holdSeconds = 0).isRecordEligible(plank))
+        assertEquals(TrendMetric.REPS, data.exerciseTrend(pushUp.id).series.single().metric)
+        assertEquals(TrendMetric.HOLD, data.exerciseTrend(plank.id).series.single().metric)
+    }
+
+    @Test
+    fun noValidSets_hasEmptySeries() {
+        val trend = data(set(0, 0.0, reps = 0)).exerciseTrend(bench.id)
+        assertTrue(trend.series.all { it.points.isEmpty() })
+        assertTrue(AppData(exercises = mutableListOf()).exerciseTrend("missing").series.isEmpty())
+    }
+}

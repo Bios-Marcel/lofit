@@ -234,26 +234,39 @@ data class AppData(
         }
         ?.toMutableList()
 
-    fun oneRepMaxes(): List<ExerciseRecord> = exercises.mapNotNull { exercise ->
-        val sets = history.flatMap { workout ->
-            workout.exercises
-                .filter { it.exerciseId == exercise.id }
-                .flatMap { it.sets }
-        }
-        val best = sets.maxWithOrNull(
-            compareBy<LoggedSet> {
+    // Build chronological record snapshots from saved sets so edits and resumed workouts stay in sync.
+    fun exerciseRecordHistory(): Map<String, List<ExerciseRecord>> = exercises
+        .sortedBy { it.name.lowercase() }
+        .mapNotNull { exercise ->
+            val sets = history.flatMap { workout ->
+                workout.exercises
+                    .filter { it.exerciseId == exercise.id }
+                    .flatMap { it.sets }
+            }.filter { it.isRecordEligible(exercise) }.sortedBy { it.completedAt }
+            val bestOrder = compareBy<LoggedSet> {
                 when {
                     exercise.type.tracksDuration -> it.holdSeconds.toDouble()
                     exercise.weighted -> it.weightKg
                     else -> it.reps.toDouble()
                 }
-            }.thenBy { it.completedAt },
-        ) ?: return@mapNotNull null
-        val volumeSet = sets.takeIf { exercise.weighted && !exercise.type.tracksDuration }?.maxWithOrNull(
-            compareBy<LoggedSet> { it.volume() }.thenBy { it.completedAt },
-        )
-        ExerciseRecord(exercise, best, volumeSet)
-    }.sortedBy { it.exercise.name.lowercase() }
+            }.thenBy { it.completedAt }
+            val volumeOrder = compareBy<LoggedSet> { it.volume() }.thenBy { it.completedAt }
+            val tracksVolume = exercise.weighted && !exercise.type.tracksDuration
+            val records = mutableListOf<ExerciseRecord>()
+            sets.forEach { set ->
+                val previous = records.lastOrNull()
+                val best = previous?.set?.takeUnless { bestOrder.compare(set, it) > 0 } ?: set
+                val volumeSet = if (tracksVolume) {
+                    previous?.volumeSet?.takeUnless { volumeOrder.compare(set, it) > 0 } ?: set
+                } else null
+                if (previous == null || best.id != previous.set.id || volumeSet?.id != previous.volumeSet?.id) {
+                    records.add(ExerciseRecord(exercise, best, volumeSet))
+                }
+            }
+            records.takeIf { it.isNotEmpty() }?.let { exercise.id to it }
+        }.toMap()
+
+    fun oneRepMaxes(): List<ExerciseRecord> = exerciseRecordHistory().values.map { it.last() }
 
     fun recordSetIds(workout: WorkoutSession): Set<String> {
         val records = oneRepMaxes().associateBy { it.exercise.id }
@@ -263,8 +276,9 @@ data class AppData(
         workout.exercises
             .flatMap { item -> item.sets.map { item.exerciseId to it } }
             .groupBy({ it.first }, { it.second })
-            .forEach { (exerciseId, sets) ->
+            .forEach { (exerciseId, loggedSets) ->
                 val exercise = exercisesById[exerciseId] ?: return@forEach
+                val sets = loggedSets.filter { it.isRecordEligible(exercise) }
                 val previousRecord = records[exerciseId] ?: return@forEach
                 if (exercise.type.tracksDuration) {
                     sets.maxWithOrNull(compareBy<LoggedSet> { it.holdSeconds }.thenBy { it.completedAt })
