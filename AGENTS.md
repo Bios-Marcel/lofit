@@ -14,19 +14,16 @@
 
 ## Android Device
 
-- Deploy: [`scripts/deploy.sh`](scripts/deploy.sh)
-- Deploy release to physical phone: [`scripts/deploy-release.sh`](scripts/deploy-release.sh)
+- Local deploy: [`scripts/deploy.sh`](scripts/deploy.sh)
 - Restart: [`scripts/restart.sh`](scripts/restart.sh)
 - Stop: [`scripts/stop.sh`](scripts/stop.sh)
 - Set `ANDROID_SERIAL` when more than one device is connected.
-- For physical device, always deploy prod build, never debug build, unless asked
-  otherwise
+- Release builds are for GitHub only. Never deploy them to physical phones.
 
 Run:
 
 ```sh
 ./scripts/deploy.sh
-./scripts/deploy-release.sh
 ./scripts/restart.sh
 ./scripts/stop.sh
 ```
@@ -37,4 +34,5 @@ Unless asked otherwise, follow these rules:
 
 * No `back` buttons
 * No useless explanation labels
+* Keep space between buttons / between buttons and other components
 
