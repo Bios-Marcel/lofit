@@ -8,6 +8,7 @@ import android.health.connect.HealthPermissions
 import android.view.WindowManager
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.Espresso.pressBack
+import androidx.test.espresso.Espresso.pressBackUnconditionally
 import androidx.test.espresso.UiController
 import androidx.test.espresso.ViewAction
 import androidx.test.espresso.action.ViewActions.click
@@ -220,6 +221,190 @@ class WorkoutFlowTest {
         onView(withText(R.string.nav_settings)).perform(click())
         onView(withContentDescription("Android health integration")).check(matches(not(isChecked())))
         instrumentation.runOnMainSync { restarted.finish() }
+    }
+
+    @Test
+    fun navigation_eachTabReturnsHomeThenBackLeavesAndWorksAfterReopening() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val intent = Intent(context, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        val activity = instrumentation.startActivitySync(intent)
+        try {
+            onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+            onView(withText(R.string.nav_workout)).check(matches(withText("Home"))).perform(click())
+            listOf(R.string.nav_routines, R.string.nav_exercises, R.string.nav_records,
+                R.string.nav_history, R.string.nav_settings).forEach { tab ->
+                onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+                onView(allOf(withText(tab), isClickable())).perform(click())
+                pressBack()
+                onView(withText("Ready to move?")).check(matches(isDisplayed()))
+            }
+
+            pressBackUnconditionally()
+            instrumentation.uiAutomation.waitForIdle(100, 5_000)
+            instrumentation.runOnMainSync { assertFalse(activity.hasWindowFocus()) }
+
+            context.startActivity(intent)
+            onView(withText("Ready to move?")).check(matches(isDisplayed()))
+            onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+            onView(withText(R.string.nav_settings)).perform(click())
+            pressBack()
+            onView(withText("Ready to move?")).check(matches(isDisplayed()))
+        } finally {
+            instrumentation.runOnMainSync { activity.finish() }
+        }
+    }
+
+    @Test
+    fun navigation_editorBackReturnsToRoutinesThenHome() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val activity = instrumentation.startActivitySync(
+            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+        try {
+            onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+            onView(allOf(withText(R.string.nav_routines), isClickable())).perform(click())
+            onView(withText("Create routine")).perform(click())
+            onView(withHint("Routine name")).perform(replaceText("Unsaved draft"), closeSoftKeyboard())
+            onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+            onView(allOf(withText(R.string.nav_exercises), isClickable())).perform(click())
+            pressBack()
+            onView(withHint("Routine name")).check(matches(withText("Unsaved draft")))
+            onView(withText("Add Exercise")).perform(scrollTo(), click())
+            pressBack()
+            onView(withHint("Routine name")).check(matches(withText("Unsaved draft")))
+            pressBack()
+            onView(withText("Create routine")).check(matches(isDisplayed()))
+            assertTrue(LofitRepository(context).data.routines.isEmpty())
+            pressBack()
+            onView(withText("Ready to move?")).check(matches(isDisplayed()))
+        } finally {
+            instrumentation.runOnMainSync { activity.finish() }
+        }
+    }
+
+    @Test
+    fun navigation_backReturnsToPreviousTab() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val activity = instrumentation.startActivitySync(
+            Intent(instrumentation.targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+        try {
+            onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+            onView(allOf(withText(R.string.nav_routines), isClickable())).perform(click())
+            onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+            onView(allOf(withText(R.string.nav_exercises), isClickable())).perform(click())
+            pressBack()
+            onView(withText("Create routine")).check(matches(isDisplayed()))
+            pressBack()
+            onView(withText("Ready to move?")).check(matches(isDisplayed()))
+        } finally {
+            instrumentation.runOnMainSync { activity.finish() }
+        }
+    }
+
+    @Test
+    fun navigation_privacyBackReturnsToSettings() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val activity = instrumentation.startActivitySync(
+            Intent(instrumentation.targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+        try {
+            onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+            onView(withText(R.string.nav_settings)).perform(click())
+            onView(withText("Health data privacy")).perform(scrollTo(), click())
+            pressBack()
+            onView(withText("Health data privacy")).check(matches(isDisplayed()))
+            pressBack()
+            onView(withText("Ready to move?")).check(matches(isDisplayed()))
+        } finally {
+            instrumentation.runOnMainSync { activity.finish() }
+        }
+    }
+
+    @Test
+    fun home_activeWorkoutTileReopensSavedSetsAndDisappearsAfterFinishing() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        LofitRepository(context).apply {
+            data.activeWorkout = WorkoutSession(
+                name = "Live workout",
+                exercises = mutableListOf(WorkoutExercise(
+                    exerciseId = "bench-press",
+                    plannedSets = mutableListOf(PlannedSet(weightKg = 60.0, reps = 8)),
+                )),
+            )
+            save()
+        }
+        val activity = instrumentation.startActivitySync(
+            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+        try {
+            onView(withText("Ready to move?")).check(matches(isDisplayed()))
+            onView(withText("Active workout")).check(matches(isDisplayed()))
+            onView(withText("Resume workout")).check(matches(isDisplayed())).check(matches(isClickable()))
+            onView(withText(R.string.start_workout)).check(doesNotExist())
+            onView(withText("Finish workout")).check(doesNotExist())
+            onView(withContentDescription("Open active workout")).perform(click())
+            onView(withContentDescription("Set 1 Repetitions")).perform(replaceText("12"), closeSoftKeyboard())
+            onView(withContentDescription("Set 1 done")).perform(click())
+            val storedState = context.getSharedPreferences("lofit-data", 0).getString("state", null)
+
+            pressBack()
+            onView(withText("Ready to move?")).check(matches(isDisplayed()))
+            onView(withContentDescription("Open active workout")).perform(click())
+            onView(withContentDescription("Set 1 Repetitions")).check(matches(withText("12")))
+            onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
+            assertEquals(storedState, context.getSharedPreferences("lofit-data", 0).getString("state", null))
+
+            onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+            onView(withText(R.string.nav_workout)).perform(click())
+            onView(withText("Ready to move?")).check(matches(isDisplayed()))
+            val notification = context.getSystemService(NotificationManager::class.java).activeNotifications.single()
+            notification.notification.contentIntent.send()
+            onView(withText("Finish workout")).perform(scrollTo(), click())
+            onView(withText("Finish and save")).perform(click())
+            onView(withText("Ready to move?")).check(matches(isDisplayed()))
+            onView(withContentDescription("Open active workout")).check(doesNotExist())
+            onView(withText(R.string.start_workout)).perform(scrollTo()).check(matches(isDisplayed()))
+            assertEquals(null, LofitRepository(context).data.activeWorkout)
+            assertEquals(12, LofitRepository(context).data.history.single().exercises.single().sets.single().reps)
+        } finally {
+            instrumentation.runOnMainSync { activity.finish() }
+        }
+    }
+
+    @Test
+    fun home_leavingNewWorkoutShowsTileThenBackLeavesApp() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val intent = Intent(context, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        val activity = instrumentation.startActivitySync(intent)
+        try {
+            onView(withText(R.string.start_workout)).perform(scrollTo(), click())
+            onView(withText("Add exercise")).check(matches(isDisplayed()))
+            val workoutId = LofitRepository(context).data.activeWorkout!!.id
+            pressBack()
+            onView(withText("Ready to move?")).check(matches(isDisplayed()))
+            onView(withContentDescription("Open active workout")).check(matches(isDisplayed()))
+            pressBackUnconditionally()
+            instrumentation.uiAutomation.waitForIdle(100, 5_000)
+            instrumentation.runOnMainSync { assertFalse(activity.hasWindowFocus()) }
+
+            context.startActivity(intent)
+            onView(withText("Ready to move?")).check(matches(isDisplayed()))
+            onView(withContentDescription("Open active workout")).perform(waitFor(500), click())
+            onView(withText("Add exercise")).check(matches(isDisplayed()))
+            assertEquals(workoutId, LofitRepository(context).data.activeWorkout!!.id)
+            onView(withText("Discard workout")).perform(scrollTo(), click())
+            onView(withText("Ready to move?")).check(matches(isDisplayed()))
+            onView(withContentDescription("Open active workout")).check(doesNotExist())
+        } finally {
+            instrumentation.runOnMainSync { activity.finish() }
+        }
     }
 
     @Test
@@ -463,6 +648,7 @@ class WorkoutFlowTest {
         val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         instrumentation.startActivitySync(intent)
+        onView(withContentDescription("Open active workout")).perform(click())
 
         onView(withContentDescription("Set 1 weight")).check(doesNotExist())
         onView(withContentDescription("Set 1 Repetitions")).perform(replaceText("12"), closeSoftKeyboard())
@@ -489,6 +675,7 @@ class WorkoutFlowTest {
         val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         instrumentation.startActivitySync(intent)
+        onView(withContentDescription("Open active workout")).perform(click())
 
         onView(withText("Weighted Push-up")).check(matches(isDisplayed()))
         onView(withContentDescription("Set 1 weight")).check(matches(withText("10")))
@@ -629,6 +816,7 @@ class WorkoutFlowTest {
         val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         instrumentation.startActivitySync(intent)
+        onView(withContentDescription("Open active workout")).perform(click())
 
         val page = arrayOfNulls<View>(1)
         val survivingRow = arrayOfNulls<View>(1)
@@ -697,6 +885,7 @@ class WorkoutFlowTest {
         val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         instrumentation.startActivitySync(intent)
+        onView(withContentDescription("Open active workout")).perform(click())
 
         val page = arrayOfNulls<View>(1)
         val survivingHeading = arrayOfNulls<View>(1)
@@ -902,6 +1091,7 @@ class WorkoutFlowTest {
         val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         instrumentation.startActivitySync(intent)
+        onView(withContentDescription("Open active workout")).perform(click())
 
         onView(withContentDescription("Set 1 record")).check(matches(not(isDisplayed())))
         onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
@@ -936,6 +1126,7 @@ class WorkoutFlowTest {
         val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         instrumentation.startActivitySync(intent)
+        onView(withContentDescription("Open active workout")).perform(click())
 
         onView(withContentDescription("Set 1 record")).check(matches(not(isDisplayed())))
         onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
@@ -1097,8 +1288,10 @@ class WorkoutFlowTest {
         pressBack()
         onView(withContentDescription("View Past workout")).check(matches(isDisplayed()))
         assertEquals(storedState, context.getSharedPreferences("lofit-data", 0).getString("state", null))
-        onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
-        onView(withText(R.string.nav_workout)).perform(click())
+        pressBack()
+        onView(withText("Ready to move?")).check(matches(isDisplayed()))
+        onView(withContentDescription("Open active workout")).check(matches(isDisplayed()))
+        onView(withContentDescription("Open active workout")).perform(click())
         onView(withText("Live workout")).check(matches(isDisplayed()))
         instrumentation.runOnMainSync { activity.finish() }
     }

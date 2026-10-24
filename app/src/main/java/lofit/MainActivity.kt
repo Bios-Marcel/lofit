@@ -80,6 +80,7 @@ class MainActivity : AppCompatActivity() {
         const val ACTION_SUBTRACT_REST = "lofit.action.SUBTRACT_REST"
         const val ACTION_ADD_REST = "lofit.action.ADD_REST"
         const val ACTION_SKIP_REST = "lofit.action.SKIP_REST"
+        const val ACTION_OPEN_WORKOUT = "lofit.action.OPEN_WORKOUT"
         const val SET_ROW_PADDING_DP = 4
         const val SET_HOLD_ACTION_WIDTH_DP = 48
         const val SET_DONE_ACTION_WIDTH_DP = 48
@@ -88,7 +89,7 @@ class MainActivity : AppCompatActivity() {
         const val ACTION_HEALTH_CONNECT_SETTINGS = "android.health.connect.action.HEALTH_HOME_SETTINGS"
     }
 
-    private enum class Screen { WORKOUT, ROUTINES, EXERCISES, RECORDS, HISTORY, SETTINGS }
+    private enum class Screen { HOME, WORKOUT, ROUTINES, EXERCISES, RECORDS, HISTORY, SETTINGS }
     private enum class PickerTarget { WORKOUT, ROUTINE }
     private enum class ConfirmAction { FINISH_WORKOUT, DISCARD_WORKOUT, DELETE_EXERCISE, DELETE_ROUTINE, RESET_DATA }
 
@@ -143,6 +144,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private lateinit var repository: LofitRepository
+    private data class PreviousScreen(
+        val screen: Screen,
+        val route: Route,
+        val scrollY: Int,
+        val routineDraft: Routine?,
+    )
+    private val previousScreens = mutableListOf<PreviousScreen>()
     private val healthWeightReader by lazy { HealthConnectWeightReader(this) }
     private var healthPermissionPending = false
     private var onboardingGender = BiologicalGender.MALE
@@ -153,7 +161,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var drawerLayout: DrawerLayout
     private lateinit var restBar: LinearLayout
     private lateinit var restTimeText: TextView
-    private var currentScreen = Screen.WORKOUT
+    private var currentScreen = Screen.HOME
     private var route: Route = Route.Root
     private var calendarMonth = YearMonth.now()
     private var routineDraft: Routine? = null
@@ -205,6 +213,9 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         repository = LofitRepository(this)
+        if (intent.action == ACTION_OPEN_WORKOUT && repository.data.activeWorkout != null) {
+            currentScreen = Screen.WORKOUT
+        }
         healthPermissionPending = savedInstanceState?.getBoolean("healthPermissionPending") ?: false
         onboardingGender = savedInstanceState?.getString("onboardingGender")?.let(BiologicalGender::valueOf)
             ?: repository.data.biologicalGender
@@ -213,11 +224,15 @@ class MainActivity : AppCompatActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (route != Route.Root) {
+                if (route != Route.Root || currentScreen != Screen.HOME) {
                     navigateBack()
                 } else {
                     isEnabled = false
-                    onBackPressedDispatcher.onBackPressed()
+                    try {
+                        onBackPressedDispatcher.onBackPressed()
+                    } finally {
+                        isEnabled = true
+                    }
                 }
             }
         })
@@ -241,6 +256,11 @@ class MainActivity : AppCompatActivity() {
             }
         }
         handler.post(tick)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.action == ACTION_OPEN_WORKOUT) openActiveWorkout()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -292,7 +312,7 @@ class MainActivity : AppCompatActivity() {
         }
         addView(titleText("Lofit").apply { textSize = 30f; setPadding(dp(8), 0, 0, dp(20)) })
         listOf(
-            Screen.WORKOUT to getString(R.string.nav_workout),
+            Screen.HOME to getString(R.string.nav_workout),
             Screen.ROUTINES to getString(R.string.nav_routines),
             Screen.EXERCISES to getString(R.string.nav_exercises),
             Screen.RECORDS to getString(R.string.nav_records),
@@ -300,11 +320,8 @@ class MainActivity : AppCompatActivity() {
             Screen.SETTINGS to getString(R.string.nav_settings),
         ).forEach { (screen, label) ->
             addView(actionButton(label, secondary = true) {
-                currentScreen = screen
-                route = Route.Root
-                routineDraft = null
                 drawerLayout.closeDrawer(GravityCompat.START, false)
-                render()
+                openScreen(screen)
             }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(58)).apply { bottomMargin = dp(8) })
         }
     }
@@ -351,6 +368,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun rootScreen(): View = when (currentScreen) {
+        Screen.HOME -> workoutHome()
         Screen.WORKOUT -> repository.data.activeWorkout?.let(::activeWorkoutScreen) ?: workoutHome()
         Screen.ROUTINES -> routinesScreen()
         Screen.EXERCISES -> exercisesScreen()
@@ -462,13 +480,26 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun workoutHome(): View = page("Ready to move?", "Local, focused, yours.") { body ->
+        repository.data.activeWorkout?.let { workout ->
+            body.addView(card {
+                addView(titleText("Active workout"))
+                addView(metaText(workout.name))
+                addView(actionButton("Resume workout") { openActiveWorkout() }.apply {
+                    contentDescription = "Open active workout"
+                }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    topMargin = dp(12)
+                })
+            })
+        }
         body.addView(workoutCalendar())
         body.addView(sectionTitle("Routines"))
-        body.addView(actionButton(getString(R.string.start_workout)) {
-            startWorkout(WorkoutSession(name = "Open workout"))
-        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-            bottomMargin = dp(16)
-        })
+        if (repository.data.activeWorkout == null) {
+            body.addView(actionButton(getString(R.string.start_workout)) {
+                startWorkout(WorkoutSession(name = "Open workout"))
+            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                bottomMargin = dp(16)
+            })
+        }
         if (repository.data.routines.isEmpty()) {
             body.addView(emptyText("No routines yet. Build one in the Routines tab, or start empty and add exercises as you go."))
         }
@@ -589,6 +620,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun discardActiveWorkout() {
         repository.data.activeWorkout = null
+        currentScreen = Screen.HOME
+        previousScreens.clear()
         restEndsAt = 0L
         clearActiveHold()
     }
@@ -1424,7 +1457,8 @@ class MainActivity : AppCompatActivity() {
                         routineDraft = null
                         restEndsAt = 0L
                         clearActiveHold()
-                        currentScreen = Screen.WORKOUT
+                        currentScreen = Screen.HOME
+                        previousScreens.clear()
                     }
                 }
                 if (confirm.action != ConfirmAction.RESET_DATA) repository.save()
@@ -1471,9 +1505,7 @@ class MainActivity : AppCompatActivity() {
     private fun startRoutine(routine: Routine) {
         if (repository.data.activeWorkout != null) {
             Toast.makeText(this, "Finish or discard the active workout first", Toast.LENGTH_SHORT).show()
-            currentScreen = Screen.WORKOUT
-            route = Route.Root
-            render()
+            openActiveWorkout()
             return
         }
         startWorkout(WorkoutSession(
@@ -1494,11 +1526,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startWorkout(workout: WorkoutSession) {
+        if (repository.data.activeWorkout != null) {
+            openActiveWorkout()
+            return
+        }
         repository.data.activeWorkout = workout
         repository.save()
-        currentScreen = Screen.WORKOUT
-        route = Route.Root
-        render()
+        openActiveWorkout()
         queryWorkoutWeight(workout)
         ensureWorkoutNotification()
     }
@@ -1564,12 +1598,51 @@ class MainActivity : AppCompatActivity() {
             repository.save()
             ensureWorkoutNotification()
         }
-        currentScreen = Screen.WORKOUT
+        openActiveWorkout()
+    }
+
+    private fun openActiveWorkout() {
+        if (repository.data.activeWorkout == null) return
+        openScreen(Screen.WORKOUT)
+    }
+
+    private fun openScreen(screen: Screen) {
+        if (screen == Screen.HOME) {
+            showHome()
+            return
+        }
+        if (screen != currentScreen || route != Route.Root) {
+            previousScreens.add(PreviousScreen(
+                currentScreen, route, (content.getChildAt(0) as? ScrollView)?.scrollY ?: 0, routineDraft,
+            ))
+        }
+        currentScreen = screen
         route = Route.Root
+        routineDraft = null
+        render()
+    }
+
+    private fun showHome() {
+        previousScreens.clear()
+        currentScreen = Screen.HOME
+        route = Route.Root
+        routineDraft = null
         render()
     }
 
     private fun navigateBack() {
+        if (route == Route.Root) {
+            val previous = previousScreens.removeLastOrNull()
+            if (previous == null) {
+                showHome()
+            } else {
+                currentScreen = previous.screen
+                route = previous.route
+                routineDraft = previous.routineDraft
+                render(previous.scrollY)
+            }
+            return
+        }
         val previousRoute = route
         route = when (previousRoute) {
             is Route.ExerciseTrend -> previousRoute.returnRoute
@@ -1847,7 +1920,8 @@ class MainActivity : AppCompatActivity() {
         val openApp = PendingIntent.getActivity(
             this,
             0,
-            Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            Intent(this, MainActivity::class.java).setAction(ACTION_OPEN_WORKOUT)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val notification = NotificationCompat.Builder(this, WORKOUT_NOTIFICATION_CHANNEL)
