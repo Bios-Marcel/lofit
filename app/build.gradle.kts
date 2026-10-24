@@ -12,10 +12,20 @@ android {
         applicationId = "lofit.app"
         minSdk = 36
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = providers.gradleProperty("versionCode").orElse("1").get().toInt()
+        versionName = providers.gradleProperty("versionName").orElse("1.0").get()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    val releaseKeystore = providers.environmentVariable("RELEASE_KEYSTORE_PATH").orNull
+    if (releaseKeystore != null) {
+        signingConfigs.create("release") {
+            storeFile = file(releaseKeystore)
+            storePassword = providers.environmentVariable("RELEASE_STORE_PASSWORD").get()
+            keyAlias = providers.environmentVariable("RELEASE_KEY_ALIAS").get()
+            keyPassword = providers.environmentVariable("RELEASE_KEY_PASSWORD").get()
+        }
     }
 
     buildTypes {
@@ -23,7 +33,7 @@ android {
             applicationIdSuffix = ".test"
         }
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (releaseKeystore != null) "release" else "debug")
             optimization {
                 enable = true
                 packageScope = setOf("androidx.**", "kotlinx.**")
