@@ -22,6 +22,8 @@ internal object StartupDataMigration {
             activeWorkout = active,
             soundCuesEnabled = root.optBoolean("soundCuesEnabled", true),
             bodyMetricsEnabled = if (root.isNull("bodyMetricsEnabled")) null else root.getBoolean("bodyMetricsEnabled"),
+            biologicalGender = BiologicalGender.valueOf(root.optString("biologicalGender", BiologicalGender.MALE.name)),
+            onboardingComplete = root.optBoolean("onboardingComplete", false),
         )
     }
 

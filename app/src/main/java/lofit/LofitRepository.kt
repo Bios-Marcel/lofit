@@ -54,6 +54,8 @@ class LofitRepository(context: Context) {
         put("activeWorkout", data.activeWorkout?.let(::encodeWorkout) ?: JSONObject.NULL)
         put("soundCuesEnabled", data.soundCuesEnabled)
         put("bodyMetricsEnabled", data.bodyMetricsEnabled ?: JSONObject.NULL)
+        put("biologicalGender", data.biologicalGender.name)
+        put("onboardingComplete", data.onboardingComplete)
     }
 
     private fun encodeExercise(exercise: Exercise) = JSONObject().apply {
@@ -136,6 +138,8 @@ class LofitRepository(context: Context) {
             activeWorkout = if (root.isNull("activeWorkout")) null else decodeWorkout(root.getJSONObject("activeWorkout")),
             soundCuesEnabled = root.getBoolean("soundCuesEnabled"),
             bodyMetricsEnabled = if (root.isNull("bodyMetricsEnabled")) null else root.getBoolean("bodyMetricsEnabled"),
+            biologicalGender = BiologicalGender.valueOf(root.optString("biologicalGender", BiologicalGender.MALE.name)),
+            onboardingComplete = root.optBoolean("onboardingComplete", false),
         )
     }
 

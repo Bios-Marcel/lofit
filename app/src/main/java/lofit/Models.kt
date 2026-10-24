@@ -190,6 +190,8 @@ data class ExerciseRecord(
     val volumeSet: LoggedSet?,
 )
 
+enum class BiologicalGender(val label: String) { MALE("Male"), FEMALE("Female") }
+
 data class AppData(
     val exercises: MutableList<Exercise> = DefaultData.exercises().toMutableList(),
     val routines: MutableList<Routine> = mutableListOf(),
@@ -197,6 +199,8 @@ data class AppData(
     var activeWorkout: WorkoutSession? = null,
     var soundCuesEnabled: Boolean = true,
     var bodyMetricsEnabled: Boolean? = null,
+    var biologicalGender: BiologicalGender = BiologicalGender.MALE,
+    var onboardingComplete: Boolean = false,
 ) {
     fun resumeWorkout(workoutId: String, resumedAt: Long = System.currentTimeMillis()): WorkoutSession? {
         if (activeWorkout != null) return null

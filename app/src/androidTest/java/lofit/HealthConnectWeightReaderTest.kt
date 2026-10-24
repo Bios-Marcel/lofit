@@ -39,7 +39,7 @@ class HealthConnectWeightReaderTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         context.getSharedPreferences("lofit-data", 0).edit().clear().commit()
-        LofitRepository(context).apply { data.bodyMetricsEnabled = true; save() }
+        LofitRepository(context).apply { data.bodyMetricsEnabled = true; data.onboardingComplete = true; save() }
         instrumentation.uiAutomation.grantRuntimePermission(context.packageName, Manifest.permission.POST_NOTIFICATIONS)
         instrumentation.uiAutomation.grantRuntimePermission(context.packageName, HealthPermissions.READ_WEIGHT)
         instrumentation.uiAutomation.grantRuntimePermission(context.packageName, HealthPermissions.READ_HEART_RATE)
@@ -76,7 +76,7 @@ class HealthConnectWeightReaderTest {
             onView(withContentDescription("Workout body weight")).check(doesNotExist())
 
             openScreen(activity, R.string.nav_settings)
-            onView(withContentDescription("Body metrics")).perform(click())
+            onView(withContentDescription("Android health integration")).perform(click())
             assertEquals(false, LofitRepository(context).data.bodyMetricsEnabled)
             openScreen(activity, R.string.nav_workout)
             onView(withText("Finish workout")).perform(scrollTo(), click())
@@ -87,7 +87,7 @@ class HealthConnectWeightReaderTest {
             assertNull(LofitRepository(context).data.activeWorkout!!.bodyWeightKg)
 
             openScreen(activity, R.string.nav_settings)
-            onView(withContentDescription("Body metrics")).perform(click())
+            onView(withContentDescription("Android health integration")).perform(click())
             val enabledDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
             while (LofitRepository(context).data.activeWorkout?.bodyWeightKg == null && System.nanoTime() < enabledDeadline) {
                 Thread.sleep(50)

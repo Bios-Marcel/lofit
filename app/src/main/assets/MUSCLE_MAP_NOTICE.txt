@@ -4,9 +4,12 @@ Anatomical paths adapted from react-native-body-highlighter:
 https://github.com/HichamELBSI/react-native-body-highlighter
 Commit: 8ed39ac2ae9cb46fb79d77eedec7e5b029a75174
 Source files: assets/bodyFront.ts, assets/bodyBack.ts,
-components/SvgMaleWrapper.tsx.
+assets/bodyFemaleFront.ts, assets/bodyFemaleBack.ts,
+components/SvgMaleWrapper.tsx, components/SvgFemaleWrapper.tsx.
 
 Paths are stored in res/raw/muscle_map_front.json and muscle_map_back.json.
+Female paths are stored in res/raw/muscle_map_female_front.json and
+muscle_map_female_back.json.
 SVG command spacing is normalized for Android PathParser. Colors, shading,
 viewport, and exercise muscle-group mappings are specific to Lofit.
 

@@ -20,6 +20,34 @@ class StartupDataMigrationTest {
     }
 
     @Test
+    fun onboarding_oldDataKeepsWorkoutsAndHealthChoiceAndNewChoicesPersist() {
+        val repository = LofitRepository(context)
+        repository.data.history.add(WorkoutSession(name = "Existing workout", completedAt = 200))
+        repository.data.bodyMetricsEnabled = true
+        repository.save()
+        val root = JSONObject(stored()).apply {
+            remove("biologicalGender")
+            remove("onboardingComplete")
+        }
+        store(root.toString())
+
+        val loaded = LofitRepository(context)
+        assertFalse(loaded.data.onboardingComplete)
+        assertEquals(BiologicalGender.MALE, loaded.data.biologicalGender)
+        assertEquals(true, loaded.data.bodyMetricsEnabled)
+        assertEquals("Existing workout", loaded.data.history.single().name)
+        loaded.data.biologicalGender = BiologicalGender.FEMALE
+        loaded.data.onboardingComplete = true
+        loaded.save()
+
+        val restarted = LofitRepository(context)
+        assertTrue(restarted.data.onboardingComplete)
+        assertEquals(BiologicalGender.FEMALE, restarted.data.biologicalGender)
+        assertEquals(true, restarted.data.bodyMetricsEnabled)
+        assertEquals("Existing workout", restarted.data.history.single().name)
+    }
+
+    @Test
     fun bodyMetricsConsent_remembersAllChoicesAndDefaultsToUndecidedForOldData() {
         listOf(null, false, true).forEach { choice ->
             val repository = LofitRepository(context)

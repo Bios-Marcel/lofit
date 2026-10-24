@@ -16,7 +16,6 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.LayerDrawable
-import android.health.connect.HealthConnectManager
 import android.health.connect.HealthPermissions
 import android.media.AudioManager
 import android.media.ToneGenerator
@@ -85,6 +84,8 @@ class MainActivity : AppCompatActivity() {
         const val SET_HOLD_ACTION_WIDTH_DP = 48
         const val SET_DONE_ACTION_WIDTH_DP = 48
         const val SET_RECORD_ACTION_WIDTH_DP = 32
+        // Same Android 14+ action as AndroidX HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS.
+        const val ACTION_HEALTH_CONNECT_SETTINGS = "android.health.connect.action.HEALTH_HOME_SETTINGS"
     }
 
     private enum class Screen { WORKOUT, ROUTINES, EXERCISES, RECORDS, HISTORY, SETTINGS }
@@ -138,6 +139,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var repository: LofitRepository
     private val healthWeightReader by lazy { HealthConnectWeightReader(this) }
     private var healthPermissionPending = false
+    private var onboardingGender = BiologicalGender.MALE
+    private var onboardingHealthEnabled = false
     private var bodyMetricsReadGeneration = 0
     private lateinit var content: FrameLayout
     private lateinit var root: LinearLayout
@@ -197,6 +200,10 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         repository = LofitRepository(this)
         healthPermissionPending = savedInstanceState?.getBoolean("healthPermissionPending") ?: false
+        onboardingGender = savedInstanceState?.getString("onboardingGender")?.let(BiologicalGender::valueOf)
+            ?: repository.data.biologicalGender
+        onboardingHealthEnabled = savedInstanceState?.getBoolean("onboardingHealthEnabled")
+            ?: (repository.data.bodyMetricsEnabled == true)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -221,15 +228,7 @@ class MainActivity : AppCompatActivity() {
         )
         buildShell()
         render()
-        if (repository.data.bodyMetricsEnabled == null) {
-            AlertDialog.Builder(this)
-                .setTitle("Use body metrics?")
-                .setMessage("Save your weight from Health Connect with your workouts? Also allow heart rate access for future use. Heart rate will not be read yet.")
-                .setPositiveButton("Enable") { _, _ -> setBodyMetricsEnabled(true) }
-                .setNegativeButton("No thanks") { _, _ -> setBodyMetricsEnabled(false) }
-                .setOnCancelListener { setBodyMetricsEnabled(false) }
-                .show()
-        } else if (!healthPermissionPending) {
+        if (repository.data.onboardingComplete && !healthPermissionPending) {
             repository.data.activeWorkout?.let { workout ->
                 if (workout.bodyWeightKg == null) queryWorkoutWeight(workout)
                 ensureWorkoutNotification()
@@ -240,6 +239,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putBoolean("healthPermissionPending", healthPermissionPending)
+        outState.putString("onboardingGender", onboardingGender.name)
+        outState.putBoolean("onboardingHealthEnabled", onboardingHealthEnabled)
         super.onSaveInstanceState(outState)
     }
 
@@ -316,6 +317,16 @@ class MainActivity : AppCompatActivity() {
         holdTimerText = null
         holdTimerButton = null
         holdDoneCheckBox = null
+        drawerLayout.setDrawerLockMode(if (repository.data.onboardingComplete) {
+            DrawerLayout.LOCK_MODE_UNLOCKED
+        } else {
+            DrawerLayout.LOCK_MODE_LOCKED_CLOSED
+        })
+        if (!repository.data.onboardingComplete) {
+            restBar.visibility = View.GONE
+            content.addView(onboardingScreen())
+            return
+        }
         val view = when (val activeRoute = route) {
             Route.Root -> rootScreen()
             is Route.ExercisePicker -> exercisePickerScreen(activeRoute)
@@ -341,7 +352,54 @@ class MainActivity : AppCompatActivity() {
         Screen.SETTINGS -> settingsScreen()
     }
 
+    private fun onboardingScreen(): View = page("Welcome to Lofit") { body ->
+        body.addView(genderChoice(onboardingGender) { onboardingGender = it })
+        body.addView(sectionTitle("Android health integration"))
+        body.addView(healthIntegrationChoice(onboardingHealthEnabled) { onboardingHealthEnabled = it })
+        body.addView(actionButton("Get started") {
+            repository.data.biologicalGender = onboardingGender
+            repository.data.onboardingComplete = true
+            repository.save()
+            render()
+            setBodyMetricsEnabled(onboardingHealthEnabled)
+        })
+    }
+
+    private fun genderChoice(selected: BiologicalGender, onChange: (BiologicalGender) -> Unit): View = card {
+        addView(titleText("Biological gender"))
+        addView(metaText("Only changes appearances in the app."))
+        addView(choiceGroup(BiologicalGender.entries.map { it.label }, selected.ordinal).apply {
+            setOnCheckedChangeListener { group, _ -> onChange(BiologicalGender.entries[selectedChoice(group)]) }
+        })
+    }
+
+    private fun healthIntegrationChoice(enabled: Boolean, onChange: (Boolean) -> Unit): View = card {
+        addView(LinearLayout(this@MainActivity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(titleText("Health Connect"), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            addView(Switch(this@MainActivity).apply {
+                isChecked = enabled
+                showText = false
+                minWidth = dp(72)
+                minHeight = dp(48)
+                thumbTintList = ColorStateList.valueOf(color(R.color.cream))
+                trackTintList = ColorStateList(
+                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                    intArrayOf(color(R.color.coral_dark), color(R.color.sage)),
+                )
+                contentDescription = "Android health integration"
+                setOnCheckedChangeListener { _, checked -> onChange(checked) }
+            })
+        })
+        addView(metaText("Save weight with workouts. Allow heart rate access for future use; heart rate is not read yet."))
+    }
+
     private fun settingsScreen(): View = page("Settings", "Control how Lofit behaves.") { body ->
+        body.addView(genderChoice(repository.data.biologicalGender) {
+            repository.data.biologicalGender = it
+            repository.save()
+        })
         body.addView(card {
             addView(LinearLayout(this@MainActivity).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -379,33 +437,18 @@ class MainActivity : AppCompatActivity() {
                 })
             })
         })
-        body.addView(sectionTitle("Health Connect"))
-        body.addView(card {
-            addView(LinearLayout(this@MainActivity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                addView(titleText("Body metrics"), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-                addView(Switch(this@MainActivity).apply {
-                    isChecked = repository.data.bodyMetricsEnabled == true
-                    showText = false
-                    minWidth = dp(72)
-                    thumbTintList = ColorStateList.valueOf(color(R.color.cream))
-                    trackTintList = ColorStateList(
-                        arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                        intArrayOf(color(R.color.coral_dark), color(R.color.sage)),
-                    )
-                    contentDescription = "Body metrics"
-                    setOnCheckedChangeListener { _, enabled -> setBodyMetricsEnabled(enabled) }
-                })
-            })
-        })
+        body.addView(sectionTitle("Android health integration"))
+        body.addView(healthIntegrationChoice(repository.data.bodyMetricsEnabled == true, ::setBodyMetricsEnabled))
         body.addView(actionButton("Manage health access", secondary = true) {
             try {
-                startActivity(Intent(HealthConnectManager.ACTION_MANAGE_HEALTH_PERMISSIONS)
-                    .putExtra(Intent.EXTRA_PACKAGE_NAME, packageName))
+                startActivity(Intent(ACTION_HEALTH_CONNECT_SETTINGS))
             } catch (_: ActivityNotFoundException) {
                 Toast.makeText(this, "Health Connect unavailable", Toast.LENGTH_SHORT).show()
+            } catch (_: SecurityException) {
+                Toast.makeText(this, "Health Connect unavailable", Toast.LENGTH_SHORT).show()
             }
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            bottomMargin = dp(8)
         })
         body.addView(actionButton("Health data privacy", secondary = true) {
             startActivity(Intent(this, HealthPrivacyActivity::class.java))
@@ -1146,7 +1189,7 @@ class MainActivity : AppCompatActivity() {
                     orientation = LinearLayout.VERTICAL
                     gravity = Gravity.CENTER
                     addView(metaText(label).apply { gravity = Gravity.CENTER })
-                    addView(MuscleMapView(this@MainActivity, side, muscleGroups))
+                    addView(MuscleMapView(this@MainActivity, side, muscleGroups, repository.data.biologicalGender))
                 }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
             }
         }
@@ -1317,6 +1360,9 @@ class MainActivity : AppCompatActivity() {
                     ConfirmAction.DELETE_ROUTINE -> repository.data.routines.removeAll { it.id == confirm.targetId }
                     ConfirmAction.RESET_DATA -> {
                         repository.reset()
+                        onboardingGender = repository.data.biologicalGender
+                        onboardingHealthEnabled = false
+                        bodyMetricsReadGeneration++
                         routineDraft = null
                         restEndsAt = 0L
                         clearActiveHold()
@@ -1326,6 +1372,8 @@ class MainActivity : AppCompatActivity() {
                 if (confirm.action != ConfirmAction.RESET_DATA) repository.save()
                 route = Route.Root
                 render()
+            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                bottomMargin = dp(8)
             })
             body.addView(actionButton("Cancel", secondary = true) { navigateBack() })
         }

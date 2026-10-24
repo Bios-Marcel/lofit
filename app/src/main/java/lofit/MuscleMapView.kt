@@ -21,9 +21,10 @@ class MuscleMapView(
     context: Context,
     private val side: MuscleMapSide,
     muscleGroups: Set<String>,
+    val biologicalGender: BiologicalGender = BiologicalGender.MALE,
 ) : View(context) {
     private val activeGroups = muscleGroups.mapNotNull(MuscleGroups::canonical).toSet()
-    private val anatomy = anatomy(context, side)
+    private val anatomy = anatomy(context, side, biologicalGender)
     private val surface = ContextCompat.getColor(context, R.color.charcoal_light)
     private val sage = ContextCompat.getColor(context, R.color.sage)
     private val coral = ContextCompat.getColor(context, R.color.coral)
@@ -42,7 +43,7 @@ class MuscleMapView(
         strokeJoin = Paint.Join.ROUND
         style = Paint.Style.STROKE
     }
-    // Parse geometry once per side; prepare shading once per card, never while scrolling.
+    // Parse geometry once per model and side; prepare shading once per card.
     private val muscles = anatomy.regions.flatMap { region ->
         val active = groupsFor(region.name, side).any(activeGroups::contains)
         val base = if (active) coral else ColorUtils.blendARGB(surface, sage, 0.48f)
@@ -65,7 +66,8 @@ class MuscleMapView(
         contentDescription = if (side == MuscleMapSide.FRONT) "Front muscle map" else "Back muscle map"
         val visibleGroups = anatomy.regions.flatMap { groupsFor(it.name, side) }.toSet()
         val highlighted = activeGroups.filter(visibleGroups::contains).sorted()
-        stateDescription = highlighted.takeIf { it.isNotEmpty() }?.joinToString(", ") ?: "No highlighted muscles"
+        stateDescription = "${biologicalGender.label}. " +
+            (highlighted.takeIf { it.isNotEmpty() }?.joinToString(", ") ?: "No highlighted muscles")
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
     }
 
@@ -106,11 +108,14 @@ class MuscleMapView(
     private data class ShadedPath(val path: Path, val paint: Paint)
 
     private companion object {
-        private val cache = mutableMapOf<MuscleMapSide, Anatomy>()
+        private val cache = mutableMapOf<Pair<BiologicalGender, MuscleMapSide>, Anatomy>()
 
         @Synchronized
-        fun anatomy(context: Context, side: MuscleMapSide): Anatomy = cache.getOrPut(side) {
-            val resource = if (side == MuscleMapSide.FRONT) R.raw.muscle_map_front else R.raw.muscle_map_back
+        fun anatomy(context: Context, side: MuscleMapSide, gender: BiologicalGender): Anatomy = cache.getOrPut(gender to side) {
+            val resource = when (gender) {
+                BiologicalGender.MALE -> if (side == MuscleMapSide.FRONT) R.raw.muscle_map_front else R.raw.muscle_map_back
+                BiologicalGender.FEMALE -> if (side == MuscleMapSide.FRONT) R.raw.muscle_map_female_front else R.raw.muscle_map_female_back
+            }
             val json = context.resources.openRawResource(resource).bufferedReader().use { JSONObject(it.readText()) }
             val viewport = json.getJSONArray("viewport")
             val x = viewport.getDouble(0).toFloat()

@@ -73,25 +73,31 @@ class WorkoutFlowTest {
             .commit()
         LofitRepository(context).apply {
             data.bodyMetricsEnabled = false
+            data.onboardingComplete = true
             save()
         }
     }
 
     @Test
-    fun startup_bodyMetricsCanBeDeclinedAndChoicePersists() {
+    fun onboarding_femaleAndHealthDeclinedPersistAcrossRestart() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
-        LofitRepository(context).apply { data.bodyMetricsEnabled = null; save() }
+        LofitRepository(context).apply { data.bodyMetricsEnabled = null; data.onboardingComplete = false; save() }
         val intent = Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         val activity = instrumentation.startActivitySync(intent)
 
-        onView(withText("Use body metrics?")).check(matches(isDisplayed()))
-        onView(withText("No thanks")).perform(click())
+        onView(withText("Welcome to Lofit")).check(matches(isDisplayed()))
+        onView(withText("Biological gender")).check(matches(isDisplayed()))
+        onView(withText("Female")).perform(click())
+        onView(withContentDescription("Android health integration")).check(matches(not(isChecked())))
+        onView(withText("Get started")).perform(click())
+        assertEquals(BiologicalGender.FEMALE, LofitRepository(context).data.biologicalGender)
+        assertTrue(LofitRepository(context).data.onboardingComplete)
         assertEquals(false, LofitRepository(context).data.bodyMetricsEnabled)
         instrumentation.runOnMainSync { activity.finish() }
 
         val restarted = instrumentation.startActivitySync(intent)
-        onView(withText("Use body metrics?")).check(doesNotExist())
+        onView(withText("Welcome to Lofit")).check(doesNotExist())
         onView(withText(R.string.start_workout)).perform(click())
         assertEquals(false, LofitRepository(context).data.bodyMetricsEnabled)
         assertEquals(null, LofitRepository(context).data.activeWorkout!!.bodyWeightKg)
@@ -99,18 +105,92 @@ class WorkoutFlowTest {
     }
 
     @Test
-    fun startup_bodyMetricsCanBeEnabled() {
+    fun onboarding_healthIntegrationCanBeEnabled() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
-        LofitRepository(context).apply { data.bodyMetricsEnabled = null; save() }
+        LofitRepository(context).apply { data.bodyMetricsEnabled = null; data.onboardingComplete = false; save() }
         val activity = instrumentation.startActivitySync(
             Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
 
-        onView(withText("Enable")).perform(click())
+        onView(withContentDescription("Android health integration")).perform(click())
+        assertEquals(null, LofitRepository(context).data.bodyMetricsEnabled)
+        onView(withText("Get started")).perform(click())
         assertEquals(true, LofitRepository(context).data.bodyMetricsEnabled)
-        onView(withText("Use body metrics?")).check(doesNotExist())
+        onView(withText("Welcome to Lofit")).check(doesNotExist())
         instrumentation.runOnMainSync { activity.finish() }
+    }
+
+    @Test
+    fun settings_genderChangesBothMuscleMapsAndPersistsAcrossRestart() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        LofitRepository(context).apply {
+            data.history.add(WorkoutSession(
+                name = "Map workout", completedAt = 200,
+                exercises = mutableListOf(WorkoutExercise(exerciseId = "bench-press")),
+            ))
+            save()
+        }
+        val intent = Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val activity = instrumentation.startActivitySync(intent)
+
+        fun checkMaps(gender: BiologicalGender) {
+            onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+            onView(withText(R.string.nav_history)).perform(click())
+            listOf("Front", "Back").forEach { side ->
+                onView(withContentDescription("$side muscle map")).perform(scrollTo()).check { view, _ ->
+                    assertEquals(gender, (view as MuscleMapView).biologicalGender)
+                    assertTrue(view.stateDescription?.startsWith(gender.label) == true)
+                }
+            }
+        }
+
+        checkMaps(BiologicalGender.MALE)
+        onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+        onView(withText(R.string.nav_settings)).perform(click())
+        onView(withText("Female")).perform(click()).check(matches(isChecked()))
+        assertEquals(BiologicalGender.FEMALE, LofitRepository(context).data.biologicalGender)
+        checkMaps(BiologicalGender.FEMALE)
+        instrumentation.runOnMainSync { activity.finish() }
+
+        val restarted = instrumentation.startActivitySync(intent)
+        onView(withText("Welcome to Lofit")).check(doesNotExist())
+        checkMaps(BiologicalGender.FEMALE)
+        onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+        onView(withText(R.string.nav_settings)).perform(click())
+        onView(withText("Female")).check(matches(isChecked()))
+        onView(withText("Male")).perform(click())
+        checkMaps(BiologicalGender.MALE)
+        instrumentation.runOnMainSync { restarted.finish() }
+    }
+
+    @Test
+    fun settings_manageHealthAccessOpensHealthConnectAndReturnsToSettings() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val activity = instrumentation.startActivitySync(
+            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+        try {
+            onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+            onView(withText(R.string.nav_settings)).perform(click())
+            onView(withText("Manage health access")).perform(scrollTo(), click())
+
+            val automation = instrumentation.uiAutomation
+            val deadline = android.os.SystemClock.elapsedRealtime() + 5_000
+            while (automation.rootInActiveWindow?.packageName?.toString()?.endsWith(".healthconnect.controller") != true &&
+                android.os.SystemClock.elapsedRealtime() < deadline) {
+                Thread.sleep(100)
+            }
+            assertTrue("Health Connect should open outside Lofit",
+                automation.rootInActiveWindow?.packageName?.toString()?.endsWith(".healthconnect.controller") == true)
+
+            automation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
+            onView(withText("Manage health access")).check(matches(isDisplayed()))
+        } finally {
+            instrumentation.runOnMainSync { activity.finish() }
+        }
     }
 
     @Test
@@ -121,22 +201,22 @@ class WorkoutFlowTest {
         val activity = instrumentation.startActivitySync(intent)
         onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
         onView(withText(R.string.nav_settings)).perform(click())
-        onView(withContentDescription("Body metrics"))
+        onView(withContentDescription("Android health integration"))
             .check(matches(not(isChecked())))
             .perform(click())
             .check(matches(isChecked()))
         assertEquals(true, LofitRepository(context).data.bodyMetricsEnabled)
-        onView(withContentDescription("Body metrics"))
+        onView(withContentDescription("Android health integration"))
             .perform(click())
             .check(matches(not(isChecked())))
         assertEquals(false, LofitRepository(context).data.bodyMetricsEnabled)
         instrumentation.runOnMainSync { activity.finish() }
 
         val restarted = instrumentation.startActivitySync(intent)
-        onView(withText("Use body metrics?")).check(doesNotExist())
+        onView(withText("Welcome to Lofit")).check(doesNotExist())
         onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
         onView(withText(R.string.nav_settings)).perform(click())
-        onView(withContentDescription("Body metrics")).check(matches(not(isChecked())))
+        onView(withContentDescription("Android health integration")).check(matches(not(isChecked())))
         instrumentation.runOnMainSync { restarted.finish() }
     }
 
