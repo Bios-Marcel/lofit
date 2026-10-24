@@ -710,6 +710,10 @@ class MainActivity : AppCompatActivity() {
             onRemove = onRemove,
             onStateUpdaterReady = onActionStateUpdaterReady,
         )), insetCardLayoutParams())
+        addView(exerciseNote(item.note, exercise, previousNote = item.previousNote) { note ->
+            item.note = note
+            repository.save()
+        }, insetCardLayoutParams().apply { topMargin = dp(8); bottomMargin = dp(8) })
         val actionWidth = SET_DONE_ACTION_WIDTH_DP + SET_RECORD_ACTION_WIDTH_DP +
             if (exercise.type.tracksDuration) SET_HOLD_ACTION_WIDTH_DP else 0
         addView(plannedSetHeader(
@@ -953,6 +957,8 @@ class MainActivity : AppCompatActivity() {
                         onRemove = { removeExercise(item) },
                         onStateUpdaterReady = { updater -> updateActionStates[item.id] = updater },
                     )), insetCardLayoutParams())
+                    addView(exerciseNote(item.note, movement) { item.note = it },
+                        insetCardLayoutParams().apply { topMargin = dp(8); bottomMargin = dp(8) })
                     val setRows = LinearLayout(this@MainActivity).apply {
                         orientation = LinearLayout.VERTICAL
                     }
@@ -1238,6 +1244,8 @@ class MainActivity : AppCompatActivity() {
                         contentDescription = "View ${movement.name} trend"
                         setOnClickListener { openExerciseTrend(movement.id) }
                     }, insetCardLayoutParams())
+                    addView(exerciseNote(item.note, movement, readOnly = true),
+                        insetCardLayoutParams().apply { topMargin = dp(8); bottomMargin = dp(8) })
                     val actionWidth = SET_DONE_ACTION_WIDTH_DP + SET_RECORD_ACTION_WIDTH_DP
                     addView(plannedSetHeader(movement, "Done", endWidth = actionWidth,
                         showActiveHold = movement.type.tracksDuration, showHoldAction = false))
@@ -1508,7 +1516,7 @@ class MainActivity : AppCompatActivity() {
                     ViewGroup.LayoutParams.WRAP_CONTENT).apply { bottomMargin = dp(12) })
             }
             val updateSets = routineChanges?.takeIf { it.changed.isNotEmpty() }?.let {
-                updateChoice("Update sets and weights in ${it.routine.name}")
+                updateChoice("Update sets, weights and notes in ${it.routine.name}")
             }
             val includeAdded = routineChanges?.takeIf { it.added.isNotEmpty() }?.let {
                 updateChoice("Add new exercises to ${it.routine.name}")
@@ -2532,6 +2540,37 @@ class MainActivity : AppCompatActivity() {
         background = fieldBackground(focused = false)
         setPadding(dp(12), 0, dp(12), 0)
         setOnFocusChangeListener { view, focused -> view.background = fieldBackground(focused) }
+    }
+
+    private fun exerciseNote(
+        value: String,
+        exercise: Exercise,
+        previousNote: String = "",
+        readOnly: Boolean = false,
+        onChange: (String) -> Unit = {},
+    ): TextView {
+        val field = if (readOnly) TextView(this) else textField("Type note here ...")
+        return field.apply {
+            hint = previousNote.ifBlank { "Type note here ..." }
+            textSize = 14f
+            setTextColor(color(R.color.cream))
+            setHintTextColor(color(R.color.sage))
+            setPadding(dp(4), dp(4), dp(4), dp(4))
+            minHeight = 0
+            background = null
+            onFocusChangeListener = null
+            contentDescription = "${exercise.name} note"
+            if (this is EditText) {
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+                    InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+                isSingleLine = false
+                gravity = Gravity.TOP or Gravity.START
+                setText(value)
+                doAfterTextChanged { onChange(it.toString()) }
+            } else {
+                text = value
+            }
+        }
     }
 
     private fun muscleGroupField(hint: String, value: String, multiple: Boolean = false): AutoCompleteTextView {

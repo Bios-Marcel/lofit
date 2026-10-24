@@ -17,12 +17,17 @@ class SharedWorkoutPlanTest {
             PlannedSet(type = SetType.FAILURE, weightKg = 5.0, holdSeconds = 40, side = Side.RIGHT))
         return WorkoutSession(name = "Together 🏋", defaultRestSeconds = 75, bodyWeightKg = 81.0,
             exercises = mutableListOf(WorkoutExercise(exerciseId = movement.id, restSecondsOverride = 45,
+                note = "Brace core\nKeep breathing",
                 plannedSets = sets, sets = mutableListOf(LoggedSet(type = SetType.WARMUP,
                     weightKg = 2.5, holdSeconds = 17, plannedSetId = sets.first().id)))))
     }
 
     @Test fun roundTrip_keepsFullPlanAndCustomExerciseWithoutPersonalData() {
         val source = workout()
+        source.exercises.single().apply {
+            previousNote = note
+            note = ""
+        }
         val payload = SharedWorkoutPlan.encode(source, listOf(movement))
         val json = JSONObject(payload.toString(Charsets.UTF_8))
         assertFalse(json.has("bodyWeightKg"))
@@ -31,6 +36,7 @@ class SharedWorkoutPlanTest {
         assertEquals(source.name, plan.routine.name)
         assertEquals(75, plan.routine.defaultRestSeconds)
         val exercise = plan.routine.exercises.single()
+        assertEquals("Brace core\nKeep breathing", exercise.note)
         assertEquals(45, exercise.restSecondsOverride)
         assertEquals(2, exercise.plannedSets.size)
         assertNull(exercise.plannedSets.first().actualHoldSeconds)
@@ -47,6 +53,7 @@ class SharedWorkoutPlanTest {
             exercises = mutableListOf(WorkoutExercise(exerciseId = movement.id,
                 sets = mutableListOf(LoggedSet(type = SetType.NORMAL, weightKg = 90.0, reps = 1))))))
         val received = plan.startIn(data)
+        assertEquals("Brace core\nKeep breathing", received.exercises.single().note)
         assertEquals("Other movement", data.exercises.first().name)
         assertEquals(2, data.exercises.size)
         assertNotEquals(movement.id, received.exercises.single().exerciseId)

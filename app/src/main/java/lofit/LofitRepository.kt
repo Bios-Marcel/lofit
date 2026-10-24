@@ -82,6 +82,7 @@ class LofitRepository(context: Context) {
                     put("id", item.id)
                     put("exerciseId", item.exerciseId)
                     put("restSecondsOverride", item.restSecondsOverride ?: JSONObject.NULL)
+                    put("note", item.note)
                     put("plannedSets", encodePlannedSets(item.plannedSets))
                 })
             }
@@ -109,6 +110,8 @@ class LofitRepository(context: Context) {
                     put("exerciseId", item.exerciseId)
                     put("restSecondsOverride", item.restSecondsOverride ?: JSONObject.NULL)
                     put("sourceRoutineExerciseId", item.sourceRoutineExerciseId ?: JSONObject.NULL)
+                    put("note", item.note)
+                    put("previousNote", item.previousNote)
                     put("plannedSets", encodePlannedSets(item.plannedSets))
                     put("sets", JSONArray().apply {
                         item.sets.forEach { set ->
@@ -166,6 +169,7 @@ class LofitRepository(context: Context) {
         exercises = value.getJSONArray("exercises").mapObjects { item ->
             RoutineExercise(
                 id = item.getString("id"),
+                note = item.optString("note", ""),
                 exerciseId = item.getString("exerciseId"),
                 restSecondsOverride = if (item.isNull("restSecondsOverride")) null else item.getInt("restSecondsOverride"),
                 plannedSets = decodePlannedSets(item.getJSONArray("plannedSets")),
@@ -183,6 +187,8 @@ class LofitRepository(context: Context) {
         exercises = value.getJSONArray("exercises").mapObjects { item ->
             WorkoutExercise(
                 id = item.getString("id"),
+                note = item.optString("note", ""),
+                previousNote = item.optString("previousNote", ""),
                 exerciseId = item.getString("exerciseId"),
                 sourceRoutineExerciseId = if (item.isNull("sourceRoutineExerciseId")) null else item.getString("sourceRoutineExerciseId"),
                 restSecondsOverride = if (item.isNull("restSecondsOverride")) null else item.getInt("restSecondsOverride"),

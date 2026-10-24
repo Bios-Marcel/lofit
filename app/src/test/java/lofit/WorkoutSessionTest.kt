@@ -10,6 +10,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WorkoutSessionTest {
+    @Test fun finishingWorkoutSavesUntouchedNoteHintsAndNewNotes() {
+        val workout = WorkoutSession(name = "Notes", exercises = mutableListOf(
+            WorkoutExercise(exerciseId = "bench", previousNote = "Keep elbows tucked"),
+            WorkoutExercise(exerciseId = "squat", previousNote = "Old cue", note = "New cue"),
+            WorkoutExercise(exerciseId = "row", previousNote = "Slow descent", note = " \n"),
+            WorkoutExercise(exerciseId = "plank"),
+        ))
+        workout.finish()
+        assertEquals(listOf("Keep elbows tucked", "New cue", "Slow descent", ""), workout.exercises.map { it.note })
+        assertTrue(workout.exercises.all { it.previousNote.isEmpty() })
+    }
+
     @Test
     fun workoutTime_usesHoursAndMinutesFromOneHour() {
         assertEquals("59:59", formatWorkoutTime(3_599))

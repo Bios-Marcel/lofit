@@ -5,9 +5,12 @@ import java.util.UUID
 /** Keep the routine's count and set kinds; refresh loads only from this routine's history. */
 fun AppData.workoutFromRoutine(routine: Routine): WorkoutSession {
     val items = routine.exercises.map { item ->
-        val latest = lastKnownSets(item.exerciseId, preferredRoutineId = routine.id, sameRoutineOnly = true)
+        val previousExercise = lastKnownExercise(item.exerciseId, preferredRoutineId = routine.id, sameRoutineOnly = true)
+        val latest = previousExercise?.plannedSets
         WorkoutExercise(exerciseId = item.exerciseId, restSecondsOverride = item.restSecondsOverride,
             sourceRoutineExerciseId = item.id,
+            note = if (previousExercise == null) item.note else "",
+            previousNote = previousExercise?.effectiveNote.orEmpty(),
             plannedSets = item.plannedSets.mapIndexed { index, saved ->
                 // Match warm-ups, working sets, and sides before falling back to row position.
                 val matching = latest.orEmpty().filter { it.type == saved.type && it.side == saved.side }
@@ -33,6 +36,7 @@ fun AppData.workoutFromRoutine(routine: Routine): WorkoutSession {
 fun WorkoutSession.captureRoutineBaseline(): Routine? = sourceRoutine?.copy(
     exercises = exercises.map { item ->
         RoutineExercise(id = item.id, exerciseId = item.exerciseId,
+            note = item.effectiveNote,
             restSecondsOverride = item.restSecondsOverride,
             plannedSets = item.plannedSets.map { it.freshCopy() }.toMutableList())
     }.toMutableList(),
@@ -48,11 +52,13 @@ class RoutineWorkoutChanges(
 ) {
     fun apply(updateSets: Boolean, includeAdded: Boolean) {
         if (updateSets) changed.forEach { (saved, trained) ->
+            saved.note = trained.effectiveNote
             saved.plannedSets.clear()
             saved.plannedSets.addAll(trained.plannedSets.map { it.freshCopy() })
         }
         if (includeAdded) added.forEach { item ->
             val saved = RoutineExercise(exerciseId = item.exerciseId,
+                note = item.effectiveNote,
                 restSecondsOverride = item.restSecondsOverride,
                 plannedSets = item.plannedSets.map { it.freshCopy() }.toMutableList())
             routine.exercises.add(saved)
@@ -70,7 +76,8 @@ fun WorkoutSession.routineChanges(routines: List<Routine>): RoutineWorkoutChange
         val saved = routine.exercises.firstOrNull {
             it.id == item.sourceRoutineExerciseId && it.exerciseId == item.exerciseId
         } ?: return@mapNotNull null
-        if (initial.plannedSets.prescription() == item.plannedSets.prescription()) null else saved to item
+        if (initial.plannedSets.prescription() == item.plannedSets.prescription() && initial.note == item.effectiveNote)
+            null else saved to item
     }
     val added = exercises.filter { it.id !in initialById && it.sourceRoutineExerciseId == null }
     return if (changed.isEmpty() && added.isEmpty()) null else RoutineWorkoutChanges(routine, changed, added)

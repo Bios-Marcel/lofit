@@ -82,8 +82,12 @@ data class WorkoutExercise(
     val sets: MutableList<LoggedSet> = mutableListOf(),
     val plannedSets: MutableList<PlannedSet> = mutableListOf(),
     var sourceRoutineExerciseId: String? = null,
+    var note: String = "",
+    var previousNote: String = "",
 ) {
     fun restSeconds(defaultRestSeconds: Int): Int = restSecondsOverride ?: defaultRestSeconds
+
+    val effectiveNote: String get() = note.ifBlank { previousNote }
 }
 
 data class WorkoutInterval(
@@ -125,6 +129,10 @@ data class WorkoutSession(
 
     fun finish(completedAt: Long = System.currentTimeMillis()) {
         if (this.completedAt != null) return
+        exercises.forEach { item ->
+            item.note = item.effectiveNote
+            item.previousNote = ""
+        }
         intervals[intervals.lastIndex] = intervals.last().copy(endedAt = completedAt)
     }
 
@@ -170,6 +178,7 @@ data class WorkoutSession(
                 exerciseId = item.exerciseId,
                 restSecondsOverride = item.restSecondsOverride,
                 plannedSets = plannedSets,
+                note = item.effectiveNote,
             )
         }.toMutableList(),
     )
@@ -187,6 +196,7 @@ data class RoutineExercise(
     val exerciseId: String,
     var restSecondsOverride: Int? = null,
     val plannedSets: MutableList<PlannedSet> = MutableList(3) { PlannedSet() },
+    var note: String = "",
 )
 
 data class ExerciseRecord(
@@ -241,6 +251,7 @@ data class AppData(
         }
         ?.let { (workout, item) ->
             WorkoutExercise(exerciseId = item.exerciseId,
+                previousNote = item.effectiveNote,
                 restSecondsOverride = item.restSecondsOverride ?: workout.defaultRestSeconds,
                 plannedSets = item.sets.map { set ->
                     PlannedSet(type = set.type, weightKg = set.weightKg, reps = set.reps,

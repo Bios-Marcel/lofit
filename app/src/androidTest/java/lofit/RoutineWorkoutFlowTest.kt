@@ -237,7 +237,7 @@ class RoutineWorkoutFlowTest {
             onView(withContentDescription("Set 1 weight")).check(matches(withText("80")))
             onView(withContentDescription("Set 1 done")).perform(click())
             onView(withText("Finish workout")).perform(scrollTo(), click())
-            onView(withText("Update sets and weights in Strength")).check(doesNotExist())
+            onView(withText("Update sets, weights and notes in Strength")).check(doesNotExist())
             onView(withText("Add new exercises to Strength")).check(doesNotExist())
             onView(withText("Finish and save")).perform(click())
             assertEquals(60.0, LofitRepository(context).data.routines.single().exercises.single().plannedSets.single().weightKg, 0.0)
@@ -257,9 +257,9 @@ class RoutineWorkoutFlowTest {
             scenario.recreate() // Source identity and initial prescription must survive a saved-data reload.
             assertNotNull(LofitRepository(context).data.activeWorkout!!.sourceRoutine)
             onView(withText("Finish workout")).perform(scrollTo(), click())
-            onView(withText("Update sets and weights in Strength")).check(matches(not(isChecked())))
+            onView(withText("Update sets, weights and notes in Strength")).check(matches(not(isChecked())))
             onView(withText("Add new exercises to Strength")).check(matches(not(isChecked())))
-            if (includeUpdates) onView(withText("Update sets and weights in Strength")).perform(click())
+            if (includeUpdates) onView(withText("Update sets, weights and notes in Strength")).perform(click())
             if (includeAdded) onView(withText("Add new exercises to Strength")).perform(click())
             onView(withText("Finish and save")).perform(scrollTo(), click())
             val data = LofitRepository(context).data
@@ -285,7 +285,7 @@ class RoutineWorkoutFlowTest {
             onView(withText("Start routine")).perform(scrollTo(), click())
             onView(withText("Add set")).perform(scrollTo(), click())
             onView(withText("Finish workout")).perform(scrollTo(), click())
-            onView(withText("Update sets and weights in Strength")).perform(click())
+            onView(withText("Update sets, weights and notes in Strength")).perform(click())
             onView(withText("Finish and save")).perform(click())
             val data = LofitRepository(context).data
             assertNull(data.activeWorkout)
@@ -300,10 +300,10 @@ class RoutineWorkoutFlowTest {
             onView(withContentDescription("Set 1 weight")).perform(replaceText("85"), closeSoftKeyboard())
             onView(withContentDescription("Set 1 done")).perform(click())
             onView(withText("Finish workout")).perform(scrollTo(), click())
-            onView(withText("Update sets and weights in Strength")).perform(click())
+            onView(withText("Update sets, weights and notes in Strength")).perform(click())
             onView(withText("Cancel")).perform(click())
             onView(withText("Discard workout")).perform(scrollTo(), click())
-            onView(withText("Update sets and weights in Strength")).check(doesNotExist())
+            onView(withText("Update sets, weights and notes in Strength")).check(doesNotExist())
             onView(withText("Discard workout")).perform(click())
             val data = LofitRepository(context).data
             assertNull(data.activeWorkout)

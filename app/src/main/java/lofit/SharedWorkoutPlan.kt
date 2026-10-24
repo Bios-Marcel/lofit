@@ -19,6 +19,7 @@ data class SharedWorkoutPlan(val routine: Routine, val exercises: List<Exercise>
             exercises = routine.exercises.map { item ->
                 WorkoutExercise(
                     exerciseId = mapped.getValue(item.exerciseId),
+                    note = item.note,
                     restSecondsOverride = item.restSecondsOverride,
                     plannedSets = item.plannedSets.map {
                         it.copy(id = UUID.randomUUID().toString(), actualHoldSeconds = null)
@@ -56,6 +57,7 @@ data class SharedWorkoutPlan(val routine: Routine, val exercises: List<Exercise>
                                 reps = it.reps, holdSeconds = it.holdSeconds, side = it.side) }
                         }
                         put(JSONObject().put("movement", item.exerciseId)
+                            .put("note", item.effectiveNote)
                             .put("rest", item.restSecondsOverride ?: JSONObject.NULL)
                             .put("sets", JSONArray().apply {
                                 sets.forEach { s -> put(JSONObject().put("type", s.type.name)
@@ -88,6 +90,7 @@ data class SharedWorkoutPlan(val routine: Routine, val exercises: List<Exercise>
                     val movement = e.text("movement")
                     require(movements.any { it.id == movement })
                     RoutineExercise(exerciseId = movement,
+                        note = e.optString("note", ""),
                         restSecondsOverride = if (e.isNull("rest")) null else e.number("rest", 0, 3_600),
                         plannedSets = e.getJSONArray("sets").objects(200).map { s ->
                             PlannedSet(type = SetType.valueOf(s.getString("type")),

@@ -145,6 +145,49 @@ class RoutineWorkoutsTest {
         assertEquals(75, data.lastKnownExercise("bench")!!.restSecondsOverride)
     }
 
+    @Test fun notesUseSavedRoutineUntilItsOwnPreviousSetsAreAvailable() {
+        val saved = routine()
+        saved.exercises.single().note = "Keep elbows tucked"
+        val data = AppData(routines = mutableListOf(saved))
+        assertEquals("Keep elbows tucked", data.workoutFromRoutine(saved).exercises.single().note)
+        val previous = WorkoutSession(name = "Open", completedAt = 200, exercises = mutableListOf(
+            WorkoutExercise(exerciseId = "bench", note = "Pause at the bottom", sets = mutableListOf(
+                LoggedSet(type = SetType.NORMAL, weightKg = 70.0, reps = 8))),
+        ))
+        data.history.add(previous)
+        assertEquals("Keep elbows tucked", data.workoutFromRoutine(saved).exercises.single().note)
+        assertEquals("", data.lastKnownExercise("bench")!!.note)
+        assertEquals("Pause at the bottom", data.lastKnownExercise("bench")!!.previousNote)
+        data.history[0] = previous.copy(sourceRoutine = saved)
+        val workout = data.workoutFromRoutine(saved)
+        assertEquals("", workout.exercises.single().note)
+        assertEquals("Pause at the bottom", workout.exercises.single().previousNote)
+        assertEquals("Pause at the bottom", workout.toRoutine().exercises.single().note)
+        assertNull(workout.routineChanges(data.routines))
+        assertEquals("Keep elbows tucked", saved.exercises.single().note)
+        previous.exercises.single().note = ""
+        assertEquals("", data.workoutFromRoutine(saved).exercises.single().note)
+        assertEquals("", data.workoutFromRoutine(saved).exercises.single().previousNote)
+    }
+
+    @Test fun noteEditsCanUpdateRoutineAndHistoryCanBecomeRoutineWithoutLosingNotes() {
+        val saved = routine()
+        saved.exercises.single().note = "Old cue"
+        val data = AppData(routines = mutableListOf(saved))
+        val workout = data.workoutFromRoutine(saved)
+        workout.exercises.single().note = "New cue\nSlow descent"
+        val changes = workout.routineChanges(data.routines)!!
+        changes.apply(updateSets = false, includeAdded = false)
+        assertEquals("Old cue", saved.exercises.single().note)
+        changes.apply(updateSets = true, includeAdded = false)
+        assertEquals("New cue\nSlow descent", saved.exercises.single().note)
+        assertEquals("New cue\nSlow descent", workout.toRoutine().exercises.single().note)
+        val added = WorkoutExercise(exerciseId = "plank", note = "Brace core")
+        workout.exercises.add(added)
+        workout.routineChanges(data.routines)!!.apply(updateSets = false, includeAdded = true)
+        assertEquals("Brace core", saved.exercises.last().note)
+    }
+
     @Test fun changesAndAdditionsAreIndependentOptInsAndKeepUnchangedRows() {
         val saved = routine()
         saved.exercises.add(RoutineExercise(exerciseId = "bench", plannedSets = mutableListOf(PlannedSet(weightKg = 30.0))))
