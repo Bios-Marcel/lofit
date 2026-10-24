@@ -208,14 +208,12 @@ class WorkoutSessionTest {
     fun routineExercise_preservesPrescribedWork() {
         val prescription = RoutineExercise(
             exerciseId = "plank",
-            targetSets = 4,
-            targetReps = 0,
-            targetHoldSeconds = 45,
+            plannedSets = MutableList(4) { PlannedSet(reps = 0, holdSeconds = 45) },
             restSecondsOverride = 60,
         )
 
-        assertEquals(4, prescription.targetSets)
-        assertEquals(45, prescription.targetHoldSeconds)
+        assertEquals(4, prescription.plannedSets.size)
+        assertTrue(prescription.plannedSets.all { it.reps == 0 && it.holdSeconds == 45 })
         assertEquals(60, prescription.restSecondsOverride)
     }
 

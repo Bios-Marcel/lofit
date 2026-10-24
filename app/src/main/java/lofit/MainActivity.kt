@@ -526,7 +526,7 @@ class MainActivity : AppCompatActivity() {
             val indices = fromIndex until endIndex
             val removedSets = item.plannedSets.subList(fromIndex, endIndex).toList()
             val loggedIds = indices.mapNotNull { setIndex ->
-                item.plannedSets.getOrNull(setIndex)?.let { set -> loggedSetFor(item, set, setIndex)?.id }
+                item.plannedSets.getOrNull(setIndex)?.let { set -> loggedSetFor(item, set)?.id }
             }.toSet()
             if (activeHoldWorkoutExerciseId == item.id && removedSets.any { it.id == activeHoldPlannedSetId }) {
                 clearActiveHold()
@@ -537,7 +537,6 @@ class MainActivity : AppCompatActivity() {
                 rowViews.remove(removedSet.id)?.let(setRows::removeView)
                 updateRowIndices.remove(removedSet.id)
             }
-            item.targetSets = item.plannedSets.size
             item.plannedSets.forEachIndexed { setIndex, set ->
                 updateRowIndices[set.id]?.invoke(setIndex)
             }
@@ -546,7 +545,7 @@ class MainActivity : AppCompatActivity() {
             updateWorkoutNotification(force = true)
         }
         fun addWorkoutSetRow(plannedSet: PlannedSet, setIndex: Int) {
-            val loggedSet = loggedSetFor(item, plannedSet, setIndex)
+            val loggedSet = loggedSetFor(item, plannedSet)
             val done = largeCheckBox().apply {
                 isChecked = loggedSet != null
                 contentDescription = "Set ${setIndex + 1} done"
@@ -620,9 +619,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 },
                 onChanged = {
-                    item.plannedSets.indexOf(plannedSet).takeIf { it >= 0 }
-                        ?.let { currentIndex -> loggedSetFor(item, plannedSet, currentIndex) }
-                        ?.let { syncLoggedSet(it, plannedSet, exercise) }
+                    loggedSetFor(item, plannedSet)?.let { syncLoggedSet(it, plannedSet, exercise) }
                     repository.save()
                     onSetsChanged()
                 },
@@ -632,7 +629,7 @@ class MainActivity : AppCompatActivity() {
                 if (currentIndex < 0) return@setOnCheckedChangeListener
                 if (checked) {
                     if (isActiveHold(item, plannedSet) && !completingHoldAutomatically) stopActiveHold()
-                    val loggedSet = loggedSetFor(item, plannedSet, currentIndex)
+                    val loggedSet = loggedSetFor(item, plannedSet)
                     if (loggedSet == null) {
                         val newSet = loggedSetFrom(plannedSet, exercise)
                         item.sets.add(newSet)
@@ -642,7 +639,7 @@ class MainActivity : AppCompatActivity() {
                     }
                     if (!completingHoldAutomatically) startRest(item, workout)
                 } else {
-                    loggedSetFor(item, plannedSet, currentIndex)?.let { removedSet ->
+                    loggedSetFor(item, plannedSet)?.let { removedSet ->
                         item.sets.remove(removedSet)
                         onRecordIndicatorReady(removedSet.id, recordIndicator.apply { visibility = View.INVISIBLE })
                     }
@@ -661,7 +658,6 @@ class MainActivity : AppCompatActivity() {
             val next = item.plannedSets.lastOrNull()?.copy(id = UUID.randomUUID().toString(), actualHoldSeconds = null)
                 ?: PlannedSet(holdSeconds = exercise.minimumHoldSeconds)
             item.plannedSets.add(next)
-            item.targetSets = item.plannedSets.size
             repository.save()
             addWorkoutSetRow(next, item.plannedSets.lastIndex)
             updateWorkoutNotification(force = true)
@@ -768,7 +764,6 @@ class MainActivity : AppCompatActivity() {
                             rowViews.remove(removedSet.id)?.let(setRows::removeView)
                             updateRowIndices.remove(removedSet.id)
                         }
-                        item.targetSets = item.plannedSets.size
                         item.plannedSets.forEachIndexed { setIndex, set ->
                             updateRowIndices[set.id]?.invoke(setIndex)
                         }
@@ -787,12 +782,7 @@ class MainActivity : AppCompatActivity() {
                                     ?.let { removeRoutineSets(it, true) }
                             },
                             onIndexUpdaterReady = { updater -> updateRowIndices[plannedSet.id] = updater },
-                        ) {
-                            if (item.plannedSets.firstOrNull() === plannedSet) {
-                                item.targetReps = plannedSet.reps
-                                item.targetHoldSeconds = plannedSet.holdSeconds
-                            }
-                        }
+                        )
                         rowViews[plannedSet.id] = row
                         setRows.addView(row)
                     }
@@ -801,9 +791,8 @@ class MainActivity : AppCompatActivity() {
                     addView(setRows)
                     addView(actionButton("Add set", secondary = true) {
                         val next = item.plannedSets.lastOrNull()?.copy(id = UUID.randomUUID().toString(), actualHoldSeconds = null)
-                            ?: PlannedSet(reps = item.targetReps, holdSeconds = item.targetHoldSeconds)
+                            ?: PlannedSet(holdSeconds = movement.minimumHoldSeconds)
                         item.plannedSets.add(next)
-                        item.targetSets = item.plannedSets.size
                         addRoutineSetRow(next, item.plannedSets.lastIndex)
                     })
                     addView(restOverrideInput(item.restSecondsOverride) { seconds ->
@@ -857,9 +846,6 @@ class MainActivity : AppCompatActivity() {
                             val lastKnownSets = repository.data.lastKnownSets(movement.id)
                             repository.data.activeWorkout?.exercises?.add(WorkoutExercise(
                                 exerciseId = movement.id,
-                                targetSets = lastKnownSets?.size,
-                                targetReps = lastKnownSets?.firstOrNull()?.reps,
-                                targetHoldSeconds = lastKnownSets?.firstOrNull()?.holdSeconds,
                                 plannedSets = lastKnownSets ?: mutableListOf(),
                             ))
                             repository.save()
@@ -867,7 +853,7 @@ class MainActivity : AppCompatActivity() {
                         } else {
                             routineDraft?.exercises?.add(RoutineExercise(
                                 exerciseId = movement.id,
-                                targetHoldSeconds = movement.minimumHoldSeconds,
+                                plannedSets = MutableList(3) { PlannedSet(holdSeconds = movement.minimumHoldSeconds) },
                             ))
                             route = Route.RoutineEditor(repository.data.routines.firstOrNull { it.id == routineDraft?.id }?.id)
                         }
@@ -1046,9 +1032,7 @@ class MainActivity : AppCompatActivity() {
                     val actionWidth = SET_DONE_ACTION_WIDTH_DP + SET_RECORD_ACTION_WIDTH_DP
                     addView(plannedSetHeader(movement, "Done", endWidth = actionWidth,
                         showActiveHold = movement.type.tracksDuration, showHoldAction = false))
-                    val displayedSetIds = mutableSetOf<String>()
                     fun addSet(plannedSet: PlannedSet, loggedSet: LoggedSet?, index: Int) {
-                        loggedSet?.let { displayedSetIds.add(it.id) }
                         val displaySet = plannedSet.copy(
                             type = loggedSet?.type ?: plannedSet.type,
                             weightKg = loggedSet?.weightKg ?: plannedSet.weightKg,
@@ -1076,11 +1060,7 @@ class MainActivity : AppCompatActivity() {
                             readOnly = true,
                         ))
                     }
-                    item.plannedSets.forEachIndexed { index, set -> addSet(set, loggedSetFor(item, set, index), index) }
-                    var nextIndex = item.plannedSets.size
-                    item.sets.filter { it.id !in displayedSetIds }.forEach { set ->
-                        addSet(PlannedSet(holdSeconds = set.holdSeconds), set, nextIndex++)
-                    }
+                    item.plannedSets.forEachIndexed { index, set -> addSet(set, loggedSetFor(item, set), index) }
                     addView(metaText("Set Rest: ${item.restSeconds(workout.defaultRestSeconds)}s"), insetCardLayoutParams())
                 })
             }
@@ -1336,9 +1316,6 @@ class MainActivity : AppCompatActivity() {
                 WorkoutExercise(
                     exerciseId = item.exerciseId,
                     restSecondsOverride = item.restSecondsOverride,
-                    targetSets = plannedSets.size,
-                    targetReps = plannedSets.firstOrNull()?.reps,
-                    targetHoldSeconds = plannedSets.firstOrNull()?.holdSeconds,
                     plannedSets = plannedSets,
                 )
             }.toMutableList(),
@@ -1554,8 +1531,7 @@ class MainActivity : AppCompatActivity() {
         if (!holdCuePlayed && plannedSet != null && movement != null && elapsed >= plannedSet.holdSeconds) {
             holdCuePlayed = true
             plannedSet.actualHoldSeconds = elapsed
-            val setIndex = item.plannedSets.indexOf(plannedSet)
-            loggedSetFor(item, plannedSet, setIndex)?.let { syncLoggedSet(it, plannedSet, movement) }
+            loggedSetFor(item, plannedSet)?.let { syncLoggedSet(it, plannedSet, movement) }
                 ?: item.sets.add(loggedSetFrom(plannedSet, movement))
             repository.save()
             completingHoldAutomatically = true
@@ -1605,7 +1581,7 @@ class MainActivity : AppCompatActivity() {
 
         val current = workout.exercises.firstNotNullOfOrNull { item ->
             val nextSet = item.plannedSets.indexOfFirst { set ->
-                loggedSetFor(item, set, item.plannedSets.indexOf(set)) == null
+                loggedSetFor(item, set) == null
             }
             when {
                 item.plannedSets.isEmpty() -> Triple(item, null, 0)
@@ -2375,9 +2351,8 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    private fun loggedSetFor(item: WorkoutExercise, plannedSet: PlannedSet, setIndex: Int): LoggedSet? =
+    private fun loggedSetFor(item: WorkoutExercise, plannedSet: PlannedSet): LoggedSet? =
         item.sets.firstOrNull { it.plannedSetId == plannedSet.id }
-            ?: item.sets.getOrNull(setIndex)?.takeIf { it.plannedSetId == null }
 
     private fun loggedSetFrom(plannedSet: PlannedSet, exercise: Exercise) = LoggedSet(
         type = plannedSet.type,

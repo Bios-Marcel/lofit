@@ -6,6 +6,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 class LofitRepository(context: Context) {
+    private companion object {
+        const val SCHEMA_VERSION = 1
+    }
+
     private val preferences = context.getSharedPreferences("lofit-data", Context.MODE_PRIVATE)
     var data: AppData = load()
         private set
@@ -21,10 +25,29 @@ class LofitRepository(context: Context) {
 
     private fun load(): AppData {
         val raw = preferences.getString("state", null) ?: return AppData()
-        return runCatching { decode(JSONObject(raw)) }.getOrElse { AppData() }
+        val root = JSONObject(raw)
+        return when (val version = if (root.has("schemaVersion")) root.getInt("schemaVersion") else 0) {
+            0 -> {
+                val migrated = encode(StartupDataMigration.migrate(root))
+                // Validate everything before changing stored data. A failed read must never
+                // become an empty AppData that a later save could write over the user's data.
+                val loaded = decode(migrated)
+                val edit = preferences.edit()
+                if (!preferences.contains("state-before-migration-v1")) {
+                    edit.putString("state-before-migration-v1", raw)
+                }
+                check(edit.putString("state", migrated.toString()).commit()) {
+                    "Could not persist startup data migration"
+                }
+                loaded
+            }
+            SCHEMA_VERSION -> decode(root)
+            else -> error("Unsupported data schema: $version")
+        }
     }
 
     private fun encode(data: AppData) = JSONObject().apply {
+        put("schemaVersion", SCHEMA_VERSION)
         put("exercises", JSONArray().apply { data.exercises.forEach { put(encodeExercise(it)) } })
         put("routines", JSONArray().apply { data.routines.forEach { put(encodeRoutine(it)) } })
         put("history", JSONArray().apply { data.history.forEach { put(encodeWorkout(it)) } })
@@ -55,9 +78,6 @@ class LofitRepository(context: Context) {
                 put(JSONObject().apply {
                     put("id", item.id)
                     put("exerciseId", item.exerciseId)
-                    put("targetSets", item.plannedSets.size)
-                    put("targetReps", item.plannedSets.firstOrNull()?.reps ?: item.targetReps)
-                    put("targetHoldSeconds", item.plannedSets.firstOrNull()?.holdSeconds ?: item.targetHoldSeconds)
                     put("restSecondsOverride", item.restSecondsOverride ?: JSONObject.NULL)
                     put("plannedSets", encodePlannedSets(item.plannedSets))
                 })
@@ -77,9 +97,6 @@ class LofitRepository(context: Context) {
                     put("id", item.id)
                     put("exerciseId", item.exerciseId)
                     put("restSecondsOverride", item.restSecondsOverride ?: JSONObject.NULL)
-                    put("targetSets", item.plannedSets.size.takeIf { item.targetSets != null } ?: JSONObject.NULL)
-                    put("targetReps", item.plannedSets.firstOrNull()?.reps ?: item.targetReps ?: JSONObject.NULL)
-                    put("targetHoldSeconds", item.plannedSets.firstOrNull()?.holdSeconds ?: item.targetHoldSeconds ?: JSONObject.NULL)
                     put("plannedSets", encodePlannedSets(item.plannedSets))
                     put("sets", JSONArray().apply {
                         item.sets.forEach { set ->
@@ -104,109 +121,67 @@ class LofitRepository(context: Context) {
         val savedExercises = root.getJSONArray("exercises").mapObjects(::decodeExercise)
         val defaults = DefaultData.exercises()
         val defaultIds = defaults.mapTo(mutableSetOf()) { it.id }
-        val exercises = (defaults + savedExercises.filter { it.custom && it.id !in defaultIds }).toMutableList()
-        val routines = root.optJSONArray("routines")?.mapObjects(::decodeRoutine)?.toMutableList() ?: mutableListOf()
-        val history = root.optJSONArray("history")?.mapObjects(::decodeWorkout)?.toMutableList() ?: mutableListOf()
-        val active = root.optJSONObject("activeWorkout")?.let(::decodeWorkout)
         return AppData(
-            exercises = exercises.ifEmpty { DefaultData.exercises().toMutableList() },
-            routines = routines,
-            history = history,
-            activeWorkout = active,
-            soundCuesEnabled = root.optBoolean("soundCuesEnabled", true),
+            exercises = (defaults + savedExercises.filter { it.id !in defaultIds }).toMutableList(),
+            routines = root.getJSONArray("routines").mapObjects(::decodeRoutine).toMutableList(),
+            history = root.getJSONArray("history").mapObjects(::decodeWorkout).toMutableList(),
+            activeWorkout = if (root.isNull("activeWorkout")) null else decodeWorkout(root.getJSONObject("activeWorkout")),
+            soundCuesEnabled = root.getBoolean("soundCuesEnabled"),
         )
     }
 
     private fun decodeExercise(value: JSONObject) = Exercise(
         id = value.getString("id"),
         name = value.getString("name"),
-        type = decodeExerciseType(value.getString("type")),
-        asymmetric = value.optBoolean("asymmetric"),
-        primaryMuscle = value.optString("primaryMuscle"),
-        secondaryMuscles = value.optString("secondaryMuscles"),
-        minimumHoldSeconds = value.optInt("minimumHoldSeconds", 30),
-        custom = value.optBoolean("custom"),
-        imageResource = value.optInt("imageResource").takeIf { !value.isNull("imageResource") },
-        imageName = value.optString("imageName").takeIf { !value.isNull("imageName") },
-        weighted = value.optBoolean("weighted", true),
+        type = ExerciseType.valueOf(value.getString("type")),
+        asymmetric = value.getBoolean("asymmetric"),
+        primaryMuscle = value.getString("primaryMuscle"),
+        secondaryMuscles = value.getString("secondaryMuscles"),
+        minimumHoldSeconds = value.getInt("minimumHoldSeconds"),
+        custom = value.getBoolean("custom"),
+        imageResource = if (value.isNull("imageResource")) null else value.getInt("imageResource"),
+        imageName = if (value.isNull("imageName")) null else value.getString("imageName"),
+        weighted = value.getBoolean("weighted"),
     )
 
     private fun decodeRoutine(value: JSONObject) = Routine(
-        value.getString("id"),
-        value.getString("name"),
-        value.optInt("defaultRestSeconds", 120),
-        value.getJSONArray("exercises").mapObjects { item ->
-            val targetSets = item.optInt("targetSets", 3)
-            val targetReps = item.optInt("targetReps", 8)
-            val targetHoldSeconds = item.optInt("targetHoldSeconds", 30)
+        id = value.getString("id"),
+        name = value.getString("name"),
+        defaultRestSeconds = value.getInt("defaultRestSeconds"),
+        exercises = value.getJSONArray("exercises").mapObjects { item ->
             RoutineExercise(
-                item.optString("id", java.util.UUID.randomUUID().toString()),
-                item.getString("exerciseId"),
-                targetSets,
-                targetReps,
-                targetHoldSeconds,
-                item.optInt("restSecondsOverride").takeIf { !item.isNull("restSecondsOverride") },
-                decodePlannedSets(item.optJSONArray("plannedSets")).ifEmpty {
-                    MutableList(targetSets) { PlannedSet(reps = targetReps, holdSeconds = targetHoldSeconds) }
-                },
+                id = item.getString("id"),
+                exerciseId = item.getString("exerciseId"),
+                restSecondsOverride = if (item.isNull("restSecondsOverride")) null else item.getInt("restSecondsOverride"),
+                plannedSets = decodePlannedSets(item.getJSONArray("plannedSets")),
             )
         }.toMutableList(),
     )
 
     private fun decodeWorkout(value: JSONObject) = WorkoutSession(
-        value.getString("id"),
-        value.getString("name"),
-        value.getLong("startedAt"),
-        value.optLong("completedAt").takeIf { !value.isNull("completedAt") },
-        value.optInt("defaultRestSeconds", 120),
-        value.getJSONArray("exercises").mapObjects { item ->
-            val loggedSets = item.optJSONArray("sets")?.mapObjects { set ->
-                LoggedSet(
-                    id = set.getString("id"),
-                    type = SetType.valueOf(set.getString("type")),
-                    weightKg = set.optDouble("weightKg"),
-                    reps = set.optInt("reps"),
-                    holdSeconds = set.optInt("holdSeconds"),
-                    side = Side.valueOf(set.optString("side", Side.BOTH.name)),
-                    completedAt = set.optLong("completedAt"),
-                    plannedSetId = set.optString("plannedSetId").takeIf { !set.isNull("plannedSetId") },
-                )
-            }?.toMutableList() ?: mutableListOf()
-            val plannedSets = decodePlannedSets(item.optJSONArray("plannedSets")).ifEmpty {
-                MutableList(item.optInt("targetSets", 0)) {
-                    PlannedSet(
-                        reps = item.optInt("targetReps", 8),
-                        holdSeconds = item.optInt("targetHoldSeconds", 30),
-                    )
-                }
-            }
-            while (plannedSets.size < loggedSets.size) {
-                val set = loggedSets[plannedSets.size]
-                plannedSets.add(PlannedSet(
-                    type = set.type,
-                    weightKg = set.weightKg,
-                    reps = set.reps,
-                    holdSeconds = set.holdSeconds,
-                    side = set.side,
-                ))
-            }
-            loggedSets.forEachIndexed { index, set ->
-                if (set.plannedSetId == null) set.plannedSetId = plannedSets.getOrNull(index)?.id
-                plannedSets.getOrNull(index)?.let { plannedSet ->
-                    if (plannedSet.actualHoldSeconds == null && set.holdSeconds > 0) {
-                        plannedSet.actualHoldSeconds = set.holdSeconds
-                    }
-                }
-            }
+        id = value.getString("id"),
+        name = value.getString("name"),
+        startedAt = value.getLong("startedAt"),
+        completedAt = if (value.isNull("completedAt")) null else value.getLong("completedAt"),
+        defaultRestSeconds = value.getInt("defaultRestSeconds"),
+        exercises = value.getJSONArray("exercises").mapObjects { item ->
             WorkoutExercise(
                 id = item.getString("id"),
                 exerciseId = item.getString("exerciseId"),
-                restSecondsOverride = item.optInt("restSecondsOverride").takeIf { !item.isNull("restSecondsOverride") },
-                targetSets = item.optInt("targetSets").takeIf { !item.isNull("targetSets") },
-                targetReps = item.optInt("targetReps").takeIf { !item.isNull("targetReps") },
-                targetHoldSeconds = item.optInt("targetHoldSeconds").takeIf { !item.isNull("targetHoldSeconds") },
-                sets = loggedSets,
-                plannedSets = plannedSets,
+                restSecondsOverride = if (item.isNull("restSecondsOverride")) null else item.getInt("restSecondsOverride"),
+                plannedSets = decodePlannedSets(item.getJSONArray("plannedSets")),
+                sets = item.getJSONArray("sets").mapObjects { set ->
+                    LoggedSet(
+                        id = set.getString("id"),
+                        type = SetType.valueOf(set.getString("type")),
+                        weightKg = set.getDouble("weightKg"),
+                        reps = set.getInt("reps"),
+                        holdSeconds = set.getInt("holdSeconds"),
+                        side = Side.valueOf(set.getString("side")),
+                        completedAt = set.getLong("completedAt"),
+                        plannedSetId = if (set.isNull("plannedSetId")) null else set.getString("plannedSetId"),
+                    )
+                }.toMutableList(),
             )
         }.toMutableList(),
     )
@@ -225,26 +200,18 @@ class LofitRepository(context: Context) {
         }
     }
 
-    private fun decodePlannedSets(value: JSONArray?): MutableList<PlannedSet> =
-        value?.mapObjects { set ->
+    private fun decodePlannedSets(value: JSONArray): MutableList<PlannedSet> =
+        value.mapObjects { set ->
             PlannedSet(
-                id = set.optString("id", java.util.UUID.randomUUID().toString()),
-                type = runCatching { SetType.valueOf(set.optString("type", SetType.NORMAL.name)) }
-                    .getOrDefault(SetType.NORMAL),
-                weightKg = set.optDouble("weightKg"),
-                reps = set.optInt("reps", 8),
-                holdSeconds = set.optInt("holdSeconds", 30),
-                actualHoldSeconds = set.optInt("actualHoldSeconds").takeIf { !set.isNull("actualHoldSeconds") },
-                side = runCatching { Side.valueOf(set.optString("side", Side.BOTH.name)) }
-                    .getOrDefault(Side.BOTH),
+                id = set.getString("id"),
+                type = SetType.valueOf(set.getString("type")),
+                weightKg = set.getDouble("weightKg"),
+                reps = set.getInt("reps"),
+                holdSeconds = set.getInt("holdSeconds"),
+                actualHoldSeconds = if (set.isNull("actualHoldSeconds")) null else set.getInt("actualHoldSeconds"),
+                side = Side.valueOf(set.getString("side")),
             )
-        }?.toMutableList() ?: mutableListOf()
-
-    private fun decodeExerciseType(value: String): ExerciseType = when (value) {
-        "WEIGHTED_REPS" -> ExerciseType.REPETITIONS
-        "WEIGHTED_HOLD", "ISOMETRIC", "STRETCH" -> ExerciseType.TIMED
-        else -> ExerciseType.valueOf(value)
-    }
+        }.toMutableList()
 }
 
 private fun <T> JSONArray.mapObjects(transform: (JSONObject) -> T): List<T> =

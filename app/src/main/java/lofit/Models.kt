@@ -77,15 +77,8 @@ data class WorkoutExercise(
     val id: String = UUID.randomUUID().toString(),
     val exerciseId: String,
     var restSecondsOverride: Int? = null,
-    var targetSets: Int? = null,
-    var targetReps: Int? = null,
-    var targetHoldSeconds: Int? = null,
     val sets: MutableList<LoggedSet> = mutableListOf(),
-    val plannedSets: MutableList<PlannedSet> = targetSets?.let { count ->
-        MutableList(count) {
-            PlannedSet(reps = targetReps ?: 8, holdSeconds = targetHoldSeconds ?: 30)
-        }
-    } ?: mutableListOf(),
+    val plannedSets: MutableList<PlannedSet> = mutableListOf(),
 ) {
     fun restSeconds(defaultRestSeconds: Int): Int = restSecondsOverride ?: defaultRestSeconds
 }
@@ -129,9 +122,6 @@ data class WorkoutSession(
             }
             RoutineExercise(
                 exerciseId = item.exerciseId,
-                targetSets = plannedSets.size,
-                targetReps = plannedSets.firstOrNull()?.reps ?: item.targetReps ?: 8,
-                targetHoldSeconds = plannedSets.firstOrNull()?.holdSeconds ?: item.targetHoldSeconds ?: 30,
                 restSecondsOverride = item.restSecondsOverride,
                 plannedSets = plannedSets,
             )
@@ -149,13 +139,8 @@ data class Routine(
 data class RoutineExercise(
     val id: String = UUID.randomUUID().toString(),
     val exerciseId: String,
-    var targetSets: Int = 3,
-    var targetReps: Int = 8,
-    var targetHoldSeconds: Int = 30,
     var restSecondsOverride: Int? = null,
-    val plannedSets: MutableList<PlannedSet> = MutableList(targetSets) {
-        PlannedSet(reps = targetReps, holdSeconds = targetHoldSeconds)
-    },
+    val plannedSets: MutableList<PlannedSet> = MutableList(3) { PlannedSet() },
 )
 
 data class ExerciseRecord(

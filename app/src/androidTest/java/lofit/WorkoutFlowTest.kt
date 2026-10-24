@@ -93,7 +93,7 @@ class WorkoutFlowTest {
         val completedAt = day.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         repository.data.history.add(WorkoutSession(
             name = "Calendar workout", startedAt = completedAt - 120_000, completedAt = completedAt,
-            exercises = mutableListOf(WorkoutExercise(
+            exercises = mutableListOf(loggedWorkoutExercise(
                 exerciseId = "bench-press",
                 sets = mutableListOf(LoggedSet(type = SetType.NORMAL, weightKg = 67.5, reps = 6)),
             )),
@@ -599,7 +599,7 @@ class WorkoutFlowTest {
             name = "Previous",
             startedAt = 100,
             completedAt = 200,
-            exercises = mutableListOf(WorkoutExercise(
+            exercises = mutableListOf(loggedWorkoutExercise(
                 exerciseId = "bench-press",
                 sets = mutableListOf(
                     LoggedSet(type = SetType.WARMUP, weightKg = 20.0, reps = 10),
@@ -639,14 +639,14 @@ class WorkoutFlowTest {
             name = "Records",
             completedAt = 200,
             exercises = mutableListOf(
-                WorkoutExercise(
+                loggedWorkoutExercise(
                     exerciseId = "bench-press",
                     sets = mutableListOf(
                         LoggedSet(type = SetType.NORMAL, weightKg = 60.0, reps = 8),
                         LoggedSet(type = SetType.NORMAL, weightKg = 82.5, reps = 2),
                     ),
                 ),
-                WorkoutExercise(
+                loggedWorkoutExercise(
                     exerciseId = "plank",
                     sets = mutableListOf(
                         LoggedSet(type = SetType.NORMAL, weightKg = 0.0, holdSeconds = 30),
@@ -703,7 +703,7 @@ class WorkoutFlowTest {
         repository.data.history.add(WorkoutSession(
             name = "Old record",
             completedAt = 100,
-            exercises = mutableListOf(WorkoutExercise(
+            exercises = mutableListOf(loggedWorkoutExercise(
                 exerciseId = "bench-press",
                 sets = mutableListOf(LoggedSet(type = SetType.NORMAL, weightKg = 60.0, reps = 5)),
             )),
@@ -748,7 +748,7 @@ class WorkoutFlowTest {
             completedAt = 200,
             defaultRestSeconds = 120,
             exercises = mutableListOf(
-                WorkoutExercise(
+                loggedWorkoutExercise(
                     exerciseId = "bench-press",
                     restSecondsOverride = 75,
                     sets = mutableListOf(
@@ -836,7 +836,7 @@ class WorkoutFlowTest {
                         type = SetType.NORMAL, weightKg = 0.0, holdSeconds = 42, plannedSetId = holdSet.id,
                     )),
                 ),
-                WorkoutExercise(
+                loggedWorkoutExercise(
                     exerciseId = "single-leg",
                     sets = mutableListOf(LoggedSet(type = SetType.NORMAL, weightKg = 0.0, reps = 12, side = Side.LEFT)),
                 ),
@@ -1016,4 +1016,27 @@ class WorkoutFlowTest {
             uiController.loopMainThreadUntilIdle()
         }
     }
+}
+
+private fun loggedWorkoutExercise(
+    exerciseId: String,
+    sets: MutableList<LoggedSet>,
+    restSecondsOverride: Int? = null,
+): WorkoutExercise {
+    val plannedSets = sets.map { set ->
+        PlannedSet(
+            type = set.type,
+            weightKg = set.weightKg,
+            reps = set.reps,
+            holdSeconds = set.holdSeconds,
+            actualHoldSeconds = set.holdSeconds.takeIf { it > 0 },
+            side = set.side,
+        ).also { set.plannedSetId = it.id }
+    }.toMutableList()
+    return WorkoutExercise(
+        exerciseId = exerciseId,
+        restSecondsOverride = restSecondsOverride,
+        sets = sets,
+        plannedSets = plannedSets,
+    )
 }
