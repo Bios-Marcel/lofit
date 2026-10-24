@@ -57,7 +57,12 @@ fun AppData.exerciseTrend(
     return ExerciseTrendData(startedAt, now, series.map { seriesItem ->
         // A record set before the span remains the baseline until it is beaten.
         val baseline = seriesItem.points.lastOrNull { it.completedAt < startedAt }
-        seriesItem.copy(points = listOfNotNull(baseline?.copy(completedAt = startedAt)) +
-            seriesItem.points.filter { it.completedAt >= startedAt })
+        val points = listOfNotNull(baseline?.copy(completedAt = startedAt)) +
+            seriesItem.points.filter { it.completedAt >= startedAt }
+        seriesItem.copy(points = points
+            .groupBy { Instant.ofEpochMilli(it.completedAt).atZone(zone).toLocalDate() }
+            .values.map { dailyPoints ->
+                dailyPoints.maxWith(compareBy<TrendPoint> { it.value }.thenBy { it.completedAt })
+            })
     })
 }

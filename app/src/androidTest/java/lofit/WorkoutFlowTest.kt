@@ -1287,7 +1287,8 @@ class WorkoutFlowTest {
         repository.data.history.add(WorkoutSession(
             name = "Trend workout", completedAt = now.toInstant().toEpochMilli(),
             exercises = mutableListOf(loggedWorkoutExercise("bench-press", mutableListOf(
-                first, logged(6, 60.0), logged(0, 80.0), logged(0, 200.0, reps = 0), logged(0, 0.0, reps = 100),
+                first, logged(6, 60.0), logged(0, 70.0), logged(0, 80.0),
+                logged(0, 50.0, reps = 8), logged(0, 200.0, reps = 0), logged(0, 0.0, reps = 100),
             ))),
         ))
         repository.save()
