@@ -4,6 +4,8 @@ import android.Manifest
 import android.app.Notification
 import android.app.NotificationManager
 import android.content.Intent
+import android.content.IntentFilter
+import android.net.Uri
 import android.health.connect.HealthPermissions
 import android.view.WindowManager
 import androidx.test.espresso.Espresso.onView
@@ -20,6 +22,7 @@ import androidx.test.espresso.action.ViewActions.typeText
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
 import androidx.test.espresso.matcher.ViewMatchers.hasDescendant
+import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.isChecked
 import androidx.test.espresso.matcher.ViewMatchers.isClickable
@@ -31,6 +34,7 @@ import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
 import androidx.test.espresso.matcher.ViewMatchers.withHint
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
@@ -422,6 +426,143 @@ class WorkoutFlowTest {
         val parent = routinesTitle[0]?.parent as ViewGroup
         assertSame(parent, startButton[0]?.parent)
         assertEquals(parent.indexOfChild(routinesTitle[0]) + 1, parent.indexOfChild(startButton[0]))
+    }
+
+    @Test
+    fun workoutTogether_scanCanBeCancelledAndLiveWorkoutCanBeShared() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        listOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT,
+            Manifest.permission.BLUETOOTH_ADVERTISE).forEach {
+            instrumentation.uiAutomation.grantRuntimePermission(context.packageName, it)
+        }
+        val activity = instrumentation.startActivitySync(Intent(context, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        try {
+            onView(withText("Workout Together")).perform(scrollTo(), click())
+            onView(withText("Scanning for nearby workouts…")).check(matches(isDisplayed()))
+            onView(withText("Cancel")).perform(click())
+            onView(withText(R.string.start_workout)).perform(scrollTo(), click())
+            onView(withText("Share workout")).perform(scrollTo(), click())
+            onView(withText("Stop sharing")).check(matches(isDisplayed())).perform(click())
+            onView(withText("Add exercise")).check(matches(isDisplayed()))
+            assertEquals("Open workout", LofitRepository(context).data.activeWorkout?.name)
+        } finally {
+            instrumentation.runOnMainSync { activity.finish() }
+        }
+    }
+
+    @Test
+    fun workoutTogether_filePickerImportsExactPlan() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val incoming = workoutFileIntent("Shared file plan")
+        val monitor = instrumentation.addMonitor(IntentFilter(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            addDataType("*/*")
+        },
+            android.app.Instrumentation.ActivityResult(android.app.Activity.RESULT_OK,
+                Intent().setData(incoming.data)), true)
+        val activity = instrumentation.startActivitySync(Intent(context, MainActivity::class.java).setAction(Intent.ACTION_MAIN)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        try {
+            onView(withContentDescription("Workout Together options")).perform(scrollTo(), click())
+            onView(withText("Bluetooth")).check(matches(isDisplayed()))
+            onView(withText("Open .lofit file")).perform(click())
+            awaitWindowText("Shared file plan")
+            assertEquals(1, monitor.hits)
+            onView(withText("Shared file plan")).check(matches(isDisplayed()))
+            onView(withText("Start workout")).perform(click())
+            val saved = LofitRepository(context).data.activeWorkout!!
+            assertEquals("Shared file plan", saved.name)
+            assertEquals(45, saved.defaultRestSeconds)
+            assertEquals(3, saved.exercises.single().plannedSets.size)
+            assertEquals(42.5, saved.exercises.single().plannedSets.first().weightKg, 0.0)
+            assertEquals(6, saved.exercises.single().plannedSets.first().reps)
+            assertTrue(saved.exercises.single().sets.isEmpty())
+        } finally {
+            instrumentation.removeMonitor(monitor)
+            instrumentation.runOnMainSync { activity.finish() }
+        }
+    }
+
+    @Test
+    fun workoutTogether_coldAndWarmFileIntentsKeepActiveWorkout() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        LofitRepository(context).apply { data.activeWorkout = WorkoutSession(name = "Mine"); save() }
+        val monitor = instrumentation.addMonitor(MainActivity::class.java.name, null, false)
+        context.startActivity(workoutFileIntent("Cold file plan").setComponent(null).setPackage(context.packageName))
+        val activity = monitor.waitForActivityWithTimeout(5_000)!!
+        instrumentation.removeMonitor(monitor)
+        try {
+            awaitWindowText("Cold file plan")
+            onView(withText("Cold file plan")).inRoot(isDialog()).check(matches(isDisplayed()))
+            onView(withText("Cancel")).inRoot(isDialog()).perform(click())
+            val warmIntent = workoutFileIntent("Warm file plan").setComponent(null).setPackage(context.packageName)
+            instrumentation.runOnMainSync { activity.startActivity(warmIntent) }
+            awaitWindowText("Warm file plan")
+            onView(withText("Warm file plan")).inRoot(isDialog()).check(matches(isDisplayed()))
+            assertEquals(null, activity.intent.data)
+            assertFalse(activity.isFinishing)
+            onView(withText("Start workout")).inRoot(isDialog()).perform(click())
+            assertEquals("Mine", LofitRepository(context).data.activeWorkout?.name)
+            onView(withText("Cancel")).inRoot(isDialog()).perform(click())
+        } finally { instrumentation.runOnMainSync { activity.finish() } }
+    }
+
+    @Test
+    fun workoutTogether_fileShareOpensSystemChooser() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        listOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT,
+            Manifest.permission.BLUETOOTH_ADVERTISE).forEach {
+            instrumentation.uiAutomation.grantRuntimePermission(context.packageName, it)
+        }
+        val monitor = instrumentation.addMonitor(IntentFilter(Intent.ACTION_CHOOSER),
+            android.app.Instrumentation.ActivityResult(android.app.Activity.RESULT_CANCELED, null), true)
+        try {
+            ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)
+                .setAction(Intent.ACTION_MAIN).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)).use { scenario ->
+                onView(withText(R.string.start_workout)).perform(scrollTo(), click())
+                val workoutId = LofitRepository(context).data.activeWorkout!!.id
+                onView(withContentDescription("Share workout options")).perform(scrollTo(), click())
+                onView(withText("Bluetooth")).check(matches(isDisplayed()))
+                onView(withText("Share .lofit file")).perform(click())
+                assertEquals(1, monitor.hits)
+                scenario.recreate()
+                onView(withText("Share workout")).check(matches(isDisplayed()))
+                assertEquals(workoutId, LofitRepository(context).data.activeWorkout?.id)
+                onView(withText("Share workout")).perform(click())
+                onView(withText("Stop sharing")).check(matches(isDisplayed()))
+                scenario.recreate()
+                onView(withText("Share workout")).check(matches(isDisplayed()))
+                assertEquals(workoutId, LofitRepository(context).data.activeWorkout?.id)
+            }
+        } finally { instrumentation.removeMonitor(monitor) }
+    }
+
+    private fun awaitWindowText(text: String) {
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        val until = android.os.SystemClock.elapsedRealtime() + 5_000
+        while (android.os.SystemClock.elapsedRealtime() < until) {
+            if (automation.rootInActiveWindow?.findAccessibilityNodeInfosByText(text)?.isNotEmpty() == true) return
+            android.os.SystemClock.sleep(50)
+        }
+        throw AssertionError("Window did not show $text")
+    }
+
+    private fun workoutFileIntent(name: String): Intent {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val movement = DefaultData.exercises().first { it.id == "bench-press" }
+        val workout = WorkoutSession(name = name, defaultRestSeconds = 45,
+            exercises = mutableListOf(WorkoutExercise(exerciseId = movement.id,
+                plannedSets = MutableList(3) { PlannedSet(weightKg = 42.5, reps = 6) })))
+        val share = WorkoutPlanFile.shareIntent(context, workout, listOf(movement))
+        return Intent(Intent.ACTION_VIEW).setDataAndType(
+            share.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java), WorkoutPlanFile.MIME_TYPE)
+            .setClass(context, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
 
     @Test
@@ -938,7 +1079,46 @@ class WorkoutFlowTest {
     }
 
     @Test
-    fun startingRoutine_usesLastKnownSetsForEachExercise() {
+    fun startingRoutine_keepsEachExercisesSavedSetCountWhenHistoryDiffers() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val repository = LofitRepository(context)
+        repository.data.history.add(WorkoutSession(name = "Old session", completedAt = 200,
+            exercises = mutableListOf(
+                loggedWorkoutExercise("bench-press", mutableListOf(LoggedSet(type = SetType.FAILURE,
+                    weightKg = 90.0, reps = 1))),
+                loggedWorkoutExercise("plank", MutableList(4) { LoggedSet(type = SetType.NORMAL,
+                    weightKg = 0.0, holdSeconds = 20) }),
+            )))
+        repository.data.routines.add(Routine(name = "Saved prescription", defaultRestSeconds = 80,
+            exercises = mutableListOf(
+                RoutineExercise(exerciseId = "bench-press", restSecondsOverride = 45,
+                    plannedSets = MutableList(3) { PlannedSet(weightKg = 60.0, reps = 5) }),
+                RoutineExercise(exerciseId = "plank", restSecondsOverride = 20,
+                    plannedSets = mutableListOf(PlannedSet(holdSeconds = 60))),
+            )))
+        repository.data.history[0] = repository.data.history[0].copy(sourceRoutine = repository.data.routines.single())
+        repository.save()
+        val activity = instrumentation.startActivitySync(Intent(context, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        try {
+            onView(withText("Start routine")).perform(scrollTo(), click())
+            val workout = LofitRepository(context).data.activeWorkout!!
+            assertEquals(listOf(3, 1), workout.exercises.map { it.plannedSets.size })
+            assertEquals(listOf(45, 20), workout.exercises.map { it.restSecondsOverride })
+            fun inCard(name: String) = isDescendantOfA(allOf(isAssignableFrom(MaterialCardView::class.java),
+                hasDescendant(withText(name))))
+            onView(allOf(withContentDescription("Set 3 Repetitions"), inCard("Bench press")))
+                .check(matches(withText("1")))
+            onView(allOf(withContentDescription("Set 1 Target time in seconds"), inCard("Plank")))
+                .check(matches(withText("20")))
+            onView(allOf(withContentDescription("Set 2 row"), inCard("Plank"))).check(doesNotExist())
+            assertEquals(listOf(3, 1), LofitRepository(context).data.routines.single().exercises.map { it.plannedSets.size })
+        } finally { instrumentation.runOnMainSync { activity.finish() } }
+    }
+
+    @Test
+    fun startingRoutine_usesLatestValuesWithSavedSetCount() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val repository = LofitRepository(instrumentation.targetContext)
         repository.data.history.add(WorkoutSession(
@@ -960,6 +1140,7 @@ class WorkoutFlowTest {
                 plannedSets = MutableList(3) { PlannedSet(weightKg = 60.0, reps = 5) },
             )),
         ))
+        repository.data.history[0] = repository.data.history[0].copy(sourceRoutine = repository.data.routines.single())
         repository.save()
         val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -971,10 +1152,11 @@ class WorkoutFlowTest {
 
         val plannedSets = LofitRepository(instrumentation.targetContext).data.activeWorkout
             ?.exercises?.single()?.plannedSets!!
-        assertEquals(2, plannedSets.size)
-        assertEquals(listOf(20.0, 67.5), plannedSets.map { it.weightKg })
-        assertEquals(listOf(10, 6), plannedSets.map { it.reps })
-        assertEquals(listOf(SetType.WARMUP, SetType.NORMAL), plannedSets.map { it.type })
+        assertEquals(3, plannedSets.size)
+        assertEquals(listOf(67.5, 67.5, 67.5), plannedSets.map { it.weightKg })
+        assertEquals(listOf(6, 6, 6), plannedSets.map { it.reps })
+        assertEquals(List(3) { SetType.NORMAL }, plannedSets.map { it.type })
+        onView(withContentDescription("Set 3 Repetitions")).check(matches(withText("6")))
     }
 
     @Test

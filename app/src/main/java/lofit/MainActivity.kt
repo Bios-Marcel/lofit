@@ -5,6 +5,8 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
 import android.content.BroadcastReceiver
 import android.content.ActivityNotFoundException
 import android.content.res.ColorStateList
@@ -22,6 +24,7 @@ import android.media.ToneGenerator
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.net.Uri
 import android.os.SystemClock
 import android.text.InputType
 import android.view.Gravity
@@ -50,6 +53,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.widget.PopupMenu
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
@@ -71,6 +75,7 @@ import java.time.format.TextStyle
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.Executors
 import kotlin.math.max
 
 class MainActivity : AppCompatActivity() {
@@ -179,6 +184,27 @@ class MainActivity : AppCompatActivity() {
     private var lastWorkoutNotification = ""
     private val drawableIds = mutableMapOf<String, Int>()
     private val handler = Handler(Looper.getMainLooper())
+    private val workoutFileWorker = Executors.newSingleThreadExecutor()
+    private var workoutFileGeneration = 0
+    private var pendingImportedPlan: SharedWorkoutPlan? = null
+    private val openWorkoutFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let(::importWorkoutFile)
+    }
+    private val workoutBluetooth by lazy { WorkoutBluetooth(this) }
+    private var workoutTogetherDialog: AlertDialog? = null
+    private var pendingBluetoothAction: (() -> Unit)? = null
+    private val bluetoothPermissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+        val action = pendingBluetoothAction
+        pendingBluetoothAction = null
+        if (result.isNotEmpty() && result.values.all { it }) action?.let(::withBluetooth)
+        else Toast.makeText(this, "Allow Nearby devices to share workouts", Toast.LENGTH_SHORT).show()
+    }
+    private val enableBluetooth = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        val action = pendingBluetoothAction
+        pendingBluetoothAction = null
+        if (it.resultCode == RESULT_OK) action?.invoke()
+        else Toast.makeText(this, "Bluetooth is off", Toast.LENGTH_SHORT).show()
+    }
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) updateWorkoutNotification(force = true)
     }
@@ -213,7 +239,9 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         repository = LofitRepository(this)
-        if (intent.action == ACTION_OPEN_WORKOUT && repository.data.activeWorkout != null) {
+        if (repository.data.activeWorkout != null &&
+            (savedInstanceState == null || savedInstanceState.getBoolean("showActiveWorkout") ||
+                intent.action == ACTION_OPEN_WORKOUT)) {
             currentScreen = Screen.WORKOUT
         }
         healthPermissionPending = savedInstanceState?.getBoolean("healthPermissionPending") ?: false
@@ -256,21 +284,40 @@ class MainActivity : AppCompatActivity() {
             }
         }
         handler.post(tick)
+        handleWorkoutFileIntent(intent)
+    }
+
+    override fun onPostResume() {
+        super.onPostResume()
+        showPendingImportedPlan()
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         if (intent.action == ACTION_OPEN_WORKOUT) openActiveWorkout()
+        handleWorkoutFileIntent(intent)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean("showActiveWorkout", currentScreen == Screen.WORKOUT)
         outState.putBoolean("healthPermissionPending", healthPermissionPending)
         outState.putString("onboardingGender", onboardingGender.name)
         outState.putBoolean("onboardingHealthEnabled", onboardingHealthEnabled)
         super.onSaveInstanceState(outState)
     }
 
+    override fun onStop() {
+        workoutTogetherDialog?.dismiss()
+        workoutBluetooth.stop()
+        super.onStop()
+    }
+
     override fun onDestroy() {
+        workoutFileGeneration++
+        workoutFileWorker.shutdownNow()
+        workoutTogetherDialog?.dismiss()
+        workoutBluetooth.stop()
         handler.removeCallbacks(tick)
         unregisterReceiver(notificationActionReceiver)
         super.onDestroy()
@@ -387,6 +434,7 @@ class MainActivity : AppCompatActivity() {
             repository.save()
             render()
             setBodyMetricsEnabled(onboardingHealthEnabled)
+            showPendingImportedPlan()
         })
     }
 
@@ -500,6 +548,11 @@ class MainActivity : AppCompatActivity() {
                 bottomMargin = dp(16)
             })
         }
+        body.addView(togetherMenuButton("Workout Together", ::scanTogetherWorkouts,
+            "Open .lofit file") { openWorkoutFile.launch(arrayOf("*/*")) },
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                bottomMargin = dp(16)
+            })
         if (repository.data.routines.isEmpty()) {
             body.addView(emptyText("No routines yet. Build one in the Routines tab, or start empty and add exercises as you go."))
         }
@@ -524,6 +577,11 @@ class MainActivity : AppCompatActivity() {
         timerText = workoutTimer
         val view = page(workout.name, "Workout in progress", headerEnd = workoutTimer) { body ->
             updateWorkoutTimer()
+            body.addView(togetherMenuButton("Share workout", { shareTogetherWorkout(workout) },
+                "Share .lofit file") { shareWorkoutFile(workout) },
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    bottomMargin = dp(16)
+                })
             body.addView(restInput(workout.defaultRestSeconds) { seconds ->
                 workout.defaultRestSeconds = seconds
                 repository.save()
@@ -608,7 +666,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun endWorkout(action: ConfirmAction) {
-        if (repository.data.activeWorkout?.setCount() == 0) {
+        val hasRoutineChanges = action == ConfirmAction.FINISH_WORKOUT &&
+            repository.data.activeWorkout?.routineChanges(repository.data.routines) != null
+        if (repository.data.activeWorkout?.setCount() == 0 && !hasRoutineChanges) {
             discardActiveWorkout()
             repository.save()
             route = Route.Root
@@ -982,11 +1042,10 @@ class MainActivity : AppCompatActivity() {
                     addView(metaText("Primary: ${movement.primaryMuscle} · Secondary: ${movement.secondaryMuscles}"))
                     addView(actionButton("Add ${movement.name}") {
                         if (target == PickerTarget.WORKOUT) {
-                            val lastKnownSets = repository.data.lastKnownSets(movement.id)
-                            repository.data.activeWorkout?.exercises?.add(WorkoutExercise(
-                                exerciseId = movement.id,
-                                plannedSets = lastKnownSets ?: mutableListOf(),
-                            ))
+                            val item = repository.data.lastKnownExercise(movement.id,
+                                preferredRoutineId = repository.data.activeWorkout?.sourceRoutine?.id)
+                                ?: WorkoutExercise(exerciseId = movement.id)
+                            repository.data.activeWorkout?.exercises?.add(item)
                             repository.save()
                             route = Route.Root
                         } else {
@@ -1432,9 +1491,26 @@ class MainActivity : AppCompatActivity() {
             ConfirmAction.RESET_DATA -> Triple("Reset all app data?", "This permanently removes workout history, routines, custom exercises, and the active workout.", "Reset everything")
         }
         return page(title, message) { body ->
+            val routineChanges = if (confirm.action == ConfirmAction.FINISH_WORKOUT)
+                repository.data.activeWorkout?.routineChanges(repository.data.routines) else null
+            fun updateChoice(label: String): CheckBox = CheckBox(this).apply {
+                text = label
+                textSize = 14f
+                setTextColor(color(R.color.cream))
+                minHeight = dp(48)
+                body.addView(this, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT).apply { bottomMargin = dp(12) })
+            }
+            val updateSets = routineChanges?.takeIf { it.changed.isNotEmpty() }?.let {
+                updateChoice("Update sets and weights in ${it.routine.name}")
+            }
+            val includeAdded = routineChanges?.takeIf { it.added.isNotEmpty() }?.let {
+                updateChoice("Add new exercises to ${it.routine.name}")
+            }
             body.addView(actionButton(buttonLabel) {
                 when (confirm.action) {
                     ConfirmAction.FINISH_WORKOUT -> repository.data.activeWorkout?.let { workout ->
+                        routineChanges?.apply(updateSets?.isChecked == true, includeAdded?.isChecked == true)
                         if (workout.setCount() == 0) {
                             discardActiveWorkout()
                         } else {
@@ -1502,27 +1578,217 @@ class MainActivity : AppCompatActivity() {
         render()
     }
 
+    private fun togetherMenuButton(
+        label: String, bluetooth: () -> Unit, fileLabel: String, file: () -> Unit,
+    ): View = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        background = GradientDrawable().apply {
+            setColor(color(R.color.charcoal_surface_high))
+            cornerRadius = dp(3).toFloat()
+        }
+        clipToOutline = true
+        addView(actionButton(label, secondary = true, action = bluetooth).apply {
+            cornerRadius = 0
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        addView(View(this@MainActivity).apply {
+            setBackgroundColor(color(R.color.cream))
+            alpha = 0.35f
+        }, LinearLayout.LayoutParams(dp(1), dp(30)))
+        addView(actionButton("", secondary = true) {}.apply {
+            contentDescription = "$label options"
+            cornerRadius = 0
+            minWidth = 0
+            minimumWidth = 0
+            minHeight = dp(48)
+            setPadding(dp(12), 0, dp(12), 0)
+            setIconResource(R.drawable.ic_arrow_drop_down)
+            iconSize = dp(24)
+            iconPadding = 0
+            iconGravity = MaterialButton.ICON_GRAVITY_TEXT_END
+            iconTint = ColorStateList.valueOf(color(R.color.cream))
+            setOnClickListener {
+                PopupMenu(this@MainActivity, this, Gravity.END).apply {
+                    menu.add("Bluetooth").setOnMenuItemClickListener { bluetooth(); true }
+                    menu.add(fileLabel).setOnMenuItemClickListener { file(); true }
+                    show()
+                }
+            }
+        }, LinearLayout.LayoutParams(dp(52), ViewGroup.LayoutParams.WRAP_CONTENT))
+    }
+
+    private fun shareWorkoutFile(workout: WorkoutSession) {
+        try {
+            startActivity(Intent.createChooser(
+                WorkoutPlanFile.shareIntent(this, workout, repository.data.exercises), "Share workout"))
+        } catch (_: Exception) {
+            Toast.makeText(this, "Could not share workout file", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun handleWorkoutFileIntent(incoming: Intent) {
+        if (incoming.action == Intent.ACTION_VIEW) incoming.data?.let(::importWorkoutFile)
+    }
+
+    private fun importWorkoutFile(uri: Uri) {
+        if (uri.scheme !in listOf("content", "file")) {
+            Toast.makeText(this, "Could not open workout file", Toast.LENGTH_LONG).show()
+            return
+        }
+        val generation = ++workoutFileGeneration
+        workoutFileWorker.execute {
+            val plan = runCatching {
+                requireNotNull(contentResolver.openInputStream(uri)).use(WorkoutPlanFile::decode)
+            }.getOrNull()
+            handler.post {
+                if (isFinishing || isDestroyed || generation != workoutFileGeneration) return@post
+                if (intent.action == Intent.ACTION_VIEW && intent.data == uri) {
+                    setIntent(Intent(this, MainActivity::class.java).setAction(Intent.ACTION_MAIN))
+                }
+                if (plan == null) {
+                    Toast.makeText(this, "Invalid or damaged .lofit file", Toast.LENGTH_LONG).show()
+                } else {
+                    pendingImportedPlan = plan
+                    showPendingImportedPlan()
+                }
+            }
+        }
+    }
+
+    private fun showPendingImportedPlan() {
+        if (!repository.data.onboardingComplete ||
+            !lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)) return
+        pendingImportedPlan?.let { plan ->
+            pendingImportedPlan = null
+            previewTogetherWorkout(plan)
+        }
+    }
+
+    private fun withBluetooth(action: () -> Unit) {
+        if (!packageManager.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
+            Toast.makeText(this, "Bluetooth LE is not supported on this device", Toast.LENGTH_LONG).show()
+            return
+        }
+        val permissions = arrayOf(Manifest.permission.BLUETOOTH_SCAN,
+            Manifest.permission.BLUETOOTH_ADVERTISE, Manifest.permission.BLUETOOTH_CONNECT)
+        if (permissions.any { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }) {
+            pendingBluetoothAction = action
+            bluetoothPermissions.launch(permissions)
+            return
+        }
+        try {
+            if (getSystemService(BluetoothManager::class.java)?.adapter?.isEnabled != true) {
+                pendingBluetoothAction = action
+                enableBluetooth.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+            } else action()
+        } catch (_: RuntimeException) {
+            pendingBluetoothAction = null
+            Toast.makeText(this, "Bluetooth is unavailable", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun togetherDialog(title: String, body: View): AlertDialog {
+        workoutTogetherDialog?.dismiss()
+        return AlertDialog.Builder(this).setTitle(title).setView(body)
+            .setNegativeButton("Cancel", null).create().also { dialog ->
+                workoutTogetherDialog = dialog
+                dialog.setOnDismissListener {
+                    workoutBluetooth.stop()
+                    if (workoutTogetherDialog === dialog) workoutTogetherDialog = null
+                }
+                dialog.show()
+            }
+    }
+
+    private fun togetherBody(): LinearLayout = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(dp(24), dp(8), dp(24), dp(8))
+    }
+
+    private fun shareTogetherWorkout(workout: WorkoutSession) = withBluetooth {
+        val payload = runCatching { SharedWorkoutPlan.encode(workout, repository.data.exercises) }.getOrElse {
+            Toast.makeText(this, it.message ?: "Could not share workout", Toast.LENGTH_LONG).show()
+            return@withBluetooth
+        }
+        val status = metaText("Starting Bluetooth broadcast…")
+        val body = togetherBody().apply {
+            addView(titleText(workout.name))
+            addView(status)
+        }
+        val dialog = togetherDialog("Share workout", body)
+        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).text = "Stop sharing"
+        workoutBluetooth.share(payload,
+            onReady = { status.text = "Sharing nearby · Open Workout Together on the other phone" },
+            error = {
+                status.text = it
+                dialog.getButton(AlertDialog.BUTTON_NEGATIVE).text = "Close"
+            })
+    }
+
+    private fun scanTogetherWorkouts() {
+        if (repository.data.activeWorkout != null) {
+            Toast.makeText(this, "Finish or discard the active workout first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        withBluetooth {
+            val status = metaText("Scanning for nearby workouts…")
+            val hosts = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            val body = togetherBody().apply {
+                addView(status)
+                addView(ScrollView(this@MainActivity).apply { addView(hosts) },
+                    LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(240)))
+            }
+            val dialog = togetherDialog("Workout Together", body)
+            fun showError(message: String) {
+                status.text = message
+                hosts.removeAllViews()
+                hosts.addView(actionButton("Try again") { dialog.dismiss(); scanTogetherWorkouts() })
+            }
+            workoutBluetooth.scan(found = { device ->
+                val name = try { device.name } catch (_: SecurityException) { null }
+                val label = name?.takeIf { it.isNotBlank() } ?: "Nearby workout"
+                hosts.addView(actionButton("$label · ${device.address.takeLast(5)}", secondary = true) {
+                    hosts.removeAllViews()
+                    status.text = "Receiving workout…"
+                    workoutBluetooth.receive(device, received = { plan ->
+                        dialog.dismiss()
+                        previewTogetherWorkout(plan)
+                    }, error = ::showError)
+                }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    topMargin = dp(12)
+                })
+            }, error = ::showError)
+        }
+    }
+
+    private fun previewTogetherWorkout(plan: SharedWorkoutPlan) {
+        val body = togetherBody().apply {
+            addView(titleText(plan.routine.name))
+            addView(metaText("${plan.routine.exercises.size} exercises · ${plan.routine.defaultRestSeconds}s default rest"))
+            addView(ScrollView(this@MainActivity).apply {
+                addView(metaText(plan.routine.exercises.joinToString("\n") { item ->
+                    "${plan.exercises.first { it.id == item.exerciseId }.name} · ${item.plannedSets.size} sets"
+                }))
+            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(180)))
+        }
+        val dialog = togetherDialog("Workout Together", body)
+        body.addView(actionButton("Start workout") {
+            if (repository.data.activeWorkout == null) {
+                dialog.dismiss()
+                startWorkout(plan.startIn(repository.data))
+            } else Toast.makeText(this, "Finish or discard the active workout first", Toast.LENGTH_SHORT).show()
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            topMargin = dp(16)
+        })
+    }
+
     private fun startRoutine(routine: Routine) {
         if (repository.data.activeWorkout != null) {
             Toast.makeText(this, "Finish or discard the active workout first", Toast.LENGTH_SHORT).show()
             openActiveWorkout()
             return
         }
-        startWorkout(WorkoutSession(
-            name = routine.name,
-            defaultRestSeconds = routine.defaultRestSeconds,
-            exercises = routine.exercises.map { item ->
-                val plannedSets = repository.data.lastKnownSets(item.exerciseId)
-                    ?: item.plannedSets.map {
-                        it.copy(id = UUID.randomUUID().toString(), actualHoldSeconds = null)
-                    }.toMutableList()
-                WorkoutExercise(
-                    exerciseId = item.exerciseId,
-                    restSecondsOverride = item.restSecondsOverride,
-                    plannedSets = plannedSets,
-                )
-            }.toMutableList(),
-        ))
+        startWorkout(repository.data.workoutFromRoutine(routine))
     }
 
     private fun startWorkout(workout: WorkoutSession) {

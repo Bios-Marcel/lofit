@@ -81,6 +81,7 @@ data class WorkoutExercise(
     var restSecondsOverride: Int? = null,
     val sets: MutableList<LoggedSet> = mutableListOf(),
     val plannedSets: MutableList<PlannedSet> = mutableListOf(),
+    var sourceRoutineExerciseId: String? = null,
 ) {
     fun restSeconds(defaultRestSeconds: Int): Int = restSecondsOverride ?: defaultRestSeconds
 }
@@ -99,6 +100,7 @@ data class WorkoutSession(
     var defaultRestSeconds: Int = 120,
     val exercises: MutableList<WorkoutExercise> = mutableListOf(),
     var bodyWeightKg: Double? = null,
+    val sourceRoutine: Routine? = null,
 ) {
     constructor(
         id: String = UUID.randomUUID().toString(),
@@ -108,7 +110,8 @@ data class WorkoutSession(
         defaultRestSeconds: Int = 120,
         exercises: MutableList<WorkoutExercise> = mutableListOf(),
         bodyWeightKg: Double? = null,
-    ) : this(id, name, mutableListOf(WorkoutInterval(startedAt, completedAt)), defaultRestSeconds, exercises, bodyWeightKg)
+        sourceRoutine: Routine? = null,
+    ) : this(id, name, mutableListOf(WorkoutInterval(startedAt, completedAt)), defaultRestSeconds, exercises, bodyWeightKg, sourceRoutine)
 
     init {
         require(intervals.isNotEmpty()) { "Workout needs a start time" }
@@ -210,29 +213,38 @@ data class AppData(
         val finishedWorkout = history.removeAt(historyIndex)
         return finishedWorkout.copy(
             intervals = (finishedWorkout.intervals + WorkoutInterval(startedAt = resumedAt)).toMutableList(),
+            sourceRoutine = finishedWorkout.captureRoutineBaseline(),
         ).also { activeWorkout = it }
     }
 
-    fun lastKnownSets(exerciseId: String): MutableList<PlannedSet>? = history
+    fun lastKnownSets(
+        exerciseId: String, preferredRoutineId: String? = null, sameRoutineOnly: Boolean = false,
+    ): MutableList<PlannedSet>? = lastKnownExercise(exerciseId, preferredRoutineId, sameRoutineOnly)?.plannedSets
+
+    // Saved prescriptions restrict history to their routine; newly added exercises can use other history.
+    fun lastKnownExercise(
+        exerciseId: String, preferredRoutineId: String? = null, sameRoutineOnly: Boolean = false,
+    ): WorkoutExercise? = history
         .withIndex()
+        .filter { !sameRoutineOnly || it.value.sourceRoutine?.id == preferredRoutineId }
         .sortedWith(
-            compareByDescending<IndexedValue<WorkoutSession>> { it.value.completedAt ?: it.value.startedAt }
+            compareByDescending<IndexedValue<WorkoutSession>> {
+                preferredRoutineId != null && it.value.sourceRoutine?.id == preferredRoutineId
+            }.thenByDescending { it.value.completedAt ?: it.value.startedAt }
                 .thenByDescending { it.index },
         )
         .firstNotNullOfOrNull { (_, workout) ->
             workout.exercises.lastOrNull { it.exerciseId == exerciseId && it.sets.isNotEmpty() }
+                ?.let { workout to it }
         }
-        ?.sets
-        ?.map { set ->
-            PlannedSet(
-                type = set.type,
-                weightKg = set.weightKg,
-                reps = set.reps,
-                holdSeconds = set.holdSeconds,
-                side = set.side,
-            )
+        ?.let { (workout, item) ->
+            WorkoutExercise(exerciseId = item.exerciseId,
+                restSecondsOverride = item.restSecondsOverride ?: workout.defaultRestSeconds,
+                plannedSets = item.sets.map { set ->
+                    PlannedSet(type = set.type, weightKg = set.weightKg, reps = set.reps,
+                        holdSeconds = set.holdSeconds, side = set.side)
+                }.toMutableList())
         }
-        ?.toMutableList()
 
     // Build chronological record snapshots from saved sets so edits and resumed workouts stay in sync.
     fun exerciseRecordHistory(): Map<String, List<ExerciseRecord>> = exercises

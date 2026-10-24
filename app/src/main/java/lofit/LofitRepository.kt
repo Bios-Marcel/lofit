@@ -92,6 +92,7 @@ class LofitRepository(context: Context) {
         put("id", workout.id)
         put("name", workout.name)
         put("bodyWeightKg", workout.bodyWeightKg ?: JSONObject.NULL)
+        put("sourceRoutine", workout.sourceRoutine?.let(::encodeRoutine) ?: JSONObject.NULL)
         put("intervals", JSONArray().apply {
             workout.intervals.forEach { interval ->
                 put(JSONObject().apply {
@@ -107,6 +108,7 @@ class LofitRepository(context: Context) {
                     put("id", item.id)
                     put("exerciseId", item.exerciseId)
                     put("restSecondsOverride", item.restSecondsOverride ?: JSONObject.NULL)
+                    put("sourceRoutineExerciseId", item.sourceRoutineExerciseId ?: JSONObject.NULL)
                     put("plannedSets", encodePlannedSets(item.plannedSets))
                     put("sets", JSONArray().apply {
                         item.sets.forEach { set ->
@@ -175,12 +177,14 @@ class LofitRepository(context: Context) {
         id = value.getString("id"),
         name = value.getString("name"),
         bodyWeightKg = if (value.isNull("bodyWeightKg")) null else value.getDouble("bodyWeightKg"),
+        sourceRoutine = if (value.isNull("sourceRoutine")) null else decodeRoutine(value.getJSONObject("sourceRoutine")),
         intervals = value.workoutIntervals(),
         defaultRestSeconds = value.getInt("defaultRestSeconds"),
         exercises = value.getJSONArray("exercises").mapObjects { item ->
             WorkoutExercise(
                 id = item.getString("id"),
                 exerciseId = item.getString("exerciseId"),
+                sourceRoutineExerciseId = if (item.isNull("sourceRoutineExerciseId")) null else item.getString("sourceRoutineExerciseId"),
                 restSecondsOverride = if (item.isNull("restSecondsOverride")) null else item.getInt("restSecondsOverride"),
                 plannedSets = decodePlannedSets(item.getJSONArray("plannedSets")),
                 sets = item.getJSONArray("sets").mapObjects { set ->
