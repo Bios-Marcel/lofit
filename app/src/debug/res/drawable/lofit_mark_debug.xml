@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@drawable/lofit_mark" />
-    <item
-        android:width="28dp"
-        android:height="28dp"
-        android:bottom="17dp"
-        android:drawable="@drawable/debug_badge"
-        android:end="17dp"
-        android:gravity="bottom|end" />
-</layer-list>
+<!-- Padding maps the approved artwork into Android's adaptive icon mask. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:insetLeft="20.3704%"
+    android:insetTop="20.3704%"
+    android:insetRight="20.3704%"
+    android:insetBottom="20.3704%">
+    <bitmap
+        android:src="@drawable/lofit_launcher_debug"
+        android:gravity="fill"
+        android:filter="true" />
+</inset>

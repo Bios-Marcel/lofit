@@ -1,0 +1,9 @@
+Generated with the built-in image_gen tool.
+Status: debug variant design preview.
+
+Use case: precise-object-edit
+Asset type: Lofit Android app icon DEBUG variant.
+Input image: edit target, the approved large flat diagonal coral and sage dumbbell icon.
+Primary request: Create the debug variant by adding ONE small, clear DEBUG badge in the empty lower-right charcoal area. Preserve the existing icon exactly: same large centered diagonal dumbbell, same five separated rounded shapes, same proportions, position, scale, gaps, solid coral plates, sage handle, flat style and dark charcoal background. Do not redraw, recolor, shrink, rotate or move the dumbbell.
+Badge: a simple flat cream (#F5F0E6) rounded rectangle, horizontal, about 37 percent of canvas width and 11 percent of canvas height, centered around 70 percent across and 76 percent down the canvas, within the Android circular mask. Place dark charcoal bold uppercase sans-serif text inside, exactly "DEBUG", with comfortable padding, perfectly legible. Keep a clear gap between badge and dumbbell, with no overlap. Badge must remain entirely inside the image. Flat solid colors, crisp edges.
+Constraints: change only by adding this badge. No other added symbols, no 3D, no shadows, no borders, no decorative effects, no watermark, no device mockup. Output one square icon.

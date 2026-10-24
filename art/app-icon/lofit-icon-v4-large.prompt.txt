@@ -1,0 +1,7 @@
+Generated with the built-in image_gen tool.
+Status: design preview; no debug variant.
+
+Use case: precise-object-edit
+Asset type: Lofit Android app icon, design preview.
+Input image: edit target, approved flat coral and sage dumbbell icon.
+Primary request: Enlarge ONLY the existing dumbbell motif uniformly by about 28 percent, and center it precisely on the same square canvas. Reduce the surrounding empty charcoal background so the motif occupies about 84 percent of the image width, leaving roughly 8 percent padding on left and right. Keep the whole motif visible without cutting any shape off. Preserve the EXACT existing five rounded rectangle shapes, their proportions, gaps, coral plates, sage handle, ascending diagonal angle, flat pictogram style and charcoal background. This is a framing/scale adjustment, not a redesign. Keep all edges clean. No extra detail, no additional shapes, no shadows, no 3D, no lettering, no border, no debug badge. Same square image, larger centered subject, less background.
