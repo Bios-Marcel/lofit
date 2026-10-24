@@ -384,10 +384,8 @@ class MainActivity : AppCompatActivity() {
                 minWidth = dp(72)
                 minHeight = dp(48)
                 thumbTintList = ColorStateList.valueOf(color(R.color.cream))
-                trackTintList = ColorStateList(
-                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                    intArrayOf(color(R.color.coral_dark), color(R.color.sage)),
-                )
+                trackDrawable = ContextCompat.getDrawable(this@MainActivity, R.drawable.switch_track)
+                trackTintList = toggleTint()
                 contentDescription = "Android health integration"
                 setOnCheckedChangeListener { _, checked -> onChange(checked) }
             })
@@ -422,13 +420,8 @@ class MainActivity : AppCompatActivity() {
                     textSize = 14f
                     setTextColor(color(R.color.cream))
                     thumbTintList = ColorStateList.valueOf(color(R.color.cream))
-                    trackTintList = ColorStateList(
-                        arrayOf(
-                            intArrayOf(android.R.attr.state_checked),
-                            intArrayOf(),
-                        ),
-                        intArrayOf(color(R.color.coral_dark), color(R.color.sage)),
-                    )
+                    trackDrawable = ContextCompat.getDrawable(this@MainActivity, R.drawable.switch_track)
+                    trackTintList = toggleTint()
                     contentDescription = "Sound cues"
                     setOnCheckedChangeListener { _, enabled ->
                         repository.data.soundCuesEnabled = enabled
@@ -1247,6 +1240,8 @@ class MainActivity : AppCompatActivity() {
                     render()
                 }.apply {
                     contentDescription = "Previous month"
+                    textSize = 20f
+                    setPadding(dp(2), 0, dp(2), 0)
                 }, LinearLayout.LayoutParams(dp(44), dp(42)).apply {
                     marginEnd = dp(6)
                 })
@@ -1255,6 +1250,8 @@ class MainActivity : AppCompatActivity() {
                     render()
                 }.apply {
                     contentDescription = "Next month"
+                    textSize = 20f
+                    setPadding(dp(2), 0, dp(2), 0)
                 }, LinearLayout.LayoutParams(dp(44), dp(42)))
             })
             addView(LinearLayout(this@MainActivity).apply {
