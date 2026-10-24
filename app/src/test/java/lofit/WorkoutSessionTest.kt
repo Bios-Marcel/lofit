@@ -234,7 +234,7 @@ class WorkoutSessionTest {
         val exercises = DefaultData.exercises()
 
         assertEquals(listOf("Repetitions", "Timed"), ExerciseType.entries.map { it.label })
-        assertEquals(460, exercises.size)
+        assertEquals(462, exercises.size)
         assert(exercises.map { it.id }.containsAll(listOf(
             "push-up",
             "close-grip-push-up",

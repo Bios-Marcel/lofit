@@ -34,6 +34,8 @@ object ExerciseCatalog {
             Exercise("split-squat-hold", "Split squat hold", ExerciseType.TIMED, true, "Quadriceps", "Glutes, hamstrings", 30, imageName = "exercise_split_squat_hold"),
             Exercise("calf-raise-hold", "Calf raise hold", ExerciseType.TIMED, false, "Calves", "Feet", 20, imageName = "exercise_calf_raise_hold"),
             Exercise("horse-stance", "Horse stance", ExerciseType.TIMED, false, "Quadriceps", "Glutes, adductors", 45, imageName = "exercise_horse_stance"),
+            Exercise("dumbbell-lateral-raise-hold", "Dumbbell lateral raise hold", ExerciseType.TIMED, false, "Lateral deltoids", "Traps, core", 30, imageName = "exercise_dumbbell_lateral_raise_hold", weighted = true),
+            Exercise("dumbbell-rear-delt-fly-hold", "Dumbbell rear delt fly hold", ExerciseType.TIMED, false, "Rear deltoids", "Rhomboids, traps", 30, imageName = "exercise_dumbbell_rear_delt_fly_hold", weighted = true),
             Exercise("band-shoulder-external-rotation", "Band Shoulder External Rotation", ExerciseType.REPETITIONS, true, "Rotator cuff", "Rear deltoids", 30, imageName = "exercise_band_shoulder_external_rotation"),
             Exercise("band-shoulder-internal-rotation", "Band Shoulder Internal Rotation", ExerciseType.REPETITIONS, true, "Rotator cuff", "Chest, lats", 30, imageName = "exercise_band_shoulder_internal_rotation"),
             Exercise("band-shoulder-external-rotation-90", "Band Shoulder External Rotation at 90°", ExerciseType.REPETITIONS, true, "Rotator cuff", "Rear deltoids", 30, imageName = "exercise_band_shoulder_external_rotation_90"),
