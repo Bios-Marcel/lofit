@@ -20,6 +20,53 @@ class StartupDataMigrationTest {
     }
 
     @Test
+    fun bodyMetricsConsent_remembersAllChoicesAndDefaultsToUndecidedForOldData() {
+        listOf(null, false, true).forEach { choice ->
+            val repository = LofitRepository(context)
+            repository.data.bodyMetricsEnabled = choice
+            repository.save()
+            assertEquals(choice, LofitRepository(context).data.bodyMetricsEnabled)
+        }
+        val root = JSONObject(stored()).apply { remove("bodyMetricsEnabled") }
+        store(root.toString())
+        assertNull(LofitRepository(context).data.bodyMetricsEnabled)
+    }
+
+    @Test
+    fun bodyWeight_survivesRestartFinishAndResume() {
+        val repository = LofitRepository(context)
+        repository.data.activeWorkout = WorkoutSession(name = "Weighted", bodyWeightKg = 72.25)
+        repository.save()
+        val restarted = LofitRepository(context)
+        val workout = restarted.data.activeWorkout!!
+        assertEquals(72.25, workout.bodyWeightKg!!, 0.0)
+        workout.finish()
+        restarted.data.activeWorkout = null
+        restarted.data.history.add(workout)
+        restarted.save()
+
+        val saved = LofitRepository(context)
+        assertEquals(72.25, saved.data.history.single().bodyWeightKg!!, 0.0)
+        assertEquals(72.25, saved.data.resumeWorkout(workout.id)!!.bodyWeightKg!!, 0.0)
+    }
+
+    @Test
+    fun oldWorkoutsWithoutBodyWeight_stillLoad() {
+        val repository = LofitRepository(context)
+        repository.data.history.add(WorkoutSession(name = "Old", completedAt = 200))
+        repository.data.activeWorkout = WorkoutSession(name = "Active")
+        repository.save()
+        val root = JSONObject(stored())
+        root.getJSONArray("history").getJSONObject(0).remove("bodyWeightKg")
+        root.getJSONObject("activeWorkout").remove("bodyWeightKg")
+        store(root.toString())
+
+        val loaded = LofitRepository(context).data
+        assertNull(loaded.history.single().bodyWeightKg)
+        assertNull(loaded.activeWorkout!!.bodyWeightKg)
+    }
+
+    @Test
     fun startup_migratesAllOldTypesAndFieldsAndKeepsExactBackup() {
         val raw = """{
             "exercises":[

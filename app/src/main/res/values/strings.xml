@@ -7,4 +7,6 @@
     <string name="nav_records">Records</string>
     <string name="nav_history">History</string>
     <string name="nav_settings">Settings</string>
+    <string name="body_weight">Body weight: %1$s kg</string>
+    <string name="health_privacy">Health data privacy\n\nIf you enable body metrics, Lofit reads your weight from Health Connect when you start a workout. It uses the nearest measurements around the workout start time, taking their average when both exist. If only one measurement exists, it uses that weight.\n\nLofit also requests heart rate access for future features. It does not read or save heart rate data.\n\nThe weight is saved with the workout on this device and shown in workout history. Lofit does not write health data, upload it, or share it with other apps.\n\nWeight history access lets Lofit use measurements older than 30 days. You can turn body metrics off in Lofit settings or revoke access in Health Connect at any time. This stops future reads. Saved workout weights remain until you reset app data or uninstall Lofit.</string>
 </resources>

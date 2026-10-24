@@ -6,6 +6,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
+import android.content.ActivityNotFoundException
 import android.content.res.ColorStateList
 import android.content.Context
 import android.content.Intent
@@ -15,6 +16,8 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.LayerDrawable
+import android.health.connect.HealthConnectManager
+import android.health.connect.HealthPermissions
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.os.Bundle
@@ -133,6 +136,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private lateinit var repository: LofitRepository
+    private val healthWeightReader by lazy { HealthConnectWeightReader(this) }
+    private var healthPermissionPending = false
+    private var bodyMetricsReadGeneration = 0
     private lateinit var content: FrameLayout
     private lateinit var root: LinearLayout
     private lateinit var drawerLayout: DrawerLayout
@@ -159,6 +165,16 @@ class MainActivity : AppCompatActivity() {
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) updateWorkoutNotification(force = true)
     }
+    private val healthPermission = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        healthPermissionPending = false
+        if (repository.data.bodyMetricsEnabled == true && !healthWeightReader.canReadWeight) {
+            repository.data.bodyMetricsEnabled = false
+            repository.save()
+        }
+        repository.data.activeWorkout?.takeIf { it.bodyWeightKg == null }?.let(::queryWorkoutWeight)
+        if (currentScreen == Screen.SETTINGS) render()
+        ensureWorkoutNotification()
+    }
     private val notificationActionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
@@ -180,6 +196,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         repository = LofitRepository(this)
+        healthPermissionPending = savedInstanceState?.getBoolean("healthPermissionPending") ?: false
         WindowCompat.setDecorFitsSystemWindows(window, false)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -204,8 +221,26 @@ class MainActivity : AppCompatActivity() {
         )
         buildShell()
         render()
-        if (repository.data.activeWorkout != null) ensureWorkoutNotification()
+        if (repository.data.bodyMetricsEnabled == null) {
+            AlertDialog.Builder(this)
+                .setTitle("Use body metrics?")
+                .setMessage("Save your weight from Health Connect with your workouts? Also allow heart rate access for future use. Heart rate will not be read yet.")
+                .setPositiveButton("Enable") { _, _ -> setBodyMetricsEnabled(true) }
+                .setNegativeButton("No thanks") { _, _ -> setBodyMetricsEnabled(false) }
+                .setOnCancelListener { setBodyMetricsEnabled(false) }
+                .show()
+        } else if (!healthPermissionPending) {
+            repository.data.activeWorkout?.let { workout ->
+                if (workout.bodyWeightKg == null) queryWorkoutWeight(workout)
+                ensureWorkoutNotification()
+            }
+        }
         handler.post(tick)
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean("healthPermissionPending", healthPermissionPending)
+        super.onSaveInstanceState(outState)
     }
 
     override fun onDestroy() {
@@ -344,6 +379,37 @@ class MainActivity : AppCompatActivity() {
                 })
             })
         })
+        body.addView(sectionTitle("Health Connect"))
+        body.addView(card {
+            addView(LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                addView(titleText("Body metrics"), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                addView(Switch(this@MainActivity).apply {
+                    isChecked = repository.data.bodyMetricsEnabled == true
+                    showText = false
+                    minWidth = dp(72)
+                    thumbTintList = ColorStateList.valueOf(color(R.color.cream))
+                    trackTintList = ColorStateList(
+                        arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                        intArrayOf(color(R.color.coral_dark), color(R.color.sage)),
+                    )
+                    contentDescription = "Body metrics"
+                    setOnCheckedChangeListener { _, enabled -> setBodyMetricsEnabled(enabled) }
+                })
+            })
+        })
+        body.addView(actionButton("Manage health access", secondary = true) {
+            try {
+                startActivity(Intent(HealthConnectManager.ACTION_MANAGE_HEALTH_PERMISSIONS)
+                    .putExtra(Intent.EXTRA_PACKAGE_NAME, packageName))
+            } catch (_: ActivityNotFoundException) {
+                Toast.makeText(this, "Health Connect unavailable", Toast.LENGTH_SHORT).show()
+            }
+        })
+        body.addView(actionButton("Health data privacy", secondary = true) {
+            startActivity(Intent(this, HealthPrivacyActivity::class.java))
+        })
         body.addView(sectionTitle("App data"))
         body.addView(metaText("Remove workout history, routines, custom exercises, and any active workout. Default exercises will be restored."))
         body.addView(actionButton("Reset all app data", secondary = true) {
@@ -356,10 +422,7 @@ class MainActivity : AppCompatActivity() {
         body.addView(workoutCalendar())
         body.addView(sectionTitle("Routines"))
         body.addView(actionButton(getString(R.string.start_workout)) {
-            repository.data.activeWorkout = WorkoutSession(name = "Open workout")
-            repository.save()
-            ensureWorkoutNotification()
-            render()
+            startWorkout(WorkoutSession(name = "Open workout"))
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             bottomMargin = dp(16)
         })
@@ -976,6 +1039,7 @@ class MainActivity : AppCompatActivity() {
                 addView(titleText(workout.name))
                 addView(metaText(DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(workout.startedAt))))
                 addView(metaText("${workout.setCount()} sets · ${formatWeight(workout.totalVolume())} kg volume · ${formatDuration(workout.durationMillis())}"))
+                workout.bodyWeightKg?.let { addView(bodyWeightText(it)) }
                 addView(exerciseMuscleMaps(workout.exercises.map { it.exerciseId }))
                 if (index == 0 && workout.wasCompletedToday()) {
                     addView(actionButton("Continue workout") {
@@ -1024,6 +1088,7 @@ class MainActivity : AppCompatActivity() {
         },
     ) { body ->
         body.addView(metaText("${workout.setCount()} sets · ${formatWeight(workout.totalVolume())} kg volume"))
+        workout.bodyWeightKg?.let { body.addView(bodyWeightText(it)) }
         body.addView(metaText("Set Rest: ${workout.defaultRestSeconds}s"))
         workout.exercises.forEach { item ->
             exercise(item.exerciseId)?.let { movement ->
@@ -1305,7 +1370,7 @@ class MainActivity : AppCompatActivity() {
             render()
             return
         }
-        repository.data.activeWorkout = WorkoutSession(
+        startWorkout(WorkoutSession(
             name = routine.name,
             defaultRestSeconds = routine.defaultRestSeconds,
             exercises = routine.exercises.map { item ->
@@ -1319,13 +1384,68 @@ class MainActivity : AppCompatActivity() {
                     plannedSets = plannedSets,
                 )
             }.toMutableList(),
-        )
+        ))
+    }
+
+    private fun startWorkout(workout: WorkoutSession) {
+        repository.data.activeWorkout = workout
         repository.save()
-        ensureWorkoutNotification()
         currentScreen = Screen.WORKOUT
         route = Route.Root
         render()
+        queryWorkoutWeight(workout)
+        ensureWorkoutNotification()
     }
+
+    private fun setBodyMetricsEnabled(enabled: Boolean) {
+        bodyMetricsReadGeneration++
+        repository.data.bodyMetricsEnabled = enabled
+        repository.save()
+        val needsHeartRatePermission = ContextCompat.checkSelfPermission(this, HealthPermissions.READ_HEART_RATE) !=
+            PackageManager.PERMISSION_GRANTED
+        if (enabled && (!healthWeightReader.canReadWeight || needsHeartRatePermission)) {
+            if (healthWeightReader.available) {
+                healthPermissionPending = true
+                healthPermission.launch(arrayOf(
+                    HealthPermissions.READ_WEIGHT,
+                    HealthPermissions.READ_HEART_RATE,
+                    HealthPermissions.READ_HEALTH_DATA_HISTORY,
+                ))
+                return
+            }
+            repository.data.bodyMetricsEnabled = false
+            repository.save()
+            Toast.makeText(this, "Health Connect unavailable", Toast.LENGTH_SHORT).show()
+        }
+        repository.data.activeWorkout?.takeIf { it.bodyWeightKg == null }?.let(::queryWorkoutWeight)
+        if (currentScreen == Screen.SETTINGS) render()
+        ensureWorkoutNotification()
+    }
+
+    private fun queryWorkoutWeight(workout: WorkoutSession) {
+        if (repository.data.bodyMetricsEnabled != true || !healthWeightReader.canReadWeight) return
+        val generation = bodyMetricsReadGeneration
+        healthWeightReader.readAt(workout.startedAt) { result ->
+            if (isDestroyed || repository.data.bodyMetricsEnabled != true || generation != bodyMetricsReadGeneration) return@readAt
+            val savedWorkout = repository.data.activeWorkout?.takeIf { it.id == workout.id }
+                ?: repository.data.history.firstOrNull { it.id == workout.id }
+                ?: return@readAt
+            result.onSuccess { weight ->
+                if (weight != null && savedWorkout.bodyWeightKg == null) {
+                    savedWorkout.bodyWeightKg = weight
+                    repository.save()
+                    if (currentScreen == Screen.HISTORY || route is Route.WorkoutHistory) render()
+                }
+            }.onFailure {
+                Toast.makeText(this, "Body weight unavailable", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun bodyWeightText(weight: Double): TextView =
+        metaText(getString(R.string.body_weight, formatWeight(weight))).apply {
+            contentDescription = "Workout body weight"
+        }
 
     private fun continueHistoryWorkout(workout: WorkoutSession) {
         if (repository.data.activeWorkout != null) {
@@ -1565,6 +1685,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun ensureWorkoutNotification() {
+        if (repository.data.activeWorkout == null) return
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
             updateWorkoutNotification(force = true)
         } else {

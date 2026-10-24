@@ -98,6 +98,7 @@ data class WorkoutSession(
     val intervals: MutableList<WorkoutInterval>,
     var defaultRestSeconds: Int = 120,
     val exercises: MutableList<WorkoutExercise> = mutableListOf(),
+    var bodyWeightKg: Double? = null,
 ) {
     constructor(
         id: String = UUID.randomUUID().toString(),
@@ -106,7 +107,8 @@ data class WorkoutSession(
         completedAt: Long? = null,
         defaultRestSeconds: Int = 120,
         exercises: MutableList<WorkoutExercise> = mutableListOf(),
-    ) : this(id, name, mutableListOf(WorkoutInterval(startedAt, completedAt)), defaultRestSeconds, exercises)
+        bodyWeightKg: Double? = null,
+    ) : this(id, name, mutableListOf(WorkoutInterval(startedAt, completedAt)), defaultRestSeconds, exercises, bodyWeightKg)
 
     init {
         require(intervals.isNotEmpty()) { "Workout needs a start time" }
@@ -194,6 +196,7 @@ data class AppData(
     val history: MutableList<WorkoutSession> = mutableListOf(),
     var activeWorkout: WorkoutSession? = null,
     var soundCuesEnabled: Boolean = true,
+    var bodyMetricsEnabled: Boolean? = null,
 ) {
     fun resumeWorkout(workoutId: String, resumedAt: Long = System.currentTimeMillis()): WorkoutSession? {
         if (activeWorkout != null) return null

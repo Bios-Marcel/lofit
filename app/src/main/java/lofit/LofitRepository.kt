@@ -53,6 +53,7 @@ class LofitRepository(context: Context) {
         put("history", JSONArray().apply { data.history.forEach { put(encodeWorkout(it)) } })
         put("activeWorkout", data.activeWorkout?.let(::encodeWorkout) ?: JSONObject.NULL)
         put("soundCuesEnabled", data.soundCuesEnabled)
+        put("bodyMetricsEnabled", data.bodyMetricsEnabled ?: JSONObject.NULL)
     }
 
     private fun encodeExercise(exercise: Exercise) = JSONObject().apply {
@@ -88,6 +89,7 @@ class LofitRepository(context: Context) {
     private fun encodeWorkout(workout: WorkoutSession) = JSONObject().apply {
         put("id", workout.id)
         put("name", workout.name)
+        put("bodyWeightKg", workout.bodyWeightKg ?: JSONObject.NULL)
         put("intervals", JSONArray().apply {
             workout.intervals.forEach { interval ->
                 put(JSONObject().apply {
@@ -133,6 +135,7 @@ class LofitRepository(context: Context) {
             history = root.getJSONArray("history").mapObjects(::decodeWorkout).toMutableList(),
             activeWorkout = if (root.isNull("activeWorkout")) null else decodeWorkout(root.getJSONObject("activeWorkout")),
             soundCuesEnabled = root.getBoolean("soundCuesEnabled"),
+            bodyMetricsEnabled = if (root.isNull("bodyMetricsEnabled")) null else root.getBoolean("bodyMetricsEnabled"),
         )
     }
 
@@ -167,6 +170,7 @@ class LofitRepository(context: Context) {
     private fun decodeWorkout(value: JSONObject) = WorkoutSession(
         id = value.getString("id"),
         name = value.getString("name"),
+        bodyWeightKg = if (value.isNull("bodyWeightKg")) null else value.getDouble("bodyWeightKg"),
         intervals = value.workoutIntervals(),
         defaultRestSeconds = value.getInt("defaultRestSeconds"),
         exercises = value.getJSONArray("exercises").mapObjects { item ->

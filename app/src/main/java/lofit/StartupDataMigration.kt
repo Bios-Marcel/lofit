@@ -21,6 +21,7 @@ internal object StartupDataMigration {
             history = history,
             activeWorkout = active,
             soundCuesEnabled = root.optBoolean("soundCuesEnabled", true),
+            bodyMetricsEnabled = if (root.isNull("bodyMetricsEnabled")) null else root.getBoolean("bodyMetricsEnabled"),
         )
     }
 

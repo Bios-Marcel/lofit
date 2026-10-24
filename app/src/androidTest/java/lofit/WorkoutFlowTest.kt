@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Notification
 import android.app.NotificationManager
 import android.content.Intent
+import android.health.connect.HealthPermissions
 import android.view.WindowManager
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.Espresso.pressBack
@@ -61,12 +62,82 @@ class WorkoutFlowTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         instrumentation.uiAutomation.grantRuntimePermission(context.packageName, Manifest.permission.POST_NOTIFICATIONS)
+        instrumentation.uiAutomation.grantRuntimePermission(context.packageName, HealthPermissions.READ_WEIGHT)
+        instrumentation.uiAutomation.grantRuntimePermission(context.packageName, HealthPermissions.READ_HEART_RATE)
+        instrumentation.uiAutomation.grantRuntimePermission(context.packageName, HealthPermissions.READ_HEALTH_DATA_HISTORY)
         context.getSystemService(NotificationManager::class.java).cancelAll()
         context
             .getSharedPreferences("lofit-data", 0)
             .edit()
             .clear()
             .commit()
+        LofitRepository(context).apply {
+            data.bodyMetricsEnabled = false
+            save()
+        }
+    }
+
+    @Test
+    fun startup_bodyMetricsCanBeDeclinedAndChoicePersists() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        LofitRepository(context).apply { data.bodyMetricsEnabled = null; save() }
+        val intent = Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val activity = instrumentation.startActivitySync(intent)
+
+        onView(withText("Use body metrics?")).check(matches(isDisplayed()))
+        onView(withText("No thanks")).perform(click())
+        assertEquals(false, LofitRepository(context).data.bodyMetricsEnabled)
+        instrumentation.runOnMainSync { activity.finish() }
+
+        val restarted = instrumentation.startActivitySync(intent)
+        onView(withText("Use body metrics?")).check(doesNotExist())
+        onView(withText(R.string.start_workout)).perform(click())
+        assertEquals(false, LofitRepository(context).data.bodyMetricsEnabled)
+        assertEquals(null, LofitRepository(context).data.activeWorkout!!.bodyWeightKg)
+        instrumentation.runOnMainSync { restarted.finish() }
+    }
+
+    @Test
+    fun startup_bodyMetricsCanBeEnabled() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        LofitRepository(context).apply { data.bodyMetricsEnabled = null; save() }
+        val activity = instrumentation.startActivitySync(
+            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+
+        onView(withText("Enable")).perform(click())
+        assertEquals(true, LofitRepository(context).data.bodyMetricsEnabled)
+        onView(withText("Use body metrics?")).check(doesNotExist())
+        instrumentation.runOnMainSync { activity.finish() }
+    }
+
+    @Test
+    fun settings_bodyMetricsCanBeEnabledAndDisabledAfterDeclining() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val intent = Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val activity = instrumentation.startActivitySync(intent)
+        onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+        onView(withText(R.string.nav_settings)).perform(click())
+        onView(withContentDescription("Body metrics"))
+            .check(matches(not(isChecked())))
+            .perform(click())
+            .check(matches(isChecked()))
+        assertEquals(true, LofitRepository(context).data.bodyMetricsEnabled)
+        onView(withContentDescription("Body metrics"))
+            .perform(click())
+            .check(matches(not(isChecked())))
+        assertEquals(false, LofitRepository(context).data.bodyMetricsEnabled)
+        instrumentation.runOnMainSync { activity.finish() }
+
+        val restarted = instrumentation.startActivitySync(intent)
+        onView(withText("Use body metrics?")).check(doesNotExist())
+        onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+        onView(withText(R.string.nav_settings)).perform(click())
+        onView(withContentDescription("Body metrics")).check(matches(not(isChecked())))
+        instrumentation.runOnMainSync { restarted.finish() }
     }
 
     @Test
@@ -95,6 +166,7 @@ class WorkoutFlowTest {
         val completedAt = day.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         repository.data.history.add(WorkoutSession(
             name = "Calendar workout", startedAt = completedAt - 120_000, completedAt = completedAt,
+            bodyWeightKg = 72.5,
             exercises = mutableListOf(loggedWorkoutExercise(
                 exerciseId = "bench-press",
                 sets = mutableListOf(LoggedSet(type = SetType.NORMAL, weightKg = 67.5, reps = 6)),
@@ -113,6 +185,7 @@ class WorkoutFlowTest {
             .check(matches(isClickable())).perform(scrollTo(), click())
         onView(withText("Calendar workout")).check(matches(isDisplayed()))
         onView(withContentDescription("Workout duration")).check(matches(withText("2:00")))
+        onView(withContentDescription("Workout body weight")).check(matches(withText("Body weight: 72.5 kg")))
         onView(withContentDescription("Set 1 weight")).perform(scrollTo(), click())
             .check(matches(withText("67.5")))
         onView(withContentDescription("Set 1 done"))
