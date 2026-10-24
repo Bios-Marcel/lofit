@@ -977,7 +977,7 @@ class MainActivity : AppCompatActivity() {
                 addView(metaText(DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(workout.completedAt ?: workout.startedAt))))
                 addView(metaText("${workout.setCount()} sets · ${formatWeight(workout.totalVolume())} kg volume · ${formatDuration((workout.completedAt ?: workout.startedAt) - workout.startedAt)}"))
                 addView(exerciseMuscleMaps(workout.exercises.map { it.exerciseId }))
-                if (index == 0) {
+                if (index == 0 && workout.wasCompletedToday()) {
                     addView(actionButton("Continue workout") {
                         continueHistoryWorkout(workout)
                     }.apply {
@@ -1331,7 +1331,10 @@ class MainActivity : AppCompatActivity() {
         if (repository.data.activeWorkout != null) {
             Toast.makeText(this, "Finish or discard the active workout first", Toast.LENGTH_SHORT).show()
         } else {
-            repository.data.resumeWorkout(workout.id)
+            if (repository.data.resumeWorkout(workout.id) == null) {
+                render()
+                return
+            }
             repository.save()
             ensureWorkoutNotification()
         }

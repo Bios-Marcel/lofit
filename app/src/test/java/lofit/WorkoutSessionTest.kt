@@ -1,5 +1,7 @@
 package lofit
 
+import java.time.LocalDate
+import java.time.ZoneId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -101,10 +103,11 @@ class WorkoutSessionTest {
 
     @Test
     fun finishedWorkout_resumesAtItsPreviousElapsedTime() {
+        val dayStart = LocalDate.of(2026, 10, 24).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
         val finished = WorkoutSession(
             name = "Paused",
-            startedAt = 1_000,
-            completedAt = 6_000,
+            startedAt = dayStart + 1_000,
+            completedAt = dayStart + 6_000,
             exercises = mutableListOf(WorkoutExercise(
                 exerciseId = "bench-press",
                 sets = mutableListOf(LoggedSet(type = SetType.NORMAL, weightKg = 60.0, reps = 8)),
@@ -112,14 +115,46 @@ class WorkoutSessionTest {
         )
         val data = AppData(history = mutableListOf(finished))
 
-        val resumed = data.resumeWorkout(finished.id, resumedAt = 20_000)
+        val resumed = data.resumeWorkout(finished.id, resumedAt = dayStart + 20_000)
 
         assertEquals(finished.id, resumed?.id)
-        assertEquals(15_000L, resumed?.startedAt)
+        assertEquals(dayStart + 15_000L, resumed?.startedAt)
         assertEquals(null, resumed?.completedAt)
         assertEquals(1, resumed?.setCount())
         assertEquals(resumed, data.activeWorkout)
         assertEquals(0, data.history.size)
+    }
+
+    @Test
+    fun finishedWorkout_cannotResumeAcrossLocalMidnight() {
+        val midnight = LocalDate.of(2026, 10, 24).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val finished = WorkoutSession(name = "Yesterday", startedAt = midnight - 60_000, completedAt = midnight - 1)
+        val data = AppData(history = mutableListOf(finished))
+
+        assertNull(data.resumeWorkout(finished.id, resumedAt = midnight))
+
+        assertNull(data.activeWorkout)
+        assertEquals(listOf(finished), data.history)
+    }
+
+    @Test
+    fun finishedWorkout_usesCompletionDayForOvernightWorkout() {
+        val midnight = LocalDate.of(2026, 10, 24).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val finished = WorkoutSession(name = "Overnight", startedAt = midnight - 60_000, completedAt = midnight + 60_000)
+        val data = AppData(history = mutableListOf(finished))
+
+        assertEquals(finished.id, data.resumeWorkout(finished.id, resumedAt = midnight + 120_000)?.id)
+    }
+
+    @Test
+    fun unfinishedHistoryWorkout_cannotResume() {
+        val unfinished = WorkoutSession(name = "Unfinished")
+        val data = AppData(history = mutableListOf(unfinished))
+
+        assertNull(data.resumeWorkout(unfinished.id))
+
+        assertNull(data.activeWorkout)
+        assertEquals(listOf(unfinished), data.history)
     }
 
     @Test

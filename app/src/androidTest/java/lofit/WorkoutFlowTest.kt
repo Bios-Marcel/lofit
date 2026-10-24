@@ -893,11 +893,12 @@ class WorkoutFlowTest {
     fun historyEntry_canContinueFinishedWorkout() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val repository = LofitRepository(instrumentation.targetContext)
+        val completedAt = LocalDate.now().atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         val plannedSet = PlannedSet(weightKg = 67.5, reps = 6)
         val workout = WorkoutSession(
             name = "Push day",
-            startedAt = 100,
-            completedAt = 200,
+            startedAt = completedAt - 100,
+            completedAt = completedAt,
             exercises = mutableListOf(WorkoutExercise(
                 exerciseId = "bench-press",
                 sets = mutableListOf(LoggedSet(
@@ -931,6 +932,30 @@ class WorkoutFlowTest {
         assertEquals(workout.id, savedData.activeWorkout?.id)
         assertEquals(null, savedData.activeWorkout?.completedAt)
         assertEquals(listOf(olderWorkout.id), savedData.history.map { it.id })
+    }
+
+    @Test
+    fun historyEntry_cannotContinueYesterdayWorkout() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val repository = LofitRepository(context)
+        val completedAt = LocalDate.now().minusDays(1).atTime(23, 59)
+            .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val workout = WorkoutSession(name = "Yesterday", startedAt = completedAt - 60_000, completedAt = completedAt)
+        repository.data.history.add(workout)
+        repository.save()
+        val storedState = context.getSharedPreferences("lofit-data", 0).getString("state", null)
+        val activity = instrumentation.startActivitySync(
+            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+
+        onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+        onView(withText(R.string.nav_history)).perform(click())
+        onView(withContentDescription("Continue Yesterday")).check(doesNotExist())
+        onView(withContentDescription("View Yesterday")).perform(scrollTo()).check(matches(isDisplayed()))
+        onView(withContentDescription("Create routine from Yesterday")).check(matches(isDisplayed()))
+        assertEquals(storedState, context.getSharedPreferences("lofit-data", 0).getString("state", null))
+        instrumentation.runOnMainSync { activity.finish() }
     }
 
     @Test

@@ -1,5 +1,7 @@
 package lofit
 
+import java.time.Instant
+import java.time.ZoneId
 import java.util.UUID
 
 enum class ExerciseType(val label: String) {
@@ -99,6 +101,13 @@ data class WorkoutSession(
     fun totalVolume(): Double = exercises.sumOf { item -> item.sets.sumOf(LoggedSet::volume) }
     fun setCount(): Int = exercises.sumOf { it.sets.size }
 
+    fun wasCompletedToday(now: Long = System.currentTimeMillis()): Boolean {
+        val finishedAt = completedAt ?: return false
+        val zone = ZoneId.systemDefault()
+        return Instant.ofEpochMilli(finishedAt).atZone(zone).toLocalDate() ==
+            Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
+    }
+
     fun toRoutine(): Routine = Routine(
         name = name,
         defaultRestSeconds = defaultRestSeconds,
@@ -160,6 +169,7 @@ data class AppData(
         if (activeWorkout != null) return null
         val historyIndex = history.indexOfFirst { it.id == workoutId }
         if (historyIndex < 0) return null
+        if (!history[historyIndex].wasCompletedToday(resumedAt)) return null
         val finishedWorkout = history.removeAt(historyIndex)
         val elapsed = ((finishedWorkout.completedAt ?: resumedAt) - finishedWorkout.startedAt).coerceAtLeast(0)
         return finishedWorkout.copy(
