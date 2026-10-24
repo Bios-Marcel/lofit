@@ -171,6 +171,19 @@ class MainActivity : AppCompatActivity() {
     private var route: Route = Route.Root
     private var calendarMonth = YearMonth.now()
     private var routineDraft: Routine? = null
+    private var exerciseDraft: Bundle? = null
+    private val exercisePictures by lazy { ExercisePictures(this) }
+    private val pictureWorker = Executors.newSingleThreadExecutor()
+    private var pictureGeneration = 0
+    private var updatePicturePreview: (() -> Unit)? = null
+    private val openExercisePicture = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null && route is Route.ExerciseEditor) {
+            runCatching {
+                contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            importExercisePicture(uri)
+        }
+    }
     private var timerText: TextView? = null
     private var holdTimerText: TextView? = null
     private var holdTimerButton: MaterialButton? = null
@@ -250,6 +263,11 @@ class MainActivity : AppCompatActivity() {
             ?: repository.data.biologicalGender
         onboardingHealthEnabled = savedInstanceState?.getBoolean("onboardingHealthEnabled")
             ?: (repository.data.bodyMetricsEnabled == true)
+        exerciseDraft = savedInstanceState?.getBundle("exerciseDraft")
+        exerciseDraft?.let {
+            currentScreen = Screen.EXERCISES
+            route = Route.ExerciseEditor(it.getString("exerciseId"))
+        }
         WindowCompat.setDecorFitsSystemWindows(window, false)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -278,6 +296,7 @@ class MainActivity : AppCompatActivity() {
         )
         buildShell()
         render()
+        exerciseDraft?.getString("pendingPicture")?.let { importExercisePicture(Uri.parse(it)) }
         if (repository.data.onboardingComplete && !healthPermissionPending) {
             repository.data.activeWorkout?.let { workout ->
                 if (workout.bodyWeightKg == null) queryWorkoutWeight(workout)
@@ -305,6 +324,7 @@ class MainActivity : AppCompatActivity() {
         outState.putBoolean("healthPermissionPending", healthPermissionPending)
         outState.putString("onboardingGender", onboardingGender.name)
         outState.putBoolean("onboardingHealthEnabled", onboardingHealthEnabled)
+        outState.putBundle("exerciseDraft", exerciseDraft)
         super.onSaveInstanceState(outState)
     }
 
@@ -317,6 +337,12 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         workoutFileGeneration++
         workoutFileWorker.shutdownNow()
+        pictureGeneration++
+        pictureWorker.shutdown()
+        if (isFinishing) {
+            exerciseDraft?.getString("imageFile")?.let(::deleteUnsavedPicture)
+            exerciseDraft?.getString("pendingPicture")?.let { releasePicturePermission(Uri.parse(it)) }
+        }
         workoutTogetherDialog?.dismiss()
         workoutBluetooth.stop()
         handler.removeCallbacks(tick)
@@ -375,6 +401,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun render(restoreScrollY: Int? = null, scrollToBottom: Boolean = false) {
+        updatePicturePreview = null
+        if (route !is Route.ExerciseEditor) {
+            pictureGeneration++
+            exerciseDraft?.getString("imageFile")?.let(::deleteUnsavedPicture)
+            exerciseDraft?.getString("pendingPicture")?.let { releasePicturePermission(Uri.parse(it)) }
+            exerciseDraft = null
+        }
         if (repository.data.activeWorkout != null) {
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         } else {
@@ -1121,13 +1154,83 @@ class MainActivity : AppCompatActivity() {
 
     private fun exerciseEditorScreen(exerciseId: String?): View {
         val existing = exerciseId?.let(::exercise)
+        val draft = exerciseDraft ?: Bundle().apply {
+            putString("exerciseId", exerciseId)
+            putString("name", existing?.name.orEmpty())
+            putString("primary", existing?.primaryMuscle.orEmpty())
+            putString("secondary", existing?.secondaryMuscles.orEmpty())
+            putInt("type", existing?.type?.ordinal ?: 0)
+            putInt("weight", if (existing?.weighted == true) 1 else 0)
+            putInt("tracking", if (existing?.asymmetric == true) 1 else 0)
+            putString("imageFile", existing?.imageFile)
+        }.also { exerciseDraft = it }
         return page(if (existing == null) "New exercise" else "Edit exercise", "Define how this movement is tracked.") { body ->
-            val name = textField("Exercise name").apply { setText(existing?.name.orEmpty()) }
-            val primary = muscleGroupField("Search primary muscle", existing?.primaryMuscle.orEmpty())
-            val secondary = muscleGroupField("Search secondary muscles", existing?.secondaryMuscles.orEmpty(), multiple = true)
-            val typeGroup = choiceGroup(ExerciseType.entries.map { it.label }, existing?.type?.ordinal ?: 0)
-            val weightGroup = choiceGroup(listOf("Bodyweight", "Weighted"), if (existing?.weighted == true) 1 else 0)
-            val trackingGroup = choiceGroup(listOf("Track both sides together", "Track left and right"), if (existing?.asymmetric == true) 1 else 0)
+            val name = textField("Exercise name").apply { setText(draft.getString("name")) }
+            val primary = muscleGroupField("Search primary muscle", draft.getString("primary").orEmpty())
+            val secondary = muscleGroupField("Search secondary muscles", draft.getString("secondary").orEmpty(), multiple = true)
+            val typeGroup = choiceGroup(ExerciseType.entries.map { it.label }, draft.getInt("type"))
+            val weightGroup = choiceGroup(listOf("Bodyweight", "Weighted"), draft.getInt("weight"))
+            val trackingGroup = choiceGroup(listOf("Track both sides together", "Track left and right"), draft.getInt("tracking"))
+            name.doAfterTextChanged { draft.putString("name", it.toString()) }
+            primary.doAfterTextChanged { draft.putString("primary", it.toString()) }
+            secondary.doAfterTextChanged { draft.putString("secondary", it.toString()) }
+            typeGroup.setOnCheckedChangeListener { _, _ -> draft.putInt("type", selectedChoice(typeGroup)) }
+            weightGroup.setOnCheckedChangeListener { _, _ -> draft.putInt("weight", selectedChoice(weightGroup)) }
+            trackingGroup.setOnCheckedChangeListener { _, _ -> draft.putInt("tracking", selectedChoice(trackingGroup)) }
+            val preview = FrameLayout(this)
+            val choosePicture = actionButton("Add picture", secondary = true) {
+                openExercisePicture.launch(arrayOf("image/*"))
+            }
+            fun pictureButton(label: String, icon: Int, action: () -> Unit) = smallButton("", action).apply {
+                contentDescription = label
+                tooltipText = label
+                setIconResource(icon)
+                iconTint = ColorStateList.valueOf(color(R.color.cream))
+                iconSize = dp(20)
+                iconPadding = 0
+                iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+                setPadding(dp(14), 0, dp(14), 0)
+                cornerRadius = dp(24)
+                elevation = dp(4).toFloat()
+            }
+            val editPicture = pictureButton("Change picture", R.drawable.ic_edit) {
+                openExercisePicture.launch(arrayOf("image/*"))
+            }
+            val removePicture = pictureButton("Remove picture", R.drawable.ic_delete) {
+                draft.getString("imageFile")?.let(::deleteUnsavedPicture)
+                draft.remove("imageFile")
+                updatePicturePreview?.invoke()
+            }
+            val pictureActions = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                addView(editPicture, LinearLayout.LayoutParams(dp(48), dp(48)))
+                addView(removePicture, LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginStart = dp(8) })
+            }
+            updatePicturePreview = {
+                val picture = draft.getString("imageFile")
+                val loading = draft.containsKey("pendingPicture")
+                preview.removeAllViews()
+                if (picture != null) {
+                    val movement = (existing ?: Exercise("preview", "Exercise", ExerciseType.REPETITIONS, false, "", ""))
+                        .copy(imageFile = picture)
+                    preview.addView(exerciseThumbnail(movement, dp(180), dp(128)),
+                        FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+                    preview.addView(pictureActions, FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP or Gravity.END,
+                    ).apply { topMargin = dp(8); marginEnd = dp(8) })
+                }
+                preview.visibility = if (picture == null) View.GONE else View.VISIBLE
+                choosePicture.visibility = if (picture == null) View.VISIBLE else View.GONE
+                choosePicture.text = if (loading) "Loading picture…" else "Add picture"
+                choosePicture.contentDescription = choosePicture.text
+                choosePicture.isEnabled = !loading
+                editPicture.isEnabled = !loading
+                removePicture.isEnabled = !loading
+            }
+            body.addView(preview, LinearLayout.LayoutParams(dp(180), dp(128)).apply { bottomMargin = dp(16) })
+            body.addView(choosePicture, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { bottomMargin = dp(16) })
+            updatePicturePreview?.invoke()
             body.addView(fieldLabel("Exercise name")); body.addView(name)
             body.addView(fieldLabel("Exercise type")); body.addView(typeGroup)
             body.addView(fieldLabel("Load")); body.addView(weightGroup)
@@ -1135,6 +1238,10 @@ class MainActivity : AppCompatActivity() {
             body.addView(fieldLabel("Primary muscle")); body.addView(primary)
             body.addView(fieldLabel("Secondary muscles")); body.addView(secondary)
             body.addView(actionButton("Save exercise") {
+                if (draft.containsKey("pendingPicture")) {
+                    Toast.makeText(this, "Wait for picture to load", Toast.LENGTH_SHORT).show()
+                    return@actionButton
+                }
                 val primaryMuscle = MuscleGroups.canonical(primary.text.toString())
                 val secondaryMuscles = MuscleGroups.canonicalList(secondary.text.toString())
                 if (name.text.isBlank() || primaryMuscle == null) {
@@ -1160,8 +1267,11 @@ class MainActivity : AppCompatActivity() {
                 movement.asymmetric = selectedChoice(trackingGroup) == 1
                 movement.primaryMuscle = primaryMuscle
                 movement.secondaryMuscles = secondaryMuscles
+                val oldPicture = movement.imageFile
+                movement.imageFile = draft.getString("imageFile")
                 if (existing == null) repository.data.exercises.add(movement)
                 repository.save()
+                oldPicture?.takeIf { it != movement.imageFile }?.let(::deleteUnsavedPicture)
                 route = Route.Root
                 currentScreen = Screen.EXERCISES
                 render()
@@ -1172,6 +1282,39 @@ class MainActivity : AppCompatActivity() {
                 LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
                     topMargin = dp(16)
                 })
+        }
+    }
+
+    private fun deleteUnsavedPicture(name: String) {
+        if (repository.data.exercises.none { it.imageFile == name }) exercisePictures.delete(name)
+    }
+
+    private fun releasePicturePermission(uri: Uri) {
+        runCatching { contentResolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+    }
+
+    private fun importExercisePicture(uri: Uri) {
+        val draft = exerciseDraft ?: return
+        draft.putString("pendingPicture", uri.toString())
+        val generation = ++pictureGeneration
+        updatePicturePreview?.invoke()
+        pictureWorker.execute {
+            val result = runCatching { exercisePictures.importPicture(uri) }
+            runOnUiThread {
+                if (generation != pictureGeneration || exerciseDraft !== draft || isDestroyed) {
+                    result.getOrNull()?.let(exercisePictures::delete)
+                    return@runOnUiThread
+                }
+                draft.remove("pendingPicture")
+                result.onSuccess { name ->
+                    draft.getString("imageFile")?.let(::deleteUnsavedPicture)
+                    draft.putString("imageFile", name)
+                }.onFailure {
+                    Toast.makeText(this, "Could not open picture", Toast.LENGTH_SHORT).show()
+                }
+                releasePicturePermission(uri)
+                updatePicturePreview?.invoke()
+            }
         }
     }
 
@@ -1532,12 +1675,16 @@ class MainActivity : AppCompatActivity() {
                     }
                     ConfirmAction.DISCARD_WORKOUT -> discardActiveWorkout()
                     ConfirmAction.DELETE_EXERCISE -> confirm.targetId?.let { id ->
+                        val picture = repository.data.exercises.firstOrNull { it.id == id && it.custom }?.imageFile
                         repository.data.exercises.removeAll { it.id == id && it.custom }
+                        picture?.let(::deleteUnsavedPicture)
                         repository.data.routines.forEach { routine -> routine.exercises.removeAll { it.exerciseId == id } }
                     }
                     ConfirmAction.DELETE_ROUTINE -> repository.data.routines.removeAll { it.id == confirm.targetId }
                     ConfirmAction.RESET_DATA -> {
+                        val pictures = repository.data.exercises.mapNotNull { it.imageFile }
                         repository.reset()
+                        pictures.forEach(::deleteUnsavedPicture)
                         onboardingGender = repository.data.biologicalGender
                         onboardingHealthEnabled = false
                         bodyMetricsReadGeneration++
@@ -2359,6 +2506,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun exerciseThumbnail(exercise: Exercise, width: Int, height: Int): View {
+        exercise.imageFile?.let { exercisePictures.thumbnail(it, width, height) }?.let { bitmap ->
+            return ImageView(this).apply {
+                setImageBitmap(bitmap)
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                contentDescription = "${exercise.name} illustration"
+            }
+        }
         val resource = exercise.imageResource ?: exercise.imageName?.let { name ->
             drawableIds.getOrPut(name) { resources.getIdentifier(name, "drawable", packageName) }
         }?.takeIf { it != 0 }

@@ -70,6 +70,7 @@ class LofitRepository(context: Context) {
         put("custom", exercise.custom)
         put("imageResource", exercise.imageResource ?: JSONObject.NULL)
         put("imageName", exercise.imageName ?: JSONObject.NULL)
+        put("imageFile", exercise.imageFile ?: JSONObject.NULL)
     }
 
     private fun encodeRoutine(routine: Routine) = JSONObject().apply {
@@ -160,6 +161,7 @@ class LofitRepository(context: Context) {
         imageResource = if (value.isNull("imageResource")) null else value.getInt("imageResource"),
         imageName = if (value.isNull("imageName")) null else value.getString("imageName"),
         weighted = value.getBoolean("weighted"),
+        imageFile = if (value.isNull("imageFile")) null else value.getString("imageFile"),
     )
 
     private fun decodeRoutine(value: JSONObject) = Routine(

@@ -37,6 +37,7 @@ data class Exercise(
     val imageResource: Int? = null,
     val imageName: String? = null,
     var weighted: Boolean = type == ExerciseType.REPETITIONS,
+    var imageFile: String? = null,
 )
 
 data class LoggedSet(
