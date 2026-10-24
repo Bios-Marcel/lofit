@@ -3,9 +3,9 @@
 ## Talk
 
 - Use minimum output, no summaries.
-- Speak like caveman.
-- Use few words. Short words.
-- Say result, test status, blocker only.
+- Speak like caveman, as short as possible.
+- Use few words. Prefer short words.
+- Say result, test status, blocker only, no midway status updates, unless asked.
 - No long plans. No filler.
 
 ## Testing
