@@ -3,8 +3,14 @@ package lofit
 import android.Manifest
 import android.app.NotificationManager
 import android.content.Intent
+import android.view.View
+import android.view.ViewTreeObserver
+import android.widget.ScrollView
+import androidx.core.view.GravityCompat
+import androidx.drawerlayout.widget.DrawerLayout
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.action.ViewActions.*
 import androidx.test.espresso.assertion.ViewAssertions.*
 import androidx.test.espresso.matcher.ViewMatchers.*
@@ -17,6 +23,9 @@ import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 
 @RunWith(AndroidJUnit4::class)
 class RoutineWorkoutFlowTest {
@@ -49,6 +58,56 @@ class RoutineWorkoutFlowTest {
 
     private fun inCard(name: String) = isDescendantOfA(allOf(isAssignableFrom(MaterialCardView::class.java),
         hasDescendant(withText(name))))
+
+    @Test fun routinePickerReturnsAtBottomOnFirstDrawForAddAndBack() {
+        launch().use { scenario ->
+            scenario.onActivity { activity ->
+                val root = activity.findViewById<android.view.ViewGroup>(android.R.id.content)
+                (root.getChildAt(0) as DrawerLayout).openDrawer(GravityCompat.START, false)
+            }
+            onView(allOf(withText(R.string.nav_routines), isClickable())).perform(click())
+            onView(withText("Create routine")).perform(click())
+            onView(withText("Add Exercise")).perform(scrollTo(), click())
+            onView(withText("Add Bench press")).perform(scrollTo(), click())
+
+            fun checkFirstDrawAtBottom(returnFromPicker: () -> Unit) {
+                val drawn = CountDownLatch(1)
+                val firstPosition = AtomicReference<Pair<Int, Int>>()
+                lateinit var root: View
+                val listener = ViewTreeObserver.OnDrawListener {
+                    val titles = arrayListOf<View>()
+                    root.findViewsWithText(titles, "New routine", View.FIND_VIEWS_WITH_TEXT)
+                    var parent = titles.firstOrNull()?.parent
+                    while (parent != null && parent !is ScrollView) parent = parent.parent
+                    (parent as? ScrollView)?.let { scroll ->
+                        val bottom = scroll.getChildAt(0).height - scroll.height
+                        if (firstPosition.compareAndSet(null, scroll.scrollY to bottom)) drawn.countDown()
+                    }
+                }
+                scenario.onActivity { activity ->
+                    root = activity.window.decorView
+                    root.viewTreeObserver.addOnDrawListener(listener)
+                }
+                try {
+                    returnFromPicker()
+                    assertTrue("Routine editor never drew", drawn.await(5, TimeUnit.SECONDS))
+                    val (scrollY, bottom) = firstPosition.get()
+                    assertTrue("Routine must exceed the viewport", bottom > 0)
+                    assertEquals("First frame must already show the bottom", bottom, scrollY)
+                } finally {
+                    scenario.onActivity { root.viewTreeObserver.removeOnDrawListener(listener) }
+                }
+                onView(withText("Cancel")).check(matches(isCompletelyDisplayed()))
+            }
+
+            onView(withText("Add Exercise")).perform(scrollTo(), click())
+            checkFirstDrawAtBottom {
+                onView(withText("Add Bench press")).perform(scrollTo(), click())
+            }
+            onView(withText("Add Exercise")).perform(click())
+            checkFirstDrawAtBottom { pressBack() }
+        }
+    }
 
     @Test fun emptyWorkoutReusesFullLoggedExercise() {
         launch().use {

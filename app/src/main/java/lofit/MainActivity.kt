@@ -60,6 +60,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.GravityCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.doOnPreDraw
 import androidx.core.widget.doAfterTextChanged
 import androidx.drawerlayout.widget.DrawerLayout
 import com.google.android.material.button.MaterialButton
@@ -373,7 +374,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun render(restoreScrollY: Int? = null) {
+    private fun render(restoreScrollY: Int? = null, scrollToBottom: Boolean = false) {
         if (repository.data.activeWorkout != null) {
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         } else {
@@ -408,7 +409,9 @@ class MainActivity : AppCompatActivity() {
             is Route.Confirm -> confirmationScreen(activeRoute)
         }
         content.addView(view)
-        restoreScrollY?.let { scrollY ->
+        if (scrollToBottom) {
+            (view as? ScrollView)?.doOnPreDraw { view.scrollTo(0, view.getChildAt(0).height) }
+        } else restoreScrollY?.let { scrollY ->
             (view as? ScrollView)?.post { view.scrollTo(0, scrollY) }
         }
         updateWorkoutNotification()
@@ -1055,7 +1058,10 @@ class MainActivity : AppCompatActivity() {
                             ))
                             route = Route.RoutineEditor(repository.data.routines.firstOrNull { it.id == routineDraft?.id }?.id)
                         }
-                        render(if (target == PickerTarget.WORKOUT) picker.returnScrollY else null)
+                        render(
+                            restoreScrollY = if (target == PickerTarget.WORKOUT) picker.returnScrollY else null,
+                            scrollToBottom = target == PickerTarget.ROUTINE,
+                        )
                     })
                 })
             }
@@ -1922,12 +1928,15 @@ class MainActivity : AppCompatActivity() {
             }
             else -> Route.Root
         }
-        render(when (previousRoute) {
-            is Route.ExercisePicker -> previousRoute.takeIf { it.target == PickerTarget.WORKOUT }?.returnScrollY
-            is Route.WorkoutHistory -> previousRoute.returnScrollY
-            is Route.ExerciseTrend -> previousRoute.returnScrollY
-            else -> null
-        })
+        render(
+            restoreScrollY = when (previousRoute) {
+                is Route.ExercisePicker -> previousRoute.takeIf { it.target == PickerTarget.WORKOUT }?.returnScrollY
+                is Route.WorkoutHistory -> previousRoute.returnScrollY
+                is Route.ExerciseTrend -> previousRoute.returnScrollY
+                else -> null
+            },
+            scrollToBottom = previousRoute is Route.ExercisePicker && previousRoute.target == PickerTarget.ROUTINE,
+        )
     }
 
     private fun startRest(item: WorkoutExercise, workout: WorkoutSession) {
