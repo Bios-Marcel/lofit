@@ -39,6 +39,8 @@ import android.widget.ScrollView
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.text.DateFormat
+import java.util.Date
 import java.util.Locale
 import org.hamcrest.Matcher
 import org.hamcrest.Matchers.allOf
@@ -890,14 +892,49 @@ class WorkoutFlowTest {
     }
 
     @Test
+    fun history_usesFirstStartAndSumsIntervalsAcrossMidnight() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val repository = LofitRepository(context)
+        val firstDay = LocalDate.now().minusDays(1)
+        val startedAt = firstDay.atTime(23, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val resumedAt = firstDay.plusDays(1).atTime(1, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        repository.data.history.add(WorkoutSession(
+            name = "Two spans",
+            intervals = mutableListOf(WorkoutInterval(startedAt, startedAt + 60_000), WorkoutInterval(resumedAt, resumedAt + 120_000)),
+        ))
+        repository.save()
+        val activity = instrumentation.startActivitySync(
+            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+        val dateText = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(startedAt))
+
+        if (firstDay.month != LocalDate.now().month) {
+            onView(withContentDescription("Previous month")).perform(click())
+        }
+        onView(withContentDescription("$firstDay, workout completed")).perform(scrollTo(), click())
+        onView(withText(dateText)).check(matches(isDisplayed()))
+        onView(withContentDescription("Workout duration")).check(matches(withText("3:00")))
+        pressBack()
+        onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+        onView(withText(R.string.nav_history)).perform(click())
+        onView(withText(dateText)).check(matches(isDisplayed()))
+        onView(withText("0 sets · 0 kg volume · 3:00")).check(matches(isDisplayed()))
+        onView(withContentDescription("View Two spans")).perform(scrollTo(), click())
+        onView(withText(dateText)).check(matches(isDisplayed()))
+        onView(withContentDescription("Workout duration")).check(matches(withText("3:00")))
+        instrumentation.runOnMainSync { activity.finish() }
+    }
+
+    @Test
     fun historyEntry_canContinueFinishedWorkout() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val repository = LofitRepository(instrumentation.targetContext)
-        val completedAt = LocalDate.now().atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val completedAt = System.currentTimeMillis() - 60_000
         val plannedSet = PlannedSet(weightKg = 67.5, reps = 6)
         val workout = WorkoutSession(
             name = "Push day",
-            startedAt = completedAt - 100,
+            startedAt = completedAt - 120_000,
             completedAt = completedAt,
             exercises = mutableListOf(WorkoutExercise(
                 exerciseId = "bench-press",
@@ -931,7 +968,20 @@ class WorkoutFlowTest {
         val savedData = LofitRepository(instrumentation.targetContext).data
         assertEquals(workout.id, savedData.activeWorkout?.id)
         assertEquals(null, savedData.activeWorkout?.completedAt)
+        assertEquals(workout.startedAt, savedData.activeWorkout?.startedAt)
+        assertEquals(2, savedData.activeWorkout?.intervals?.size)
+        val notification = instrumentation.targetContext.getSystemService(NotificationManager::class.java)
+            .activeNotifications.single().notification
+        assertTrue(kotlin.math.abs(System.currentTimeMillis() - notification.`when` - 120_000) < 5_000)
         assertEquals(listOf(olderWorkout.id), savedData.history.map { it.id })
+
+        onView(withText("Finish workout")).perform(scrollTo(), click())
+        onView(withText("Finish and save")).perform(click())
+        val finished = LofitRepository(instrumentation.targetContext).data.history.single { it.id == workout.id }
+        assertEquals(workout.startedAt, finished.startedAt)
+        assertEquals(workout.intervals.single(), finished.intervals.first())
+        assertTrue(finished.intervals.all { it.endedAt != null })
+        assertEquals(2, finished.intervals.size)
     }
 
     @Test

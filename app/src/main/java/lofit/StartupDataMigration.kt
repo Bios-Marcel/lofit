@@ -5,7 +5,7 @@ import org.json.JSONObject
 import java.util.UUID
 
 /**
- * Unversioned data -> schema 1. Called once, before the repository exposes data.
+ * Unversioned data -> current schema. Called once, before the repository exposes data.
  * After installed data has migrated, delete this file and the schema-0 branch in load().
  * Keep schemaVersion in the current codec. The original JSON stays in state-before-migration-v1.
  */
@@ -59,8 +59,7 @@ internal object StartupDataMigration {
     private fun decodeWorkout(value: JSONObject) = WorkoutSession(
         value.getString("id"),
         value.getString("name"),
-        value.getLong("startedAt"),
-        value.optLong("completedAt").takeIf { !value.isNull("completedAt") },
+        value.workoutIntervals(),
         value.optInt("defaultRestSeconds", 120),
         value.getJSONArray("exercises").mapObjects { item ->
             val loggedSets = item.optJSONArray("sets")?.mapObjects { set ->

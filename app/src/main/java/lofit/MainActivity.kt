@@ -974,8 +974,8 @@ class MainActivity : AppCompatActivity() {
         history.forEachIndexed { index, workout ->
             body.addView(card {
                 addView(titleText(workout.name))
-                addView(metaText(DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(workout.completedAt ?: workout.startedAt))))
-                addView(metaText("${workout.setCount()} sets · ${formatWeight(workout.totalVolume())} kg volume · ${formatDuration((workout.completedAt ?: workout.startedAt) - workout.startedAt)}"))
+                addView(metaText(DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(workout.startedAt))))
+                addView(metaText("${workout.setCount()} sets · ${formatWeight(workout.totalVolume())} kg volume · ${formatDuration(workout.durationMillis())}"))
                 addView(exerciseMuscleMaps(workout.exercises.map { it.exerciseId }))
                 if (index == 0 && workout.wasCompletedToday()) {
                     addView(actionButton("Continue workout") {
@@ -1018,8 +1018,8 @@ class MainActivity : AppCompatActivity() {
     private fun pastWorkoutScreen(workout: WorkoutSession): View = page(
         workout.name,
         DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
-            .format(Date(workout.completedAt ?: workout.startedAt)),
-        headerEnd = titleText(formatDuration((workout.completedAt ?: workout.startedAt) - workout.startedAt)).apply {
+            .format(Date(workout.startedAt)),
+        headerEnd = titleText(formatDuration(workout.durationMillis())).apply {
             contentDescription = "Workout duration"
         },
     ) { body ->
@@ -1120,8 +1120,8 @@ class MainActivity : AppCompatActivity() {
         val today = LocalDate.now(zone)
         val month = calendarMonth
         val trainingDays = repository.data.history.filter { it.completedAt != null }
-            .sortedByDescending { it.completedAt }
-            .groupBy { Instant.ofEpochMilli(it.completedAt!!).atZone(zone).toLocalDate() }
+            .sortedByDescending { it.startedAt }
+            .groupBy { Instant.ofEpochMilli(it.startedAt).atZone(zone).toLocalDate() }
         val monthTitle = month.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault()))
 
         return card {
@@ -1195,9 +1195,9 @@ class MainActivity : AppCompatActivity() {
                                         val timeFormat = DateFormat.getTimeInstance(DateFormat.SHORT)
                                         AlertDialog.Builder(this@MainActivity)
                                             .setTitle(DateFormat.getDateInstance(DateFormat.MEDIUM)
-                                                .format(Date(workouts.first().completedAt!!)))
+                                                .format(Date(workouts.first().startedAt)))
                                             .setItems(workouts.map { workout ->
-                                                "${workout.name} · ${timeFormat.format(Date(workout.completedAt!!))}"
+                                                "${workout.name} · ${timeFormat.format(Date(workout.startedAt))}"
                                             }.toTypedArray()) { _, index ->
                                                 openWorkoutHistory(workouts[index])
                                             }
@@ -1239,7 +1239,7 @@ class MainActivity : AppCompatActivity() {
                         if (workout.setCount() == 0) {
                             discardActiveWorkout()
                         } else {
-                            workout.completedAt = System.currentTimeMillis()
+                            workout.finish()
                             repository.data.history.add(workout)
                             discardActiveWorkout()
                         }
@@ -1377,7 +1377,7 @@ class MainActivity : AppCompatActivity() {
             updateRestBar()
             return
         }
-        val elapsed = max(0, ((System.currentTimeMillis() - workout.startedAt) / 1_000).toInt())
+        val elapsed = (workout.durationMillis() / 1_000).toInt()
         timerText?.text = formatWorkoutTime(elapsed)
         updateRestBar()
         updateWorkoutNotification()
@@ -1630,7 +1630,7 @@ class MainActivity : AppCompatActivity() {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setWhen(workout.startedAt)
+            .setWhen(System.currentTimeMillis() - workout.durationMillis())
             .setUsesChronometer(restSeconds == 0)
         if (restSeconds > 0) {
             notification

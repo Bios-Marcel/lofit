@@ -48,7 +48,7 @@ class StartupDataMigrationTest {
         val data = LofitRepository(context).data
 
         assertEquals(raw, preferences.getString(backupKey, null))
-        assertEquals(1, JSONObject(stored()).getInt("schemaVersion"))
+        assertEquals(2, JSONObject(stored()).getInt("schemaVersion"))
         assertFalse(stored().contains("targetSets"))
         assertFalse(stored().contains("targetReps"))
         assertFalse(stored().contains("targetHoldSeconds"))
@@ -177,7 +177,7 @@ class StartupDataMigrationTest {
             )),
         )
         data.history.add(workout)
-        data.activeWorkout = workout.copy(id = "active", completedAt = null)
+        data.activeWorkout = workout.copy(id = "active", intervals = mutableListOf(WorkoutInterval(100)))
         data.soundCuesEnabled = false
         repository.save()
         val root = JSONObject(stored()).apply { remove("schemaVersion") }
@@ -187,6 +187,59 @@ class StartupDataMigrationTest {
         assertEquals(data, LofitRepository(context).data)
         assertEquals(data, LofitRepository(context).data)
         assertEquals(raw, preferences.getString(backupKey, null))
+    }
+
+    @Test
+    fun startup_migratesVersionOneWorkoutTimesAndKeepsBackup() {
+        val repository = LofitRepository(context)
+        repository.data.history.add(WorkoutSession(name = "Past", startedAt = 100, completedAt = 250))
+        repository.data.activeWorkout = WorkoutSession(name = "Active", startedAt = 300)
+        repository.save()
+        val root = JSONObject(stored()).apply { put("schemaVersion", 1) }
+        listOf(root.getJSONArray("history").getJSONObject(0), root.getJSONObject("activeWorkout")).forEach { workout ->
+            val interval = workout.getJSONArray("intervals").getJSONObject(0)
+            workout.put("startedAt", interval.getLong("startedAt"))
+            workout.put("completedAt", interval.get("endedAt"))
+            workout.remove("intervals")
+        }
+        val raw = root.toString()
+        store(raw)
+
+        val loaded = LofitRepository(context)
+
+        assertEquals(listOf(WorkoutInterval(100, 250)), loaded.data.history.single().intervals)
+        assertEquals(listOf(WorkoutInterval(300)), loaded.data.activeWorkout!!.intervals)
+        assertEquals(raw, preferences.getString("state-before-migration-v2", null))
+        val migrated = stored()
+        assertEquals(2, JSONObject(migrated).getInt("schemaVersion"))
+        assertFalse(JSONObject(migrated).getJSONArray("history").getJSONObject(0).has("startedAt"))
+        assertEquals(loaded.data, LofitRepository(context).data)
+        assertEquals(migrated, stored())
+    }
+
+    @Test
+    fun workoutIntervals_surviveRestartsWhileActiveAndAfterFinishing() {
+        val repository = LofitRepository(context)
+        repository.data.activeWorkout = WorkoutSession(
+            name = "Resumed",
+            intervals = mutableListOf(WorkoutInterval(100, 250), WorkoutInterval(500, 700), WorkoutInterval(900)),
+        )
+        repository.save()
+
+        val restarted = LofitRepository(context)
+        assertEquals(repository.data, restarted.data)
+        val workout = restarted.data.activeWorkout!!
+        assertEquals(450L, workout.durationMillis(1_000))
+        workout.finish(1_100)
+        restarted.data.history.add(workout)
+        restarted.data.activeWorkout = null
+        restarted.save()
+
+        val saved = LofitRepository(context).data.history.single()
+        assertEquals(listOf(WorkoutInterval(100, 250), WorkoutInterval(500, 700), WorkoutInterval(900, 1_100)), saved.intervals)
+        assertEquals(100L, saved.startedAt)
+        assertEquals(1_100L, saved.completedAt)
+        assertEquals(550L, saved.durationMillis(5_000))
     }
 
     @Test
@@ -224,7 +277,7 @@ class StartupDataMigrationTest {
 
     @Test
     fun startup_badJsonAndNewerSchemaNeverBecomeEmptyData() {
-        listOf("broken JSON", """{"schemaVersion":2,"exercises":[]}""").forEach { raw ->
+        listOf("broken JSON", """{"schemaVersion":3,"exercises":[]}""").forEach { raw ->
             store(raw)
             assertThrows(Exception::class.java) { LofitRepository(context) }
             assertEquals(raw, stored())

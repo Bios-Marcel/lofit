@@ -85,14 +85,44 @@ data class WorkoutExercise(
     fun restSeconds(defaultRestSeconds: Int): Int = restSecondsOverride ?: defaultRestSeconds
 }
 
+data class WorkoutInterval(
+    val startedAt: Long = System.currentTimeMillis(),
+    val endedAt: Long? = null,
+) {
+    fun durationMillis(now: Long): Long = ((endedAt ?: now) - startedAt).coerceAtLeast(0)
+}
+
 data class WorkoutSession(
     val id: String = UUID.randomUUID().toString(),
     val name: String,
-    val startedAt: Long = System.currentTimeMillis(),
-    var completedAt: Long? = null,
+    val intervals: MutableList<WorkoutInterval>,
     var defaultRestSeconds: Int = 120,
     val exercises: MutableList<WorkoutExercise> = mutableListOf(),
 ) {
+    constructor(
+        id: String = UUID.randomUUID().toString(),
+        name: String,
+        startedAt: Long = System.currentTimeMillis(),
+        completedAt: Long? = null,
+        defaultRestSeconds: Int = 120,
+        exercises: MutableList<WorkoutExercise> = mutableListOf(),
+    ) : this(id, name, mutableListOf(WorkoutInterval(startedAt, completedAt)), defaultRestSeconds, exercises)
+
+    init {
+        require(intervals.isNotEmpty()) { "Workout needs a start time" }
+        require(intervals.dropLast(1).all { it.endedAt != null }) { "Only the last interval can be active" }
+    }
+
+    val startedAt: Long get() = intervals.first().startedAt
+    val completedAt: Long? get() = intervals.last().endedAt
+
+    fun durationMillis(now: Long = System.currentTimeMillis()): Long = intervals.sumOf { it.durationMillis(now) }
+
+    fun finish(completedAt: Long = System.currentTimeMillis()) {
+        if (this.completedAt != null) return
+        intervals[intervals.lastIndex] = intervals.last().copy(endedAt = completedAt)
+    }
+
     fun moveExercise(from: Int, to: Int) {
         if (from !in exercises.indices || to !in exercises.indices || from == to) return
         exercises.add(to, exercises.removeAt(from))
@@ -171,10 +201,8 @@ data class AppData(
         if (historyIndex < 0) return null
         if (!history[historyIndex].wasCompletedToday(resumedAt)) return null
         val finishedWorkout = history.removeAt(historyIndex)
-        val elapsed = ((finishedWorkout.completedAt ?: resumedAt) - finishedWorkout.startedAt).coerceAtLeast(0)
         return finishedWorkout.copy(
-            startedAt = resumedAt - elapsed,
-            completedAt = null,
+            intervals = (finishedWorkout.intervals + WorkoutInterval(startedAt = resumedAt)).toMutableList(),
         ).also { activeWorkout = it }
     }
 

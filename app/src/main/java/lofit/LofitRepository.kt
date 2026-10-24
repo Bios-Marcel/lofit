@@ -7,7 +7,7 @@ import org.json.JSONObject
 
 class LofitRepository(context: Context) {
     private companion object {
-        const val SCHEMA_VERSION = 1
+        const val SCHEMA_VERSION = 2
     }
 
     private val preferences = context.getSharedPreferences("lofit-data", Context.MODE_PRIVATE)
@@ -27,23 +27,23 @@ class LofitRepository(context: Context) {
         val raw = preferences.getString("state", null) ?: return AppData()
         val root = JSONObject(raw)
         return when (val version = if (root.has("schemaVersion")) root.getInt("schemaVersion") else 0) {
-            0 -> {
-                val migrated = encode(StartupDataMigration.migrate(root))
-                // Validate everything before changing stored data. A failed read must never
-                // become an empty AppData that a later save could write over the user's data.
-                val loaded = decode(migrated)
-                val edit = preferences.edit()
-                if (!preferences.contains("state-before-migration-v1")) {
-                    edit.putString("state-before-migration-v1", raw)
-                }
-                check(edit.putString("state", migrated.toString()).commit()) {
-                    "Could not persist startup data migration"
-                }
-                loaded
-            }
+            0 -> persistMigration(raw, StartupDataMigration.migrate(root), "state-before-migration-v1")
+            1 -> persistMigration(raw, decode(root), "state-before-migration-v2")
             SCHEMA_VERSION -> decode(root)
             else -> error("Unsupported data schema: $version")
         }
+    }
+
+    private fun persistMigration(raw: String, data: AppData, backupKey: String): AppData {
+        val migrated = encode(data)
+        // Validate before changing stored data, and keep the original for recovery.
+        val loaded = decode(migrated)
+        val edit = preferences.edit()
+        if (!preferences.contains(backupKey)) edit.putString(backupKey, raw)
+        check(edit.putString("state", migrated.toString()).commit()) {
+            "Could not persist startup data migration"
+        }
+        return loaded
     }
 
     private fun encode(data: AppData) = JSONObject().apply {
@@ -88,8 +88,14 @@ class LofitRepository(context: Context) {
     private fun encodeWorkout(workout: WorkoutSession) = JSONObject().apply {
         put("id", workout.id)
         put("name", workout.name)
-        put("startedAt", workout.startedAt)
-        put("completedAt", workout.completedAt ?: JSONObject.NULL)
+        put("intervals", JSONArray().apply {
+            workout.intervals.forEach { interval ->
+                put(JSONObject().apply {
+                    put("startedAt", interval.startedAt)
+                    put("endedAt", interval.endedAt ?: JSONObject.NULL)
+                })
+            }
+        })
         put("defaultRestSeconds", workout.defaultRestSeconds)
         put("exercises", JSONArray().apply {
             workout.exercises.forEach { item ->
@@ -161,8 +167,7 @@ class LofitRepository(context: Context) {
     private fun decodeWorkout(value: JSONObject) = WorkoutSession(
         id = value.getString("id"),
         name = value.getString("name"),
-        startedAt = value.getLong("startedAt"),
-        completedAt = if (value.isNull("completedAt")) null else value.getLong("completedAt"),
+        intervals = value.workoutIntervals(),
         defaultRestSeconds = value.getInt("defaultRestSeconds"),
         exercises = value.getJSONArray("exercises").mapObjects { item ->
             WorkoutExercise(
@@ -213,6 +218,21 @@ class LofitRepository(context: Context) {
             )
         }.toMutableList()
 }
+
+internal fun JSONObject.workoutIntervals(): MutableList<WorkoutInterval> =
+    if (has("intervals")) {
+        getJSONArray("intervals").mapObjects { interval ->
+            WorkoutInterval(
+                startedAt = interval.getLong("startedAt"),
+                endedAt = if (interval.isNull("endedAt")) null else interval.getLong("endedAt"),
+            )
+        }.toMutableList()
+    } else {
+        mutableListOf(WorkoutInterval(
+            startedAt = getLong("startedAt"),
+            endedAt = if (isNull("completedAt")) null else getLong("completedAt"),
+        ))
+    }
 
 private fun <T> JSONArray.mapObjects(transform: (JSONObject) -> T): List<T> =
     (0 until length()).map { transform(getJSONObject(it)) }

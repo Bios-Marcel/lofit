@@ -118,11 +118,53 @@ class WorkoutSessionTest {
         val resumed = data.resumeWorkout(finished.id, resumedAt = dayStart + 20_000)
 
         assertEquals(finished.id, resumed?.id)
-        assertEquals(dayStart + 15_000L, resumed?.startedAt)
+        assertEquals(dayStart + 1_000L, resumed?.startedAt)
+        assertEquals(listOf(
+            WorkoutInterval(dayStart + 1_000, dayStart + 6_000),
+            WorkoutInterval(dayStart + 20_000),
+        ), resumed?.intervals)
+        assertEquals(5_000L, resumed?.durationMillis(dayStart + 20_000))
+        assertEquals(8_000L, resumed?.durationMillis(dayStart + 23_000))
         assertEquals(null, resumed?.completedAt)
         assertEquals(1, resumed?.setCount())
         assertEquals(resumed, data.activeWorkout)
         assertEquals(0, data.history.size)
+    }
+
+    @Test
+    fun resumedWorkout_excludesEveryBreakAndKeepsFirstStart() {
+        val dayStart = LocalDate.of(2026, 10, 24).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val workout = WorkoutSession(name = "Intervals", startedAt = dayStart + 1_000)
+        val data = AppData()
+        workout.finish(dayStart + 6_000)
+        data.history.add(workout)
+
+        val firstResume = data.resumeWorkout(workout.id, dayStart + 20_000)!!
+        firstResume.finish(dayStart + 23_000)
+        data.activeWorkout = null
+        data.history.add(firstResume)
+        val secondResume = data.resumeWorkout(workout.id, dayStart + 50_000)!!
+        secondResume.finish(dayStart + 54_000)
+        secondResume.finish(dayStart + 60_000)
+
+        assertEquals(dayStart + 1_000, secondResume.startedAt)
+        assertEquals(dayStart + 54_000, secondResume.completedAt)
+        assertEquals(listOf(
+            WorkoutInterval(dayStart + 1_000, dayStart + 6_000),
+            WorkoutInterval(dayStart + 20_000, dayStart + 23_000),
+            WorkoutInterval(dayStart + 50_000, dayStart + 54_000),
+        ), secondResume.intervals)
+        assertEquals(12_000L, secondResume.durationMillis(dayStart + 90_000))
+        assertEquals(listOf(WorkoutInterval(dayStart + 1_000, dayStart + 6_000)), workout.intervals)
+    }
+
+    @Test
+    fun workoutDuration_neverCountsNegativeIntervals() {
+        val workout = WorkoutSession(name = "Clock changed", startedAt = 5_000)
+
+        assertEquals(0L, workout.durationMillis(3_000))
+        workout.finish(4_000)
+        assertEquals(0L, workout.durationMillis(9_000))
     }
 
     @Test
