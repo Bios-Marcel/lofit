@@ -1,6 +1,6 @@
 package lofit
 
-/** Bundled default catalog. Source exercise data and photos: yuhonas/free-exercise-db (Unlicense). */
+/** Bundled default catalog. Source exercise data: yuhonas/free-exercise-db (Unlicense). */
 object ExerciseCatalog {
     fun exercises(): List<Exercise> {
         val baseExercises = listOf(
