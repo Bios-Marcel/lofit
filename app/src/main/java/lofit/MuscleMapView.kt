@@ -13,6 +13,7 @@ import androidx.core.graphics.ColorUtils
 import androidx.core.graphics.PathParser
 import org.json.JSONObject
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 enum class MuscleMapSide { FRONT, BACK }
 
@@ -20,10 +21,9 @@ enum class MuscleMapSide { FRONT, BACK }
 class MuscleMapView(
     context: Context,
     private val side: MuscleMapSide,
-    muscleGroups: Set<String>,
+    workload: MuscleWorkload,
     val biologicalGender: BiologicalGender = BiologicalGender.MALE,
 ) : View(context) {
-    private val activeGroups = muscleGroups.mapNotNull(MuscleGroups::canonical).toSet()
     private val anatomy = anatomy(context, side, biologicalGender)
     private val surface = ContextCompat.getColor(context, R.color.charcoal_light)
     private val sage = ContextCompat.getColor(context, R.color.sage)
@@ -45,9 +45,14 @@ class MuscleMapView(
     }
     // Parse geometry once per model and side; prepare shading once per card.
     private val muscles = anatomy.regions.flatMap { region ->
-        val active = groupsFor(region.name, side).any(activeGroups::contains)
-        val base = if (active) coral else ColorUtils.blendARGB(surface, sage, 0.48f)
-        val light = ColorUtils.blendARGB(base, if (active) cream else sage, 0.20f)
+        val saturation = workload.saturationFor(groupsFor(region.name, side))
+        val inactive = ColorUtils.blendARGB(surface, sage, 0.48f)
+        val base = ColorUtils.blendARGB(inactive, coral, saturation)
+        val light = ColorUtils.blendARGB(
+            ColorUtils.blendARGB(inactive, sage, 0.20f),
+            ColorUtils.blendARGB(coral, cream, 0.20f),
+            saturation,
+        )
         val shadow = ColorUtils.blendARGB(base, surface, 0.28f)
         region.paths.map { path ->
             val bounds = RectF().also { path.computeBounds(it, true) }
@@ -65,7 +70,10 @@ class MuscleMapView(
     init {
         contentDescription = if (side == MuscleMapSide.FRONT) "Front muscle map" else "Back muscle map"
         val visibleGroups = anatomy.regions.flatMap { groupsFor(it.name, side) }.toSet()
-        val highlighted = activeGroups.filter(visibleGroups::contains).sorted()
+        val highlighted = visibleGroups.sorted().mapNotNull { group ->
+            val saturation = workload.saturationFor(setOf(group))
+            if (saturation > 0f) "$group ${(saturation * 100).roundToInt()}%" else null
+        }
         stateDescription = "${biologicalGender.label}. " +
             (highlighted.takeIf { it.isNotEmpty() }?.joinToString(", ") ?: "No highlighted muscles")
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES

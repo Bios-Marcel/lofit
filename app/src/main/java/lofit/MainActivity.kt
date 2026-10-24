@@ -563,7 +563,7 @@ class MainActivity : AppCompatActivity() {
             body.addView(card {
                 addView(titleText(routine.name))
                 addView(metaText("${routine.exercises.size} exercises · ${routine.defaultRestSeconds}s default rest"))
-                addView(exerciseMuscleMaps(routine.exercises.map { it.exerciseId }))
+                addView(exerciseMuscleMaps(routine.exercises.map { it.exerciseId to it.plannedSets.size }))
                 addView(actionButton("Start routine") { startRoutine(routine) })
             })
         }
@@ -880,7 +880,7 @@ class MainActivity : AppCompatActivity() {
             body.addView(card {
                 addView(titleText(routine.name))
                 addView(metaText("Default rest ${routine.defaultRestSeconds}s"))
-                addView(exerciseMuscleMaps(routine.exercises.map { it.exerciseId }))
+                addView(exerciseMuscleMaps(routine.exercises.map { it.exerciseId to it.plannedSets.size }))
                 addView(horizontalActions(
                     actionButton("Start") { startRoutine(routine) },
                     actionButton("Edit", secondary = true) { openRoutineEditor(routine) },
@@ -1181,7 +1181,7 @@ class MainActivity : AppCompatActivity() {
                 addView(metaText(DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(workout.startedAt))))
                 addView(metaText("${workout.setCount()} sets · ${formatWeight(workout.totalVolume())} kg volume · ${formatDuration(workout.durationMillis())}"))
                 workout.bodyWeightKg?.let { addView(bodyWeightText(it)) }
-                addView(exerciseMuscleMaps(workout.exercises.map { it.exerciseId }))
+                addView(exerciseMuscleMaps(workout.exercises.map { it.exerciseId to it.sets.size }))
                 if (index == 0 && workout.wasCompletedToday()) {
                     addView(actionButton("Continue workout") {
                         continueHistoryWorkout(workout)
@@ -1276,10 +1276,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun exerciseMuscleMaps(exerciseIds: List<String>): View {
-        val muscleGroups = exerciseIds.mapNotNull(::exercise).flatMap { movement ->
-            listOf(movement.primaryMuscle) + movement.secondaryMuscles.split(',')
-        }.map(String::trim).filter(String::isNotBlank).toSet()
+    private fun exerciseMuscleMaps(exerciseSets: List<Pair<String, Int>>): View {
+        val workload = MuscleWorkload(exerciseSets.mapNotNull { (exerciseId, sets) ->
+            exercise(exerciseId)?.let { it to sets }
+        })
 
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -1290,7 +1290,7 @@ class MainActivity : AppCompatActivity() {
                     orientation = LinearLayout.VERTICAL
                     gravity = Gravity.CENTER
                     addView(metaText(label).apply { gravity = Gravity.CENTER })
-                    addView(MuscleMapView(this@MainActivity, side, muscleGroups, repository.data.biologicalGender))
+                    addView(MuscleMapView(this@MainActivity, side, workload, repository.data.biologicalGender))
                 }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
             }
         }

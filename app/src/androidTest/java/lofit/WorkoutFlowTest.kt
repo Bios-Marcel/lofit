@@ -129,6 +129,48 @@ class WorkoutFlowTest {
     }
 
     @Test
+    fun muscleMaps_usePlannedRoutineSetsAndOnlyLoggedHistorySets() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        LofitRepository(context).apply {
+            data.routines.add(Routine(name = "Map routine", exercises = mutableListOf(
+                RoutineExercise(exerciseId = "bench-press", plannedSets = MutableList(8) { PlannedSet() }),
+            )))
+            data.history.add(WorkoutSession(
+                name = "Map workout", completedAt = 200,
+                exercises = mutableListOf(
+                    WorkoutExercise(exerciseId = "bench-press",
+                        plannedSets = MutableList(8) { PlannedSet() },
+                        sets = MutableList(4) { LoggedSet(type = SetType.NORMAL, weightKg = 20.0, reps = 8) }),
+                    WorkoutExercise(exerciseId = "fedb-barbell-curl",
+                        plannedSets = MutableList(8) { PlannedSet() }),
+                ),
+            ))
+            save()
+        }
+        ActivityScenario.launch(MainActivity::class.java).use {
+            fun checkMaps(chest: Int, triceps: Int) {
+                onView(withContentDescription("Front muscle map")).perform(scrollTo()).check { view, _ ->
+                    val state = view.stateDescription.toString()
+                    assertTrue(state, state.contains("Chest $chest%"))
+                    assertFalse(state, state.contains("Biceps"))
+                }
+                onView(withContentDescription("Back muscle map")).perform(scrollTo()).check { view, _ ->
+                    val state = view.stateDescription.toString()
+                    assertTrue(state, state.contains("Triceps $triceps%"))
+                }
+            }
+            checkMaps(chest = 100, triceps = 25)
+            onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+            onView(allOf(withText(R.string.nav_routines), isClickable())).perform(click())
+            checkMaps(chest = 100, triceps = 25)
+            onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+            onView(withText(R.string.nav_history)).perform(click())
+            checkMaps(chest = 50, triceps = 13)
+        }
+    }
+
+    @Test
     fun settings_genderChangesBothMuscleMapsAndPersistsAcrossRestart() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
