@@ -2668,7 +2668,7 @@ class MainActivity : AppCompatActivity() {
                 contentDescription = "Set ${currentSetIndex + 1} weight"
                 setPadding(dp(6), 0, dp(6), 0)
                 doAfterTextChanged { value ->
-                    value.toString().toDoubleOrNull()?.takeIf { it >= 0 }?.let {
+                    parseWeight(value.toString())?.takeIf { it >= 0 }?.let {
                         plannedSet.weightKg = it
                         onChanged()
                     }
@@ -2964,7 +2964,6 @@ class MainActivity : AppCompatActivity() {
         SetType.FAILURE -> SetType.NORMAL
     }
 
-    private fun formatWeight(value: Double): String = String.format(Locale.getDefault(), if (value % 1.0 == 0.0) "%.0f" else "%.1f", value)
     private fun formatInteger(value: Int): String = String.format(Locale.getDefault(), "%d", value)
     private fun formatSeconds(total: Int): String = String.format(Locale.getDefault(), "%d:%02d", total / 60, total % 60)
     private fun formatDuration(milliseconds: Long): String = formatWorkoutTime((milliseconds / 1_000).toInt())

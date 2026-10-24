@@ -55,7 +55,7 @@ data class LoggedSet(
         require(holdSeconds >= 0) { "Hold duration cannot be negative" }
     }
 
-    fun volume(): Double = weightKg * reps
+    fun volume(): Double = (weightKg.toBigDecimal() * reps.toBigDecimal()).toDouble()
 }
 
 data class PlannedSet(
@@ -133,7 +133,9 @@ data class WorkoutSession(
         exercises.add(to, exercises.removeAt(from))
     }
 
-    fun totalVolume(): Double = exercises.sumOf { item -> item.sets.sumOf(LoggedSet::volume) }
+    fun totalVolume(): Double = exercises.sumOf { item ->
+        item.sets.sumOf { it.volume().toBigDecimal() }
+    }.toDouble()
     fun setCount(): Int = exercises.sumOf { it.sets.size }
 
     fun wasCompletedToday(now: Long = System.currentTimeMillis()): Boolean {

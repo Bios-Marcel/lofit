@@ -775,6 +775,77 @@ class WorkoutFlowTest {
     }
 
     @Test
+    fun addedSet_preservesFractionalWeightInFieldsStorageAndVolume() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        LofitRepository(context).apply {
+            data.activeWorkout = WorkoutSession(
+                name = "Fractional weights",
+                defaultRestSeconds = 0,
+                exercises = mutableListOf(WorkoutExercise(
+                    exerciseId = "bench-press",
+                    plannedSets = mutableListOf(PlannedSet(weightKg = 1.25, reps = 1)),
+                )),
+            )
+            save()
+        }
+        val weightText = "1${java.text.DecimalFormatSymbols.getInstance().decimalSeparator}25"
+        ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)
+            .setAction(Intent.ACTION_MAIN)).use { scenario ->
+            onView(withContentDescription("Set 1 weight")).check(matches(withText(weightText)))
+            onView(withText("Add set")).perform(scrollTo(), click())
+            onView(withContentDescription("Set 2 weight")).check(matches(withText(weightText)))
+                .perform(replaceText(weightText), closeSoftKeyboard())
+            onView(withContentDescription("Set 2 Repetitions")).perform(replaceText("2"), closeSoftKeyboard())
+            scenario.recreate()
+            onView(withContentDescription("Set 1 weight")).check(matches(withText(weightText)))
+            onView(withContentDescription("Set 2 weight")).check(matches(withText(weightText)))
+            onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
+            onView(withContentDescription("Set 2 done")).perform(scrollTo(), click())
+
+            val active = LofitRepository(context).data.activeWorkout!!
+            assertEquals(listOf(1.25, 1.25), active.exercises.single().plannedSets.map { it.weightKg })
+            assertEquals(listOf(1.25, 1.25), active.exercises.single().sets.map { it.weightKg })
+            assertEquals(3.75, active.totalVolume(), 0.0)
+
+            onView(withText("Finish workout")).perform(scrollTo(), click())
+            onView(withText("Finish and save")).perform(click())
+            assertEquals(3.75, LofitRepository(context).data.history.single().totalVolume(), 0.0)
+            onView(withContentDescription("${LocalDate.now()}, workout completed")).perform(scrollTo(), click())
+            val volumeText = "2 sets · 3${java.text.DecimalFormatSymbols.getInstance().decimalSeparator}75 kg volume"
+            onView(withText(volumeText)).check(matches(isDisplayed()))
+            onView(withContentDescription("Set 2 weight")).perform(scrollTo()).check(matches(withText(weightText)))
+        }
+    }
+
+    @Test
+    fun routineAddedSet_preservesFractionalWeight() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        LofitRepository(context).apply {
+            data.routines.add(Routine(
+                name = "Fractional routine",
+                exercises = mutableListOf(RoutineExercise(
+                    exerciseId = "bench-press",
+                    plannedSets = mutableListOf(PlannedSet(weightKg = 1.25, reps = 1)),
+                )),
+            ))
+            save()
+        }
+        val weightText = "1${java.text.DecimalFormatSymbols.getInstance().decimalSeparator}25"
+        ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)
+            .setAction(Intent.ACTION_MAIN)).use {
+            onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+            onView(allOf(withText(R.string.nav_routines), isAssignableFrom(android.widget.Button::class.java))).perform(click())
+            onView(withText("Edit")).perform(click())
+            onView(withContentDescription("Set 1 weight")).check(matches(withText(weightText)))
+            onView(withText("Add set")).perform(scrollTo(), click())
+            onView(withContentDescription("Set 2 weight")).check(matches(withText(weightText)))
+            onView(withText("Save routine")).perform(scrollTo(), click())
+            val sets = LofitRepository(context).data.routines.single().exercises.single().plannedSets
+            assertEquals(listOf(1.25, 1.25), sets.map { it.weightKg })
+        }
+    }
+
+    @Test
     fun bodyweightExercise_skipsWeightColumnAndLogsRepetitions() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val repository = LofitRepository(instrumentation.targetContext)
