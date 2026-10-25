@@ -1291,6 +1291,7 @@ class WorkoutFlowTest {
                 logged(0, 50.0, reps = 8), logged(0, 200.0, reps = 0), logged(0, 0.0, reps = 100),
             ))),
         ))
+        repository.data.recordWorkout(repository.data.history.single())
         repository.save()
         instrumentation.startActivitySync(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
@@ -1354,6 +1355,7 @@ class WorkoutFlowTest {
                 ),
             ),
         ))
+        repository.data.recordWorkout(repository.data.history.single())
         repository.save()
         val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -1387,13 +1389,18 @@ class WorkoutFlowTest {
         val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         instrumentation.startActivitySync(intent)
-        onView(withContentDescription("Open active workout")).perform(click())
 
         onView(withContentDescription("Set 1 record")).check(matches(not(isDisplayed())))
         onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
         onView(withContentDescription("Set 1 record")).check(matches(not(isDisplayed())))
         onView(withContentDescription("Set 2 done")).perform(scrollTo(), click())
         onView(withContentDescription("Set 2 record")).check(matches(not(isDisplayed())))
+        assertTrue(LofitRepository(instrumentation.targetContext).data.exerciseRecords.isEmpty())
+        onView(withText("Finish workout")).perform(scrollTo(), click())
+        onView(withText("Finish and save")).perform(click())
+        val saved = LofitRepository(instrumentation.targetContext).data
+        assertEquals(55.0, saved.exerciseRecords.getValue("bench-press").last().set.weightKg, 0.0)
+        assertEquals(2, saved.exerciseRecords.getValue("bench-press").size)
     }
 
     @Test
@@ -1418,11 +1425,11 @@ class WorkoutFlowTest {
                 ),
             )),
         )
+        repository.data.recordWorkout(repository.data.history.single())
         repository.save()
         val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         instrumentation.startActivitySync(intent)
-        onView(withContentDescription("Open active workout")).perform(click())
 
         onView(withContentDescription("Set 1 record")).check(matches(not(isDisplayed())))
         onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
@@ -1648,6 +1655,7 @@ class WorkoutFlowTest {
                 plannedSets = mutableListOf(plannedSet),
             )),
         )
+        repository.data.recordWorkout(workout)
         repository.data.history.add(workout)
         val olderWorkout = WorkoutSession(name = "Older workout", startedAt = 10, completedAt = 50)
         repository.data.history.add(olderWorkout)
@@ -1667,6 +1675,7 @@ class WorkoutFlowTest {
         onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
         onView(withContentDescription("Set 1 weight")).check(matches(withText("67.5")))
         val savedData = LofitRepository(instrumentation.targetContext).data
+        assertEquals(repository.data.exerciseRecords, savedData.exerciseRecords)
         assertEquals(workout.id, savedData.activeWorkout?.id)
         assertEquals(null, savedData.activeWorkout?.completedAt)
         assertEquals(workout.startedAt, savedData.activeWorkout?.startedAt)
@@ -1683,6 +1692,7 @@ class WorkoutFlowTest {
         assertEquals(workout.intervals.single(), finished.intervals.first())
         assertTrue(finished.intervals.all { it.endedAt != null })
         assertEquals(2, finished.intervals.size)
+        assertEquals(repository.data.exerciseRecords, LofitRepository(instrumentation.targetContext).data.exerciseRecords)
     }
 
     @Test

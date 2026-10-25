@@ -217,6 +217,7 @@ data class AppData(
     var bodyMetricsEnabled: Boolean? = null,
     var biologicalGender: BiologicalGender = BiologicalGender.MALE,
     var onboardingComplete: Boolean = false,
+    val exerciseRecords: MutableMap<String, MutableList<ExerciseRecord>> = mutableMapOf(),
 ) {
     fun resumeWorkout(workoutId: String, resumedAt: Long = System.currentTimeMillis()): WorkoutSession? {
         if (activeWorkout != null) return null
@@ -260,15 +261,13 @@ data class AppData(
                 }.toMutableList())
         }
 
-    // Build chronological record snapshots from saved sets so edits and resumed workouts stay in sync.
-    fun exerciseRecordHistory(): Map<String, List<ExerciseRecord>> = exercises
-        .sortedBy { it.name.lowercase() }
-        .mapNotNull { exercise ->
-            val sets = history.flatMap { workout ->
-                workout.exercises
-                    .filter { it.exerciseId == exercise.id }
-                    .flatMap { it.sets }
-            }.filter { it.isRecordEligible(exercise) }.sortedBy { it.completedAt }
+    // Append snapshots only when a workout is saved; never rebuild records from history.
+    fun recordWorkout(workout: WorkoutSession) {
+        val exercisesById = exercises.associateBy { it.id }
+        workout.exercises.groupBy { it.exerciseId }.forEach { (exerciseId, items) ->
+            val exercise = exercisesById[exerciseId] ?: return@forEach
+            val sets = items.flatMap { it.sets }
+                .filter { it.isRecordEligible(exercise) }.sortedBy { it.completedAt }
             val bestOrder = compareBy<LoggedSet> {
                 when {
                     exercise.type.tracksDuration -> it.holdSeconds.toDouble()
@@ -278,24 +277,24 @@ data class AppData(
             }.thenBy { it.completedAt }
             val volumeOrder = compareBy<LoggedSet> { it.volume() }.thenBy { it.completedAt }
             val tracksVolume = exercise.weighted && !exercise.type.tracksDuration
-            val records = mutableListOf<ExerciseRecord>()
             sets.forEach { set ->
-                val previous = records.lastOrNull()
+                val previous = exerciseRecords[exerciseId]?.lastOrNull()
                 val best = previous?.set?.takeUnless { bestOrder.compare(set, it) > 0 } ?: set
                 val volumeSet = if (tracksVolume) {
                     previous?.volumeSet?.takeUnless { volumeOrder.compare(set, it) > 0 } ?: set
                 } else null
-                if (previous == null || best.id != previous.set.id || volumeSet?.id != previous.volumeSet?.id) {
-                    records.add(ExerciseRecord(exercise, best, volumeSet))
+                if (previous == null || best != previous.set || volumeSet != previous.volumeSet) {
+                    exerciseRecords.getOrPut(exerciseId) { mutableListOf() }
+                        .add(ExerciseRecord(exercise, best.copy(), volumeSet?.copy()))
                 }
             }
-            records.takeIf { it.isNotEmpty() }?.let { exercise.id to it }
-        }.toMap()
+        }
+    }
 
-    fun oneRepMaxes(): List<ExerciseRecord> = exerciseRecordHistory().values.map { it.last() }
+    fun oneRepMaxes(): List<ExerciseRecord> = exerciseRecords.values.mapNotNull { it.lastOrNull() }
+        .sortedBy { it.exercise.name.lowercase() }
 
     fun recordSetIds(workout: WorkoutSession): Set<String> {
-        val records = oneRepMaxes().associateBy { it.exercise.id }
         val exercisesById = exercises.associateBy { it.id }
         val recordIds = mutableSetOf<String>()
 
@@ -305,7 +304,7 @@ data class AppData(
             .forEach { (exerciseId, loggedSets) ->
                 val exercise = exercisesById[exerciseId] ?: return@forEach
                 val sets = loggedSets.filter { it.isRecordEligible(exercise) }
-                val previousRecord = records[exerciseId] ?: return@forEach
+                val previousRecord = exerciseRecords[exerciseId]?.lastOrNull() ?: return@forEach
                 if (exercise.type.tracksDuration) {
                     sets.maxWithOrNull(compareBy<LoggedSet> { it.holdSeconds }.thenBy { it.completedAt })
                         ?.takeIf { it.holdSeconds > previousRecord.set.holdSeconds }

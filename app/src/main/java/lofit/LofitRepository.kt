@@ -51,6 +51,18 @@ class LofitRepository(context: Context) {
         put("exercises", JSONArray().apply { data.exercises.forEach { put(encodeExercise(it)) } })
         put("routines", JSONArray().apply { data.routines.forEach { put(encodeRoutine(it)) } })
         put("history", JSONArray().apply { data.history.forEach { put(encodeWorkout(it)) } })
+        put("exerciseRecords", JSONObject().apply {
+            data.exerciseRecords.forEach { (exerciseId, records) ->
+                put(exerciseId, JSONArray().apply {
+                    records.forEach { record ->
+                        put(JSONObject().apply {
+                            put("set", encodeLoggedSet(record.set))
+                            put("volumeSet", record.volumeSet?.let(::encodeLoggedSet) ?: JSONObject.NULL)
+                        })
+                    }
+                })
+            }
+        })
         put("activeWorkout", data.activeWorkout?.let(::encodeWorkout) ?: JSONObject.NULL)
         put("soundCuesEnabled", data.soundCuesEnabled)
         put("bodyMetricsEnabled", data.bodyMetricsEnabled ?: JSONObject.NULL)
@@ -116,16 +128,7 @@ class LofitRepository(context: Context) {
                     put("plannedSets", encodePlannedSets(item.plannedSets))
                     put("sets", JSONArray().apply {
                         item.sets.forEach { set ->
-                            put(JSONObject().apply {
-                                put("id", set.id)
-                                put("type", set.type.name)
-                                put("weightKg", set.weightKg)
-                                put("reps", set.reps)
-                                put("holdSeconds", set.holdSeconds)
-                                put("side", set.side.name)
-                                put("completedAt", set.completedAt)
-                                put("plannedSetId", set.plannedSetId ?: JSONObject.NULL)
-                            })
+                            put(encodeLoggedSet(set))
                         }
                     })
                 })
@@ -133,12 +136,24 @@ class LofitRepository(context: Context) {
         })
     }
 
+    private fun encodeLoggedSet(set: LoggedSet) = JSONObject().apply {
+        put("id", set.id)
+        put("type", set.type.name)
+        put("weightKg", set.weightKg)
+        put("reps", set.reps)
+        put("holdSeconds", set.holdSeconds)
+        put("side", set.side.name)
+        put("completedAt", set.completedAt)
+        put("plannedSetId", set.plannedSetId ?: JSONObject.NULL)
+    }
+
     private fun decode(root: JSONObject): AppData {
         val savedExercises = root.getJSONArray("exercises").mapObjects(::decodeExercise)
         val defaults = DefaultData.exercises()
         val defaultIds = defaults.mapTo(mutableSetOf()) { it.id }
+        val exercises = (defaults + savedExercises.filter { it.id !in defaultIds }).toMutableList()
         return AppData(
-            exercises = (defaults + savedExercises.filter { it.id !in defaultIds }).toMutableList(),
+            exercises = exercises,
             routines = root.getJSONArray("routines").mapObjects(::decodeRoutine).toMutableList(),
             history = root.getJSONArray("history").mapObjects(::decodeWorkout).toMutableList(),
             activeWorkout = if (root.isNull("activeWorkout")) null else decodeWorkout(root.getJSONObject("activeWorkout")),
@@ -146,7 +161,28 @@ class LofitRepository(context: Context) {
             bodyMetricsEnabled = if (root.isNull("bodyMetricsEnabled")) null else root.getBoolean("bodyMetricsEnabled"),
             biologicalGender = BiologicalGender.valueOf(root.optString("biologicalGender", BiologicalGender.MALE.name)),
             onboardingComplete = root.optBoolean("onboardingComplete", false),
+            exerciseRecords = decodeRecords(root.optJSONObject("exerciseRecords"), exercises),
         )
+    }
+
+    private fun decodeRecords(
+        value: JSONObject?, exercises: List<Exercise>,
+    ): MutableMap<String, MutableList<ExerciseRecord>> {
+        val records = mutableMapOf<String, MutableList<ExerciseRecord>>()
+        if (value == null) return records
+        val exercisesById = exercises.associateBy { it.id }
+        value.keys().forEach { exerciseId ->
+            val exercise = exercisesById[exerciseId] ?: return@forEach
+            val entries = value.getJSONArray(exerciseId).mapObjects { entry ->
+                ExerciseRecord(
+                    exercise = exercise,
+                    set = decodeLoggedSet(entry.getJSONObject("set")),
+                    volumeSet = if (entry.isNull("volumeSet")) null else decodeLoggedSet(entry.getJSONObject("volumeSet")),
+                )
+            }
+            if (entries.isNotEmpty()) records[exerciseId] = entries.toMutableList()
+        }
+        return records
     }
 
     private fun decodeExercise(value: JSONObject) = Exercise(
@@ -195,20 +231,20 @@ class LofitRepository(context: Context) {
                 sourceRoutineExerciseId = if (item.isNull("sourceRoutineExerciseId")) null else item.getString("sourceRoutineExerciseId"),
                 restSecondsOverride = if (item.isNull("restSecondsOverride")) null else item.getInt("restSecondsOverride"),
                 plannedSets = decodePlannedSets(item.getJSONArray("plannedSets")),
-                sets = item.getJSONArray("sets").mapObjects { set ->
-                    LoggedSet(
-                        id = set.getString("id"),
-                        type = SetType.valueOf(set.getString("type")),
-                        weightKg = set.getDouble("weightKg"),
-                        reps = set.getInt("reps"),
-                        holdSeconds = set.getInt("holdSeconds"),
-                        side = Side.valueOf(set.getString("side")),
-                        completedAt = set.getLong("completedAt"),
-                        plannedSetId = if (set.isNull("plannedSetId")) null else set.getString("plannedSetId"),
-                    )
-                }.toMutableList(),
+                sets = item.getJSONArray("sets").mapObjects(::decodeLoggedSet).toMutableList(),
             )
         }.toMutableList(),
+    )
+
+    private fun decodeLoggedSet(set: JSONObject) = LoggedSet(
+        id = set.getString("id"),
+        type = SetType.valueOf(set.getString("type")),
+        weightKg = set.getDouble("weightKg"),
+        reps = set.getInt("reps"),
+        holdSeconds = set.getInt("holdSeconds"),
+        side = Side.valueOf(set.getString("side")),
+        completedAt = set.getLong("completedAt"),
+        plannedSetId = if (set.isNull("plannedSetId")) null else set.getString("plannedSetId"),
     )
 
     private fun encodePlannedSets(sets: List<PlannedSet>) = JSONArray().apply {

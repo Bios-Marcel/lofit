@@ -1669,6 +1669,7 @@ class MainActivity : AppCompatActivity() {
                             discardActiveWorkout()
                         } else {
                             workout.finish()
+                            repository.data.recordWorkout(workout)
                             repository.data.history.add(workout)
                             discardActiveWorkout()
                         }
@@ -1677,6 +1678,7 @@ class MainActivity : AppCompatActivity() {
                     ConfirmAction.DELETE_EXERCISE -> confirm.targetId?.let { id ->
                         val picture = repository.data.exercises.firstOrNull { it.id == id && it.custom }?.imageFile
                         repository.data.exercises.removeAll { it.id == id && it.custom }
+                        repository.data.exerciseRecords.remove(id)
                         picture?.let(::deleteUnsavedPicture)
                         repository.data.routines.forEach { routine -> routine.exercises.removeAll { it.exerciseId == id } }
                     }
@@ -2379,16 +2381,13 @@ class MainActivity : AppCompatActivity() {
     )
 
     private fun recordFor(exercise: Exercise): String? {
-        val sets = repository.data.history.flatMap { workout ->
-            workout.exercises.filter { it.exerciseId == exercise.id }.flatMap { it.sets }
-        }
-        if (sets.isEmpty()) return null
+        val set = repository.data.exerciseRecords[exercise.id]?.lastOrNull()?.set ?: return null
         return when {
             exercise.type.tracksDuration && exercise.weighted ->
-                "Best: ${sets.maxOf { it.holdSeconds }}s hold · ${formatWeight(sets.maxOf { it.weightKg })} kg"
-            exercise.type.tracksDuration -> "Best: ${sets.maxOf { it.holdSeconds }}s hold"
-            exercise.weighted -> "Best: ${formatWeight(sets.maxOf { it.weightKg })} kg · ${sets.maxOf { it.reps }} reps"
-            else -> "Best: ${sets.maxOf { it.reps }} reps"
+                "Best: ${set.holdSeconds}s hold · ${formatWeight(set.weightKg)} kg"
+            exercise.type.tracksDuration -> "Best: ${set.holdSeconds}s hold"
+            exercise.weighted -> "Best: ${formatWeight(set.weightKg)} kg · ${set.reps} reps"
+            else -> "Best: ${set.reps} reps"
         }
     }
 

@@ -37,7 +37,7 @@ fun AppData.exerciseTrend(
     now: Long = System.currentTimeMillis(),
     zone: ZoneId = ZoneId.systemDefault(),
 ): ExerciseTrendData {
-    val records = exerciseRecordHistory()[exerciseId].orEmpty()
+    val records = exerciseRecords[exerciseId].orEmpty()
     val exercise = exercises.firstOrNull { it.id == exerciseId }
     val metrics = when {
         exercise == null -> emptyList()
@@ -47,8 +47,10 @@ fun AppData.exerciseTrend(
     }
     val series = metrics.map { metric ->
         val sets = records.mapNotNull { if (metric == TrendMetric.VOLUME) it.volumeSet else it.set }
+            .asReversed()
             .distinctBy { it.id }
             .filter { it.completedAt <= now }
+            .sortedBy { it.completedAt }
         TrendSeries(metric, sets.map { TrendPoint(it.completedAt, metric.value(it)) })
     }
     val startedAt = span.startedAt(now, zone)

@@ -23,7 +23,7 @@ class ExerciseTrendTest {
         history = mutableListOf(WorkoutSession(name = "Records", exercises = mutableListOf(
             WorkoutExercise(exerciseId = bench.id, sets = sets.toMutableList()),
         ))),
-    )
+    ).also { it.recordWorkout(it.history.single()) }
 
     @Test
     fun defaultSpan_isCalendarYearWithEarlierBaseline() {
@@ -90,6 +90,7 @@ class ExerciseTrendTest {
         val nextDay = logged(morning.plusDays(1), 90.0, 6)
         val data = data(weight, first)
         data.history.addAll(data(nextDay, volume, tiedWeight).history)
+        data.recordWorkout(data.history.last())
 
         val trend = data.exerciseTrend(bench.id, TrendSpan.ALL,
             now.plusDays(1).toInstant().toEpochMilli(), zone)
@@ -136,6 +137,7 @@ class ExerciseTrendTest {
             }.toMutableList()),
         ))
         val endedAt = midnight.plusDays(1).toInstant().toEpochMilli()
+        data.recordWorkout(data.history.single())
 
         assertEquals(listOf(10.0, 40.0), data.exerciseTrend(pushUp.id, TrendSpan.ALL, endedAt, zone)
             .series.single().points.map { it.value })
@@ -160,6 +162,7 @@ class ExerciseTrendTest {
         assertTrue(hold.isRecordEligible(plank))
         assertFalse(reps.copy(reps = 0).isRecordEligible(pushUp))
         assertFalse(hold.copy(holdSeconds = 0).isRecordEligible(plank))
+        data.recordWorkout(data.history.single())
         assertEquals(TrendMetric.REPS, data.exerciseTrend(pushUp.id).series.single().metric)
         assertEquals(TrendMetric.HOLD, data.exerciseTrend(plank.id).series.single().metric)
     }

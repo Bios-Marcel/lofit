@@ -391,7 +391,50 @@ class WorkoutSessionTest {
     }
 
     @Test
-    fun exerciseRecordHistory_keepsProgressionPerExerciseAndDisplaysLatestBest() {
+    fun exerciseRecords_resumedWorkoutAppendsImprovementsWithoutChangingPastSnapshots() {
+        val bench = Exercise("bench", "Bench", ExerciseType.REPETITIONS, false, "Chest", "")
+        val set = LoggedSet(type = SetType.NORMAL, weightKg = 60.0, reps = 5)
+        val workout = WorkoutSession(name = "Resume", exercises = mutableListOf(
+            WorkoutExercise(exerciseId = bench.id, sets = mutableListOf(set)),
+        ))
+        val data = AppData(exercises = mutableListOf(bench))
+        workout.finish()
+        data.recordWorkout(workout)
+        data.history.add(workout)
+
+        val resumed = data.resumeWorkout(workout.id)!!
+        assertEquals(60.0, data.exerciseRecords.getValue(bench.id).single().set.weightKg, 0.0)
+        resumed.exercises.single().sets.single().weightKg = 70.0
+        resumed.finish()
+        data.recordWorkout(resumed)
+        data.recordWorkout(resumed)
+
+        assertEquals(listOf(60.0, 70.0), data.exerciseRecords.getValue(bench.id).map { it.set.weightKg })
+        assertEquals(listOf(70.0), data.exerciseTrend(bench.id, TrendSpan.ALL).series.first().points.map { it.value })
+    }
+
+    @Test
+    fun exerciseRecords_createEntriesOnlyForEligibleSets() {
+        val bench = Exercise("bench", "Bench", ExerciseType.REPETITIONS, false, "Chest", "")
+        val data = AppData(exercises = mutableListOf(bench))
+        val workout = WorkoutSession(name = "Invalid", exercises = mutableListOf(
+            WorkoutExercise(exerciseId = bench.id, sets = mutableListOf(
+                LoggedSet(type = SetType.NORMAL, weightKg = 100.0, reps = 0),
+                LoggedSet(type = SetType.NORMAL, weightKg = 0.0, reps = 10),
+            )),
+            WorkoutExercise(exerciseId = "missing", sets = mutableListOf(
+                LoggedSet(type = SetType.NORMAL, weightKg = 100.0, reps = 10),
+            )),
+        ))
+
+        data.recordWorkout(workout)
+
+        assertTrue(data.exerciseRecords.isEmpty())
+        assertTrue(data.oneRepMaxes().isEmpty())
+    }
+
+    @Test
+    fun exerciseRecords_appendProgressionAndKeepSnapshotsIndependentOfHistory() {
         val bench = Exercise("bench", "Bench", ExerciseType.REPETITIONS, false, "Chest", "")
         val unused = Exercise("unused", "Unused", ExerciseType.REPETITIONS, false, "Chest", "")
         val first = LoggedSet(id = "first", type = SetType.NORMAL, weightKg = 60.0, reps = 5, completedAt = 10)
@@ -416,7 +459,10 @@ class WorkoutSessionTest {
             )),
         )
 
-        val records = data.exerciseRecordHistory()
+        assertTrue(data.exerciseRecords.isEmpty())
+        assertTrue(data.oneRepMaxes().isEmpty())
+        data.history.asReversed().forEach(data::recordWorkout)
+        val records = data.exerciseRecords
 
         assertEquals(setOf(bench.id), records.keys)
         assertEquals(listOf(first, weight, weight), records.getValue(bench.id).map { it.set })
@@ -424,12 +470,15 @@ class WorkoutSessionTest {
         assertEquals(listOf(records.getValue(bench.id).last()), data.oneRepMaxes())
 
         data.history.removeAt(0)
+        volume.weightKg = 1.0
 
-        assertEquals(first, data.oneRepMaxes().single().volumeSet)
+        assertEquals(500.0, data.oneRepMaxes().single().volumeSet!!.volume(), 0.0)
+        assertEquals(80.0, data.oneRepMaxes().single().set.weightKg, 0.0)
+        assertEquals(3, records.getValue(bench.id).size)
     }
 
     @Test
-    fun exerciseRecordHistory_tracksHoldsAndBodyweightRepsWithoutVolume() {
+    fun exerciseRecords_trackHoldsAndBodyweightRepsWithoutVolume() {
         val plank = Exercise("plank-test", "Plank", ExerciseType.TIMED, false, "Core", "")
         val pushUp = Exercise("push-up-test", "Push-up", ExerciseType.REPETITIONS, false, "Chest", "", weighted = false)
         val data = AppData(
@@ -448,16 +497,17 @@ class WorkoutSessionTest {
             ))),
         )
 
-        val records = data.exerciseRecordHistory()
+        data.recordWorkout(data.history.single())
+        val records = data.exerciseRecords
 
-        assertEquals(listOf(plank.id, pushUp.id), records.keys.toList())
+        assertEquals(setOf(plank.id, pushUp.id), records.keys)
         assertEquals(listOf(30, 45), records.getValue(plank.id).map { it.set.holdSeconds })
         assertEquals(listOf(8, 12), records.getValue(pushUp.id).map { it.set.reps })
         assertTrue(records.values.flatten().all { it.volumeSet == null })
     }
 
     @Test
-    fun exerciseRecordHistory_keepsNewestTiedRecords() {
+    fun exerciseRecords_keepNewestTiedRecordsAndDoNotDuplicateOnResave() {
         val bench = Exercise("bench", "Bench", ExerciseType.REPETITIONS, false, "Chest", "")
         val older = LoggedSet(id = "older", type = SetType.NORMAL, weightKg = 60.0, reps = 5, completedAt = 10)
         val newer = older.copy(id = "newer", completedAt = 20)
@@ -469,7 +519,9 @@ class WorkoutSessionTest {
             ))),
         )
 
-        val records = data.exerciseRecordHistory().getValue(bench.id)
+        data.recordWorkout(data.history.single())
+        data.recordWorkout(data.history.single())
+        val records = data.exerciseRecords.getValue(bench.id)
 
         assertEquals(listOf(older, newer), records.map { it.set })
         assertEquals(newer, data.oneRepMaxes().single().set)
@@ -477,7 +529,7 @@ class WorkoutSessionTest {
     }
 
     @Test
-    fun oneRepMaxes_useHighestWeightLongestHoldAndSetVolumeFromHistory() {
+    fun oneRepMaxes_useStoredHighestWeightLongestHoldAndSetVolume() {
         val bench = Exercise("bench", "Bench", ExerciseType.REPETITIONS, false, "Chest", "")
         val plank = Exercise("plank-test", "Plank", ExerciseType.TIMED, false, "Core", "")
         val data = AppData(
@@ -510,6 +562,7 @@ class WorkoutSessionTest {
             ),
         )
 
+        data.recordWorkout(data.history.single())
         val records = data.oneRepMaxes().associateBy { it.exercise.id }
 
         assertEquals(75.0, records.getValue(bench.id).set.weightKg, 0.001)
@@ -535,6 +588,7 @@ class WorkoutSessionTest {
             )),
         )
 
+        data.recordWorkout(data.history.single())
         val record = data.oneRepMaxes().single()
 
         assertEquals(20, record.set.reps)
@@ -561,6 +615,7 @@ class WorkoutSessionTest {
             exercises = mutableListOf(WorkoutExercise(exerciseId = pushUp.id, sets = mutableListOf(record, noRecord))),
         )
 
+        data.recordWorkout(data.history.single())
         assertEquals(setOf("rep-record"), data.recordSetIds(workout))
     }
 
@@ -590,6 +645,7 @@ class WorkoutSessionTest {
             ),
         )
 
+        data.recordWorkout(data.history.single())
         assertEquals(setOf("weight-record", "volume-record", "hold-record"), data.recordSetIds(workout))
     }
 
@@ -613,6 +669,7 @@ class WorkoutSessionTest {
             exercises = mutableListOf(WorkoutExercise(exerciseId = squat.id, sets = mutableListOf(firstRecord, secondRecord))),
         )
 
+        data.recordWorkout(data.history.single())
         assertEquals(setOf("second-record"), data.recordSetIds(workout))
     }
 
