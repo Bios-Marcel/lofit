@@ -1720,6 +1720,33 @@ class WorkoutFlowTest {
     }
 
     @Test
+    fun restTimer_reachingEndHidesOverlay() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        LofitRepository(context).apply {
+            data.activeWorkout = WorkoutSession(
+                name = "Short rest",
+                defaultRestSeconds = 1,
+                exercises = mutableListOf(WorkoutExercise(
+                    exerciseId = "plank",
+                    plannedSets = mutableListOf(PlannedSet(holdSeconds = 30)),
+                )),
+            )
+            save()
+        }
+        val activity = instrumentation.startActivitySync(
+            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+
+        onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
+        onView(withContentDescription("Rest timer overlay")).check(matches(isDisplayed()))
+        onView(withContentDescription("Set 1 done")).perform(waitFor(1_500))
+        onView(withContentDescription("Rest timer overlay")).check(matches(not(isDisplayed())))
+        onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
+        instrumentation.runOnMainSync { activity.finish() }
+    }
+
+    @Test
     fun holdTimer_runsInsideWorkoutSetRow() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val repository = LofitRepository(instrumentation.targetContext)

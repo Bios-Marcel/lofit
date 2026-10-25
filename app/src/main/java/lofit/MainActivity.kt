@@ -19,8 +19,8 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.LayerDrawable
 import android.health.connect.HealthPermissions
-import android.media.AudioManager
-import android.media.ToneGenerator
+import android.media.AudioAttributes
+import android.media.SoundPool
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -192,6 +192,8 @@ class MainActivity : AppCompatActivity() {
     private var activeHoldPlannedSetId: String? = null
     private var holdStartedAt = 0L
     private var holdCuePlayed = false
+    private lateinit var cueSounds: SoundPool
+    private var completionCueId = 0
     private var updatingHoldTimer = false
     private var completingHoldAutomatically = false
     private var restEndsAt = 0L
@@ -253,6 +255,14 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         repository = LofitRepository(this)
+        cueSounds = SoundPool.Builder()
+            .setMaxStreams(1)
+            .setAudioAttributes(AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build())
+            .build()
+        completionCueId = cueSounds.load(this, R.raw.completion_chime, 1)
         if (repository.data.activeWorkout != null &&
             (savedInstanceState == null || savedInstanceState.getBoolean("showActiveWorkout") ||
                 intent.action == ACTION_OPEN_WORKOUT)) {
@@ -346,6 +356,7 @@ class MainActivity : AppCompatActivity() {
         workoutTogetherDialog?.dismiss()
         workoutBluetooth.stop()
         handler.removeCallbacks(tick)
+        cueSounds.release()
         unregisterReceiver(notificationActionReceiver)
         super.onDestroy()
     }
@@ -2163,7 +2174,7 @@ class MainActivity : AppCompatActivity() {
         if (remaining <= 0) {
             restEndsAt = 0L
             restBar.visibility = View.GONE
-            playCue(ToneGenerator.TONE_DTMF_D, durationMs = 750, volume = 100)
+            playCue()
             updateWorkoutNotification(force = true)
             return
         }
@@ -2270,15 +2281,13 @@ class MainActivity : AppCompatActivity() {
             completingHoldAutomatically = true
             holdDoneCheckBox?.isChecked = true
             completingHoldAutomatically = false
-            playCue(ToneGenerator.TONE_PROP_ACK, durationMs = 500, volume = 100)
+            playCue()
         }
     }
 
-    private fun playCue(tone: Int, durationMs: Int = 300, volume: Int = 80) {
+    private fun playCue() {
         if (!repository.data.soundCuesEnabled) return
-        val generator = ToneGenerator(AudioManager.STREAM_ALARM, volume)
-        generator.startTone(tone, durationMs)
-        handler.postDelayed({ generator.release() }, durationMs + 200L)
+        cueSounds.play(completionCueId, 0.85f, 0.85f, 1, 0, 1f)
     }
 
     private fun createWorkoutNotificationChannel() {
