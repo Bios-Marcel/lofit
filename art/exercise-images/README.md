@@ -40,3 +40,20 @@ equipment, and view. Then normalize the chosen output:
 
 The result is written to `app/src/main/res/drawable-nodpi/<name>.webp` at the
 same 627 x 314 size as the original Lofit illustrations.
+
+## Female variants
+
+Every bundled `exercise_*.webp` has a sibling `<name>_female.webp`. The original
+resource is the male variant. `ExercisePictures.bundledResource` selects the
+variant using the saved biological gender, for both resource IDs and image
+names. User-uploaded pictures keep priority over bundled illustrations.
+
+Use `style-seed.png` as the first reference, `style-seed-female.png` as the
+female character reference, and the original exercise illustration as the
+pose and equipment reference. Preserve the exercise, view, outfit, background,
+and rendering style. The female athlete has dark brown hair in a ponytail,
+an off-white T-shirt, deep green shorts, white socks, and gray shoes.
+
+`female-variants.json` records every source, destination, exercise name, and
+full prompt from the built-in `image_gen` generation run. Normalize female
+outputs with the same script, passing `<original_name>_female` as the name.

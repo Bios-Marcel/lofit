@@ -7,6 +7,8 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
 import android.os.SystemClock
 import android.view.ViewGroup
 import android.widget.ImageView
@@ -108,6 +110,72 @@ class ExercisePicturesTest {
         bitmap.recycle()
         listOf(Color::red, Color::green, Color::blue).forEach { channel ->
             assertTrue(kotlin.math.abs(channel(expected) - channel(actual)) <= 5)
+        }
+    }
+
+    @Test fun everyBundledPictureHasDistinctFemaleVariant() {
+        val fields = R.drawable::class.java.fields.filter {
+            it.name.startsWith("exercise_") && !it.name.endsWith("_female")
+        }
+        assertTrue(fields.isNotEmpty())
+        fields.forEach { field ->
+            val maleId = field.getInt(null)
+            val femaleId = context.resources.getIdentifier("${field.name}_female", "drawable", context.packageName)
+            assertNotEquals("Missing female variant: ${field.name}", 0, femaleId)
+            val male = BitmapFactory.decodeResource(context.resources, maleId)
+            val female = BitmapFactory.decodeResource(context.resources, femaleId)
+            assertNotNull(field.name, female)
+            assertEquals(field.name, male.width, female.width)
+            assertEquals(field.name, male.height, female.height)
+            assertFalse("Variant must differ: ${field.name}", male.sameAs(female))
+            male.recycle()
+            female.recycle()
+        }
+        ExerciseCatalog.exercises().forEach { exercise ->
+            val name = exercise.imageResource?.let(context.resources::getResourceEntryName)
+                ?: exercise.imageName ?: return@forEach
+            val male = context.resources.getIdentifier(name, "drawable", context.packageName)
+            val female = context.resources.getIdentifier("${name}_female", "drawable", context.packageName)
+            assertEquals(exercise.name, male, pictures.bundledResource(exercise, BiologicalGender.MALE))
+            assertEquals(exercise.name, female, pictures.bundledResource(exercise, BiologicalGender.FEMALE))
+            assertEquals(exercise.name, male, pictures.bundledResource(exercise, BiologicalGender.MALE))
+        }
+    }
+
+    @Test fun settingsSwitchPicturesAndKeepChoiceAfterRestart() {
+        fun openScreen(scenario: ActivityScenario<MainActivity>, label: Int) {
+            scenario.onActivity { activity ->
+                val root = activity.findViewById<ViewGroup>(android.R.id.content)
+                (root.getChildAt(0) as DrawerLayout).openDrawer(GravityCompat.START, false)
+            }
+            onView(allOf(withText(label), isClickable())).perform(click())
+        }
+        fun checkPicture(scenario: ActivityScenario<MainActivity>, gender: BiologicalGender) {
+            openScreen(scenario, R.string.nav_exercises)
+            val examples = ExerciseCatalog.exercises().filter {
+                it.id == "bench-press" || it.imageName == "exercise_db_001"
+            }
+            examples.forEach { exercise ->
+                onView(withHint("Search name or muscle")).perform(scrollTo(), replaceText(exercise.name), closeSoftKeyboard())
+                onView(withContentDescription("${exercise.name} illustration")).check { view, _ ->
+                    val expectedId = pictures.bundledResource(exercise, gender)!!
+                    val expected = BitmapFactory.decodeResource(context.resources, expectedId)
+                    assertTrue(expected.sameAs(((view as ImageView).drawable as BitmapDrawable).bitmap))
+                    expected.recycle()
+                }
+            }
+        }
+        ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)
+            .setAction(Intent.ACTION_MAIN).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)).use { scenario ->
+            checkPicture(scenario, BiologicalGender.MALE)
+            openScreen(scenario, R.string.nav_settings)
+            onView(withText("Female")).perform(click())
+            checkPicture(scenario, BiologicalGender.FEMALE)
+            scenario.recreate()
+            checkPicture(scenario, BiologicalGender.FEMALE)
+            openScreen(scenario, R.string.nav_settings)
+            onView(withText("Male")).perform(click())
+            checkPicture(scenario, BiologicalGender.MALE)
         }
     }
 

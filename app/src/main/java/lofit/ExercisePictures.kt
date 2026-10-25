@@ -12,8 +12,19 @@ import kotlin.math.max
 /** Own the selected picture so moving or deleting the source does not break exercises. */
 class ExercisePictures(private val context: Context) {
     private val directory = File(context.filesDir, "exercise-pictures")
+    private val drawableIds = mutableMapOf<String, Int>()
     private val thumbnails = object : LruCache<String, Bitmap>(8 * 1024 * 1024) {
         override fun sizeOf(key: String, value: Bitmap) = value.allocationByteCount
+    }
+
+    fun bundledResource(exercise: Exercise, gender: BiologicalGender): Int? {
+        val name = exercise.imageResource?.let(context.resources::getResourceEntryName)
+            ?: exercise.imageName ?: return null
+        fun resource(name: String) = drawableIds.getOrPut(name) {
+            context.resources.getIdentifier(name, "drawable", context.packageName)
+        }.takeIf { it != 0 }
+        return if (gender == BiologicalGender.FEMALE) resource("${name}_female") ?: resource(name)
+            else resource(name)
     }
 
     fun importPicture(uri: Uri): String {

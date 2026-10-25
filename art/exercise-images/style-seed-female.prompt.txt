@@ -1,0 +1,4 @@
+Use case: stylized-concept
+Asset type: Lofit exercise illustration female character reference sheet.
+Input image 1: edit target and strict reference for outfit, palette, background, lighting, linework and rendering style.
+Create a female variant of this exact athlete reference sheet: replace the adult male athlete in all three views with the SAME adult athletic woman, natural female anatomy, dark brown hair tied in a practical ponytail, neutral face. Keep off-white short-sleeved T-shirt, deep green shorts, white socks, gray shoes. Same relaxed standing poses, front, side, rear views, whole body, generous padding, charcoal background, softly cel-shaded 2D style. Preserve composition and colors. No text, logos, watermark or extra objects.

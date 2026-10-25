@@ -198,7 +198,6 @@ class MainActivity : AppCompatActivity() {
     private var completingHoldAutomatically = false
     private var restEndsAt = 0L
     private var lastWorkoutNotification = ""
-    private val drawableIds = mutableMapOf<String, Int>()
     private val handler = Handler(Looper.getMainLooper())
     private val workoutFileWorker = Executors.newSingleThreadExecutor()
     private var workoutFileGeneration = 0
@@ -2521,9 +2520,7 @@ class MainActivity : AppCompatActivity() {
                 contentDescription = "${exercise.name} illustration"
             }
         }
-        val resource = exercise.imageResource ?: exercise.imageName?.let { name ->
-            drawableIds.getOrPut(name) { resources.getIdentifier(name, "drawable", packageName) }
-        }?.takeIf { it != 0 }
+        val resource = exercisePictures.bundledResource(exercise, repository.data.biologicalGender)
         return resource?.let {
             ImageView(this).apply {
                 setImageResource(it)
