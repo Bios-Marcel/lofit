@@ -1074,6 +1074,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun exercisePickerScreen(picker: Route.ExercisePicker): View = page("Add exercise") { body ->
         val target = picker.target
+        val exercises = repository.data.exercisesByRecency()
         val search = textField("Search name or muscle").apply {
             inputType = InputType.TYPE_CLASS_TEXT
             contentDescription = "Search exercises"
@@ -1081,7 +1082,7 @@ class MainActivity : AppCompatActivity() {
         val results = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         fun updateResults(query: String) {
             results.removeAllViews()
-            val allMatches = repository.data.exercises.filter { exercise ->
+            val allMatches = exercises.filter { exercise ->
                 matchesSearchQuery(query, exercise.name, exercise.primaryMuscle, exercise.secondaryMuscles, exerciseSearchTerms(exercise))
             }
             val matches = allMatches.take(40)
@@ -1093,12 +1094,12 @@ class MainActivity : AppCompatActivity() {
                     addView(metaText(listOf(exerciseTrackingLabel(movement), if (movement.asymmetric) "left / right" else null).filterNotNull().joinToString(" · ")))
                     addView(metaText("Primary: ${movement.primaryMuscle} · Secondary: ${movement.secondaryMuscles}"))
                     addView(actionButton("Add ${movement.name}") {
+                        repository.data.exerciseLastSelectedAt[movement.id] = System.currentTimeMillis()
                         if (target == PickerTarget.WORKOUT) {
                             val item = repository.data.lastKnownExercise(movement.id,
                                 preferredRoutineId = repository.data.activeWorkout?.sourceRoutine?.id)
                                 ?: WorkoutExercise(exerciseId = movement.id)
                             repository.data.activeWorkout?.exercises?.add(item)
-                            repository.save()
                             route = Route.Root
                         } else {
                             routineDraft?.exercises?.add(RoutineExercise(
@@ -1107,6 +1108,7 @@ class MainActivity : AppCompatActivity() {
                             ))
                             route = Route.RoutineEditor(repository.data.routines.firstOrNull { it.id == routineDraft?.id }?.id)
                         }
+                        repository.save()
                         render(
                             restoreScrollY = if (target == PickerTarget.WORKOUT) picker.returnScrollY else null,
                             scrollToBottom = target == PickerTarget.ROUTINE,
@@ -1689,6 +1691,7 @@ class MainActivity : AppCompatActivity() {
                         val picture = repository.data.exercises.firstOrNull { it.id == id && it.custom }?.imageFile
                         repository.data.exercises.removeAll { it.id == id && it.custom }
                         repository.data.exerciseRecords.remove(id)
+                        repository.data.exerciseLastSelectedAt.remove(id)
                         picture?.let(::deleteUnsavedPicture)
                         repository.data.routines.forEach { routine -> routine.exercises.removeAll { it.exerciseId == id } }
                     }

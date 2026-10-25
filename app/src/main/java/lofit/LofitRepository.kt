@@ -68,6 +68,7 @@ class LofitRepository(context: Context) {
         put("bodyMetricsEnabled", data.bodyMetricsEnabled ?: JSONObject.NULL)
         put("biologicalGender", data.biologicalGender.name)
         put("onboardingComplete", data.onboardingComplete)
+        put("exerciseLastSelectedAt", JSONObject(data.exerciseLastSelectedAt))
     }
 
     private fun encodeExercise(exercise: Exercise) = JSONObject().apply {
@@ -162,6 +163,13 @@ class LofitRepository(context: Context) {
             biologicalGender = BiologicalGender.valueOf(root.optString("biologicalGender", BiologicalGender.MALE.name)),
             onboardingComplete = root.optBoolean("onboardingComplete", false),
             exerciseRecords = decodeRecords(root.optJSONObject("exerciseRecords"), exercises),
+            exerciseLastSelectedAt = mutableMapOf<String, Long>().apply {
+                root.optJSONObject("exerciseLastSelectedAt")?.let { timestamps ->
+                    timestamps.keys().forEach { id ->
+                        if (exercises.any { it.id == id }) put(id, timestamps.getLong(id))
+                    }
+                }
+            },
         )
     }
 
