@@ -12,6 +12,7 @@ An Android-native local fitness app.
 * Calendar
 * Records
 * Rudimentary Android Health integration
+* Share active workout
 
 ## Tech
 
