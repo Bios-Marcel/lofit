@@ -1,0 +1,34 @@
+{
+  "mode": "built-in image_gen",
+  "reference": "art/exercise-images/style-seed.png",
+  "size": [
+    627,
+    314
+  ],
+  "images": [
+    {
+      "output": "app/src/main/res/drawable-nodpi/exercise_band_external_rotation.webp",
+      "exercise": "Band external rotation",
+      "reason": "Regenerated the former 320 x 240 image on a wide 2:1 canvas, then normalized to the same 627 x 314 size as the rest of the catalog.",
+      "prompt": "Use case: stylized-concept\nAsset type: Lofit exercise card illustration\nInput image: strict reference for character identity, anatomy, outfit, palette,\nbackground, lighting, linework, and rendering style.\n\nExercise: Band external rotation\nPose: Standing upright, right elbow bent 90 degrees and tucked against the ribs, right forearm rotated outward to the right against a taut band anchored on the left at elbow height, keeping the upper arm still and both feet planted.\nEquipment: one resistance band anchored at elbow height to one dark gray vertical support visible on the left\nView: front\n\nCreate one polished instructional illustration of the reference athlete doing\nthe exercise. Keep his face, hair, build, off-white T-shirt, deep green shorts,\nwhite socks, and gray shoes unchanged. Use the same near-black charcoal card\nbackground and softly cel-shaded 2D finish as the reference. Show the whole\nbody and all equipment, centered with generous padding, on a wide 2:1 canvas.\nChoose a clear, anatomically correct key position.\n\nNo text, labels, logos, watermark, scenery, panel borders, motion trail,\ncropped body parts, extra limbs, or extra equipment. Do not change the outfit,\ncharacter, colors, or art style."
+    },
+    {
+      "output": "app/src/main/res/drawable-nodpi/exercise_band_internal_rotation.webp",
+      "exercise": "Band internal rotation",
+      "reason": "Regenerated the former 320 x 240 image on a wide 2:1 canvas, then normalized to the same 627 x 314 size as the rest of the catalog.",
+      "prompt": "Use case: stylized-concept\nAsset type: Lofit exercise card illustration\nInput image: strict reference for character identity, anatomy, outfit, palette,\nbackground, lighting, linework, and rendering style.\n\nExercise: Band internal rotation\nPose: Standing upright, right elbow bent 90 degrees and tucked against the ribs, right forearm rotated inward across the abdomen against a taut band anchored on the right at elbow height, keeping the upper arm still and both feet planted.\nEquipment: one resistance band anchored at elbow height to one dark gray vertical support visible on the right\nView: front\n\nCreate one polished instructional illustration of the reference athlete doing\nthe exercise. Keep his face, hair, build, off-white T-shirt, deep green shorts,\nwhite socks, and gray shoes unchanged. Use the same near-black charcoal card\nbackground and softly cel-shaded 2D finish as the reference. Show the whole\nbody and all equipment, centered with generous padding, on a wide 2:1 canvas.\nChoose a clear, anatomically correct key position.\n\nNo text, labels, logos, watermark, scenery, panel borders, motion trail,\ncropped body parts, extra limbs, or extra equipment. Do not change the outfit,\ncharacter, colors, or art style."
+    },
+    {
+      "output": "app/src/main/res/drawable-nodpi/exercise_band_shoulder_rotation.webp",
+      "exercise": "Band shoulder rotation",
+      "reason": "Regenerated the former 320 x 240 image on a wide 2:1 canvas, then normalized to the same 627 x 314 size as the rest of the catalog.",
+      "prompt": "Use case: stylized-concept\nAsset type: Lofit exercise card illustration\nInput image: strict reference for character identity, anatomy, outfit, palette,\nbackground, lighting, linework, and rendering style.\n\nExercise: Band shoulder rotation\nPose: Standing upright with feet hip-width apart, elbow of the working arm bent 90 degrees and tucked against the ribs, forearm horizontal in front of the abdomen holding a taut band anchored at elbow height beside the athlete while the other arm hangs relaxed.\nEquipment: one resistance band anchored at elbow height to one dark gray vertical support\nView: three-quarter\n\nCreate one polished instructional illustration of the reference athlete doing\nthe exercise. Keep his face, hair, build, off-white T-shirt, deep green shorts,\nwhite socks, and gray shoes unchanged. Use the same near-black charcoal card\nbackground and softly cel-shaded 2D finish as the reference. Show the whole\nbody and all equipment, centered with generous padding, on a wide 2:1 canvas.\nChoose a clear, anatomically correct key position.\n\nNo text, labels, logos, watermark, scenery, panel borders, motion trail,\ncropped body parts, extra limbs, or extra equipment. Do not change the outfit,\ncharacter, colors, or art style."
+    },
+    {
+      "output": "app/src/main/res/drawable-nodpi/exercise_generic.webp",
+      "exercise": "Bodyweight squat (generic exercise illustration)",
+      "reason": "Regenerated the former 320 x 240 image on a wide 2:1 canvas, then normalized to the same 627 x 314 size as the rest of the catalog.",
+      "prompt": "Use case: stylized-concept\nAsset type: Lofit exercise card illustration\nInput image: strict reference for character identity, anatomy, outfit, palette,\nbackground, lighting, linework, and rendering style.\n\nExercise: Bodyweight squat (generic exercise illustration)\nPose: Holding the bottom of a bodyweight squat with feet shoulder-width apart, heels planted, knees tracking toes, hips near knee height, neutral spine and palms together in front of the chest.\nEquipment: none\nView: front\n\nCreate one polished instructional illustration of the reference athlete doing\nthe exercise. Keep his face, hair, build, off-white T-shirt, deep green shorts,\nwhite socks, and gray shoes unchanged. Use the same near-black charcoal card\nbackground and softly cel-shaded 2D finish as the reference. Show the whole\nbody and all equipment, centered with generous padding, on a wide 2:1 canvas.\nChoose a clear, anatomically correct key position.\n\nNo text, labels, logos, watermark, scenery, panel borders, motion trail,\ncropped body parts, extra limbs, or extra equipment. Do not change the outfit,\ncharacter, colors, or art style."
+    }
+  ]
+}
