@@ -88,6 +88,7 @@ class WorkoutBluetooth(private val context: Context) {
         onError = error
         val token = generation
         try {
+            val transfer = SharedWorkoutPlan.compressForTransfer(payload)
             val radio = adapter
             if (radio?.isEnabled != true) return fail("Turn on Bluetooth to share")
             advertiser = radio.bluetoothLeAdvertiser
@@ -121,7 +122,7 @@ class WorkoutBluetooth(private val context: Context) {
                     characteristic: BluetoothGattCharacteristic, preparedWrite: Boolean,
                     responseNeeded: Boolean, offset: Int, value: ByteArray) = dispatch(token) {
                     val cursor = if (value.size == 4) ByteBuffer.wrap(value).int else -1
-                    val valid = characteristic.uuid == DATA && !preparedWrite && offset == 0 && cursor in 0 until payload.size
+                    val valid = characteristic.uuid == DATA && !preparedWrite && offset == 0 && cursor in 0 until transfer.size
                     if (valid) cursors[device.address] = cursor
                     if (responseNeeded) server?.sendResponse(device, requestId,
                         if (valid) BluetoothGatt.GATT_SUCCESS else BluetoothGatt.GATT_REQUEST_NOT_SUPPORTED, 0, null)
@@ -129,10 +130,10 @@ class WorkoutBluetooth(private val context: Context) {
                 override fun onCharacteristicReadRequest(device: BluetoothDevice, requestId: Int, offset: Int,
                     characteristic: BluetoothGattCharacteristic) = dispatch(token) {
                     val bytes = when (characteristic.uuid) {
-                        SIZE -> ByteBuffer.allocate(4).putInt(payload.size).array()
+                        SIZE -> ByteBuffer.allocate(4).putInt(transfer.size).array()
                         DATA -> {
                             val cursor = cursors[device.address] ?: 0
-                            payload.copyOfRange(cursor, minOf(cursor + CHUNK, payload.size))
+                            transfer.copyOfRange(cursor, minOf(cursor + CHUNK, transfer.size))
                         }
                         else -> null
                     }
@@ -223,7 +224,7 @@ class WorkoutBluetooth(private val context: Context) {
                     if (characteristic.uuid == SIZE) {
                         if (value.size != 4) return@dispatch fail("Invalid workout plan")
                         total = ByteBuffer.wrap(value).int
-                        if (total !in 1..SharedWorkoutPlan.MAX_BYTES) return@dispatch fail("Invalid workout plan size")
+                        if (total !in 1..SharedWorkoutPlan.MAX_TRANSFER_BYTES) return@dispatch fail("Invalid workout plan size")
                         next(gatt)
                     } else if (characteristic.uuid == DATA) {
                         if (value.size != minOf(CHUNK, total - output.size())) {
@@ -231,7 +232,7 @@ class WorkoutBluetooth(private val context: Context) {
                         }
                         output.write(value)
                         if (output.size() == total) {
-                            val plan = runCatching { SharedWorkoutPlan.decode(output.toByteArray()) }.getOrNull()
+                            val plan = runCatching { SharedWorkoutPlan.decodeTransfer(output.toByteArray()) }.getOrNull()
                                 ?: return@dispatch fail("Invalid workout plan")
                             stop()
                             received(plan)

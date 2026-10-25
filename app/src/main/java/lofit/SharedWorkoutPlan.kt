@@ -2,7 +2,11 @@ package lofit
 
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.util.UUID
+import java.util.zip.GZIPInputStream
+import java.util.zip.GZIPOutputStream
 
 /** A plan only: no history, completed sets, body metrics, or running timers. */
 data class SharedWorkoutPlan(val routine: Routine, val exercises: List<Exercise>) {
@@ -31,6 +35,23 @@ data class SharedWorkoutPlan(val routine: Routine, val exercises: List<Exercise>
 
     companion object {
         const val MAX_BYTES = 256 * 1024
+        const val MAX_TRANSFER_BYTES = MAX_BYTES + 1024
+
+        fun compressForTransfer(json: ByteArray): ByteArray {
+            require(json.size in 1..MAX_BYTES)
+            val output = ByteArrayOutputStream()
+            GZIPOutputStream(output).use { it.write(json) }
+            return output.toByteArray().also { require(it.size <= MAX_TRANSFER_BYTES) }
+        }
+
+        fun decodeTransfer(bytes: ByteArray): SharedWorkoutPlan {
+            require(bytes.size in 1..MAX_TRANSFER_BYTES)
+            // Keep receiving plain JSON from older senders.
+            val json = if (bytes.size >= 2 && bytes[0] == 0x1f.toByte() && bytes[1] == 0x8b.toByte()) {
+                GZIPInputStream(ByteArrayInputStream(bytes)).use { it.readNBytes(MAX_BYTES + 1) }
+            } else bytes
+            return decode(json)
+        }
 
         private fun sameMovement(a: Exercise, b: Exercise): Boolean =
             a.name == b.name && a.type == b.type && a.asymmetric == b.asymmetric &&
