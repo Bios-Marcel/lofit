@@ -307,21 +307,21 @@ data class AppData(
                 val sets = loggedSets.filter { it.isRecordEligible(exercise) }
                 val previousRecord = exerciseRecords[exerciseId]?.lastOrNull() ?: return@forEach
                 if (exercise.type.tracksDuration) {
-                    sets.maxWithOrNull(compareBy<LoggedSet> { it.holdSeconds }.thenBy { it.completedAt })
+                    sets.maxWithOrNull(compareBy<LoggedSet> { it.holdSeconds }.thenByDescending { it.completedAt })
                         ?.takeIf { it.holdSeconds > previousRecord.set.holdSeconds }
                         ?.let { recordIds.add(it.id) }
                 } else if (exercise.weighted) {
-                    sets.maxWithOrNull(compareBy<LoggedSet> { it.weightKg }.thenBy { it.completedAt })
+                    sets.maxWithOrNull(compareBy<LoggedSet> { it.weightKg }.thenByDescending { it.completedAt })
                         ?.takeIf { it.weightKg > previousRecord.set.weightKg }
                         ?.let { recordIds.add(it.id) }
                     val previousVolume = previousRecord.volumeSet?.volume()
                     if (previousVolume != null) {
-                        sets.maxWithOrNull(compareBy<LoggedSet> { it.volume() }.thenBy { it.completedAt })
+                        sets.maxWithOrNull(compareBy<LoggedSet> { it.volume() }.thenByDescending { it.completedAt })
                             ?.takeIf { it.volume() > previousVolume }
                             ?.let { recordIds.add(it.id) }
                     }
                 } else {
-                    sets.maxWithOrNull(compareBy<LoggedSet> { it.reps }.thenBy { it.completedAt })
+                    sets.maxWithOrNull(compareBy<LoggedSet> { it.reps }.thenByDescending { it.completedAt })
                         ?.takeIf { it.reps > previousRecord.set.reps }
                         ?.let { recordIds.add(it.id) }
                 }

@@ -674,6 +674,38 @@ class WorkoutSessionTest {
     }
 
     @Test
+    fun recordSetIds_keepEarliestCompletedSetWhenRecordsTie() {
+        val weighted = Exercise("weighted", "Weighted", ExerciseType.REPETITIONS, false, "Chest", "")
+        val bodyweight = weighted.copy(id = "bodyweight", weighted = false)
+        val timed = weighted.copy(id = "timed", type = ExerciseType.TIMED)
+        val baseline = LoggedSet(type = SetType.NORMAL, weightKg = 10.0, reps = 5, holdSeconds = 30)
+        listOf(
+            weighted to baseline.copy(weightKg = 12.0),
+            weighted to baseline.copy(reps = 6),
+            bodyweight to baseline.copy(reps = 6),
+            timed to baseline.copy(holdSeconds = 45),
+        ).forEach { (exercise, improved) ->
+            val data = AppData(exercises = mutableListOf(exercise))
+            data.recordWorkout(WorkoutSession(
+                name = "Previous record",
+                exercises = mutableListOf(WorkoutExercise(exerciseId = exercise.id, sets = mutableListOf(baseline))),
+            ))
+            val first = improved.copy(id = "first", completedAt = 10)
+            val tied = improved.copy(id = "tied", completedAt = 20)
+            val item = WorkoutExercise(exerciseId = exercise.id, sets = mutableListOf(first))
+            val workout = WorkoutSession(name = "Tied records", exercises = mutableListOf(item))
+
+            assertEquals(setOf(first.id), data.recordSetIds(workout))
+            item.sets.add(tied)
+            assertEquals(setOf(first.id), data.recordSetIds(workout))
+            item.sets.reverse()
+            assertEquals(setOf(first.id), data.recordSetIds(workout))
+            item.sets.remove(first)
+            assertEquals(setOf(tied.id), data.recordSetIds(workout))
+        }
+    }
+
+    @Test
     fun recordSetIds_requireEarlierWorkoutWithExercise() {
         val bench = Exercise("bench", "Bench", ExerciseType.REPETITIONS, false, "Chest", "")
         val first = LoggedSet(id = "first", type = SetType.NORMAL, weightKg = 50.0, reps = 5, completedAt = 10)

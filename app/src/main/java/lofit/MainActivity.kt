@@ -17,6 +17,7 @@ import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.InsetDrawable
 import android.graphics.drawable.LayerDrawable
 import android.health.connect.HealthPermissions
 import android.media.AudioAttributes
@@ -90,7 +91,6 @@ class MainActivity : AppCompatActivity() {
         const val SET_ROW_PADDING_DP = 4
         const val SET_HOLD_ACTION_WIDTH_DP = 48
         const val SET_DONE_ACTION_WIDTH_DP = 48
-        const val SET_RECORD_ACTION_WIDTH_DP = 32
         // Same Android 14+ action as AndroidX HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS.
         const val ACTION_HEALTH_CONNECT_SETTINGS = "android.health.connect.action.HEALTH_HOME_SETTINGS"
     }
@@ -660,12 +660,10 @@ class MainActivity : AppCompatActivity() {
                 repository.save()
                 updateWorkoutNotification(force = true)
             }
-            val recordIndicators = mutableMapOf<String, View>()
-            fun updateRecordIndicators() {
+            val doneStateUpdaters = mutableMapOf<String, (Set<String>) -> Unit>()
+            fun updateDoneStates() {
                 val recordSetIds = repository.data.recordSetIds(workout)
-                recordIndicators.forEach { (setId, indicator) ->
-                    indicator.visibility = if (setId in recordSetIds) View.VISIBLE else View.INVISIBLE
-                }
+                doneStateUpdaters.values.forEach { it(recordSetIds) }
             }
             fun removeWorkoutExercise(item: WorkoutExercise) {
                 if (activeHoldWorkoutExerciseId == item.id) clearActiveHold()
@@ -690,9 +688,9 @@ class MainActivity : AppCompatActivity() {
                         exercise = movement,
                         onRemove = { removeWorkoutExercise(item) },
                         onReorderHandleReady = { handle = it },
-                        onRecordIndicatorReady = { setId, indicator -> recordIndicators[setId] = indicator },
+                        onDoneStateUpdaterReady = { setId, update -> doneStateUpdaters[setId] = update },
                         onSetsChanged = {
-                            updateRecordIndicators()
+                            updateDoneStates()
                             updateFinishButton()
                         },
                     )
@@ -701,7 +699,7 @@ class MainActivity : AppCompatActivity() {
                     reorder.bind(handle, card)
                 }
             }
-            updateRecordIndicators()
+            updateDoneStates()
             body.addView(exerciseCards)
             body.addView(actionButton("Add exercise") {
                 val scrollY = (content.getChildAt(0) as? ScrollView)?.scrollY
@@ -753,7 +751,7 @@ class MainActivity : AppCompatActivity() {
         exercise: Exercise,
         onRemove: () -> Unit,
         onReorderHandleReady: (View) -> Unit,
-        onRecordIndicatorReady: (String, View) -> Unit,
+        onDoneStateUpdaterReady: (String, (Set<String>) -> Unit) -> Unit,
         onSetsChanged: () -> Unit,
     ): View = card(horizontalPadding = 0) {
         addView(exerciseHeading(exercise, large = true, showMuscle = false, actions = exerciseActions(
@@ -765,7 +763,7 @@ class MainActivity : AppCompatActivity() {
             item.note = note
             repository.save()
         }, insetCardLayoutParams().apply { topMargin = dp(8); bottomMargin = dp(8) })
-        val actionWidth = SET_DONE_ACTION_WIDTH_DP + SET_RECORD_ACTION_WIDTH_DP +
+        val actionWidth = SET_DONE_ACTION_WIDTH_DP +
             if (exercise.type.tracksDuration) SET_HOLD_ACTION_WIDTH_DP else 0
         addView(plannedSetHeader(
             exercise,
@@ -806,14 +804,22 @@ class MainActivity : AppCompatActivity() {
             val done = largeCheckBox().apply {
                 isChecked = loggedSet != null
                 contentDescription = "Set ${setIndex + 1} done"
+                stateDescription = if (isChecked) "Done" else "Not done"
             }
-            val recordIndicator = ImageView(this@MainActivity).apply {
-                setImageResource(R.drawable.ic_crown)
-                contentDescription = "Set ${setIndex + 1} record"
-                visibility = View.INVISIBLE
-                setPadding(dp(5), dp(12), dp(5), dp(12))
+            val doneDrawable = done.buttonDrawable
+            val recordDrawable = sizedButtonDrawable(
+                InsetDrawable(ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_crown), dp(8)), 40,
+            )
+            onDoneStateUpdaterReady(plannedSet.id) { recordSetIds ->
+                val isRecord = loggedSetFor(item, plannedSet)?.id in recordSetIds
+                done.buttonTintList = if (isRecord) null else toggleTint()
+                done.buttonDrawable = if (isRecord) recordDrawable else doneDrawable
+                done.stateDescription = when {
+                    isRecord -> "Done, record"
+                    done.isChecked -> "Done"
+                    else -> "Not done"
+                }
             }
-            loggedSet?.let { onRecordIndicatorReady(it.id, recordIndicator) }
             lateinit var activeHoldAmount: EditText
             val holdButton = if (exercise.type.tracksDuration) smallButton(
                 if (isActiveHold(item, plannedSet)) "■" else "▶",
@@ -835,7 +841,6 @@ class MainActivity : AppCompatActivity() {
                     addView(setGridControl(it), LinearLayout.LayoutParams(dp(SET_HOLD_ACTION_WIDTH_DP), dp(48)))
                 }
                 addView(done, LinearLayout.LayoutParams(dp(SET_DONE_ACTION_WIDTH_DP), dp(56)))
-                addView(recordIndicator, LinearLayout.LayoutParams(dp(SET_RECORD_ACTION_WIDTH_DP), dp(56)))
             }
             val setRow = plannedSetEditor(
                 exercise = exercise,
@@ -867,7 +872,6 @@ class MainActivity : AppCompatActivity() {
                     updateRowIndices[plannedSet.id] = { newIndex ->
                         updateEditorIndex(newIndex)
                         done.contentDescription = "Set ${newIndex + 1} done"
-                        recordIndicator.contentDescription = "Set ${newIndex + 1} record"
                         holdButton?.contentDescription = if (isActiveHold(item, plannedSet)) {
                             "Stop set ${newIndex + 1} hold"
                         } else {
@@ -890,7 +894,6 @@ class MainActivity : AppCompatActivity() {
                     if (loggedSet == null) {
                         val newSet = loggedSetFrom(plannedSet, exercise)
                         item.sets.add(newSet)
-                        onRecordIndicatorReady(newSet.id, recordIndicator)
                     } else {
                         syncLoggedSet(loggedSet, plannedSet, exercise)
                     }
@@ -898,7 +901,6 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     loggedSetFor(item, plannedSet)?.let { removedSet ->
                         item.sets.remove(removedSet)
-                        onRecordIndicatorReady(removedSet.id, recordIndicator.apply { visibility = View.INVISIBLE })
                     }
                 }
                 setRow.setBackgroundColor(if (checked) color(R.color.done_green) else Color.TRANSPARENT)
@@ -1459,7 +1461,7 @@ class MainActivity : AppCompatActivity() {
                     }, insetCardLayoutParams())
                     addView(exerciseNote(item.note, movement, readOnly = true),
                         insetCardLayoutParams().apply { topMargin = dp(8); bottomMargin = dp(8) })
-                    val actionWidth = SET_DONE_ACTION_WIDTH_DP + SET_RECORD_ACTION_WIDTH_DP
+                    val actionWidth = SET_DONE_ACTION_WIDTH_DP
                     addView(plannedSetHeader(movement, "Done", endWidth = actionWidth,
                         showActiveHold = movement.type.tracksDuration, showHoldAction = false))
                     fun addSet(plannedSet: PlannedSet, loggedSet: LoggedSet?, index: Int) {
@@ -3102,12 +3104,12 @@ class MainActivity : AppCompatActivity() {
                 addView(setGridHeader("Weight"), setGridCell(columns[1]))
                 addView(setGridHeader("Target"), setGridCell(columns[2]))
                 addView(setGridHeader("Active"), setGridCell(columns[3]))
-                endLabel?.let { addView(if (showHoldAction) timedSetActionHeader(endWidth) else doneSetActionHeader(), setGridCell(columns[4])) }
+                endLabel?.let { addView(if (showHoldAction) timedSetActionHeader() else doneSetActionHeader(), setGridCell(columns[4])) }
             }
             activeGrid -> {
                 addView(setGridHeader("Target"), setGridCell(columns[1]))
                 addView(setGridHeader("Active"), setGridCell(columns[2]))
-                endLabel?.let { addView(if (showHoldAction) timedSetActionHeader(endWidth) else doneSetActionHeader(), setGridCell(columns[3])) }
+                endLabel?.let { addView(if (showHoldAction) timedSetActionHeader() else doneSetActionHeader(), setGridCell(columns[3])) }
             }
             exercise.weighted -> {
                 addView(setGridHeader("Weight"), setGridCell(columns[1]))
@@ -3128,15 +3130,13 @@ class MainActivity : AppCompatActivity() {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.END
         addView(setGridHeader("Done").apply { gravity = Gravity.CENTER }, LinearLayout.LayoutParams(dp(SET_DONE_ACTION_WIDTH_DP), ViewGroup.LayoutParams.MATCH_PARENT))
-        addView(View(this@MainActivity), LinearLayout.LayoutParams(dp(SET_RECORD_ACTION_WIDTH_DP), ViewGroup.LayoutParams.MATCH_PARENT))
     }
 
-    private fun timedSetActionHeader(endWidth: Int): View = LinearLayout(this).apply {
+    private fun timedSetActionHeader(): View = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.END
         addView(setGridHeader("Start").apply { gravity = Gravity.CENTER }, LinearLayout.LayoutParams(dp(SET_HOLD_ACTION_WIDTH_DP), ViewGroup.LayoutParams.MATCH_PARENT))
         addView(setGridHeader("Done").apply { gravity = Gravity.CENTER }, LinearLayout.LayoutParams(dp(SET_DONE_ACTION_WIDTH_DP), ViewGroup.LayoutParams.MATCH_PARENT))
-        addView(View(this@MainActivity), LinearLayout.LayoutParams(dp((endWidth - SET_HOLD_ACTION_WIDTH_DP - SET_DONE_ACTION_WIDTH_DP).coerceAtLeast(0)), ViewGroup.LayoutParams.MATCH_PARENT))
     }
 
     private fun setGridHeader(value: String) = metaText(value).apply {

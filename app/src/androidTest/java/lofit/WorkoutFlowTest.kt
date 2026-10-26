@@ -1203,7 +1203,6 @@ class WorkoutFlowTest {
         val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         instrumentation.startActivitySync(intent)
-        onView(withContentDescription("Open active workout")).perform(click())
 
         val page = arrayOfNulls<View>(1)
         val survivingRow = arrayOfNulls<View>(1)
@@ -1560,11 +1559,11 @@ class WorkoutFlowTest {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         instrumentation.startActivitySync(intent)
 
-        onView(withContentDescription("Set 1 record")).check(matches(not(isDisplayed())))
+        assertSetDoneState(1, "Not done")
         onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
-        onView(withContentDescription("Set 1 record")).check(matches(not(isDisplayed())))
+        assertSetDoneState(1, "Done")
         onView(withContentDescription("Set 2 done")).perform(scrollTo(), click())
-        onView(withContentDescription("Set 2 record")).check(matches(not(isDisplayed())))
+        assertSetDoneState(2, "Done")
         assertTrue(LofitRepository(instrumentation.targetContext).data.exerciseRecords.isEmpty())
         onView(withText("Finish workout")).perform(scrollTo(), click())
         onView(withText("Finish and save")).perform(click())
@@ -1591,7 +1590,7 @@ class WorkoutFlowTest {
                 exerciseId = "bench-press",
                 plannedSets = mutableListOf(
                     PlannedSet(weightKg = 61.0, reps = 5),
-                    PlannedSet(weightKg = 62.0, reps = 5),
+                    PlannedSet(weightKg = 61.0, reps = 5),
                 ),
             )),
         )
@@ -1601,20 +1600,78 @@ class WorkoutFlowTest {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         instrumentation.startActivitySync(intent)
 
-        onView(withContentDescription("Set 1 record")).check(matches(not(isDisplayed())))
+        assertSetDoneState(1, "Not done")
         onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
-        onView(withContentDescription("Set 1 record")).check(matches(isDisplayed()))
-        val doneLocation = IntArray(2)
-        val crownLocation = IntArray(2)
+        assertSetDoneState(1, "Done, record")
         onView(withContentDescription("Set 1 done")).check { view, _ ->
-            view.getLocationOnScreen(doneLocation)
             assertTrue(view.width <= (48 * view.resources.displayMetrics.density).toInt())
+            assertEquals(1, (view.parent as ViewGroup).childCount)
         }
-        onView(withContentDescription("Set 1 record")).check { view, _ -> view.getLocationOnScreen(crownLocation) }
-        assertTrue(doneLocation[0] < crownLocation[0])
         onView(withContentDescription("Set 2 done")).perform(scrollTo(), click())
-        onView(withContentDescription("Set 1 record")).check(matches(not(isDisplayed())))
-        onView(withContentDescription("Set 2 record")).check(matches(isDisplayed()))
+        assertSetDoneState(1, "Done, record")
+        assertSetDoneState(2, "Done")
+        onView(withContentDescription("Set 2 weight")).perform(replaceText("62"), closeSoftKeyboard())
+        assertSetDoneState(1, "Done")
+        assertSetDoneState(2, "Done, record")
+        onView(withContentDescription("Set 2 done")).perform(click())
+        assertSetDoneState(2, "Not done")
+        assertSetDoneState(1, "Done, record")
+        assertEquals(1, LofitRepository(instrumentation.targetContext).data.activeWorkout!!.setCount())
+        onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
+        assertSetDoneState(1, "Not done")
+        assertEquals(0, LofitRepository(instrumentation.targetContext).data.activeWorkout!!.setCount())
+    }
+
+    @Test
+    fun weightedTimedSet_recordUsesDoneSlotAndUpdatesAfterEditingAndRestart() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val repository = LofitRepository(instrumentation.targetContext)
+        repository.data.exercises.add(Exercise(
+            id = "weighted-plank", name = "Weighted plank", type = ExerciseType.TIMED,
+            asymmetric = false, primaryMuscle = "Abs", secondaryMuscles = "",
+            custom = true, weighted = true,
+        ))
+        repository.data.recordWorkout(WorkoutSession(
+            name = "Old hold", completedAt = 100,
+            exercises = mutableListOf(loggedWorkoutExercise(
+                exerciseId = "weighted-plank",
+                sets = mutableListOf(LoggedSet(type = SetType.NORMAL, weightKg = 10.0, holdSeconds = 30)),
+            )),
+        ))
+        repository.data.activeWorkout = WorkoutSession(
+            name = "Weighted hold",
+            exercises = mutableListOf(WorkoutExercise(
+                exerciseId = "weighted-plank",
+                plannedSets = mutableListOf(PlannedSet(weightKg = 10.0, holdSeconds = 45, actualHoldSeconds = 46)),
+            )),
+        )
+        repository.save()
+        val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        ActivityScenario.launch<MainActivity>(intent).use { scenario ->
+            onView(withContentDescription("Set 1 weight")).check(matches(isDisplayed()))
+            onView(withContentDescription("Set 1 Target time in seconds")).check(matches(isDisplayed()))
+            onView(withContentDescription("Set 1 Active time in seconds")).check(matches(isDisplayed()))
+            onView(withContentDescription("Start set 1 hold")).check(matches(isDisplayed()))
+            onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
+            assertSetDoneState(1, "Done, record")
+            onView(withContentDescription("Set 1 done")).check { view, _ ->
+                val actions = view.parent as ViewGroup
+                assertEquals(2, actions.childCount)
+                assertEquals((96 * view.resources.displayMetrics.density).toInt(), actions.width)
+            }
+            onView(withContentDescription("Set 1 Active time in seconds"))
+                .perform(replaceText("20"), closeSoftKeyboard())
+            assertSetDoneState(1, "Done")
+            onView(withContentDescription("Set 1 Active time in seconds"))
+                .perform(replaceText("46"), closeSoftKeyboard())
+            assertSetDoneState(1, "Done, record")
+            scenario.recreate()
+            assertSetDoneState(1, "Done, record")
+            onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
+            assertSetDoneState(1, "Not done")
+            assertEquals(0, LofitRepository(instrumentation.targetContext).data.activeWorkout!!.setCount())
+        }
     }
 
     @Test
@@ -1762,9 +1819,6 @@ class WorkoutFlowTest {
         onView(withContentDescription("View Past workout")).check(matches(isDisplayed()))
         assertEquals(storedState, context.getSharedPreferences("lofit-data", 0).getString("state", null))
         pressBack()
-        onView(withText("Ready to move?")).check(matches(isDisplayed()))
-        onView(withContentDescription("Open active workout")).check(matches(isDisplayed()))
-        onView(withContentDescription("Open active workout")).perform(click())
         onView(withText("Live workout")).check(matches(isDisplayed()))
         instrumentation.runOnMainSync { activity.finish() }
     }
@@ -1981,6 +2035,15 @@ class WorkoutFlowTest {
         onView(withContentDescription("Start set 1 hold")).perform(click())
         onView(withContentDescription("Rest timer overlay")).check(matches(not(isDisplayed())))
         onView(withContentDescription("Stop set 1 hold")).perform(click())
+    }
+
+    private fun assertSetDoneState(index: Int, state: String) {
+        onView(withContentDescription("Set $index done")).check { view, _ ->
+            val checkbox = view as CheckBox
+            assertEquals(state, checkbox.stateDescription)
+            assertEquals(state != "Not done", checkbox.isChecked)
+            assertEquals(state == "Done, record", checkbox.buttonTintList == null)
+        }
     }
 
     private fun dragExercise(direction: Int, cancel: Boolean = false) = object : ViewAction {
