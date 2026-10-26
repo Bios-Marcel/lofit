@@ -82,7 +82,7 @@ class RoutineWorkoutFlowTest {
             onView(withHint("Search name or muscle")).perform(typeText("Bench press"))
             assertKeyboardVisible(scenario, true)
 
-            onView(withText("Add Bench press")).perform(scrollTo(), click())
+            onView(withContentDescription("Add Bench press")).perform(scrollTo(), click())
 
             assertKeyboardVisible(scenario, false)
             onView(withText("Bench press")).check(matches(isDisplayed()))
@@ -102,7 +102,7 @@ class RoutineWorkoutFlowTest {
             onView(withHint("Search name or muscle")).perform(typeText("Bench press"))
             assertKeyboardVisible(scenario, true)
 
-            onView(withText("Add Bench press")).perform(scrollTo(), click())
+            onView(withContentDescription("Add Bench press")).perform(scrollTo(), click())
 
             assertKeyboardVisible(scenario, false)
             onView(withText("New routine")).check(matches(isDisplayed()))
@@ -119,7 +119,7 @@ class RoutineWorkoutFlowTest {
             onView(allOf(withText(R.string.nav_routines), isClickable())).perform(click())
             onView(withText("Create routine")).perform(click())
             onView(withText("Add Exercise")).perform(scrollTo(), click())
-            onView(withText("Add Bench press")).perform(scrollTo(), click())
+            onView(withContentDescription("Add Bench press")).perform(scrollTo(), click())
 
             fun checkFirstDrawAtBottom(returnFromPicker: () -> Unit) {
                 val drawn = CountDownLatch(1)
@@ -153,7 +153,7 @@ class RoutineWorkoutFlowTest {
 
             onView(withText("Add Exercise")).perform(scrollTo(), click())
             checkFirstDrawAtBottom {
-                onView(withText("Add Bench press")).perform(scrollTo(), click())
+                onView(withContentDescription("Add Bench press")).perform(scrollTo(), click())
             }
             onView(withText("Add Exercise")).perform(click())
             checkFirstDrawAtBottom { pressBack() }
@@ -165,7 +165,7 @@ class RoutineWorkoutFlowTest {
             onView(withText(R.string.start_workout)).perform(scrollTo(), click())
             onView(withText("Add exercise")).perform(scrollTo(), click())
             onView(withHint("Search name or muscle")).perform(replaceText("Bench press"), closeSoftKeyboard())
-            onView(withText("Add Bench press")).perform(scrollTo(), click())
+            onView(withContentDescription("Add Bench press")).perform(scrollTo(), click())
             onView(withContentDescription("Set 1 weight")).check(matches(withText("20")))
             onView(withContentDescription("Set 2 weight")).check(matches(withText("80")))
             onView(withContentDescription("Set 2 Repetitions")).check(matches(withText("6")))
@@ -215,13 +215,13 @@ class RoutineWorkoutFlowTest {
             onView(withContentDescription("Set 4 row")).check(doesNotExist())
             onView(withText("Add exercise")).perform(scrollTo(), click())
             onView(withHint("Search name or muscle")).perform(replaceText("Plank"), closeSoftKeyboard())
-            onView(withText("Add Plank")).perform(scrollTo(), click())
+            onView(withContentDescription("Add Plank")).perform(scrollTo(), click())
             onView(withContentDescription("Set 1 Target time in seconds")).check(matches(withText("45")))
             onView(withText("Discard workout")).perform(scrollTo(), click())
             onView(withText(R.string.start_workout)).perform(scrollTo(), click())
             onView(withText("Add exercise")).perform(scrollTo(), click())
             onView(withHint("Search name or muscle")).perform(replaceText("Bench press"), closeSoftKeyboard())
-            onView(withText("Add Bench press")).perform(scrollTo(), click())
+            onView(withContentDescription("Add Bench press")).perform(scrollTo(), click())
             onView(withContentDescription("Set 1 weight")).check(matches(withText("120")))
             onView(withContentDescription("Set 5 Repetitions")).check(matches(withText("2")))
             assertEquals(5, LofitRepository(context).data.activeWorkout!!.exercises.single().plannedSets.size)
@@ -276,7 +276,7 @@ class RoutineWorkoutFlowTest {
             onView(withText(R.string.start_workout)).perform(scrollTo(), click())
             onView(withText("Add exercise")).perform(scrollTo(), click())
             onView(withHint("Search name or muscle")).perform(replaceText("Bench press"), closeSoftKeyboard())
-            onView(withText("Add Bench press")).perform(scrollTo(), click())
+            onView(withContentDescription("Add Bench press")).perform(scrollTo(), click())
             onView(withContentDescription("Set 1 weight")).check(matches(withText("200")))
             onView(withContentDescription("Set 5 Repetitions")).check(matches(withText("2")))
         }
@@ -303,7 +303,7 @@ class RoutineWorkoutFlowTest {
             onView(withContentDescription("Set 1 done")).perform(click())
             onView(withText("Add exercise")).perform(scrollTo(), click())
             onView(withHint("Search name or muscle")).perform(replaceText("Plank"), closeSoftKeyboard())
-            onView(withText("Add Plank")).perform(scrollTo(), click())
+            onView(withContentDescription("Add Plank")).perform(scrollTo(), click())
             onView(allOf(withText("Add set"), inCard("Plank"))).perform(scrollTo(), click())
             scenario.recreate() // Source identity and initial prescription must survive a saved-data reload.
             assertNotNull(LofitRepository(context).data.activeWorkout!!.sourceRoutine)

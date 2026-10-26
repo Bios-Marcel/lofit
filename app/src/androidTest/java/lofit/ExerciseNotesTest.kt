@@ -111,7 +111,7 @@ class ExerciseNotesTest {
             onView(withText(R.string.start_workout)).perform(scrollTo(), click())
             onView(withText("Add exercise")).perform(scrollTo(), click())
             onView(withHint("Search name or muscle")).perform(replaceText("Bench press"), closeSoftKeyboard())
-            onView(withText("Add Bench press")).perform(scrollTo(), click())
+            onView(withContentDescription("Add Bench press")).perform(scrollTo(), click())
             onView(withContentDescription("Bench press note")).check(matches(withText("")))
                 .check(matches(withHint("Pause at bottom")))
             scenario.recreate()

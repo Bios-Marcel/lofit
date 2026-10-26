@@ -736,7 +736,7 @@ class WorkoutFlowTest {
         onView(withText("Add exercise")).perform(scrollTo(), click())
         onView(withHint("Search name or muscle")).perform(typeText("squat"), closeSoftKeyboard())
         onView(withContentDescription("Back squat illustration")).check(matches(isDisplayed()))
-        onView(withText("Add Back squat")).perform(scrollTo(), click())
+        onView(withContentDescription("Add Back squat")).perform(scrollTo(), click())
         onView(withText("Back squat")).check(matches(isDisplayed()))
         onView(withText("Add set")).check { view, _ ->
             var ancestor = view.parent
@@ -950,10 +950,10 @@ class WorkoutFlowTest {
         onView(withText(R.string.start_workout)).perform(click())
         onView(withText("Add exercise")).perform(scrollTo(), click())
         onView(withHint("Search name or muscle")).perform(replaceText("SqUa BACK"), closeSoftKeyboard())
-        onView(withText("Add Back squat")).check(matches(isDisplayed()))
+        onView(withContentDescription("Add Back squat")).check(matches(isDisplayed()))
         onView(withHint("Search name or muscle")).perform(replaceText("weighted push"), closeSoftKeyboard())
-        onView(withText("Add Weighted Push-up")).perform(scrollTo()).check(matches(isDisplayed()))
-        onView(withText("Add Push-up")).check(doesNotExist())
+        onView(withContentDescription("Add Weighted Push-up")).perform(scrollTo()).check(matches(isDisplayed()))
+        onView(withContentDescription("Add Push-up")).check(doesNotExist())
 
         activity.finish()
     }
@@ -968,12 +968,12 @@ class WorkoutFlowTest {
         onView(withText(R.string.start_workout)).perform(click())
         onView(withText("Add exercise")).perform(scrollTo(), click())
         onView(withHint("Search name or muscle")).perform(typeText("squat"), closeSoftKeyboard())
-        onView(withText("Add Back squat")).perform(scrollTo(), click())
+        onView(withContentDescription("Add Back squat")).perform(scrollTo(), click())
         repeat(2) { onView(withText("Add set")).perform(scrollTo(), click()) }
 
         onView(withText("Add exercise")).perform(scrollTo(), click())
         onView(withHint("Search name or muscle")).perform(typeText("plank"), closeSoftKeyboard())
-        onView(withText("Add Plank")).perform(scrollTo(), click())
+        onView(withContentDescription("Add Plank")).perform(scrollTo(), click())
         val plankAddSet = allOf(
             withText("Add set"),
             isDescendantOfA(allOf(
@@ -1001,7 +1001,7 @@ class WorkoutFlowTest {
         }
         instrumentation.runOnMainSync { root.viewTreeObserver.addOnDrawListener(listener) }
         try {
-            onView(withText("Add Dumbbell curl")).perform(scrollTo(), click())
+            onView(withContentDescription("Add Dumbbell curl")).perform(scrollTo(), click())
             assertTrue("Workout never drew", drawn.await(5, TimeUnit.SECONDS))
             val (scrollY, bottom) = firstPosition.get()
             assertTrue("Workout must exceed the viewport", bottom > 0)

@@ -136,7 +136,11 @@ class MainActivity : AppCompatActivity() {
 
     private sealed class Route {
         data object Root : Route()
-        data class ExercisePicker(val target: PickerTarget, val returnScrollY: Int? = null) : Route()
+        data class ExercisePicker(
+            val target: PickerTarget,
+            val returnScrollY: Int? = null,
+            val selectedIds: MutableSet<String> = linkedSetOf(),
+        ) : Route()
         data class RoutineEditor(val originalId: String?) : Route()
         data class ExerciseEditor(val exerciseId: String?) : Route()
         data class WorkoutHistory(val workoutId: String, val returnScrollY: Int) : Route()
@@ -1072,14 +1076,74 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun exercisePickerScreen(picker: Route.ExercisePicker): View = page("Add exercise") { body ->
+    private fun exercisePickerScreen(picker: Route.ExercisePicker): View {
+        val footer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), dp(12), dp(14), dp(20))
+            setBackgroundColor(color(R.color.charcoal))
+        }
         val target = picker.target
         val exercises = repository.data.exercisesByRecency()
         val search = textField("Search name or muscle").apply {
             inputType = InputType.TYPE_CLASS_TEXT
             contentDescription = "Search exercises"
         }
-        val results = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        fun addExercises(movements: List<Exercise>) {
+            if (movements.isEmpty()) return
+            WindowCompat.getInsetsController(window, search).hide(WindowInsetsCompat.Type.ime())
+            search.clearFocus()
+            val selectedAt = System.currentTimeMillis()
+            movements.forEach { movement ->
+                repository.data.exerciseLastSelectedAt[movement.id] = selectedAt
+                if (target == PickerTarget.WORKOUT) {
+                    val item = repository.data.lastKnownExercise(movement.id,
+                        preferredRoutineId = repository.data.activeWorkout?.sourceRoutine?.id)
+                        ?: WorkoutExercise(exerciseId = movement.id)
+                    repository.data.activeWorkout?.exercises?.add(item)
+                } else {
+                    routineDraft?.exercises?.add(RoutineExercise(
+                        exerciseId = movement.id,
+                        plannedSets = MutableList(3) { PlannedSet(holdSeconds = movement.minimumHoldSeconds) },
+                    ))
+                }
+            }
+            route = if (target == PickerTarget.WORKOUT) Route.Root else {
+                Route.RoutineEditor(repository.data.routines.firstOrNull { it.id == routineDraft?.id }?.id)
+            }
+            repository.save()
+            render(scrollToBottom = true)
+        }
+        val addSelected = actionButton("Add selected") {
+            addExercises(picker.selectedIds.mapNotNull(::exercise))
+        }.apply {
+            contentDescription = "Add selected exercises"
+            val states = arrayOf(intArrayOf(-android.R.attr.state_enabled), intArrayOf())
+            backgroundTintList = ColorStateList(states,
+                intArrayOf(color(R.color.charcoal_surface_high), color(R.color.coral)))
+            setTextColor(ColorStateList(states,
+                intArrayOf(color(R.color.sage), color(R.color.white))))
+        }
+        fun updateSelection() {
+            addSelected.isEnabled = picker.selectedIds.isNotEmpty()
+            addSelected.text = if (picker.selectedIds.isEmpty()) "Add selected" else "Add selected (${picker.selectedIds.size})"
+        }
+        updateSelection()
+        val resultLabel = metaText("").apply { contentDescription = "Exercise results" }
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), dp(10), dp(14), dp(8))
+            addView(titleText("Add exercise").apply { textSize = 26f; setPadding(0, dp(5), 0, 0) })
+            addView(search)
+            addView(resultLabel)
+        }
+        val results = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), 0, dp(14), dp(12))
+        }
+        val resultsScroll = ScrollView(this).apply {
+            isFillViewport = true
+            addView(results)
+        }
         fun updateResults(query: String) {
             results.removeAllViews()
             val allMatches = exercises.filter { exercise ->
@@ -1087,39 +1151,51 @@ class MainActivity : AppCompatActivity() {
             }
             val matches = allMatches.take(40)
             if (matches.isEmpty()) results.addView(emptyText("No matching exercises."))
-            if (allMatches.size > matches.size) results.addView(metaText("Showing 40 of ${allMatches.size}. Search to narrow the list."))
+            resultLabel.text = "Showing 40 of ${allMatches.size}. Search to narrow the list."
+            resultLabel.visibility = if (allMatches.size > matches.size) View.VISIBLE else View.GONE
             matches.forEach { movement ->
                 results.addView(card {
                     addView(exerciseHeading(movement, large = true))
                     addView(metaText(listOf(exerciseTrackingLabel(movement), if (movement.asymmetric) "left / right" else null).filterNotNull().joinToString(" · ")))
                     addView(metaText("Primary: ${movement.primaryMuscle} · Secondary: ${movement.secondaryMuscles}"))
-                    addView(actionButton("Add ${movement.name}") {
-                        WindowCompat.getInsetsController(window, search).hide(WindowInsetsCompat.Type.ime())
-                        search.clearFocus()
-                        repository.data.exerciseLastSelectedAt[movement.id] = System.currentTimeMillis()
-                        if (target == PickerTarget.WORKOUT) {
-                            val item = repository.data.lastKnownExercise(movement.id,
-                                preferredRoutineId = repository.data.activeWorkout?.sourceRoutine?.id)
-                                ?: WorkoutExercise(exerciseId = movement.id)
-                            repository.data.activeWorkout?.exercises?.add(item)
-                            route = Route.Root
-                        } else {
-                            routineDraft?.exercises?.add(RoutineExercise(
-                                exerciseId = movement.id,
-                                plannedSets = MutableList(3) { PlannedSet(holdSeconds = movement.minimumHoldSeconds) },
-                            ))
-                            route = Route.RoutineEditor(repository.data.routines.firstOrNull { it.id == routineDraft?.id }?.id)
-                        }
-                        repository.save()
-                        render(scrollToBottom = true)
+                    addView(LinearLayout(this@MainActivity).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.CENTER_VERTICAL
+                        setPadding(0, dp(8), 0, 0)
+                        addView(largeCheckBox().apply {
+                            contentDescription = "Select ${movement.name}"
+                            isChecked = movement.id in picker.selectedIds
+                            setOnCheckedChangeListener { _, checked ->
+                                if (checked) picker.selectedIds.add(movement.id) else picker.selectedIds.remove(movement.id)
+                                updateSelection()
+                            }
+                        }, LinearLayout.LayoutParams(dp(56), dp(56)).apply { marginEnd = dp(12) })
+                        addView(actionButton("Add") { addExercises(listOf(movement)) }.apply {
+                            contentDescription = "Add ${movement.name}"
+                        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
                     })
                 })
             }
         }
-        search.doAfterTextChanged { updateResults(it.toString()) }
-        body.addView(search)
-        body.addView(results)
+        search.doAfterTextChanged {
+            updateResults(it.toString())
+            resultsScroll.scrollTo(0, 0)
+        }
+        footer.addView(addSelected, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         updateResults("")
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            addView(header, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            addView(resultsScroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+            addView(footer, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
+                val keyboard = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+                val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom
+                view.setPadding(0, 0, 0, (keyboard - bars).coerceAtLeast(0))
+                insets
+            }
+        }
     }
 
     private fun exercisesScreen(): View = page("Exercise library", "Search built-in and custom movements.") { body ->
