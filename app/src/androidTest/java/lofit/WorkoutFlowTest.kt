@@ -8,6 +8,8 @@ import android.content.IntentFilter
 import android.net.Uri
 import android.health.connect.HealthPermissions
 import android.view.WindowManager
+import android.view.MotionEvent
+import android.os.SystemClock
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.Espresso.pressBackUnconditionally
@@ -1161,21 +1163,55 @@ class WorkoutFlowTest {
         val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         instrumentation.startActivitySync(intent)
-        onView(withContentDescription("Open active workout")).perform(click())
 
         val page = arrayOfNulls<View>(1)
         val survivingHeading = arrayOfNulls<View>(1)
         onView(isAssignableFrom(ScrollView::class.java)).check { view, _ -> page[0] = view }
         onView(withText("Plank")).check { view, _ -> survivingHeading[0] = view }
-        onView(withContentDescription("Move Plank up")).perform(click())
+        onView(withContentDescription("Reorder Plank")).perform(scrollTo(), dragExercise(-1, cancel = true))
+        assertEquals(listOf("bench-press", "plank", "back-squat"),
+            LofitRepository(instrumentation.targetContext).data.activeWorkout!!.exercises.map { it.exerciseId })
+        onView(withContentDescription("Reorder Plank")).perform(scrollTo(), dragExercise(-1))
+        assertEquals(listOf("plank", "bench-press", "back-squat"),
+            LofitRepository(instrumentation.targetContext).data.activeWorkout!!.exercises.map { it.exerciseId })
         onView(isAssignableFrom(ScrollView::class.java)).check { view, _ -> assertSame(page[0], view) }
         onView(withText("Plank")).check { view, _ -> assertSame(survivingHeading[0], view) }
-        onView(withContentDescription("Move Plank down")).perform(click())
+        onView(withContentDescription("Reorder Plank")).perform(scrollTo(), dragExercise(1))
+        assertEquals(listOf("bench-press", "plank", "back-squat"),
+            LofitRepository(instrumentation.targetContext).data.activeWorkout!!.exercises.map { it.exerciseId })
         onView(withText("Plank")).check { view, _ -> assertSame(survivingHeading[0], view) }
-        onView(withContentDescription("Remove Bench press")).perform(click())
+        onView(withContentDescription("Remove Bench press")).perform(scrollTo(), click())
 
         onView(isAssignableFrom(ScrollView::class.java)).check { view, _ -> assertSame(page[0], view) }
         onView(withText("Plank")).check { view, _ -> assertSame(survivingHeading[0], view) }
+    }
+
+    @Test
+    fun workoutExerciseDrag_scrollsPastTallCardAndKeepsSetData() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val bench = WorkoutExercise(exerciseId = "bench-press", note = "Keep this note",
+            plannedSets = mutableListOf(PlannedSet(weightKg = 65.0, reps = 7)))
+        val plank = WorkoutExercise(exerciseId = "plank",
+            plannedSets = MutableList(12) { PlannedSet(holdSeconds = 45) })
+        LofitRepository(context).apply {
+            data.activeWorkout = WorkoutSession(name = "Tall cards", exercises = mutableListOf(bench, plank))
+            save()
+        }
+        ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)).use { scenario ->
+            onView(withContentDescription("Reorder Bench press")).perform(scrollTo(), dragExercise(1))
+            var saved = LofitRepository(context).data.activeWorkout!!
+            assertEquals(listOf(plank.id, bench.id), saved.exercises.map { it.id })
+            assertEquals("Keep this note", saved.exercises.last().note)
+            assertEquals(65.0, saved.exercises.last().plannedSets.single().weightKg, 0.0)
+            assertEquals(12, saved.exercises.first().plannedSets.size)
+            scenario.recreate()
+            saved = LofitRepository(context).data.activeWorkout!!
+            assertEquals(listOf(plank.id, bench.id), saved.exercises.map { it.id })
+            onView(withContentDescription("Reorder Bench press")).perform(scrollTo(), dragExercise(-1))
+            assertEquals(listOf(bench.id, plank.id),
+                LofitRepository(context).data.activeWorkout!!.exercises.map { it.id })
+        }
     }
 
     @Test
@@ -1202,15 +1238,18 @@ class WorkoutFlowTest {
         val survivingHeading = arrayOfNulls<View>(1)
         onView(isAssignableFrom(ScrollView::class.java)).check { view, _ -> page[0] = view }
         onView(withText("Plank")).check { view, _ -> survivingHeading[0] = view }
-        onView(withContentDescription("Move Plank up")).perform(click())
+        onView(withContentDescription("Reorder Plank")).perform(scrollTo(), dragExercise(-1))
         onView(isAssignableFrom(ScrollView::class.java)).check { view, _ -> assertSame(page[0], view) }
         onView(withText("Plank")).check { view, _ -> assertSame(survivingHeading[0], view) }
-        onView(withContentDescription("Move Plank down")).perform(click())
+        onView(withContentDescription("Reorder Plank")).perform(scrollTo(), dragExercise(1))
         onView(withText("Plank")).check { view, _ -> assertSame(survivingHeading[0], view) }
-        onView(withContentDescription("Remove Bench press")).perform(click())
+        onView(withContentDescription("Remove Bench press")).perform(scrollTo(), click())
 
         onView(isAssignableFrom(ScrollView::class.java)).check { view, _ -> assertSame(page[0], view) }
         onView(withText("Plank")).check { view, _ -> assertSame(survivingHeading[0], view) }
+        onView(withText("Save routine")).perform(scrollTo(), click())
+        assertEquals(listOf("plank", "back-squat"),
+            LofitRepository(instrumentation.targetContext).data.routines.single().exercises.map { it.exerciseId })
     }
 
     @Test
@@ -1833,6 +1872,38 @@ class WorkoutFlowTest {
         onView(withContentDescription("Start set 1 hold")).perform(click())
         onView(withContentDescription("Rest timer overlay")).check(matches(not(isDisplayed())))
         onView(withContentDescription("Stop set 1 hold")).perform(click())
+    }
+
+    private fun dragExercise(direction: Int, cancel: Boolean = false) = object : ViewAction {
+        override fun getDescription() = "drag exercise one place ${if (direction < 0) "up" else "down"}"
+        override fun getConstraints(): Matcher<View> = isDisplayed()
+        override fun perform(uiController: UiController, view: View) {
+            val card = generateSequence(view.parent) { it.parent }.filterIsInstance<MaterialCardView>().first()
+            val cards = card.parent as ViewGroup
+            val neighbor = cards.getChildAt(cards.indexOfChild(card) + direction)
+            val location = IntArray(2)
+            view.getLocationOnScreen(location)
+            val x = location[0] + view.width / 2f
+            val startY = location[1] + view.height / 2f
+            val distance = neighbor.top + neighbor.height / 2f - card.top - card.height / 2f +
+                direction * 24 * view.resources.displayMetrics.density
+            val viewport = generateSequence(cards.parent) { it.parent }.filterIsInstance<ScrollView>().first()
+            viewport.getLocationOnScreen(location)
+            val endY = (startY + distance).coerceIn(location[1] + 10f, location[1] + viewport.height - 10f)
+            val downTime = SystemClock.uptimeMillis()
+            fun send(action: Int, y: Float) {
+                val event = MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), action, x, y, 0)
+                try { assertTrue(uiController.injectMotionEvent(event)) } finally { event.recycle() }
+            }
+            send(MotionEvent.ACTION_DOWN, startY)
+            for (step in 1..20) {
+                send(MotionEvent.ACTION_MOVE, startY + (endY - startY) * step / 20)
+                uiController.loopMainThreadForAtLeast(16)
+            }
+            if (endY != startY + distance) uiController.loopMainThreadForAtLeast(600)
+            send(if (cancel) MotionEvent.ACTION_CANCEL else MotionEvent.ACTION_UP, endY)
+            uiController.loopMainThreadUntilIdle()
+        }
     }
 
     private fun waitFor(milliseconds: Long) = object : ViewAction {

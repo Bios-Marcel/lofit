@@ -639,7 +639,11 @@ class MainActivity : AppCompatActivity() {
 
             val exerciseCards = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
             val cardViews = mutableMapOf<String, View>()
-            val updateActionStates = mutableMapOf<String, (Boolean, Boolean) -> Unit>()
+            val reorder = ExerciseReorderController(exerciseCards) { from, to ->
+                workout.moveExercise(from, to)
+                repository.save()
+                updateWorkoutNotification(force = true)
+            }
             val recordIndicators = mutableMapOf<String, View>()
             fun updateRecordIndicators() {
                 val recordSetIds = repository.data.recordSetIds(workout)
@@ -647,54 +651,34 @@ class MainActivity : AppCompatActivity() {
                     indicator.visibility = if (setId in recordSetIds) View.VISIBLE else View.INVISIBLE
                 }
             }
-            fun updateExerciseActions() {
-                workout.exercises.forEachIndexed { index, item ->
-                    updateActionStates[item.id]?.invoke(index > 0, index < workout.exercises.lastIndex)
-                }
-            }
-            fun moveWorkoutExercise(item: WorkoutExercise, offset: Int) {
-                val fromIndex = workout.exercises.indexOf(item)
-                val toIndex = fromIndex + offset
-                if (fromIndex !in workout.exercises.indices || toIndex !in workout.exercises.indices) return
-                workout.moveExercise(fromIndex, toIndex)
-                cardViews[item.id]?.let { card ->
-                    exerciseCards.removeView(card)
-                    exerciseCards.addView(card, toIndex)
-                }
-                updateExerciseActions()
-                repository.save()
-            }
             fun removeWorkoutExercise(item: WorkoutExercise) {
                 if (activeHoldWorkoutExerciseId == item.id) clearActiveHold()
                 workout.exercises.remove(item)
-                cardViews.remove(item.id)?.let(exerciseCards::removeView)
-                updateActionStates.remove(item.id)
+                cardViews.remove(item.id)?.let(reorder::remove)
                 if (workout.exercises.isEmpty()) {
                     exerciseCards.addView(emptyText("This workout is empty. Add any exercise when you’re ready."))
                 }
-                updateExerciseActions()
                 repository.save()
                 updateWorkoutNotification(force = true)
             }
             if (workout.exercises.isEmpty()) {
                 exerciseCards.addView(emptyText("This workout is empty. Add any exercise when you’re ready."))
             }
-            workout.exercises.forEachIndexed { index, item ->
+            workout.exercises.forEach { item ->
                 exercise(item.exerciseId)?.let { movement ->
+                    lateinit var handle: View
                     val card = workoutExerciseCard(
                         workout = workout,
                         item = item,
                         exercise = movement,
-                        index = index,
-                        onMoveUp = { moveWorkoutExercise(item, -1) },
-                        onMoveDown = { moveWorkoutExercise(item, 1) },
                         onRemove = { removeWorkoutExercise(item) },
-                        onActionStateUpdaterReady = { updater -> updateActionStates[item.id] = updater },
+                        onReorderHandleReady = { handle = it },
                         onRecordIndicatorReady = { setId, indicator -> recordIndicators[setId] = indicator },
                         onSetsChanged = ::updateRecordIndicators,
                     )
                     cardViews[item.id] = card
                     exerciseCards.addView(card)
+                    reorder.bind(handle, card)
                 }
             }
             updateRecordIndicators()
@@ -740,22 +724,15 @@ class MainActivity : AppCompatActivity() {
         workout: WorkoutSession,
         item: WorkoutExercise,
         exercise: Exercise,
-        index: Int,
-        onMoveUp: () -> Unit,
-        onMoveDown: () -> Unit,
         onRemove: () -> Unit,
-        onActionStateUpdaterReady: ((Boolean, Boolean) -> Unit) -> Unit,
+        onReorderHandleReady: (View) -> Unit,
         onRecordIndicatorReady: (String, View) -> Unit,
         onSetsChanged: () -> Unit,
     ): View = card(horizontalPadding = 0) {
         addView(exerciseHeading(exercise, large = true, showMuscle = false, actions = exerciseActions(
             exercise = exercise,
-            canMoveUp = index > 0,
-            canMoveDown = index < workout.exercises.lastIndex,
-            onMoveUp = onMoveUp,
-            onMoveDown = onMoveDown,
             onRemove = onRemove,
-            onStateUpdaterReady = onActionStateUpdaterReady,
+            onReorderHandleReady = onReorderHandleReady,
         )), insetCardLayoutParams())
         addView(exerciseNote(item.note, exercise, previousNote = item.previousNote) { note ->
             item.note = note
@@ -962,47 +939,28 @@ class MainActivity : AppCompatActivity() {
             body.addView(sectionTitle("Exercises"))
             val exerciseCards = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
             val cardViews = mutableMapOf<String, View>()
-            val updateActionStates = mutableMapOf<String, (Boolean, Boolean) -> Unit>()
-            fun updateExerciseActions() {
-                draft.exercises.forEachIndexed { index, item ->
-                    updateActionStates[item.id]?.invoke(index > 0, index < draft.exercises.lastIndex)
-                }
-            }
-            fun moveExercise(item: RoutineExercise, offset: Int) {
-                val fromIndex = draft.exercises.indexOf(item)
-                val toIndex = fromIndex + offset
-                if (fromIndex !in draft.exercises.indices || toIndex !in draft.exercises.indices) return
-                draft.exercises.add(toIndex, draft.exercises.removeAt(fromIndex))
-                cardViews[item.id]?.let { exerciseCard ->
-                    exerciseCards.removeView(exerciseCard)
-                    exerciseCards.addView(exerciseCard, toIndex)
-                }
-                updateExerciseActions()
+            val reorder = ExerciseReorderController(exerciseCards) { from, to ->
+                draft.exercises.add(to, draft.exercises.removeAt(from))
             }
             fun removeExercise(item: RoutineExercise) {
                 draft.exercises.remove(item)
-                cardViews.remove(item.id)?.let(exerciseCards::removeView)
-                updateActionStates.remove(item.id)
+                cardViews.remove(item.id)?.let(reorder::remove)
                 if (draft.exercises.isEmpty()) {
                     exerciseCards.addView(emptyText("Add exercises, then specify sets and repetitions or hold time."))
                 }
-                updateExerciseActions()
             }
             if (draft.exercises.isEmpty()) {
                 exerciseCards.addView(emptyText("Add exercises, then specify sets and repetitions or hold time."))
             }
             body.addView(exerciseCards)
-            draft.exercises.forEachIndexed { index, item ->
-                val movement = exercise(item.exerciseId) ?: return@forEachIndexed
+            draft.exercises.forEach { item ->
+                val movement = exercise(item.exerciseId) ?: return@forEach
+                lateinit var handle: View
                 val exerciseCard = card(horizontalPadding = 0) {
                     addView(exerciseHeading(movement, large = true, actions = exerciseActions(
                         exercise = movement,
-                        canMoveUp = index > 0,
-                        canMoveDown = index < draft.exercises.lastIndex,
-                        onMoveUp = { moveExercise(item, -1) },
-                        onMoveDown = { moveExercise(item, 1) },
                         onRemove = { removeExercise(item) },
-                        onStateUpdaterReady = { updater -> updateActionStates[item.id] = updater },
+                        onReorderHandleReady = { handle = it },
                     )), insetCardLayoutParams())
                     addView(exerciseNote(item.note, movement) { item.note = it },
                         insetCardLayoutParams().apply { topMargin = dp(8); bottomMargin = dp(8) })
@@ -1056,6 +1014,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 cardViews[item.id] = exerciseCard
                 exerciseCards.addView(exerciseCard)
+                reorder.bind(handle, exerciseCard)
             }
             body.addView(actionButton("Add Exercise") {
                 route = Route.ExercisePicker(PickerTarget.ROUTINE)
@@ -2556,38 +2515,25 @@ class MainActivity : AppCompatActivity() {
 
     private fun exerciseActions(
         exercise: Exercise,
-        canMoveUp: Boolean,
-        canMoveDown: Boolean,
-        onMoveUp: () -> Unit,
-        onMoveDown: () -> Unit,
         onRemove: () -> Unit,
-        onStateUpdaterReady: ((Boolean, Boolean) -> Unit) -> Unit = {},
+        onReorderHandleReady: (View) -> Unit,
     ): View = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        val moveUp = smallButton("↑", onMoveUp).apply {
-            isEnabled = canMoveUp
-            contentDescription = "Move ${exercise.name} up"
-            textSize = 20f
-            setPadding(dp(2), 0, dp(2), 0)
+        val handle = ImageView(this@MainActivity).apply {
+            setImageResource(R.drawable.ic_drag_handle)
+            imageTintList = ColorStateList.valueOf(color(R.color.cream))
+            scaleType = ImageView.ScaleType.CENTER
+            contentDescription = "Reorder ${exercise.name}"
+            isFocusable = true
         }
-        val moveDown = smallButton("↓", onMoveDown).apply {
-            isEnabled = canMoveDown
-            contentDescription = "Move ${exercise.name} down"
-            textSize = 20f
-            setPadding(dp(2), 0, dp(2), 0)
-        }
-        addView(moveUp, LinearLayout.LayoutParams(dp(42), dp(42)))
-        addView(moveDown, LinearLayout.LayoutParams(dp(42), dp(42)).apply { marginStart = dp(4) })
+        addView(handle, LinearLayout.LayoutParams(dp(42), dp(48)))
+        onReorderHandleReady(handle)
         addView(smallButton("×", onRemove).apply {
             contentDescription = "Remove ${exercise.name}"
             textSize = 20f
             setPadding(dp(2), 0, dp(2), 0)
         }, LinearLayout.LayoutParams(dp(42), dp(42)).apply { marginStart = dp(4) })
-        onStateUpdaterReady { moveUpEnabled, moveDownEnabled ->
-            moveUp.isEnabled = moveUpEnabled
-            moveDown.isEnabled = moveDownEnabled
-        }
     }
 
     private fun exerciseThumbnail(exercise: Exercise, width: Int, height: Int): View {
