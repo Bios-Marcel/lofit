@@ -1094,6 +1094,8 @@ class MainActivity : AppCompatActivity() {
                     addView(metaText(listOf(exerciseTrackingLabel(movement), if (movement.asymmetric) "left / right" else null).filterNotNull().joinToString(" · ")))
                     addView(metaText("Primary: ${movement.primaryMuscle} · Secondary: ${movement.secondaryMuscles}"))
                     addView(actionButton("Add ${movement.name}") {
+                        WindowCompat.getInsetsController(window, search).hide(WindowInsetsCompat.Type.ime())
+                        search.clearFocus()
                         repository.data.exerciseLastSelectedAt[movement.id] = System.currentTimeMillis()
                         if (target == PickerTarget.WORKOUT) {
                             val item = repository.data.lastKnownExercise(movement.id,
@@ -1109,10 +1111,7 @@ class MainActivity : AppCompatActivity() {
                             route = Route.RoutineEditor(repository.data.routines.firstOrNull { it.id == routineDraft?.id }?.id)
                         }
                         repository.save()
-                        render(
-                            restoreScrollY = if (target == PickerTarget.WORKOUT) picker.returnScrollY else null,
-                            scrollToBottom = target == PickerTarget.ROUTINE,
-                        )
+                        render(scrollToBottom = true)
                     })
                 })
             }

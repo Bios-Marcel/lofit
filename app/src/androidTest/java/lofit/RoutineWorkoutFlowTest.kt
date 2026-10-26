@@ -7,6 +7,8 @@ import android.view.View
 import android.view.ViewTreeObserver
 import android.widget.ScrollView
 import androidx.core.view.GravityCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
@@ -58,6 +60,55 @@ class RoutineWorkoutFlowTest {
 
     private fun inCard(name: String) = isDescendantOfA(allOf(isAssignableFrom(MaterialCardView::class.java),
         hasDescendant(withText(name))))
+
+    private fun assertKeyboardVisible(scenario: ActivityScenario<MainActivity>, expected: Boolean) {
+        var visible: Boolean? = null
+        val deadline = android.os.SystemClock.uptimeMillis() + 5_000
+        do {
+            scenario.onActivity { activity ->
+                visible = ViewCompat.getRootWindowInsets(activity.window.decorView)
+                    ?.isVisible(WindowInsetsCompat.Type.ime())
+            }
+            if (visible == expected) return
+            android.os.SystemClock.sleep(50)
+        } while (android.os.SystemClock.uptimeMillis() < deadline)
+        assertEquals("Keyboard visibility", expected, visible)
+    }
+
+    @Test fun addingExerciseToWorkoutClosesSearchKeyboard() {
+        launch().use { scenario ->
+            onView(withText(R.string.start_workout)).perform(scrollTo(), click())
+            onView(withText("Add exercise")).perform(scrollTo(), click())
+            onView(withHint("Search name or muscle")).perform(typeText("Bench press"))
+            assertKeyboardVisible(scenario, true)
+
+            onView(withText("Add Bench press")).perform(scrollTo(), click())
+
+            assertKeyboardVisible(scenario, false)
+            onView(withText("Bench press")).check(matches(isDisplayed()))
+            onView(withHint("Search name or muscle")).check(doesNotExist())
+        }
+    }
+
+    @Test fun addingExerciseToRoutineClosesSearchKeyboard() {
+        launch().use { scenario ->
+            scenario.onActivity { activity ->
+                val root = activity.findViewById<android.view.ViewGroup>(android.R.id.content)
+                (root.getChildAt(0) as DrawerLayout).openDrawer(GravityCompat.START, false)
+            }
+            onView(allOf(withText(R.string.nav_routines), isClickable())).perform(click())
+            onView(withText("Create routine")).perform(click())
+            onView(withText("Add Exercise")).perform(scrollTo(), click())
+            onView(withHint("Search name or muscle")).perform(typeText("Bench press"))
+            assertKeyboardVisible(scenario, true)
+
+            onView(withText("Add Bench press")).perform(scrollTo(), click())
+
+            assertKeyboardVisible(scenario, false)
+            onView(withText("New routine")).check(matches(isDisplayed()))
+            onView(withHint("Search name or muscle")).check(doesNotExist())
+        }
+    }
 
     @Test fun routinePickerReturnsAtBottomOnFirstDrawForAddAndBack() {
         launch().use { scenario ->

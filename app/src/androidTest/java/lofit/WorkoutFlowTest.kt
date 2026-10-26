@@ -41,6 +41,7 @@ import androidx.drawerlayout.widget.DrawerLayout
 import com.google.android.material.card.MaterialCardView
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewTreeObserver
 import android.widget.CheckBox
 import android.widget.ScrollView
 import java.time.LocalDate
@@ -50,6 +51,9 @@ import java.time.format.DateTimeFormatter
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
 import org.hamcrest.Matcher
 import org.hamcrest.Matchers.allOf
 import org.hamcrest.Matchers.not
@@ -955,11 +959,11 @@ class WorkoutFlowTest {
     }
 
     @Test
-    fun addingExercise_keepsWorkoutScrollPosition() {
+    fun addingExercise_showsWorkoutBottomOnFirstDraw() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        instrumentation.startActivitySync(intent)
+        val activity = instrumentation.startActivitySync(intent)
 
         onView(withText(R.string.start_workout)).perform(click())
         onView(withText("Add exercise")).perform(scrollTo(), click())
@@ -979,18 +983,36 @@ class WorkoutFlowTest {
         )
         repeat(2) { onView(plankAddSet).perform(scrollTo(), click()) }
 
-        var scrollBeforeAdd = 0
-        onView(withText("Add exercise")).perform(scrollTo())
-        onView(isAssignableFrom(ScrollView::class.java)).check { view, _ ->
-            scrollBeforeAdd = view.scrollY
-            assertTrue(scrollBeforeAdd > 0)
-        }
-        onView(withText("Add exercise")).perform(click())
+        onView(withText("Add exercise")).perform(scrollTo(), click())
         onView(withHint("Search name or muscle")).perform(typeText("dumbbell curl"), closeSoftKeyboard())
-        onView(withText("Add Dumbbell curl")).perform(scrollTo(), click())
 
-        onView(isAssignableFrom(ScrollView::class.java)).check { view, _ ->
-            assertEquals(scrollBeforeAdd, view.scrollY)
+        val root = activity.window.decorView
+        val drawn = CountDownLatch(1)
+        val firstPosition = AtomicReference<Pair<Int, Int>>()
+        val listener = ViewTreeObserver.OnDrawListener {
+            val buttons = arrayListOf<View>()
+            root.findViewsWithText(buttons, "Discard workout", View.FIND_VIEWS_WITH_TEXT)
+            var parent = buttons.firstOrNull()?.parent
+            while (parent != null && parent !is ScrollView) parent = parent.parent
+            (parent as? ScrollView)?.let { scroll ->
+                val bottom = scroll.getChildAt(0).height - scroll.height
+                if (firstPosition.compareAndSet(null, scroll.scrollY to bottom)) drawn.countDown()
+            }
+        }
+        instrumentation.runOnMainSync { root.viewTreeObserver.addOnDrawListener(listener) }
+        try {
+            onView(withText("Add Dumbbell curl")).perform(scrollTo(), click())
+            assertTrue("Workout never drew", drawn.await(5, TimeUnit.SECONDS))
+            val (scrollY, bottom) = firstPosition.get()
+            assertTrue("Workout must exceed the viewport", bottom > 0)
+            assertEquals("First frame must already show the bottom", bottom, scrollY)
+            onView(isAssignableFrom(ScrollView::class.java)).check { view, _ ->
+                val scroll = view as ScrollView
+                assertEquals(scroll.getChildAt(0).height - scroll.height, scroll.scrollY)
+            }
+        } finally {
+            instrumentation.runOnMainSync { root.viewTreeObserver.removeOnDrawListener(listener) }
+            activity.finish()
         }
     }
 
