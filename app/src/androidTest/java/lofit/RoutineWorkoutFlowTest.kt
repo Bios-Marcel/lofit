@@ -16,6 +16,7 @@ import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.action.ViewActions.*
 import androidx.test.espresso.assertion.ViewAssertions.*
 import androidx.test.espresso.matcher.ViewMatchers.*
+import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.google.android.material.card.MaterialCardView
@@ -60,6 +61,69 @@ class RoutineWorkoutFlowTest {
 
     private fun inCard(name: String) = isDescendantOfA(allOf(isAssignableFrom(MaterialCardView::class.java),
         hasDescendant(withText(name))))
+
+    private fun editRoutine(scenario: ActivityScenario<MainActivity>) {
+        scenario.onActivity { activity ->
+            val root = activity.findViewById<android.view.ViewGroup>(android.R.id.content)
+            (root.getChildAt(0) as DrawerLayout).openDrawer(GravityCompat.START, false)
+        }
+        onView(allOf(withText(R.string.nav_routines), isClickable())).perform(click())
+        onView(withText("Edit")).perform(scrollTo(), click())
+    }
+
+    @Test fun cancelUnchangedOrRevertedRoutineDoesNotAskToDiscard() {
+        LofitRepository(context).apply {
+            data.routines.single().exercises.add(RoutineExercise(exerciseId = "plank",
+                plannedSets = mutableListOf(PlannedSet(actualHoldSeconds = 45))))
+            save()
+        }
+        val original = LofitRepository(context).data.routines.single()
+        launch().use { scenario ->
+            editRoutine(scenario)
+            onView(withText("Cancel")).perform(scrollTo(), click())
+            onView(withText("Create routine")).check(matches(isDisplayed()))
+            onView(withText("Edit")).perform(scrollTo(), click())
+            onView(withHint("Routine name")).perform(scrollTo(), replaceText("Changed"), closeSoftKeyboard())
+            onView(withContentDescription("Set 1 weight")).perform(scrollTo(), replaceText("85"), closeSoftKeyboard())
+            onView(withHint("Routine name")).perform(scrollTo(), replaceText("Strength"), closeSoftKeyboard())
+            onView(withContentDescription("Set 1 weight")).perform(scrollTo(), replaceText("60"), closeSoftKeyboard())
+            onView(withText("Cancel")).perform(scrollTo(), click())
+            onView(withText("Create routine")).check(matches(isDisplayed()))
+            assertEquals(original, LofitRepository(context).data.routines.single())
+        }
+    }
+
+    @Test fun cancelChangedRoutineAsksAboutChangesAndKeepsSavedRoutine() {
+        val original = LofitRepository(context).data.routines.single()
+        launch().use { scenario ->
+            editRoutine(scenario)
+            onView(withContentDescription("Set 1 weight")).perform(scrollTo(), replaceText("85"), closeSoftKeyboard())
+            onView(withText("Cancel")).perform(scrollTo(), click())
+            onView(withText("Discard changes?")).inRoot(isDialog()).check(matches(isDisplayed()))
+            onView(withText("Cancel")).inRoot(isDialog()).perform(click())
+            onView(withContentDescription("Set 1 weight")).perform(scrollTo()).check(matches(withText("85")))
+            assertEquals(original, LofitRepository(context).data.routines.single())
+            onView(withText("Cancel")).perform(scrollTo(), click())
+            onView(withText("Discard changes")).inRoot(isDialog()).perform(click())
+            onView(withText("Create routine")).check(matches(isDisplayed()))
+            assertEquals(original, LofitRepository(context).data.routines.single())
+            onView(withText("Edit")).perform(scrollTo(), click())
+            onView(withContentDescription("Set 1 weight")).check(matches(withText("60")))
+        }
+    }
+
+    @Test fun cancelRoutineAfterRemovingLastExerciseStillAsksAboutChanges() {
+        val original = LofitRepository(context).data.routines.single()
+        launch().use { scenario ->
+            editRoutine(scenario)
+            onView(withContentDescription("Remove Bench press")).perform(scrollTo(), click())
+            onView(withText("Cancel")).perform(scrollTo(), click())
+            onView(withText("Discard changes?")).inRoot(isDialog()).check(matches(isDisplayed()))
+            onView(withText("Discard changes")).inRoot(isDialog()).perform(click())
+            onView(withText("Create routine")).check(matches(isDisplayed()))
+            assertEquals(original, LofitRepository(context).data.routines.single())
+        }
+    }
 
     private fun assertKeyboardVisible(scenario: ActivityScenario<MainActivity>, expected: Boolean) {
         var visible: Boolean? = null
@@ -218,6 +282,7 @@ class RoutineWorkoutFlowTest {
             onView(withContentDescription("Add Plank")).perform(scrollTo(), click())
             onView(withContentDescription("Set 1 Target time in seconds")).check(matches(withText("45")))
             onView(withText("Discard workout")).perform(scrollTo(), click())
+            onView(withText("Discard workout")).inRoot(isDialog()).perform(click())
             onView(withText(R.string.start_workout)).perform(scrollTo(), click())
             onView(withText("Add exercise")).perform(scrollTo(), click())
             onView(withHint("Search name or muscle")).perform(replaceText("Bench press"), closeSoftKeyboard())
@@ -273,6 +338,7 @@ class RoutineWorkoutFlowTest {
             onView(allOf(withContentDescription("Set 3 row"), inCard("Plank"))).check(doesNotExist())
             assertEquals(listOf(3, 2), LofitRepository(context).data.activeWorkout!!.exercises.map { it.plannedSets.size })
             onView(withText("Discard workout")).perform(scrollTo(), click())
+            onView(withText("Discard workout")).inRoot(isDialog()).perform(click())
             onView(withText(R.string.start_workout)).perform(scrollTo(), click())
             onView(withText("Add exercise")).perform(scrollTo(), click())
             onView(withHint("Search name or muscle")).perform(replaceText("Bench press"), closeSoftKeyboard())
@@ -331,17 +397,15 @@ class RoutineWorkoutFlowTest {
     @Test fun finishCanAddExercisesWithoutUpdatingExistingSets() = changedWorkout(false, true)
     @Test fun finishCanUpdateSetsAndIncludeAddedExercises() = changedWorkout(true, true)
 
-    @Test fun changedRoutineWithNoDoneSetsCanUpdateSourceAtFinish() {
+    @Test fun changedRoutineWithNoDoneSetsCannotFinish() {
         launch().use {
             onView(withText("Start routine")).perform(scrollTo(), click())
             onView(withText("Add set")).perform(scrollTo(), click())
-            onView(withText("Finish workout")).perform(scrollTo(), click())
-            onView(withText("Update sets, weights and notes in Strength")).perform(click())
-            onView(withText("Finish and save")).perform(click())
+            onView(withText("Finish workout")).perform(scrollTo()).check(matches(not(isEnabled())))
             val data = LofitRepository(context).data
-            assertNull(data.activeWorkout)
+            assertNotNull(data.activeWorkout)
             assertEquals(1, data.history.size)
-            assertEquals(2, data.routines.single().exercises.single().plannedSets.size)
+            assertEquals(1, data.routines.single().exercises.single().plannedSets.size)
         }
     }
 
@@ -355,7 +419,7 @@ class RoutineWorkoutFlowTest {
             onView(withText("Cancel")).perform(click())
             onView(withText("Discard workout")).perform(scrollTo(), click())
             onView(withText("Update sets, weights and notes in Strength")).check(doesNotExist())
-            onView(withText("Discard workout")).perform(click())
+            onView(withText("Discard workout")).inRoot(isDialog()).perform(click())
             val data = LofitRepository(context).data
             assertNull(data.activeWorkout)
             assertEquals(1, data.history.size)

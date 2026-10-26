@@ -97,7 +97,7 @@ class MainActivity : AppCompatActivity() {
 
     private enum class Screen { HOME, WORKOUT, ROUTINES, EXERCISES, RECORDS, HISTORY, SETTINGS }
     private enum class PickerTarget { WORKOUT, ROUTINE }
-    private enum class ConfirmAction { FINISH_WORKOUT, DISCARD_WORKOUT, DELETE_EXERCISE, DELETE_ROUTINE, RESET_DATA }
+    private enum class ConfirmAction { FINISH_WORKOUT, DELETE_EXERCISE, DELETE_ROUTINE, RESET_DATA }
 
     private inner class SwipeRevealRow(
         private val revealWidth: Int,
@@ -617,6 +617,22 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun activeWorkoutScreen(workout: WorkoutSession): View {
+        val finishButton = actionButton("Finish workout") {
+            if (workout.setCount() > 0) {
+                route = Route.Confirm(ConfirmAction.FINISH_WORKOUT)
+                render()
+            }
+        }
+        fun updateFinishButton() {
+            finishButton.isEnabled = workout.setCount() > 0
+            finishButton.backgroundTintList = ColorStateList.valueOf(color(
+                if (finishButton.isEnabled) R.color.coral else R.color.charcoal_surface_high,
+            ))
+            finishButton.setTextColor(color(
+                if (finishButton.isEnabled) R.color.white else R.color.sage,
+            ))
+        }
+        updateFinishButton()
         val workoutTimer = TextView(this).apply {
             textSize = 18f
             setTextColor(color(R.color.cream))
@@ -659,6 +675,7 @@ class MainActivity : AppCompatActivity() {
                     exerciseCards.addView(emptyText("This workout is empty. Add any exercise when you’re ready."))
                 }
                 repository.save()
+                updateFinishButton()
                 updateWorkoutNotification(force = true)
             }
             if (workout.exercises.isEmpty()) {
@@ -674,7 +691,10 @@ class MainActivity : AppCompatActivity() {
                         onRemove = { removeWorkoutExercise(item) },
                         onReorderHandleReady = { handle = it },
                         onRecordIndicatorReady = { setId, indicator -> recordIndicators[setId] = indicator },
-                        onSetsChanged = ::updateRecordIndicators,
+                        onSetsChanged = {
+                            updateRecordIndicators()
+                            updateFinishButton()
+                        },
                     )
                     cardViews[item.id] = card
                     exerciseCards.addView(card)
@@ -689,27 +709,34 @@ class MainActivity : AppCompatActivity() {
                 render()
             })
             body.addView(divider())
-            body.addView(actionButton("Finish workout") {
-                endWorkout(ConfirmAction.FINISH_WORKOUT)
-            })
+            body.addView(finishButton, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { bottomMargin = dp(8) })
             body.addView(actionButton("Discard workout", secondary = true) {
-                endWorkout(ConfirmAction.DISCARD_WORKOUT)
+                confirmDiscardWorkout()
             })
         }
         return view
     }
 
-    private fun endWorkout(action: ConfirmAction) {
-        val hasRoutineChanges = action == ConfirmAction.FINISH_WORKOUT &&
-            repository.data.activeWorkout?.routineChanges(repository.data.routines) != null
-        if (repository.data.activeWorkout?.setCount() == 0 && !hasRoutineChanges) {
+    private fun confirmDiscardWorkout() {
+        val workout = repository.data.activeWorkout ?: return
+        fun discard() {
             discardActiveWorkout()
             repository.save()
             route = Route.Root
-        } else {
-            route = Route.Confirm(action)
+            render()
         }
-        render()
+        if (workout.exercises.size > 1 || workout.setCount() > 0) {
+            AlertDialog.Builder(this)
+                .setTitle("Discard workout?")
+                .setMessage("All exercises and sets in this workout will be removed.")
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Discard workout") { _, _ -> discard() }
+                .show()
+        } else {
+            discard()
+        }
     }
 
     private fun discardActiveWorkout() {
@@ -1028,7 +1055,7 @@ class MainActivity : AppCompatActivity() {
                     saveRoutineDraft(originalId)
                 }
             })
-            body.addView(actionButton("Cancel", secondary = true) { cancelRoutineEditor() },
+            body.addView(actionButton("Cancel", secondary = true) { cancelRoutineEditor(originalId) },
                 LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
                     topMargin = dp(16)
                 })
@@ -1685,7 +1712,6 @@ class MainActivity : AppCompatActivity() {
     private fun confirmationScreen(confirm: Route.Confirm): View {
         val (title, message, buttonLabel) = when (confirm.action) {
             ConfirmAction.FINISH_WORKOUT -> Triple("Finish workout?", "The workout and all logged sets will be saved to history.", "Finish and save")
-            ConfirmAction.DISCARD_WORKOUT -> Triple("Discard workout?", "All sets logged in this workout will be removed.", "Discard workout")
             ConfirmAction.DELETE_EXERCISE -> Triple("Delete exercise?", "The custom exercise will be removed from routines and the library.", "Delete exercise")
             ConfirmAction.DELETE_ROUTINE -> Triple("Delete routine?", "The routine will be removed. Workout history is unaffected.", "Delete routine")
             ConfirmAction.RESET_DATA -> Triple("Reset all app data?", "This permanently removes workout history, routines, custom exercises, and the active workout.", "Reset everything")
@@ -1720,7 +1746,6 @@ class MainActivity : AppCompatActivity() {
                             discardActiveWorkout()
                         }
                     }
-                    ConfirmAction.DISCARD_WORKOUT -> discardActiveWorkout()
                     ConfirmAction.DELETE_EXERCISE -> confirm.targetId?.let { id ->
                         val picture = repository.data.exercises.firstOrNull { it.id == id && it.custom }?.imageFile
                         repository.data.exercises.removeAll { it.id == id && it.custom }
@@ -1754,12 +1779,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun Routine.editableCopy(): Routine = copy(
+        exercises = exercises.map { item ->
+            item.copy(plannedSets = item.plannedSets.map { it.copy(actualHoldSeconds = null) }.toMutableList())
+        }.toMutableList(),
+    )
+
     private fun openRoutineEditor(existing: Routine?) {
-        routineDraft = existing?.copy(
-            exercises = existing.exercises.map { item ->
-                item.copy(plannedSets = item.plannedSets.map { it.copy(actualHoldSeconds = null) }.toMutableList())
-            }.toMutableList(),
-        ) ?: Routine(name = "")
+        routineDraft = existing?.editableCopy() ?: Routine(name = "")
         route = Route.RoutineEditor(existing?.id)
         render()
     }
@@ -1779,10 +1806,26 @@ class MainActivity : AppCompatActivity() {
         render()
     }
 
-    private fun cancelRoutineEditor() {
-        routineDraft = null
-        route = Route.Root
-        render()
+    private fun cancelRoutineEditor(originalId: String?) {
+        fun discard() {
+            routineDraft = null
+            route = Route.Root
+            render()
+        }
+        val editing = originalId != null
+        val original = repository.data.routines.firstOrNull { it.id == originalId }
+        val needsConfirmation = if (editing) routineDraft != original?.editableCopy()
+            else (routineDraft?.exercises?.size ?: 0) > 1
+        if (needsConfirmation) {
+            AlertDialog.Builder(this)
+                .setTitle(if (editing) "Discard changes?" else "Discard routine?")
+                .setMessage("Unsaved changes to this routine will be removed.")
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton(if (editing) "Discard changes" else "Discard routine") { _, _ -> discard() }
+                .show()
+        } else {
+            discard()
+        }
     }
 
     private fun togetherMenuButton(

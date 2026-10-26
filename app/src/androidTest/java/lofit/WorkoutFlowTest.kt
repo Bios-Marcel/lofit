@@ -394,6 +394,8 @@ class WorkoutFlowTest {
             Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
         try {
+            onView(withText("Finish workout")).perform(scrollTo()).check(matches(isDisplayed()))
+            pressBack()
             onView(withText("Ready to move?")).check(matches(isDisplayed()))
             onView(withText("Active workout")).check(matches(isDisplayed()))
             onView(withText("Resume workout")).check(matches(isDisplayed())).check(matches(isClickable()))
@@ -1019,28 +1021,123 @@ class WorkoutFlowTest {
     }
 
     @Test
-    fun finishingWorkoutWithNoDoneSets_discardsWithoutConfirmation() {
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val repository = LofitRepository(instrumentation.targetContext)
-        repository.data.routines.add(Routine(
-            name = "Strength",
-            exercises = mutableListOf(RoutineExercise(
-                exerciseId = "bench-press",
-                plannedSets = MutableList(3) { PlannedSet(weightKg = 60.0, reps = 5) },
-            )),
-        ))
-        repository.save()
-        val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        instrumentation.startActivitySync(intent)
+    fun finishWorkout_requiresDoneSetAndUpdatesAfterChanges() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)).use { scenario ->
+            onView(withText(R.string.start_workout)).perform(click())
+            onView(withText("Finish workout")).perform(scrollTo()).check(matches(not(isEnabled())))
+            onView(withText("Add exercise")).perform(scrollTo(), click())
+            onView(withHint("Search name or muscle")).perform(replaceText("Bench press"), closeSoftKeyboard())
+            onView(withContentDescription("Add Bench press")).perform(scrollTo(), click())
+            onView(withText("Add set")).perform(scrollTo(), click())
+            onView(withText("Finish workout")).perform(scrollTo()).check(matches(not(isEnabled())))
+            onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
+            onView(withText("Finish workout")).perform(scrollTo()).check(matches(isEnabled()))
+            onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
+            onView(withText("Finish workout")).perform(scrollTo()).check(matches(not(isEnabled())))
+            onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
+            scenario.recreate()
+            onView(withText("Finish workout")).perform(scrollTo()).check(matches(isEnabled()))
+            onView(withContentDescription("Remove Bench press")).perform(scrollTo(), click())
+            onView(withText("Finish workout")).perform(scrollTo()).check(matches(not(isEnabled())))
+            onView(withText("Discard workout")).perform(scrollTo(), click())
+            assertEquals(null, LofitRepository(context).data.activeWorkout)
+            assertEquals(0, LofitRepository(context).data.history.size)
+        }
+    }
 
-        onView(withText("Start routine")).perform(scrollTo(), click())
-        onView(withText("Finish workout")).perform(scrollTo(), click())
+    @Test
+    fun discardWorkout_multipleExercisesUsesModalAndKeepsWorkoutOnCancel() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        LofitRepository(context).apply {
+            data.routines.add(Routine(name = "Strength", exercises = mutableListOf(
+                RoutineExercise(exerciseId = "bench-press", plannedSets = mutableListOf(PlannedSet())),
+                RoutineExercise(exerciseId = "plank", plannedSets = mutableListOf(PlannedSet())),
+            )))
+            save()
+        }
+        ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)).use {
+            onView(withText("Start routine")).perform(scrollTo(), click())
+            val workoutId = LofitRepository(context).data.activeWorkout!!.id
+            onView(withText("Discard workout")).perform(scrollTo(), click())
+            onView(withText("Discard workout?")).inRoot(isDialog()).check(matches(isDisplayed()))
+            onView(withText("Cancel")).inRoot(isDialog()).perform(click())
+            assertEquals(workoutId, LofitRepository(context).data.activeWorkout!!.id)
+            onView(withText("Add exercise")).check(matches(isDisplayed()))
+            onView(withText("Discard workout")).perform(scrollTo(), click())
+            pressBack()
+            assertEquals(workoutId, LofitRepository(context).data.activeWorkout!!.id)
+            onView(withText("Discard workout")).perform(scrollTo(), click())
+            onView(withText("Discard workout")).inRoot(isDialog()).perform(click())
+            onView(withText(R.string.start_workout)).check(matches(isDisplayed()))
+            assertEquals(null, LofitRepository(context).data.activeWorkout)
+            assertEquals(0, LofitRepository(context).data.history.size)
+        }
+    }
 
-        onView(withText(R.string.start_workout)).check(matches(isDisplayed()))
-        val savedData = LofitRepository(instrumentation.targetContext).data
-        assertEquals(null, savedData.activeWorkout)
-        assertEquals(0, savedData.history.size)
+    @Test
+    fun cancelRoutine_multipleExercisesUsesModalAndKeepsDraftOnCancel() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)).use {
+            onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+            onView(allOf(withText(R.string.nav_routines), isClickable())).perform(click())
+            onView(withText("Create routine")).perform(click())
+            onView(withHint("Routine name")).perform(replaceText("Strength"), closeSoftKeyboard())
+            listOf("Bench press", "Plank").forEach { name ->
+                onView(withText("Add Exercise")).perform(scrollTo(), click())
+                onView(withHint("Search name or muscle")).perform(replaceText(name), closeSoftKeyboard())
+                onView(withContentDescription("Add $name")).perform(scrollTo(), click())
+            }
+            onView(withContentDescription("Set 1 weight")).perform(scrollTo(), replaceText("60"), closeSoftKeyboard())
+            onView(withText("Cancel")).perform(scrollTo(), click())
+            onView(withText("Discard routine?")).inRoot(isDialog()).check(matches(isDisplayed()))
+            onView(withText("Cancel")).inRoot(isDialog()).perform(click())
+            onView(withHint("Routine name")).perform(scrollTo()).check(matches(withText("Strength")))
+            onView(withContentDescription("Set 1 weight")).perform(scrollTo()).check(matches(withText("60")))
+            onView(withText("Plank")).perform(scrollTo()).check(matches(isDisplayed()))
+            assertTrue(LofitRepository(context).data.routines.isEmpty())
+            onView(withText("Cancel")).perform(scrollTo(), click())
+            pressBack()
+            onView(withHint("Routine name")).perform(scrollTo()).check(matches(withText("Strength")))
+            onView(withText("Cancel")).perform(scrollTo(), click())
+            onView(withText("Discard routine")).inRoot(isDialog()).perform(click())
+            onView(withText("Create routine")).check(matches(isDisplayed()))
+            assertTrue(LofitRepository(context).data.routines.isEmpty())
+        }
+    }
+
+    @Test
+    fun cancelRoutine_zeroOrOneExerciseNeedsNoConfirmation() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)).use {
+            onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+            onView(allOf(withText(R.string.nav_routines), isClickable())).perform(click())
+            repeat(2) { exerciseCount ->
+                onView(withText("Create routine")).perform(click())
+                if (exerciseCount == 1) {
+                    onView(withText("Add Exercise")).perform(scrollTo(), click())
+                    onView(withHint("Search name or muscle")).perform(replaceText("Bench press"), closeSoftKeyboard())
+                    onView(withContentDescription("Add Bench press")).perform(scrollTo(), click())
+                }
+                onView(withText("Cancel")).perform(scrollTo(), click())
+                onView(withText("Create routine")).check(matches(isDisplayed()))
+                assertTrue(LofitRepository(context).data.routines.isEmpty())
+            }
+        }
+    }
+
+    @Test
+    fun discardWorkout_singleExerciseWithNoDoneSetsNeedsNoConfirmation() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)).use {
+            onView(withText(R.string.start_workout)).perform(click())
+            onView(withText("Add exercise")).perform(scrollTo(), click())
+            onView(withHint("Search name or muscle")).perform(replaceText("Bench press"), closeSoftKeyboard())
+            onView(withContentDescription("Add Bench press")).perform(scrollTo(), click())
+            onView(withText("Discard workout")).perform(scrollTo(), click())
+            onView(withText(R.string.start_workout)).check(matches(isDisplayed()))
+            assertEquals(null, LofitRepository(context).data.activeWorkout)
+        }
     }
 
     @Test

@@ -79,7 +79,8 @@ class HealthConnectWeightReaderTest {
             onView(withContentDescription("Android health integration")).perform(click())
             assertEquals(false, LofitRepository(context).data.bodyMetricsEnabled)
             openScreen(activity, R.string.nav_workout)
-            onView(withText("Finish workout")).perform(scrollTo(), click())
+            onView(withContentDescription("Open active workout")).perform(click())
+            onView(withText("Discard workout")).perform(scrollTo(), click())
             onView(withText(R.string.start_workout)).perform(click())
             // Real weight data and OS permission remain available while app consent is off.
             assertEquals(80.0, read(reader, System.currentTimeMillis())!!, 0.0)
