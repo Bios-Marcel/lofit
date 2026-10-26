@@ -1502,19 +1502,7 @@ class MainActivity : AppCompatActivity() {
             exercise(exerciseId)?.let { it to sets }
         })
 
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            setPadding(0, dp(10), 0, dp(10))
-            listOf("Front" to MuscleMapSide.FRONT, "Back" to MuscleMapSide.BACK).forEach { (label, side) ->
-                addView(LinearLayout(this@MainActivity).apply {
-                    orientation = LinearLayout.VERTICAL
-                    gravity = Gravity.CENTER
-                    addView(metaText(label).apply { gravity = Gravity.CENTER })
-                    addView(MuscleMapView(this@MainActivity, side, workload, repository.data.biologicalGender))
-                }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-            }
-        }
+        return MuscleTargetPager(this, workload, repository.data.biologicalGender)
     }
 
     private fun recordsScreen(): View = page("Records", "Your best logged set for each exercise.") { body ->

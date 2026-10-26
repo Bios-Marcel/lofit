@@ -20,6 +20,7 @@ import androidx.test.espresso.action.ViewActions.closeSoftKeyboard
 import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.action.ViewActions.scrollTo
 import androidx.test.espresso.action.ViewActions.swipeLeft
+import androidx.test.espresso.action.ViewActions.swipeRight
 import androidx.test.espresso.action.ViewActions.typeText
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
@@ -165,6 +166,17 @@ class WorkoutFlowTest {
                     val state = view.stateDescription.toString()
                     assertTrue(state, state.contains("Triceps $triceps%"))
                 }
+                onView(withContentDescription("Muscle maps, page 1 of 2")).check(matches(isSelected()))
+                onView(withContentDescription("Muscle visualization pages")).perform(scrollTo(), swipeLeft())
+                onView(withContentDescription("Muscle targeting graph")).check(matches(isDisplayed())).check { view, _ ->
+                    assertEquals("Legs 0%, Arms 17%, Shoulders 17%, Back 0%, Chest 66%", view.stateDescription.toString())
+                }
+                onView(withContentDescription("Muscle targeting, page 2 of 2")).check(matches(isSelected()))
+                onView(withContentDescription("Muscle visualization pages")).perform(swipeRight())
+                onView(withContentDescription("Front muscle map")).check(matches(isDisplayed()))
+                onView(withContentDescription("Muscle targeting, page 2 of 2")).perform(scrollTo(), click())
+                onView(withContentDescription("Muscle targeting graph")).check(matches(isDisplayed()))
+                onView(withContentDescription("Muscle maps, page 1 of 2")).perform(scrollTo(), click())
             }
             checkMaps(chest = 100, triceps = 25)
             onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
