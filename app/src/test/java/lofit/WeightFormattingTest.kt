@@ -6,6 +6,15 @@ import org.junit.Test
 
 class WeightFormattingTest {
     @Test
+    fun bodyWeight_showsTwoDecimalPlacesInEachLocale() {
+        assertEquals("64.02", formatBodyWeight(64.020001002032, Locale.US))
+        assertEquals("64.03", formatBodyWeight(64.025, Locale.US))
+        assertEquals("64.00", formatBodyWeight(64.0, Locale.US))
+        assertEquals("64,02", formatBodyWeight(64.020001002032, Locale.GERMANY))
+        assertEquals("64,50", formatBodyWeight(64.5, Locale.GERMANY))
+    }
+
+    @Test
     fun fractionalWeights_keepAllDecimalPlaces() {
         listOf("0", "60", "1.25", "1.125", "1.23456789", "0.0000125", "1234567890.25").forEach { text ->
             val weight = text.toDouble()

@@ -2089,7 +2089,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun bodyWeightText(weight: Double): TextView =
-        metaText(getString(R.string.body_weight, formatWeight(weight))).apply {
+        metaText(getString(R.string.body_weight, formatBodyWeight(weight))).apply {
             contentDescription = "Workout body weight"
         }
 

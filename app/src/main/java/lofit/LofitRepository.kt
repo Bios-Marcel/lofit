@@ -106,7 +106,7 @@ class LofitRepository(context: Context) {
     private fun encodeWorkout(workout: WorkoutSession) = JSONObject().apply {
         put("id", workout.id)
         put("name", workout.name)
-        put("bodyWeightKg", workout.bodyWeightKg ?: JSONObject.NULL)
+        put("bodyWeightKg", workout.bodyWeightKg?.let(::roundBodyWeight) ?: JSONObject.NULL)
         put("sourceRoutine", workout.sourceRoutine?.let(::encodeRoutine) ?: JSONObject.NULL)
         put("intervals", JSONArray().apply {
             workout.intervals.forEach { interval ->
@@ -226,7 +226,7 @@ class LofitRepository(context: Context) {
     private fun decodeWorkout(value: JSONObject) = WorkoutSession(
         id = value.getString("id"),
         name = value.getString("name"),
-        bodyWeightKg = if (value.isNull("bodyWeightKg")) null else value.getDouble("bodyWeightKg"),
+        bodyWeightKg = if (value.isNull("bodyWeightKg")) null else roundBodyWeight(value.getDouble("bodyWeightKg")),
         sourceRoutine = if (value.isNull("sourceRoutine")) null else decodeRoutine(value.getJSONObject("sourceRoutine")),
         intervals = value.workoutIntervals(),
         defaultRestSeconds = value.getInt("defaultRestSeconds"),

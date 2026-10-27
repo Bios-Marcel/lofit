@@ -79,6 +79,27 @@ class StartupDataMigrationTest {
     }
 
     @Test
+    fun bodyWeight_roundsStoredAndExistingWorkoutsToTwoDecimalPlaces() {
+        val repository = LofitRepository(context)
+        repository.data.activeWorkout = WorkoutSession(name = "Active", bodyWeightKg = 64.020001002032)
+        repository.data.history.add(WorkoutSession(name = "Past", bodyWeightKg = 72.255))
+        repository.save()
+
+        val root = JSONObject(stored())
+        assertEquals(64.02, root.getJSONObject("activeWorkout").getDouble("bodyWeightKg"), 0.0)
+        assertEquals(72.26, root.getJSONArray("history").getJSONObject(0).getDouble("bodyWeightKg"), 0.0)
+
+        root.getJSONObject("activeWorkout").put("bodyWeightKg", 64.020001002032)
+        root.getJSONArray("history").getJSONObject(0).put("bodyWeightKg", 72.255)
+        store(root.toString())
+        val loaded = LofitRepository(context)
+        assertEquals(64.02, loaded.data.activeWorkout!!.bodyWeightKg!!, 0.0)
+        assertEquals(72.26, loaded.data.history.single().bodyWeightKg!!, 0.0)
+        loaded.save()
+        assertEquals(64.02, JSONObject(stored()).getJSONObject("activeWorkout").getDouble("bodyWeightKg"), 0.0)
+    }
+
+    @Test
     fun oldWorkoutsWithoutBodyWeight_stillLoad() {
         val repository = LofitRepository(context)
         repository.data.history.add(WorkoutSession(name = "Old", completedAt = 200))

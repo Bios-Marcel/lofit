@@ -29,6 +29,19 @@ class BodyWeightTest {
     }
 
     @Test
+    fun bodyWeight_roundsExactNearestAndAveragedMeasurementsToTwoDecimalPlaces() {
+        val precise = listOf(
+            BodyWeightMeasurement(100, 64.020001002032),
+            BodyWeightMeasurement(300, 64.03),
+        )
+        assertEquals(64.02, bodyWeightAt(100, precise)!!, 0.0)
+        assertEquals(64.02, bodyWeightAt(50, precise)!!, 0.0)
+        assertEquals(64.03, bodyWeightAt(500, precise)!!, 0.0)
+        assertEquals(64.03, bodyWeightAt(200, precise)!!, 0.0)
+        assertEquals(64.03, roundBodyWeight(64.025), 0.0)
+    }
+
+    @Test
     fun emptyOrInvalidMeasurements_leaveWeightUnknown() {
         assertNull(bodyWeightAt(200, emptyList()))
         assertNull(bodyWeightAt(200, listOf(

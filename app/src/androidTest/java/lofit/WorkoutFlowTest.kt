@@ -655,7 +655,7 @@ class WorkoutFlowTest {
             .check(matches(isClickable())).perform(scrollTo(), click())
         onView(withText("Calendar workout")).check(matches(isDisplayed()))
         onView(withContentDescription("Workout duration")).check(matches(withText("2:00")))
-        onView(withContentDescription("Workout body weight")).check(matches(withText("Body weight: 72.5 kg")))
+        onView(withContentDescription("Workout body weight")).check(matches(withText("Body weight: 72.50 kg")))
         onView(withContentDescription("Set 1 weight")).perform(scrollTo(), click())
             .check(matches(withText("67.5")))
         onView(withContentDescription("Set 1 done"))
