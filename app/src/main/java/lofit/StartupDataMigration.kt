@@ -7,7 +7,7 @@ import java.util.UUID
 /**
  * Unversioned data -> current schema. Called once, before the repository exposes data.
  * After installed data has migrated, delete this file and the schema-0 branch in load().
- * Keep schemaVersion in the current codec. The original JSON stays in state-before-migration-v1.
+ * Keep schemaVersion in the current codec. The original JSON stays in state-before-migration-v1.json.
  */
 internal object StartupDataMigration {
     fun migrate(root: JSONObject): AppData {

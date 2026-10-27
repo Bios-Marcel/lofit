@@ -37,7 +37,7 @@ class ExercisePicturesTest {
 
     @Before fun resetData() {
         instrumentation.uiAutomation.grantRuntimePermission(context.packageName, Manifest.permission.POST_NOTIFICATIONS)
-        context.getSharedPreferences("lofit-data", 0).edit().clear().commit()
+        context.clearRepositoryTestData()
         LofitRepository(context).apply {
             data.bodyMetricsEnabled = false
             data.onboardingComplete = true

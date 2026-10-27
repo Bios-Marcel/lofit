@@ -28,11 +28,10 @@ import org.junit.runner.RunWith
 class ExerciseRecencyTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
-    private val preferences = context.getSharedPreferences("lofit-data", 0)
 
     @Before fun resetData() {
         instrumentation.uiAutomation.grantRuntimePermission(context.packageName, Manifest.permission.POST_NOTIFICATIONS)
-        assertTrue(preferences.edit().clear().commit())
+        context.clearRepositoryTestData()
         LofitRepository(context).apply {
             data.onboardingComplete = true
             data.bodyMetricsEnabled = false
@@ -242,8 +241,8 @@ class ExerciseRecencyTest {
     }
 
     @Test fun oldDataUsesHistoryAndResetClearsSelectionRecency() {
-        val oldState = JSONObject(preferences.getString("state", null)!!).apply { remove("exerciseLastSelectedAt") }
-        assertTrue(preferences.edit().putString("state", oldState.toString()).commit())
+        val oldState = JSONObject(context.repositoryStateFile.readText()).apply { remove("exerciseLastSelectedAt") }
+        context.repositoryStateFile.writeText(oldState.toString())
         val loaded = LofitRepository(context)
         assertTrue(loaded.data.exerciseLastSelectedAt.isEmpty())
         assertEquals(listOf("bench-press", "recent-custom"), loaded.data.exercisesByRecency().take(2).map { it.id })

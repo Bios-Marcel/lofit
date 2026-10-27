@@ -80,11 +80,7 @@ class WorkoutFlowTest {
         instrumentation.uiAutomation.grantRuntimePermission(context.packageName, HealthPermissions.READ_HEART_RATE)
         instrumentation.uiAutomation.grantRuntimePermission(context.packageName, HealthPermissions.READ_HEALTH_DATA_HISTORY)
         context.getSystemService(NotificationManager::class.java).cancelAll()
-        context
-            .getSharedPreferences("lofit-data", 0)
-            .edit()
-            .clear()
-            .commit()
+        context.clearRepositoryTestData()
         LofitRepository(context).apply {
             data.bodyMetricsEnabled = false
             data.onboardingComplete = true
@@ -416,14 +412,14 @@ class WorkoutFlowTest {
             onView(withContentDescription("Open active workout")).perform(click())
             onView(withContentDescription("Set 1 Repetitions")).perform(replaceText("12"), closeSoftKeyboard())
             onView(withContentDescription("Set 1 done")).perform(click())
-            val storedState = context.getSharedPreferences("lofit-data", 0).getString("state", null)
+            val storedState = context.repositoryStateFile.readText()
 
             pressBack()
             onView(withText("Ready to move?")).check(matches(isDisplayed()))
             onView(withContentDescription("Open active workout")).perform(click())
             onView(withContentDescription("Set 1 Repetitions")).check(matches(withText("12")))
             onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
-            assertEquals(storedState, context.getSharedPreferences("lofit-data", 0).getString("state", null))
+            assertEquals(storedState, context.repositoryStateFile.readText())
 
             onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
             onView(withText(R.string.nav_workout)).perform(click())
@@ -643,7 +639,7 @@ class WorkoutFlowTest {
             )),
         ))
         repository.save()
-        val storedState = context.getSharedPreferences("lofit-data", 0).getString("state", null)
+        val storedState = context.repositoryStateFile.readText()
         val activity = instrumentation.startActivitySync(
             Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
@@ -667,7 +663,7 @@ class WorkoutFlowTest {
         onView(withContentDescription("Workout calendar")).check(matches(isDisplayed()))
         onView(withText(day.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault()))))
             .check(matches(isDisplayed()))
-        assertEquals(storedState, context.getSharedPreferences("lofit-data", 0).getString("state", null))
+        assertEquals(storedState, context.repositoryStateFile.readText())
         instrumentation.runOnMainSync { activity.finish() }
     }
 
@@ -684,7 +680,7 @@ class WorkoutFlowTest {
             ))
         }
         repository.save()
-        val storedState = context.getSharedPreferences("lofit-data", 0).getString("state", null)
+        val storedState = context.repositoryStateFile.readText()
         val activity = instrumentation.startActivitySync(
             Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
@@ -697,7 +693,7 @@ class WorkoutFlowTest {
             pressBack()
             onView(withContentDescription("Workout calendar")).check(matches(isDisplayed()))
         }
-        assertEquals(storedState, context.getSharedPreferences("lofit-data", 0).getString("state", null))
+        assertEquals(storedState, context.repositoryStateFile.readText())
         instrumentation.runOnMainSync { activity.finish() }
     }
 
@@ -726,6 +722,7 @@ class WorkoutFlowTest {
         val exercises = legacyTypes.mapIndexed { index, type ->
             """{"id":"legacy-$index","name":"Legacy $index","type":"$type","asymmetric":false,"primaryMuscle":"Core","secondaryMuscles":"","custom":true}"""
         }.joinToString(",")
+        context.clearRepositoryTestData()
         context.getSharedPreferences("lofit-data", 0).edit()
             .putString("state", """{"exercises":[$exercises],"routines":[],"history":[],"activeWorkout":null}""")
             .commit()
@@ -1779,7 +1776,7 @@ class WorkoutFlowTest {
         )
         repository.data.history.add(workout)
         repository.save()
-        val storedState = context.getSharedPreferences("lofit-data", 0).getString("state", null)
+        val storedState = context.repositoryStateFile.readText()
         val intent = Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         val activity = instrumentation.startActivitySync(intent)
 
@@ -1817,7 +1814,7 @@ class WorkoutFlowTest {
         onView(withContentDescription("Delete set 1")).check(doesNotExist())
         pressBack()
         onView(withContentDescription("View Past workout")).check(matches(isDisplayed()))
-        assertEquals(storedState, context.getSharedPreferences("lofit-data", 0).getString("state", null))
+        assertEquals(storedState, context.repositoryStateFile.readText())
         pressBack()
         onView(withText("Live workout")).check(matches(isDisplayed()))
         instrumentation.runOnMainSync { activity.finish() }
@@ -1929,7 +1926,7 @@ class WorkoutFlowTest {
         val workout = WorkoutSession(name = "Yesterday", startedAt = completedAt - 60_000, completedAt = completedAt)
         repository.data.history.add(workout)
         repository.save()
-        val storedState = context.getSharedPreferences("lofit-data", 0).getString("state", null)
+        val storedState = context.repositoryStateFile.readText()
         val activity = instrumentation.startActivitySync(
             Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
@@ -1939,7 +1936,7 @@ class WorkoutFlowTest {
         onView(withContentDescription("Continue Yesterday")).check(doesNotExist())
         onView(withContentDescription("View Yesterday")).perform(scrollTo()).check(matches(isDisplayed()))
         onView(withContentDescription("Create routine from Yesterday")).check(matches(isDisplayed()))
-        assertEquals(storedState, context.getSharedPreferences("lofit-data", 0).getString("state", null))
+        assertEquals(storedState, context.repositoryStateFile.readText())
         instrumentation.runOnMainSync { activity.finish() }
     }
 

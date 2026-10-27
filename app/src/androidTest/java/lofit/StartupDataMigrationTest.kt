@@ -1,7 +1,7 @@
 package lofit
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
+import java.io.File
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Before
@@ -10,13 +10,12 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class StartupDataMigrationTest {
-    private val context = InstrumentationRegistry.getInstrumentation().targetContext
-    private val preferences = context.getSharedPreferences("lofit-data", 0)
+    private val context = RepositoryTestContext("schema-migration")
     private val backupKey = "state-before-migration-v1"
 
     @Before
     fun clearData() {
-        assertTrue(preferences.edit().clear().commit())
+        context.clearRepositoryTestData()
     }
 
     @Test
@@ -143,7 +142,7 @@ class StartupDataMigrationTest {
 
         val data = LofitRepository(context).data
 
-        assertEquals(raw, preferences.getString(backupKey, null))
+        assertEquals(raw, File(context.filesDir, "$backupKey.json").readText())
         assertEquals(2, JSONObject(stored()).getInt("schemaVersion"))
         assertFalse(stored().contains("targetSets"))
         assertFalse(stored().contains("targetReps"))
@@ -202,7 +201,7 @@ class StartupDataMigrationTest {
         assertEquals("Edited", third.data.routines.single().name)
         assertTrue(third.data.routines.single().exercises.single().plannedSets.isEmpty())
         assertEquals(saved, stored())
-        assertEquals(raw, preferences.getString(backupKey, null))
+        assertEquals(raw, File(context.filesDir, "$backupKey.json").readText())
     }
 
     @Test
@@ -282,7 +281,7 @@ class StartupDataMigrationTest {
 
         assertEquals(data, LofitRepository(context).data)
         assertEquals(data, LofitRepository(context).data)
-        assertEquals(raw, preferences.getString(backupKey, null))
+        assertEquals(raw, File(context.filesDir, "$backupKey.json").readText())
     }
 
     @Test
@@ -305,7 +304,7 @@ class StartupDataMigrationTest {
 
         assertEquals(listOf(WorkoutInterval(100, 250)), loaded.data.history.single().intervals)
         assertEquals(listOf(WorkoutInterval(300)), loaded.data.activeWorkout!!.intervals)
-        assertEquals(raw, preferences.getString("state-before-migration-v2", null))
+        assertEquals(raw, File(context.filesDir, "state-before-migration-v2.json").readText())
         val migrated = stored()
         assertEquals(2, JSONObject(migrated).getInt("schemaVersion"))
         assertFalse(JSONObject(migrated).getJSONArray("history").getJSONObject(0).has("startedAt"))
@@ -354,7 +353,7 @@ class StartupDataMigrationTest {
 
         assertNull(loaded.data.history.single().exercises.single().plannedSets.single().actualHoldSeconds)
         assertEquals(raw, stored())
-        assertFalse(preferences.contains(backupKey))
+        assertFalse(File(context.filesDir, "$backupKey.json").exists())
     }
 
     @Test
@@ -364,11 +363,11 @@ class StartupDataMigrationTest {
 
         assertThrows(IllegalArgumentException::class.java) { LofitRepository(context) }
         assertEquals(raw, stored())
-        assertFalse(preferences.contains(backupKey))
+        assertFalse(File(context.filesDir, "$backupKey.json").exists())
 
         store(raw.replace("UNKNOWN", "STRETCH"))
         assertEquals(ExerciseType.TIMED, LofitRepository(context).data.exercises.single { it.id == "bad" }.type)
-        assertTrue(preferences.contains(backupKey))
+        assertTrue(File(context.filesDir, "$backupKey.json").exists())
     }
 
     @Test
@@ -377,7 +376,7 @@ class StartupDataMigrationTest {
             store(raw)
             assertThrows(Exception::class.java) { LofitRepository(context) }
             assertEquals(raw, stored())
-            assertFalse(preferences.contains(backupKey))
+            assertFalse(File(context.filesDir, "$backupKey.json").exists())
         }
     }
 
@@ -397,12 +396,12 @@ class StartupDataMigrationTest {
 
         assertThrows(IllegalArgumentException::class.java) { LofitRepository(context) }
         assertEquals(raw, stored())
-        assertFalse(preferences.contains(backupKey))
+        assertFalse(File(context.filesDir, "$backupKey.json").exists())
     }
 
     private fun store(raw: String) {
-        assertTrue(preferences.edit().putString("state", raw).commit())
+        context.repositoryStateFile.writeText(raw)
     }
 
-    private fun stored(): String = preferences.getString("state", null)!!
+    private fun stored(): String = context.repositoryStateFile.readText()
 }

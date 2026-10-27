@@ -26,11 +26,10 @@ import org.junit.runner.RunWith
 class ExerciseNotesTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
-    private val preferences = context.getSharedPreferences("lofit-data", 0)
 
     @Before fun resetData() {
         instrumentation.uiAutomation.grantRuntimePermission(context.packageName, Manifest.permission.POST_NOTIFICATIONS)
-        preferences.edit().clear().commit()
+        context.clearRepositoryTestData()
         LofitRepository(context).apply {
             data.bodyMetricsEnabled = false
             data.onboardingComplete = true
@@ -158,14 +157,14 @@ class ExerciseNotesTest {
             data.history.add(data.activeWorkout!!.copy(id = "past", intervals = mutableListOf(WorkoutInterval(100, 200))))
             save()
         }
-        val root = JSONObject(preferences.getString("state", null)!!)
+        val root = JSONObject(context.repositoryStateFile.readText())
         root.getJSONArray("routines").getJSONObject(0).getJSONArray("exercises").getJSONObject(0).remove("note")
         listOf(root.getJSONObject("activeWorkout"), root.getJSONArray("history").getJSONObject(0)).forEach { workout ->
             workout.getJSONArray("exercises").getJSONObject(0).remove("note")
             workout.getJSONArray("exercises").getJSONObject(0).remove("previousNote")
             workout.getJSONObject("sourceRoutine").getJSONArray("exercises").getJSONObject(0).remove("note")
         }
-        assertTrue(preferences.edit().putString("state", root.toString()).commit())
+        context.repositoryStateFile.writeText(root.toString())
         val loaded = LofitRepository(context).data
         assertEquals("", loaded.routines.single().exercises.single().note)
         assertEquals("", loaded.activeWorkout!!.exercises.single().note)

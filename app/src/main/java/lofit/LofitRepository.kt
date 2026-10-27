@@ -1,35 +1,43 @@
 package lofit
 
 import android.content.Context
-import androidx.core.content.edit
+import android.util.AtomicFile
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 
 class LofitRepository(context: Context) {
     private companion object {
         const val SCHEMA_VERSION = 2
     }
 
-    private val preferences = context.getSharedPreferences("lofit-data", Context.MODE_PRIVATE)
+    private val stateFile = AtomicFile(File(context.filesDir, "lofit-data.json"))
+    private val preferences by lazy { context.getSharedPreferences("lofit-data", Context.MODE_PRIVATE) }
     var data: AppData = load()
         private set
 
     fun save() {
-        preferences.edit { putString("state", encode(data).toString()) }
+        write(encode(data).toString())
     }
 
     fun reset() {
-        data = AppData()
-        preferences.edit { clear() }
+        val fresh = AppData()
+        write(encode(fresh).toString())
+        data = fresh
     }
 
     private fun load(): AppData {
-        val raw = preferences.getString("state", null) ?: return AppData()
+        val hasJson = exists(stateFile)
+        val raw = if (hasJson) stateFile.readFully().toString(Charsets.UTF_8)
+            else preferences.getString("state", null) ?: return AppData()
         val root = JSONObject(raw)
         return when (val version = if (root.has("schemaVersion")) root.getInt("schemaVersion") else 0) {
             0 -> persistMigration(raw, StartupDataMigration.migrate(root), "state-before-migration-v1")
             1 -> persistMigration(raw, decode(root), "state-before-migration-v2")
-            SCHEMA_VERSION -> decode(root)
+            SCHEMA_VERSION -> decode(root).also {
+                // Copy only after validation. Keep the original XML and its backups untouched.
+                if (!hasJson) write(raw)
+            }
             else -> error("Unsupported data schema: $version")
         }
     }
@@ -38,12 +46,24 @@ class LofitRepository(context: Context) {
         val migrated = encode(data)
         // Validate before changing stored data, and keep the original for recovery.
         val loaded = decode(migrated)
-        val edit = preferences.edit()
-        if (!preferences.contains(backupKey)) edit.putString(backupKey, raw)
-        check(edit.putString("state", migrated.toString()).commit()) {
-            "Could not persist startup data migration"
-        }
+        val backup = AtomicFile(File(stateFile.baseFile.parentFile, "$backupKey.json"))
+        if (!exists(backup)) write(raw, backup)
+        write(migrated.toString())
         return loaded
+    }
+
+    private fun exists(file: AtomicFile): Boolean =
+        file.baseFile.exists() || File("${file.baseFile.path}.bak").exists()
+
+    private fun write(raw: String, file: AtomicFile = stateFile) {
+        val stream = file.startWrite()
+        try {
+            stream.write(raw.toByteArray(Charsets.UTF_8))
+            file.finishWrite(stream)
+        } catch (failure: Throwable) {
+            file.failWrite(stream)
+            throw failure
+        }
     }
 
     private fun encode(data: AppData) = JSONObject().apply {

@@ -1,7 +1,6 @@
 package lofit
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Before
@@ -10,12 +9,11 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class ExerciseRecordsStorageTest {
-    private val context = InstrumentationRegistry.getInstrumentation().targetContext
-    private val preferences = context.getSharedPreferences("lofit-data", 0)
+    private val context = RepositoryTestContext("exercise-records")
 
     @Before
     fun clearData() {
-        assertTrue(preferences.edit().clear().commit())
+        context.clearRepositoryTestData()
     }
 
     @Test
@@ -76,8 +74,8 @@ class ExerciseRecordsStorageTest {
             ))),
         ))
         repository.save()
-        val oldState = JSONObject(preferences.getString("state", null)!!).apply { remove("exerciseRecords") }
-        assertTrue(preferences.edit().putString("state", oldState.toString()).commit())
+        val oldState = JSONObject(context.repositoryStateFile.readText()).apply { remove("exerciseRecords") }
+        context.repositoryStateFile.writeText(oldState.toString())
 
         val loaded = LofitRepository(context)
         assertEquals(1, loaded.data.history.size)

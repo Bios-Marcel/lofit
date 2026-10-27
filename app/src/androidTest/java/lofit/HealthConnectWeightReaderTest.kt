@@ -38,7 +38,7 @@ class HealthConnectWeightReaderTest {
     fun healthConnect_readsNearestWeightsAndWorkoutSavesSnapshot() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
-        context.getSharedPreferences("lofit-data", 0).edit().clear().commit()
+        context.clearRepositoryTestData()
         LofitRepository(context).apply { data.bodyMetricsEnabled = true; data.onboardingComplete = true; save() }
         instrumentation.uiAutomation.grantRuntimePermission(context.packageName, Manifest.permission.POST_NOTIFICATIONS)
         instrumentation.uiAutomation.grantRuntimePermission(context.packageName, HealthPermissions.READ_WEIGHT)
