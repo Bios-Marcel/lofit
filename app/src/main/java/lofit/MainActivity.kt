@@ -1149,9 +1149,7 @@ class MainActivity : AppCompatActivity() {
             if (movements.isEmpty()) return
             WindowCompat.getInsetsController(window, search).hide(WindowInsetsCompat.Type.ime())
             search.clearFocus()
-            val selectedAt = System.currentTimeMillis()
             movements.forEach { movement ->
-                repository.data.exerciseLastSelectedAt[movement.id] = selectedAt
                 if (target == PickerTarget.WORKOUT) {
                     val item = repository.data.lastKnownExercise(movement.id,
                         preferredRoutineId = repository.data.activeWorkout?.sourceRoutine?.id)
@@ -1800,6 +1798,7 @@ class MainActivity : AppCompatActivity() {
                             discardActiveWorkout()
                         } else {
                             workout.finish()
+                            repository.data.recordExerciseRecency(workout)
                             repository.data.recordWorkout(workout)
                             repository.data.history.add(workout)
                             discardActiveWorkout()

@@ -58,7 +58,7 @@ class ExerciseRecencyTest {
         return names
     }
 
-    @Test fun bothSelectorsPrioritizeHistoryAndPersistNewPicksAcrossRestartAndSearch() {
+    @Test fun bothSelectorsPrioritizeHistoryUntilWorkoutFinishes() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             onView(withText(R.string.start_workout)).perform(scrollTo(), click())
             onView(withText("Add exercise")).perform(scrollTo(), click())
@@ -69,14 +69,14 @@ class ExerciseRecencyTest {
             onView(withContentDescription("Add Recent curl")).perform(scrollTo(), click())
             scenario.recreate()
             onView(withText("Add exercise")).perform(scrollTo(), click())
-            assertEquals(listOf("Recent curl", "Bench press"), pickerNames(scenario).take(2))
+            assertEquals(listOf("Bench press", "Recent curl"), pickerNames(scenario).take(2))
             onView(withContentDescription("Search exercises")).perform(replaceText("Chest"), closeSoftKeyboard())
             assertEquals("Bench press", pickerNames(scenario).first())
             assertFalse(pickerNames(scenario).contains("Recent curl"))
             onView(withContentDescription("Search exercises")).perform(replaceText("no-such-exercise"), closeSoftKeyboard())
             onView(withText("No matching exercises.")).check(matches(isDisplayed()))
             onView(withContentDescription("Search exercises")).perform(replaceText(""), closeSoftKeyboard())
-            assertEquals("Recent curl", pickerNames(scenario).first())
+            assertEquals("Bench press", pickerNames(scenario).first())
             pressBack()
 
             scenario.onActivity { activity ->
@@ -87,7 +87,7 @@ class ExerciseRecencyTest {
             onView(withText("Create routine")).perform(scrollTo(), click())
             onView(withHint("Routine name")).perform(replaceText("Recent routine"), closeSoftKeyboard())
             onView(withText("Add Exercise")).perform(scrollTo(), click())
-            assertEquals(listOf("Recent curl", "Bench press"), pickerNames(scenario).take(2))
+            assertEquals(listOf("Bench press", "Recent curl"), pickerNames(scenario).take(2))
             onView(withContentDescription("Add Bench press")).perform(scrollTo(), click())
             onView(withText("Save routine")).perform(scrollTo(), click())
             scenario.recreate()
@@ -121,11 +121,29 @@ class ExerciseRecencyTest {
 
             assertEquals(listOf("recent-custom", "bench-press"),
                 LofitRepository(context).data.activeWorkout!!.exercises.map { exercise -> exercise.exerciseId })
-            assertTrue(LofitRepository(context).data.exerciseLastSelectedAt.keys.containsAll(listOf("bench-press", "recent-custom")))
+            assertTrue(LofitRepository(context).data.exerciseLastSelectedAt.isEmpty())
             onView(withContentDescription("Search exercises")).check(androidx.test.espresso.assertion.ViewAssertions.doesNotExist())
             onView(withText("Add exercise")).perform(scrollTo(), click())
             onView(withContentDescription("Add selected exercises")).check(matches(org.hamcrest.Matchers.not(isEnabled())))
             pressBack()
+        }
+    }
+
+    @Test fun finishingWorkoutUpdatesRecencyAfterAddingAndLoggingExercise() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            onView(withText(R.string.start_workout)).perform(scrollTo(), click())
+            onView(withText("Add exercise")).perform(scrollTo(), click())
+            onView(withContentDescription("Add Recent curl")).perform(scrollTo(), click())
+            onView(withText("Add set")).perform(scrollTo(), click())
+            onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
+            scenario.recreate()
+            assertTrue(LofitRepository(context).data.exerciseLastSelectedAt.isEmpty())
+            onView(withText("Finish workout")).perform(scrollTo(), click())
+            onView(withText("Finish and save")).perform(click())
+            val data = LofitRepository(context).data
+            val completedAt = data.history.single { it.name == "Open workout" }.completedAt!!
+            assertEquals(completedAt, data.exerciseLastSelectedAt["recent-custom"])
+            assertEquals("recent-custom", data.exercisesByRecency().first().id)
         }
     }
 
