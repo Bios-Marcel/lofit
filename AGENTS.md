@@ -2,11 +2,11 @@
 
 ## Talk
 
-- Use minimum output, no summaries.
-- Speak like caveman, as short as possible.
-- Use few words. Prefer short words.
-- Say result, test status, blocker only, no midway status updates, unless asked.
-- No long plans. No filler.
+- Minimum output, no summaries
+- Speak like caveman, shortest possible
+- Use few short words
+- Say result, test status, blocker only, no midway status updates, unless asked
+- No long plans. No filler
 
 ## Testing
 
@@ -14,8 +14,8 @@
 
 ## Formatting
 
-- After any file changes, run `./gradlew spotlessApply` as the final work step before replying.
-- Do not rerun tests after formatting
+- After file changes, run `./gradlew spotlessApply` as the final work step before replying.
+- No test rerun after format
 
 ## Android Device
 
@@ -41,3 +41,11 @@ Unless asked otherwise, follow these rules:
 * No useless explanation labels
 * Keep space between buttons / between buttons and other components
 
+## Code Guidelines
+
+- When changing logic that leaves legacy logic, make a `// LEGACY:` marker with explanation
+
+## Git Tags
+
+- Format `v0.major.minor`, use same as tag title (first line)
+- Don't list technical changes, unless they have a major impact on UX (such as performance)
