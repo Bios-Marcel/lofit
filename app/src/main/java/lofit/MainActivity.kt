@@ -78,6 +78,8 @@ import java.util.Date
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.Executors
+import java.util.concurrent.FutureTask
+import java.util.concurrent.TimeUnit
 import kotlin.math.max
 
 class MainActivity : AppCompatActivity() {
@@ -154,6 +156,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private lateinit var repository: LofitRepository
+    private var mcpServer: McpHttpServer? = null
     private data class PreviousScreen(
         val screen: Screen,
         val route: Route,
@@ -309,6 +312,7 @@ class MainActivity : AppCompatActivity() {
         )
         buildShell()
         render()
+        updateMcpServer()
         exerciseDraft?.getString("pendingPicture")?.let { importExercisePicture(Uri.parse(it)) }
         if (repository.data.onboardingComplete && !healthPermissionPending) {
             repository.data.activeWorkout?.let { workout ->
@@ -348,6 +352,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        mcpServer?.close()
+        mcpServer = null
         workoutFileGeneration++
         workoutFileWorker.shutdownNow()
         pictureGeneration++
@@ -553,6 +559,7 @@ class MainActivity : AppCompatActivity() {
                 })
             })
         })
+        body.addView(mcpSettings())
         body.addView(sectionTitle("Android health integration"))
         body.addView(healthIntegrationChoice(repository.data.bodyMetricsEnabled == true, ::setBodyMetricsEnabled))
         body.addView(actionButton("Manage health access", secondary = true) {
@@ -575,6 +582,68 @@ class MainActivity : AppCompatActivity() {
             route = Route.Confirm(ConfirmAction.RESET_DATA)
             render()
         })
+    }
+
+    private fun mcpSettings(): View = card {
+        addView(LinearLayout(this@MainActivity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(titleText("MCP server"), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginEnd = dp(12)
+            })
+            addView(Switch(this@MainActivity).apply {
+                isChecked = repository.data.mcpEnabled
+                showText = false
+                minWidth = dp(72)
+                thumbTintList = ColorStateList.valueOf(color(R.color.cream))
+                trackDrawable = ContextCompat.getDrawable(this@MainActivity, R.drawable.switch_track)
+                trackTintList = toggleTint()
+                contentDescription = "MCP server"
+                setOnCheckedChangeListener { _, enabled ->
+                    repository.data.mcpEnabled = enabled
+                    repository.save()
+                    updateMcpServer()
+                    render()
+                }
+            })
+        })
+        if (repository.data.mcpEnabled) {
+            McpHttpServer.urls().forEach { url ->
+                addView(metaText(url).apply { setTextIsSelectable(true) })
+            }
+        }
+    }
+
+    private fun updateMcpServer() {
+        if (!repository.data.mcpEnabled) {
+            mcpServer?.close()
+            mcpServer = null
+            return
+        }
+        if (mcpServer != null) return
+        val protocol = McpProtocol(repository) {
+            if (route == Route.Root && currentScreen in listOf(Screen.HOME, Screen.ROUTINES)) render()
+        }
+        try {
+            lateinit var server: McpHttpServer
+            server = McpHttpServer { body ->
+                val task = FutureTask {
+                    check(mcpServer === server && repository.data.mcpEnabled && !isDestroyed)
+                    protocol.handle(body)?.toString()
+                }
+                handler.post(task)
+                try {
+                    task.get(10, TimeUnit.SECONDS)
+                } finally {
+                    task.cancel(false)
+                }
+            }
+            mcpServer = server
+        } catch (_: Exception) {
+            repository.data.mcpEnabled = false
+            repository.save()
+            Toast.makeText(this, "MCP server could not start", Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun workoutHome(): View = page("Ready to move?", "Local, focused, yours.") { body ->
@@ -1748,6 +1817,7 @@ class MainActivity : AppCompatActivity() {
                     ConfirmAction.RESET_DATA -> {
                         val pictures = repository.data.exercises.mapNotNull { it.imageFile }
                         repository.reset()
+                        updateMcpServer()
                         pictures.forEach(::deleteUnsavedPicture)
                         onboardingGender = repository.data.biologicalGender
                         onboardingHealthEnabled = false

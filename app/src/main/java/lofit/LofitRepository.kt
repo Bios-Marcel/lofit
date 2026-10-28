@@ -85,13 +85,14 @@ class LofitRepository(context: Context) {
         })
         put("activeWorkout", data.activeWorkout?.let(::encodeWorkout) ?: JSONObject.NULL)
         put("soundCuesEnabled", data.soundCuesEnabled)
+        put("mcpEnabled", data.mcpEnabled)
         put("bodyMetricsEnabled", data.bodyMetricsEnabled ?: JSONObject.NULL)
         put("biologicalGender", data.biologicalGender.name)
         put("onboardingComplete", data.onboardingComplete)
         put("exerciseLastSelectedAt", JSONObject(data.exerciseLastSelectedAt))
     }
 
-    private fun encodeExercise(exercise: Exercise) = JSONObject().apply {
+    internal fun encodeExercise(exercise: Exercise) = JSONObject().apply {
         put("id", exercise.id)
         put("name", exercise.name)
         put("type", exercise.type.name)
@@ -106,7 +107,7 @@ class LofitRepository(context: Context) {
         put("imageFile", exercise.imageFile ?: JSONObject.NULL)
     }
 
-    private fun encodeRoutine(routine: Routine) = JSONObject().apply {
+    internal fun encodeRoutine(routine: Routine) = JSONObject().apply {
         put("id", routine.id)
         put("name", routine.name)
         put("defaultRestSeconds", routine.defaultRestSeconds)
@@ -123,7 +124,7 @@ class LofitRepository(context: Context) {
         })
     }
 
-    private fun encodeWorkout(workout: WorkoutSession) = JSONObject().apply {
+    internal fun encodeWorkout(workout: WorkoutSession) = JSONObject().apply {
         put("id", workout.id)
         put("name", workout.name)
         put("bodyWeightKg", workout.bodyWeightKg?.let(::roundBodyWeight) ?: JSONObject.NULL)
@@ -179,6 +180,7 @@ class LofitRepository(context: Context) {
             history = root.getJSONArray("history").mapObjects(::decodeWorkout).toMutableList(),
             activeWorkout = if (root.isNull("activeWorkout")) null else decodeWorkout(root.getJSONObject("activeWorkout")),
             soundCuesEnabled = root.getBoolean("soundCuesEnabled"),
+            mcpEnabled = root.optBoolean("mcpEnabled", false),
             bodyMetricsEnabled = if (root.isNull("bodyMetricsEnabled")) null else root.getBoolean("bodyMetricsEnabled"),
             biologicalGender = BiologicalGender.valueOf(root.optString("biologicalGender", BiologicalGender.MALE.name)),
             onboardingComplete = root.optBoolean("onboardingComplete", false),

@@ -4,6 +4,9 @@ plugins {
 
 android {
     namespace = "lofit"
+    buildFeatures {
+        buildConfig = true
+    }
     compileSdk {
         version = release(37)
     }
@@ -31,8 +34,10 @@ android {
     buildTypes {
         debug {
             applicationIdSuffix = ".test"
+            buildConfigField("int", "MCP_PORT", "8765")
         }
         release {
+            buildConfigField("int", "MCP_PORT", "8766")
             signingConfig = signingConfigs.getByName(if (releaseKeystore != null) "release" else "debug")
             optimization {
                 enable = true

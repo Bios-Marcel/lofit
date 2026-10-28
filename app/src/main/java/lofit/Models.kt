@@ -219,6 +219,7 @@ data class AppData(
     var onboardingComplete: Boolean = false,
     val exerciseRecords: MutableMap<String, MutableList<ExerciseRecord>> = mutableMapOf(),
     val exerciseLastSelectedAt: MutableMap<String, Long> = mutableMapOf(),
+    var mcpEnabled: Boolean = false,
 ) {
     fun resumeWorkout(workoutId: String, resumedAt: Long = System.currentTimeMillis()): WorkoutSession? {
         if (activeWorkout != null) return null
