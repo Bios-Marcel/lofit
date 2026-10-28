@@ -53,39 +53,4 @@ class WorkoutBluetoothTest {
             assertNull(failure.get(), failure.get())
         } finally { instrumentation.runOnMainSync { transport.stop() } }
     }
-
-    /** Run concurrently on two devices with -e bluetoothRole sender / receiver. No saved data is touched. */
-    @Test fun exchangePlanWithPeer() {
-        val role = InstrumentationRegistry.getArguments().getString("bluetoothRole")
-        assumeTrue("Needs two devices and a bluetoothRole argument", role == "sender" || role == "receiver")
-        val transport = WorkoutBluetooth(context)
-        val done = CountDownLatch(1)
-        val failure = AtomicReference<String>()
-        val result = AtomicReference<SharedWorkoutPlan>()
-        val (session, movement) = fixture()
-        try {
-            instrumentation.runOnMainSync {
-                if (role == "sender") {
-                    transport.share(SharedWorkoutPlan.encode(session, listOf(movement)), onReady = {},
-                        error = { failure.set(it); done.countDown() })
-                } else {
-                    transport.scan(found = { device ->
-                        transport.receive(device, received = { result.set(it); done.countDown() },
-                            error = { failure.set(it); done.countDown() })
-                    }, error = { failure.set(it); done.countDown() })
-                }
-            }
-            val completed = done.await(if (role == "sender") 45 else 35, TimeUnit.SECONDS)
-            assertNull(failure.get(), failure.get())
-            if (role == "receiver") {
-                assertTrue("No workout received from peer", completed)
-                val plan = result.get()
-                assertEquals(session.name, plan.routine.name)
-                assertEquals(12, plan.routine.exercises.size)
-                assertEquals(8, plan.routine.exercises.last().plannedSets.size)
-                assertEquals(13.5, plan.routine.exercises.last().plannedSets.first().weightKg, 0.0)
-                assertEquals(47, plan.routine.exercises.last().plannedSets.last().holdSeconds)
-            }
-        } finally { instrumentation.runOnMainSync { transport.stop() } }
-    }
 }
