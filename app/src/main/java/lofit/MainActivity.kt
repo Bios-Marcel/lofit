@@ -184,6 +184,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private lateinit var repository: LofitRepository
+    private val hevySettings by lazy { HevySettings(this) }
+    private val hevyWorker = Executors.newSingleThreadExecutor()
     private var mcpServer: McpHttpServer? = null
 
     private data class PreviousScreen(
@@ -305,6 +307,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        hevySettings
         repository = LofitRepository(this)
         cueSounds =
             SoundPool.Builder()
@@ -412,6 +415,7 @@ class MainActivity : AppCompatActivity() {
         mcpServer = null
         workoutFileGeneration++
         workoutFileWorker.shutdownNow()
+        hevyWorker.shutdown()
         pictureGeneration++
         pictureWorker.shutdown()
         if (isFinishing) {
@@ -709,6 +713,7 @@ class MainActivity : AppCompatActivity() {
                 }
             )
             body.addView(mcpSettings())
+            body.addView(hevySettingsCard())
             body.addView(sectionTitle("Android health integration"))
             body.addView(
                 healthIntegrationChoice(
@@ -754,6 +759,68 @@ class MainActivity : AppCompatActivity() {
                 }
             )
         }
+
+    private fun hevySettingsCard(): View = card {
+        addView(titleText("Hevy export"))
+        addView(
+            metaText(
+                "Use access and refresh tokens from one Hevy session, or a Hevy Pro API key. Refreshing a browser session may sign it out."
+            )
+        )
+        val initialToken = hevySettings.accessToken
+        val initialRefresh = hevySettings.refreshToken
+        val initialKey = hevySettings.apiKey
+        val tokenField =
+            textField("Bearer token").apply {
+                setText(initialToken)
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+                contentDescription = "Hevy bearer token"
+            }
+        val keyField =
+            textField("API key (optional)").apply {
+                setText(initialKey)
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+                contentDescription = "Hevy API key"
+            }
+        val refreshField =
+            textField("Refresh token (for auto renewal)").apply {
+                setText(initialRefresh)
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+                contentDescription = "Hevy refresh token"
+            }
+        listOf(tokenField, refreshField, keyField).forEach { field ->
+            addView(
+                field,
+                LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    )
+                    .apply { bottomMargin = dp(10) },
+            )
+        }
+        addView(
+            actionButton("Save Hevy tokens", secondary = true) {
+                val access = tokenField.text.toString().trim()
+                val refresh = refreshField.text.toString().trim()
+                val accessChanged =
+                    access.replace(Regex("^Bearer\\s+", RegexOption.IGNORE_CASE), "") !=
+                        initialToken
+                val refreshChanged = refresh != initialRefresh
+                if (accessChanged || refreshChanged) {
+                    hevySettings.saveTokenPair(
+                        access,
+                        if (accessChanged && !refreshChanged) "" else refresh,
+                    )
+                    refreshField.setText(hevySettings.refreshToken)
+                }
+                hevySettings.apiKey =
+                    if (accessChanged && keyField.text.toString() == initialKey) ""
+                    else keyField.text.toString()
+                keyField.setText(hevySettings.apiKey)
+                Toast.makeText(this@MainActivity, "Hevy tokens saved", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
 
     private fun mcpSettings(): View = card {
         addView(
@@ -2260,6 +2327,30 @@ class MainActivity : AppCompatActivity() {
                                     topMargin = dp(12)
                                 },
                         )
+                        val hevyWorkoutId = hevySettings.remoteWorkoutId(workout.id)
+                        if (
+                            workout.setCount() > 0 &&
+                                (hevyWorkoutId == null || hevySettings.apiKey.isNotBlank())
+                        ) {
+                            val label =
+                                if (hevyWorkoutId == null) "Export to Hevy" else "Update on Hevy"
+                            addView(
+                                actionButton(label, secondary = true) {
+                                        exportWorkoutToHevy(
+                                            workout,
+                                            repository.data.exercises.toList(),
+                                        )
+                                    }
+                                    .apply {
+                                        contentDescription = "$label ${workout.name}"
+                                    },
+                                LinearLayout.LayoutParams(
+                                        ViewGroup.LayoutParams.MATCH_PARENT,
+                                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                                    )
+                                    .apply { topMargin = dp(12) },
+                            )
+                        }
                     }
                 )
             }
@@ -2367,6 +2458,26 @@ class MainActivity : AppCompatActivity() {
                         }
                     )
                 }
+            }
+            if (
+                workout.setCount() > 0 &&
+                    (hevySettings.apiKey.isNotBlank() ||
+                        hevySettings.remoteWorkoutId(workout.id) == null)
+            ) {
+                body.addView(
+                    actionButton(
+                        if (hevySettings.remoteWorkoutId(workout.id) == null) "Export to Hevy"
+                        else "Update on Hevy",
+                        secondary = true,
+                    ) {
+                        exportWorkoutToHevy(workout, repository.data.exercises.toList())
+                    },
+                    LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                        )
+                        .apply { topMargin = dp(12) },
+                )
             }
         }
 
@@ -2726,6 +2837,9 @@ class MainActivity : AppCompatActivity() {
                     ?.let {
                         updateChoice("Add new exercises to ${it.routine.name}")
                     }
+            val exportToHevy =
+                if (confirm.action == ConfirmAction.FINISH_WORKOUT) updateChoice("Export to Hevy")
+                else null
             body.addView(
                 actionButton(buttonLabel) {
                     when (confirm.action) {
@@ -2743,6 +2857,12 @@ class MainActivity : AppCompatActivity() {
                                     repository.data.recordWorkout(workout)
                                     repository.data.history.add(workout)
                                     repository.saveHistory()
+                                    if (exportToHevy?.isChecked == true) {
+                                        exportWorkoutToHevy(
+                                            workout,
+                                            repository.data.exercises.toList(),
+                                        )
+                                    }
                                     discardActiveWorkout()
                                 }
                             }
@@ -2765,6 +2885,7 @@ class MainActivity : AppCompatActivity() {
                         ConfirmAction.RESET_DATA -> {
                             val pictures = repository.data.exercises.mapNotNull { it.imageFile }
                             repository.reset()
+                            hevySettings.clear()
                             updateMcpServer()
                             pictures.forEach(::deleteUnsavedPicture)
                             onboardingGender = repository.data.biologicalGender
@@ -2790,6 +2911,25 @@ class MainActivity : AppCompatActivity() {
                     },
             )
             body.addView(actionButton("Cancel", secondary = true) { navigateBack() })
+        }
+    }
+
+    private fun exportWorkoutToHevy(workout: WorkoutSession, catalog: List<Exercise>) {
+        hevyWorker.execute {
+            val result = runCatching { HevyExport(this, hevySettings).export(workout, catalog) }
+            runOnUiThread {
+                if (!isDestroyed) {
+                    val message =
+                        result.fold(
+                            onSuccess = { it },
+                            onFailure = { it.message ?: "Hevy export failed" },
+                        )
+                    AlertDialog.Builder(this)
+                        .setMessage(message)
+                        .setPositiveButton("OK", null)
+                        .show()
+                }
+            }
         }
     }
 

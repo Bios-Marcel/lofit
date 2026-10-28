@@ -533,6 +533,7 @@ class WorkoutFlowTest {
                     .single()
             notification.notification.contentIntent.send()
             onView(withText("Finish workout")).perform(scrollTo(), click())
+            onView(withText("Export to Hevy")).check(matches(not(isChecked())))
             onView(withText("Finish and save")).perform(click())
             onView(withText("Ready to move?")).check(matches(isDisplayed()))
             onView(withContentDescription("Open active workout")).check(doesNotExist())
