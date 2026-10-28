@@ -106,6 +106,15 @@ To format or check all Kotlin source and Gradle scripts:
 ./gradlew spotlessCheck
 ```
 
+To measure debug test coverage, with an emulator running:
+
+```sh
+./gradlew :app:createDebugUnitTestCoverageReport :app:createDebugAndroidTestCoverageReport
+```
+
+Reports are in `app/build/reports/coverage/test/debug/` and
+`app/build/reports/coverage/androidTest/debug/connected/`.
+
 This is my first open source project that is PURELY vibecoded. I do NOT read the
 code and I do NOT care. It is somewhat of an experiment. UX/UI come first and
 there are GUI tests to ensure basic functionality stays stable to a certain

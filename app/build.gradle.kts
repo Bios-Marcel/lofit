@@ -35,6 +35,8 @@ android {
         debug {
             applicationIdSuffix = ".test"
             buildConfigField("int", "MCP_PORT", "8765")
+            enableUnitTestCoverage = true
+            enableAndroidTestCoverage = true
         }
         release {
             buildConfigField("int", "MCP_PORT", "8766")
