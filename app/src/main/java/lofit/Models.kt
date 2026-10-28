@@ -220,6 +220,7 @@ data class AppData(
     val exerciseRecords: MutableMap<String, MutableList<ExerciseRecord>> = mutableMapOf(),
     val exerciseLastSelectedAt: MutableMap<String, Long> = mutableMapOf(),
     var mcpEnabled: Boolean = false,
+    var mcpPort: Int = BuildConfig.MCP_PORT,
 ) {
     fun resumeWorkout(workoutId: String, resumedAt: Long = System.currentTimeMillis()): WorkoutSession? {
         if (activeWorkout != null) return null

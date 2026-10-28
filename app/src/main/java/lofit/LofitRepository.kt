@@ -86,6 +86,7 @@ class LofitRepository(context: Context) {
         put("activeWorkout", data.activeWorkout?.let(::encodeWorkout) ?: JSONObject.NULL)
         put("soundCuesEnabled", data.soundCuesEnabled)
         put("mcpEnabled", data.mcpEnabled)
+        put("mcpPort", data.mcpPort)
         put("bodyMetricsEnabled", data.bodyMetricsEnabled ?: JSONObject.NULL)
         put("biologicalGender", data.biologicalGender.name)
         put("onboardingComplete", data.onboardingComplete)
@@ -181,6 +182,8 @@ class LofitRepository(context: Context) {
             activeWorkout = if (root.isNull("activeWorkout")) null else decodeWorkout(root.getJSONObject("activeWorkout")),
             soundCuesEnabled = root.getBoolean("soundCuesEnabled"),
             mcpEnabled = root.optBoolean("mcpEnabled", false),
+            mcpPort = root.optInt("mcpPort", BuildConfig.MCP_PORT).takeIf { it in 1..65535 }
+                ?: BuildConfig.MCP_PORT,
             bodyMetricsEnabled = if (root.isNull("bodyMetricsEnabled")) null else root.getBoolean("bodyMetricsEnabled"),
             biologicalGender = BiologicalGender.valueOf(root.optString("biologicalGender", BiologicalGender.MALE.name)),
             onboardingComplete = root.optBoolean("onboardingComplete", false),

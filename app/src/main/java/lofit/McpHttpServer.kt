@@ -47,9 +47,9 @@ internal class McpHttpServer(
                 .filter(::isTailscaleAddress)
         }.getOrDefault(emptyList())
 
-        fun urls(): List<String> = listOf(URL) + tailscaleAddresses().map {
+        fun urls(port: Int = PORT): List<String> = listOf("http://127.0.0.1:$port/mcp") + tailscaleAddresses().map {
             val host = it.hostAddress!!.substringBefore('%')
-            "http://${if (':' in host) "[$host]" else host}:$PORT/mcp"
+            "http://${if (':' in host) "[$host]" else host}:$port/mcp"
         }
     }
 

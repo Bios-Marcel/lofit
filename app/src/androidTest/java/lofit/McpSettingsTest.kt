@@ -8,12 +8,14 @@ import androidx.drawerlayout.widget.DrawerLayout
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
+import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.action.ViewActions.scrollTo
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.*
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.net.Socket
+import java.net.ServerSocket
 import java.net.NetworkInterface
 import org.hamcrest.Matchers.allOf
 import org.hamcrest.Matchers.not
@@ -105,6 +107,38 @@ class McpSettingsTest {
         }
     }
 
+    @Test fun portOverrideRestartsServerAndPersists() {
+        val port = ServerSocket(0).use { it.localPort }
+        val intent = Intent(context, MainActivity::class.java).setAction(Intent.ACTION_MAIN)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        ActivityScenario.launch<MainActivity>(intent).use { scenario ->
+            navigate(scenario, R.string.nav_settings)
+            onView(withText("Port")).check(matches(isDisplayed()))
+            onView(withContentDescription("MCP server")).perform(scrollTo(), click())
+            onView(withContentDescription("MCP port")).perform(scrollTo(), replaceText("0"))
+            onView(withText("Apply")).perform(scrollTo(), click())
+            assertEquals(McpHttpServer.PORT, LofitRepository(context).data.mcpPort)
+            onView(withContentDescription("MCP port")).perform(scrollTo(), replaceText(port.toString()))
+            onView(withText("Apply")).perform(scrollTo(), click())
+            assertEquals(port, LofitRepository(context).data.mcpPort)
+            onView(withText("http://127.0.0.1:$port/mcp")).check(matches(isDisplayed()))
+            assertClosed()
+            assertTrue(post("ping", port = port).has("result"))
+            scenario.recreate()
+            navigate(scenario, R.string.nav_settings)
+            assertEquals(port, LofitRepository(context).data.mcpPort)
+            assertTrue(post("ping", port = port).has("result"))
+            ServerSocket(0).use { occupied ->
+                onView(withContentDescription("MCP port")).perform(scrollTo(), replaceText(occupied.localPort.toString()))
+                onView(withText("Apply")).perform(scrollTo(), click())
+                assertEquals(port, LofitRepository(context).data.mcpPort)
+                assertTrue(post("ping", port = port).has("result"))
+            }
+            onView(withContentDescription("MCP server")).perform(scrollTo(), click())
+            assertClosed(port)
+        }
+    }
+
     @Test fun lanConnectionsCannotDispatchEvenWithALocalhostHeader() {
         val address = NetworkInterface.getNetworkInterfaces().toList()
             .flatMap { it.inetAddresses.toList() }
@@ -121,20 +155,21 @@ class McpSettingsTest {
         }
     }
 
-    private fun assertClosed() {
-        val connection = runCatching { Socket("127.0.0.1", McpHttpServer.PORT) }.getOrNull()
+    private fun assertClosed(port: Int = McpHttpServer.PORT) {
+        val connection = runCatching { Socket("127.0.0.1", port) }.getOrNull()
         connection?.close()
         assertNull("MCP port should be closed", connection)
     }
 
-    private fun post(method: String, params: JSONObject = JSONObject(), host: String = "127.0.0.1"): JSONObject {
+    private fun post(method: String, params: JSONObject = JSONObject(), host: String = "127.0.0.1",
+        port: Int = McpHttpServer.PORT): JSONObject {
         val body = JSONObject().put("jsonrpc", "2.0").put("id", 1).put("method", method).put("params", params)
             .toString().toByteArray()
-        return Socket(host, McpHttpServer.PORT).use { socket ->
+        return Socket(host, port).use { socket ->
             socket.soTimeout = 15_000
             socket.getOutputStream().apply {
                 val authority = if (':' in host) "[$host]" else host
-                write(("POST /mcp HTTP/1.1\r\nHost: $authority:${McpHttpServer.PORT}\r\n" +
+                write(("POST /mcp HTTP/1.1\r\nHost: $authority:$port\r\n" +
                     "Content-Type: application/json\r\nAccept: application/json, text/event-stream\r\n" +
                     "MCP-Protocol-Version: 2025-11-25\r\nContent-Length: ${body.size}\r\n\r\n").toByteArray())
                 write(body)

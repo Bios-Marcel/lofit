@@ -607,9 +607,48 @@ class MainActivity : AppCompatActivity() {
                 }
             })
         })
+        addView(LinearLayout(this@MainActivity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(titleText("Port"), LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT).apply { marginEnd = dp(12) })
+            val portField = numberField("Port").apply {
+                setText(repository.data.mcpPort.toString())
+                contentDescription = "MCP port"
+            }
+            addView(portField, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginEnd = dp(12)
+            })
+            addView(actionButton("Apply", secondary = true) {
+                val port = portField.text.toString().toIntOrNull()
+                if (port == null || port !in 1..65535) {
+                    portField.error = "Use a port from 1 to 65535"
+                } else if (port != repository.data.mcpPort) {
+                    if (repository.data.mcpEnabled) {
+                        try {
+                            val replacement = createMcpServer(port)
+                            val previous = mcpServer
+                            mcpServer = replacement
+                            previous?.close()
+                        } catch (_: Exception) {
+                            portField.error = "Port unavailable"
+                            return@actionButton
+                        }
+                    }
+                    repository.data.mcpPort = port
+                    repository.save()
+                    render()
+                }
+            })
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            topMargin = dp(12)
+        })
         if (repository.data.mcpEnabled) {
-            McpHttpServer.urls().forEach { url ->
-                addView(metaText(url).apply { setTextIsSelectable(true) })
+            McpHttpServer.urls(repository.data.mcpPort).forEachIndexed { index, url ->
+                addView(metaText(url).apply { setTextIsSelectable(true) },
+                    LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                        if (index == 0) topMargin = dp(10)
+                    })
             }
         }
     }
@@ -621,29 +660,33 @@ class MainActivity : AppCompatActivity() {
             return
         }
         if (mcpServer != null) return
-        val protocol = McpProtocol(repository) {
-            if (route == Route.Root && currentScreen in listOf(Screen.HOME, Screen.ROUTINES)) render()
-        }
         try {
-            lateinit var server: McpHttpServer
-            server = McpHttpServer { body ->
-                val task = FutureTask {
-                    check(mcpServer === server && repository.data.mcpEnabled && !isDestroyed)
-                    protocol.handle(body)?.toString()
-                }
-                handler.post(task)
-                try {
-                    task.get(10, TimeUnit.SECONDS)
-                } finally {
-                    task.cancel(false)
-                }
-            }
-            mcpServer = server
+            mcpServer = createMcpServer(repository.data.mcpPort)
         } catch (_: Exception) {
             repository.data.mcpEnabled = false
             repository.save()
             Toast.makeText(this, "MCP server could not start", Toast.LENGTH_LONG).show()
         }
+    }
+
+    private fun createMcpServer(port: Int): McpHttpServer {
+        val protocol = McpProtocol(repository) {
+            if (route == Route.Root && currentScreen in listOf(Screen.HOME, Screen.ROUTINES)) render()
+        }
+        lateinit var server: McpHttpServer
+        server = McpHttpServer(port) { body ->
+            val task = FutureTask {
+                check(mcpServer === server && repository.data.mcpEnabled && !isDestroyed)
+                protocol.handle(body)?.toString()
+            }
+            handler.post(task)
+            try {
+                task.get(10, TimeUnit.SECONDS)
+            } finally {
+                task.cancel(false)
+            }
+        }
+        return server
     }
 
     private fun workoutHome(): View = page("Ready to move?", "Local, focused, yours.") { body ->

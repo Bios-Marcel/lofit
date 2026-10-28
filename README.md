@@ -28,6 +28,9 @@ uses **8766**, so both apps can run MCP at the same time. The server listens at
 `http://127.0.0.1:PORT/mcp` while the app's activity exists, including in the
 background. Reopen the app after Android stops it. Turning the switch off or
 resetting app data closes the server. The setting persists across app restarts.
+To use another port, enter it in Settings and tap **Apply**. The change restarts
+the listener and persists across app restarts. Use the new port in your MCP URL,
+ADB forward command, and Tailscale rules.
 
 To connect the debug app from a computer over USB or an emulator:
 
