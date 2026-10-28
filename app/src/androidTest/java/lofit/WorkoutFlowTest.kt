@@ -453,19 +453,21 @@ class WorkoutFlowTest {
             val workoutId = LofitRepository(context).data.activeWorkout!!.id
             pressBack()
             onView(withText("Ready to move?")).check(matches(isDisplayed()))
-            onView(withContentDescription("Open active workout")).check(matches(isDisplayed()))
+            onView(withText("Resume workout")).check(matches(isDisplayed()))
             pressBackUnconditionally()
             instrumentation.uiAutomation.waitForIdle(100, 5_000)
             instrumentation.runOnMainSync { assertFalse(activity.hasWindowFocus()) }
 
             context.startActivity(intent)
+            onView(withText("Add exercise")).check(matches(isDisplayed()))
+            pressBack()
             onView(withText("Ready to move?")).check(matches(isDisplayed()))
-            onView(withContentDescription("Open active workout")).perform(waitFor(500), click())
+            onView(withText("Resume workout")).perform(waitFor(500), click())
             onView(withText("Add exercise")).check(matches(isDisplayed()))
             assertEquals(workoutId, LofitRepository(context).data.activeWorkout!!.id)
             onView(withText("Discard workout")).perform(scrollTo(), click())
             onView(withText("Ready to move?")).check(matches(isDisplayed()))
-            onView(withContentDescription("Open active workout")).check(doesNotExist())
+            onView(withText("Resume workout")).check(doesNotExist())
         } finally {
             instrumentation.runOnMainSync { activity.finish() }
         }
@@ -923,7 +925,7 @@ class WorkoutFlowTest {
         val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         instrumentation.startActivitySync(intent)
-        onView(withContentDescription("Open active workout")).perform(click())
+        onView(withText("Bodyweight workout")).check(matches(isDisplayed()))
 
         onView(withContentDescription("Set 1 weight")).check(doesNotExist())
         onView(withContentDescription("Set 1 Repetitions")).perform(replaceText("12"), closeSoftKeyboard())
@@ -950,7 +952,7 @@ class WorkoutFlowTest {
         val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         instrumentation.startActivitySync(intent)
-        onView(withContentDescription("Open active workout")).perform(click())
+        onView(withText("Weighted bodyweight workout")).check(matches(isDisplayed()))
 
         onView(withText("Weighted Push-up")).check(matches(isDisplayed()))
         onView(withContentDescription("Set 1 weight")).check(matches(withText("10")))
