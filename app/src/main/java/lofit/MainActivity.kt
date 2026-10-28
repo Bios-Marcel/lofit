@@ -871,10 +871,9 @@ class MainActivity : AppCompatActivity() {
             onRemove = onRemove,
             onReorderHandleReady = onReorderHandleReady,
         )), insetCardLayoutParams())
-        addView(exerciseNote(item.note, exercise, previousNote = item.previousNote) { note ->
-            item.note = note
-            repository.save()
-        }, insetCardLayoutParams().apply { topMargin = dp(8); bottomMargin = dp(8) })
+        addView(exerciseNote(item.note, exercise, previousNote = item.previousNote,
+            onChange = { item.note = it }, onCommit = repository::save),
+            insetCardLayoutParams().apply { topMargin = dp(8); bottomMargin = dp(8) })
         val actionWidth = SET_DONE_ACTION_WIDTH_DP +
             if (exercise.type.tracksDuration) SET_HOLD_ACTION_WIDTH_DP else 0
         addView(plannedSetHeader(
@@ -2872,9 +2871,18 @@ class MainActivity : AppCompatActivity() {
         exercise: Exercise,
         previousNote: String = "",
         readOnly: Boolean = false,
+        onCommit: () -> Unit = {},
         onChange: (String) -> Unit = {},
     ): TextView {
         val field = if (readOnly) TextView(this) else textField("Type note here ...")
+        var committedValue = value
+        fun commitNote() {
+            val currentValue = field.text.toString()
+            if (currentValue == committedValue) return
+            onChange(currentValue)
+            onCommit()
+            committedValue = currentValue
+        }
         return field.apply {
             hint = previousNote.ifBlank { "Type note here ..." }
             textSize = 14f
@@ -2883,7 +2891,6 @@ class MainActivity : AppCompatActivity() {
             setPadding(dp(4), dp(4), dp(4), dp(4))
             minHeight = 0
             background = null
-            onFocusChangeListener = null
             contentDescription = "${exercise.name} note"
             if (this is EditText) {
                 inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or
@@ -2892,6 +2899,11 @@ class MainActivity : AppCompatActivity() {
                 gravity = Gravity.TOP or Gravity.START
                 setText(value)
                 doAfterTextChanged { onChange(it.toString()) }
+                setOnFocusChangeListener { _, focused -> if (!focused) commitNote() }
+                addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+                    override fun onViewAttachedToWindow(view: View) = Unit
+                    override fun onViewDetachedFromWindow(view: View) = commitNote()
+                })
             } else {
                 text = value
             }
