@@ -47,16 +47,8 @@ class LofitRepository(context: Context) {
                         write("[]", historyFile)
                     }
         val root = JSONObject(raw)
-        return when (
-            val version = if (root.has("schemaVersion")) root.getInt("schemaVersion") else 0
-        ) {
-            0 ->
-                persistMigration(
-                    raw,
-                    StartupDataMigration.migrate(root),
-                    "state-before-migration-v1",
-                )
-            1 -> persistMigration(raw, decode(root), "state-before-migration-v2")
+        return when (val version = root.optInt("schemaVersion", 0)) {
+            // LEGACY: Schema 2 embeds history in the state file; move it to its own file.
             2 -> persistMigration(raw, decode(root), "state-before-migration-v3")
             SCHEMA_VERSION -> {
                 val history = historyFile.readFully().toString(Charsets.UTF_8)
@@ -365,7 +357,18 @@ class LofitRepository(context: Context) {
             sourceRoutine =
                 if (value.isNull("sourceRoutine")) null
                 else decodeRoutine(value.getJSONObject("sourceRoutine")),
-            intervals = value.workoutIntervals(),
+            intervals =
+                value
+                    .getJSONArray("intervals")
+                    .mapObjects { interval ->
+                        WorkoutInterval(
+                            startedAt = interval.getLong("startedAt"),
+                            endedAt =
+                                if (interval.isNull("endedAt")) null
+                                else interval.getLong("endedAt"),
+                        )
+                    }
+                    .toMutableList(),
             defaultRestSeconds = value.getInt("defaultRestSeconds"),
             exercises =
                 value
@@ -439,25 +442,6 @@ class LofitRepository(context: Context) {
             }
             .toMutableList()
 }
-
-internal fun JSONObject.workoutIntervals(): MutableList<WorkoutInterval> =
-    if (has("intervals")) {
-        getJSONArray("intervals")
-            .mapObjects { interval ->
-                WorkoutInterval(
-                    startedAt = interval.getLong("startedAt"),
-                    endedAt = if (interval.isNull("endedAt")) null else interval.getLong("endedAt"),
-                )
-            }
-            .toMutableList()
-    } else {
-        mutableListOf(
-            WorkoutInterval(
-                startedAt = getLong("startedAt"),
-                endedAt = if (isNull("completedAt")) null else getLong("completedAt"),
-            )
-        )
-    }
 
 private fun <T> JSONArray.mapObjects(transform: (JSONObject) -> T): List<T> =
     (0 until length()).map { transform(getJSONObject(it)) }

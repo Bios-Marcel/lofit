@@ -54,32 +54,6 @@ class JsonStorageMigrationTest {
     }
 
     @Test
-    fun xmlMigration_upgradesOlderSchemasWithoutChangingTheirXmlOrBackups() {
-        val current = sampleJson()
-        val unversioned =
-            """{"exercises":[],"routines":[{"id":"old","name":"Old","exercises":[{"exerciseId":"plank"}]}]}"""
-        val versionOne =
-            JSONObject(current)
-                .put("schemaVersion", 1)
-                .put("history", org.json.JSONArray(context.repositoryHistoryFile.readText()))
-                .toString()
-        listOf(unversioned, versionOne).forEachIndexed { index, raw ->
-            context.clearRepositoryTestData()
-            val xml = seedXml(raw)
-
-            val loaded = LofitRepository(context)
-
-            assertEquals(3, JSONObject(stateFile.readText()).getInt("schemaVersion"))
-            assertEquals(
-                raw,
-                File(context.filesDir, "state-before-migration-v${index + 1}.json").readText(),
-            )
-            assertEquals(loaded.data, LofitRepository(context).data)
-            assertArrayEquals(xml, context.legacyXmlFile.readBytes())
-        }
-    }
-
-    @Test
     fun reset_writesFreshJsonWithoutDeletingXmlOrRestoringOldWorkouts() {
         val xml = seedXml(sampleJson())
         val repository = LofitRepository(context)
@@ -226,6 +200,18 @@ class JsonStorageMigrationTest {
     }
 
     @Test
+    fun unsupportedOldSchemas_leaveStateUntouched() {
+        listOf("""{"exercises":[]}""", """{"schemaVersion":1}""").forEach { raw ->
+            stateFile.writeText(raw)
+
+            assertThrows(IllegalStateException::class.java) { LofitRepository(context) }
+
+            assertEquals(raw, stateFile.readText())
+            assertFalse(File(context.filesDir, "state-before-migration-v3.json").exists())
+        }
+    }
+
+    @Test
     fun invalidXmlState_doesNotCreateJsonAndCanRetryAfterCorrection() {
         val valid = sampleJson()
         listOf(
@@ -315,26 +301,23 @@ class JsonStorageMigrationTest {
 
     @Test
     fun schemaMigration_keepsAnExistingJsonBackup() {
-        val raw = """{"exercises":[],"routines":[]}"""
-        val backup = File(context.filesDir, "state-before-migration-v1.json")
+        val raw =
+            JSONObject(sampleJson())
+                .put("schemaVersion", 2)
+                .put("history", JSONArray(context.repositoryHistoryFile.readText()))
+                .toString()
+        stateFile.writeText(raw)
+        val backup = File(context.filesDir, "state-before-migration-v3.json")
         backup.writeText("original backup")
-        val xml = seedXml(raw)
 
         LofitRepository(context)
 
         assertEquals("original backup", backup.readText())
-        assertArrayEquals(xml, context.legacyXmlFile.readBytes())
+        assertEquals(3, JSONObject(stateFile.readText()).getInt("schemaVersion"))
     }
 
     private fun seedXml(raw: String): ByteArray {
-        assertTrue(
-            preferences
-                .edit()
-                .putString("state", raw)
-                .putString("state-before-migration-v1", "existing XML backup")
-                .putString("state-before-migration-v2", "another XML backup")
-                .commit()
-        )
+        assertTrue(preferences.edit().putString("state", raw).commit())
         return context.legacyXmlFile.readBytes()
     }
 

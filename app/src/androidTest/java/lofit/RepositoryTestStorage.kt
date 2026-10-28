@@ -18,14 +18,7 @@ internal fun Context.clearRepositoryTestData() {
     assertTrue(getSharedPreferences("lofit-data", 0).edit().clear().commit())
     AtomicFile(repositoryStateFile).delete()
     AtomicFile(repositoryHistoryFile).delete()
-    listOf(
-            "state-before-migration-v1.json",
-            "state-before-migration-v2.json",
-            "state-before-migration-v3.json",
-        )
-        .forEach {
-            AtomicFile(File(filesDir, it)).delete()
-        }
+    AtomicFile(File(filesDir, "state-before-migration-v3.json")).delete()
 }
 
 // Storage tests must not clear the installed app's workouts or migration backups.
