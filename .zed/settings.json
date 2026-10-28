@@ -1,0 +1,13 @@
+{
+  "languages": {
+    "Kotlin": {
+      "formatter": {
+        "external": {
+          "command": "./scripts/format-kotlin-stdin.sh",
+          "arguments": []
+        }
+      },
+      "format_on_save": "on"
+    }
+  }
+}

@@ -22,20 +22,26 @@ class TrendGraphView(
     private val number = NumberFormat.getNumberInstance().apply { maximumFractionDigits = 1 }
     private val sage = ContextCompat.getColor(context, R.color.sage)
     private val coral = ContextCompat.getColor(context, R.color.coral)
-    private val dateFormat = DateTimeFormatter.ofPattern(
-        if (endedAt - startedAt > 180L * 24 * 60 * 60 * 1000) "MMM yy" else "d MMM",
-    ).withZone(ZoneId.systemDefault())
+    private val dateFormat =
+        DateTimeFormatter.ofPattern(
+                if (endedAt - startedAt > 180L * 24 * 60 * 60 * 1000) "MMM yy" else "d MMM"
+            )
+            .withZone(ZoneId.systemDefault())
 
     init {
         contentDescription = "${series.metric.label} trend"
-        stateDescription = series.points.joinToString("; ") {
-            "${dateFormat.format(Instant.ofEpochMilli(it.completedAt))}: ${number.format(it.value)} ${series.metric.unit}"
-        }
+        stateDescription =
+            series.points.joinToString("; ") {
+                "${dateFormat.format(Instant.ofEpochMilli(it.completedAt))}: ${number.format(it.value)} ${series.metric.unit}"
+            }
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        setMeasuredDimension(resolveSize(dp(320).toInt(), widthMeasureSpec), resolveSize(dp(240).toInt(), heightMeasureSpec))
+        setMeasuredDimension(
+            resolveSize(dp(320).toInt(), widthMeasureSpec),
+            resolveSize(dp(240).toInt(), heightMeasureSpec),
+        )
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -54,9 +60,12 @@ class TrendGraphView(
         val top = dp(16)
         val bottom = height - dp(34)
         if (right <= left || bottom <= top) return
-        fun x(time: Long): Float = left +
-            ((time - startedAt).toDouble() / (endedAt - startedAt).coerceAtLeast(1)).toFloat() * (right - left)
-        fun y(value: Double): Float = bottom - ((value - minimum) / (maximum - minimum)).toFloat() * (bottom - top)
+        fun x(time: Long): Float =
+            left +
+                ((time - startedAt).toDouble() / (endedAt - startedAt).coerceAtLeast(1)).toFloat() *
+                    (right - left)
+        fun y(value: Double): Float =
+            bottom - ((value - minimum) / (maximum - minimum)).toFloat() * (bottom - top)
 
         ticks.forEach { value ->
             paint.color = sage
@@ -69,16 +78,23 @@ class TrendGraphView(
         }
         (0..2).forEach { index ->
             val time = startedAt + (endedAt - startedAt) * index / 2
-            paint.textAlign = when (index) {
-                0 -> Paint.Align.LEFT
-                2 -> Paint.Align.RIGHT
-                else -> Paint.Align.CENTER
-            }
-            canvas.drawText(dateFormat.format(Instant.ofEpochMilli(time)), x(time), bottom + dp(24), paint)
+            paint.textAlign =
+                when (index) {
+                    0 -> Paint.Align.LEFT
+                    2 -> Paint.Align.RIGHT
+                    else -> Paint.Align.CENTER
+                }
+            canvas.drawText(
+                dateFormat.format(Instant.ofEpochMilli(time)),
+                x(time),
+                bottom + dp(24),
+                paint,
+            )
         }
         val path = Path()
         series.points.forEachIndexed { index, point ->
-            if (index == 0) path.moveTo(x(point.completedAt), y(point.value)) else {
+            if (index == 0) path.moveTo(x(point.completedAt), y(point.value))
+            else {
                 path.lineTo(x(point.completedAt), y(series.points[index - 1].value))
                 path.lineTo(x(point.completedAt), y(point.value))
             }

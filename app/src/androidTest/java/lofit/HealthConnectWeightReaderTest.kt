@@ -1,9 +1,8 @@
 package lofit
 
 import android.Manifest
-import android.content.Intent
 import android.app.Activity
-import android.view.ViewGroup
+import android.content.Intent
 import android.health.connect.HealthConnectException
 import android.health.connect.HealthConnectManager
 import android.health.connect.HealthPermissions
@@ -13,6 +12,9 @@ import android.health.connect.datatypes.Metadata
 import android.health.connect.datatypes.WeightRecord
 import android.health.connect.datatypes.units.Mass
 import android.os.OutcomeReceiver
+import android.view.ViewGroup
+import androidx.core.view.GravityCompat
+import androidx.drawerlayout.widget.DrawerLayout
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.scrollTo
@@ -21,8 +23,6 @@ import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.core.view.GravityCompat
-import androidx.drawerlayout.widget.DrawerLayout
 import java.time.Instant
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -39,28 +39,57 @@ class HealthConnectWeightReaderTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         context.clearRepositoryTestData()
-        LofitRepository(context).apply { data.bodyMetricsEnabled = true; data.onboardingComplete = true; save() }
-        instrumentation.uiAutomation.grantRuntimePermission(context.packageName, Manifest.permission.POST_NOTIFICATIONS)
-        instrumentation.uiAutomation.grantRuntimePermission(context.packageName, HealthPermissions.READ_WEIGHT)
-        instrumentation.uiAutomation.grantRuntimePermission(context.packageName, HealthPermissions.READ_HEART_RATE)
-        instrumentation.uiAutomation.grantRuntimePermission(context.packageName, HealthPermissions.READ_HEALTH_DATA_HISTORY)
-        val activity = instrumentation.startActivitySync(
-            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        LofitRepository(context).apply {
+            data.bodyMetricsEnabled = true
+            data.onboardingComplete = true
+            save()
+        }
+        instrumentation.uiAutomation.grantRuntimePermission(
+            context.packageName,
+            Manifest.permission.POST_NOTIFICATIONS,
         )
-        instrumentation.uiAutomation.grantRuntimePermission(context.packageName, HealthPermissions.WRITE_WEIGHT)
+        instrumentation.uiAutomation.grantRuntimePermission(
+            context.packageName,
+            HealthPermissions.READ_WEIGHT,
+        )
+        instrumentation.uiAutomation.grantRuntimePermission(
+            context.packageName,
+            HealthPermissions.READ_HEART_RATE,
+        )
+        instrumentation.uiAutomation.grantRuntimePermission(
+            context.packageName,
+            HealthPermissions.READ_HEALTH_DATA_HISTORY,
+        )
+        val activity =
+            instrumentation.startActivitySync(
+                Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        instrumentation.uiAutomation.grantRuntimePermission(
+            context.packageName,
+            HealthPermissions.WRITE_WEIGHT,
+        )
         val manager = context.getSystemService(HealthConnectManager::class.java)
         val now = Instant.now().minusSeconds(60)
-        val records = listOf(
-            now.minusSeconds(240) to 70.0,
-            now.minusSeconds(120) to 74.0,
-            now to 80.0,
-        ).map { (time, weight) ->
-            WeightRecord.Builder(Metadata.Builder().build(), time, Mass.fromGrams(weight * 1000)).build()
-        }
+        val records =
+            listOf(
+                    now.minusSeconds(240) to 70.0,
+                    now.minusSeconds(120) to 74.0,
+                    now to 80.0,
+                )
+                .map { (time, weight) ->
+                    WeightRecord.Builder(
+                            Metadata.Builder().build(),
+                            time,
+                            Mass.fromGrams(weight * 1000),
+                        )
+                        .build()
+                }
         // Only debug builds declare write access for instrumentation fixtures.
-        val inserted = awaitHealthResult<InsertRecordsResponse> {
-            manager.insertRecords(records, context.mainExecutor, it)
-        }.records
+        val inserted =
+            awaitHealthResult<InsertRecordsResponse> {
+                    manager.insertRecords(records, context.mainExecutor, it)
+                }
+                .records
         try {
             val reader = HealthConnectWeightReader(context)
             assertEquals(77.0, read(reader, now.minusSeconds(90).toEpochMilli())!!, 0.0)
@@ -69,7 +98,10 @@ class HealthConnectWeightReaderTest {
 
             onView(withText(R.string.start_workout)).perform(click())
             val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
-            while (LofitRepository(context).data.activeWorkout?.bodyWeightKg == null && System.nanoTime() < deadline) {
+            while (
+                LofitRepository(context).data.activeWorkout?.bodyWeightKg == null &&
+                    System.nanoTime() < deadline
+            ) {
                 Thread.sleep(50)
             }
             assertEquals(80.0, LofitRepository(context).data.activeWorkout!!.bodyWeightKg!!, 0.0)
@@ -90,7 +122,10 @@ class HealthConnectWeightReaderTest {
             openScreen(activity, R.string.nav_settings)
             onView(withContentDescription("Android health integration")).perform(click())
             val enabledDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
-            while (LofitRepository(context).data.activeWorkout?.bodyWeightKg == null && System.nanoTime() < enabledDeadline) {
+            while (
+                LofitRepository(context).data.activeWorkout?.bodyWeightKg == null &&
+                    System.nanoTime() < enabledDeadline
+            ) {
                 Thread.sleep(50)
             }
             assertEquals(true, LofitRepository(context).data.bodyMetricsEnabled)
@@ -98,9 +133,13 @@ class HealthConnectWeightReaderTest {
         } finally {
             try {
                 awaitHealthResult<Void> { callback ->
-                    manager.deleteRecords(inserted.map {
-                        RecordIdFilter.fromId(WeightRecord::class.java, it.metadata.id)
-                    }, context.mainExecutor, callback)
+                    manager.deleteRecords(
+                        inserted.map {
+                            RecordIdFilter.fromId(WeightRecord::class.java, it.metadata.id)
+                        },
+                        context.mainExecutor,
+                        callback,
+                    )
                 }
             } finally {
                 instrumentation.runOnMainSync { activity.finish() }
@@ -119,21 +158,33 @@ class HealthConnectWeightReaderTest {
     private fun read(reader: HealthConnectWeightReader, time: Long): Double? {
         val latch = CountDownLatch(1)
         var result: Result<Double?>? = null
-        reader.readAt(time) { result = it; latch.countDown() }
+        reader.readAt(time) {
+            result = it
+            latch.countDown()
+        }
         assertTrue("Weight read timed out", latch.await(10, TimeUnit.SECONDS))
         return result!!.getOrThrow()
     }
 
     private fun <T> awaitHealthResult(
-        action: (OutcomeReceiver<T, HealthConnectException>) -> Unit,
+        action: (OutcomeReceiver<T, HealthConnectException>) -> Unit
     ): T {
         val latch = CountDownLatch(1)
         var value: T? = null
         var error: Exception? = null
-        action(object : OutcomeReceiver<T, HealthConnectException> {
-            override fun onResult(result: T) { value = result; latch.countDown() }
-            override fun onError(failure: HealthConnectException) { error = failure; latch.countDown() }
-        })
+        action(
+            object : OutcomeReceiver<T, HealthConnectException> {
+                override fun onResult(result: T) {
+                    value = result
+                    latch.countDown()
+                }
+
+                override fun onError(failure: HealthConnectException) {
+                    error = failure
+                    latch.countDown()
+                }
+            }
+        )
         assertTrue("Health Connect timed out", latch.await(10, TimeUnit.SECONDS))
         error?.let { throw it }
         @Suppress("UNCHECKED_CAST")

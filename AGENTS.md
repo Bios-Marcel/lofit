@@ -12,6 +12,11 @@
 
 - Test on emulator if started.
 
+## Formatting
+
+- After any file changes, run `./gradlew spotlessApply` as the final work step before replying.
+- Do not rerun tests after formatting
+
 ## Android Device
 
 - Local deploy: [`scripts/deploy.sh`](scripts/deploy.sh)

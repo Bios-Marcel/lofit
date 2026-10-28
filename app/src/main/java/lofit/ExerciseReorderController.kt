@@ -52,16 +52,30 @@ internal class ExerciseReorderController(
             val index = cards.indexOfChild(card)
             handle.isEnabled = cards.childCount > 1
             handle.alpha = if (handle.isEnabled) 1f else 0.4f
-            ViewCompat.removeAccessibilityAction(handle, AccessibilityActionCompat.ACTION_SCROLL_BACKWARD.id)
-            ViewCompat.removeAccessibilityAction(handle, AccessibilityActionCompat.ACTION_SCROLL_FORWARD.id)
+            ViewCompat.removeAccessibilityAction(
+                handle,
+                AccessibilityActionCompat.ACTION_SCROLL_BACKWARD.id,
+            )
+            ViewCompat.removeAccessibilityAction(
+                handle,
+                AccessibilityActionCompat.ACTION_SCROLL_FORWARD.id,
+            )
             if (index > 0) {
-                ViewCompat.replaceAccessibilityAction(handle, AccessibilityActionCompat.ACTION_SCROLL_BACKWARD, "Move up") { _, _ ->
+                ViewCompat.replaceAccessibilityAction(
+                    handle,
+                    AccessibilityActionCompat.ACTION_SCROLL_BACKWARD,
+                    "Move up",
+                ) { _, _ ->
                     move(card, cards.indexOfChild(card) - 1)
                     true
                 }
             }
             if (index < cards.childCount - 1) {
-                ViewCompat.replaceAccessibilityAction(handle, AccessibilityActionCompat.ACTION_SCROLL_FORWARD, "Move down") { _, _ ->
+                ViewCompat.replaceAccessibilityAction(
+                    handle,
+                    AccessibilityActionCompat.ACTION_SCROLL_FORWARD,
+                    "Move down",
+                ) { _, _ ->
                     move(card, cards.indexOfChild(card) + 1)
                     true
                 }
@@ -69,7 +83,8 @@ internal class ExerciseReorderController(
         }
     }
 
-    private inner class DragGesture(private val handle: View, private val card: View) : View.OnTouchListener {
+    private inner class DragGesture(private val handle: View, private val card: View) :
+        View.OnTouchListener {
         private val touchSlop = ViewConfiguration.get(cards.context).scaledTouchSlop
         private var startY = 0f
         private var pointerY = 0f
@@ -80,26 +95,30 @@ internal class ExerciseReorderController(
         private var target = -1
         private var elevation = 0f
 
-        private val autoScroll = object : Runnable {
-            override fun run() {
-                if (!dragging || !handle.isAttachedToWindow) return
-                scroll?.let { viewport ->
-                    val location = IntArray(2)
-                    viewport.getLocationOnScreen(location)
-                    val edge = 64 * density
-                    val top = location[1] + viewport.paddingTop
-                    val bottom = location[1] + viewport.height - viewport.paddingBottom
-                    val speed = when {
-                        pointerY < top + edge -> -((top + edge - pointerY) / edge).coerceIn(0f, 1f)
-                        pointerY > bottom - edge -> ((pointerY - bottom + edge) / edge).coerceIn(0f, 1f)
-                        else -> 0f
+        private val autoScroll =
+            object : Runnable {
+                override fun run() {
+                    if (!dragging || !handle.isAttachedToWindow) return
+                    scroll?.let { viewport ->
+                        val location = IntArray(2)
+                        viewport.getLocationOnScreen(location)
+                        val edge = 64 * density
+                        val top = location[1] + viewport.paddingTop
+                        val bottom = location[1] + viewport.height - viewport.paddingBottom
+                        val speed =
+                            when {
+                                pointerY < top + edge ->
+                                    -((top + edge - pointerY) / edge).coerceIn(0f, 1f)
+                                pointerY > bottom - edge ->
+                                    ((pointerY - bottom + edge) / edge).coerceIn(0f, 1f)
+                                else -> 0f
+                            }
+                        viewport.scrollBy(0, (speed * 16 * density).roundToInt())
                     }
-                    viewport.scrollBy(0, (speed * 16 * density).roundToInt())
+                    updatePreview()
+                    handle.postOnAnimation(this)
                 }
-                updatePreview()
-                handle.postOnAnimation(this)
             }
-        }
 
         override fun onTouch(view: View, event: MotionEvent): Boolean {
             when (event.actionMasked) {
@@ -108,7 +127,10 @@ internal class ExerciseReorderController(
                     tracking = true
                     startY = event.rawY
                     pointerY = startY
-                    scroll = generateSequence(cards.parent) { it.parent }.filterIsInstance<ScrollView>().firstOrNull()
+                    scroll =
+                        generateSequence(cards.parent) { it.parent }
+                            .filterIsInstance<ScrollView>()
+                            .firstOrNull()
                     startScrollY = scroll?.scrollY ?: 0
                     target = cards.indexOfChild(card)
                     elevation = card.elevation
@@ -127,7 +149,8 @@ internal class ExerciseReorderController(
                     if (dragging) updatePreview()
                 }
                 MotionEvent.ACTION_UP -> finish(commit = true)
-                MotionEvent.ACTION_CANCEL, MotionEvent.ACTION_POINTER_DOWN -> finish(commit = false)
+                MotionEvent.ACTION_CANCEL,
+                MotionEvent.ACTION_POINTER_DOWN -> finish(commit = false)
             }
             return true
         }
@@ -152,11 +175,12 @@ internal class ExerciseReorderController(
             val stride = (card.height + margins.topMargin + margins.bottomMargin).toFloat()
             for (index in 0 until cards.childCount) {
                 if (index == from) continue
-                cards.getChildAt(index).translationY = when {
-                    index in target until from -> stride
-                    index in (from + 1)..target -> -stride
-                    else -> 0f
-                }
+                cards.getChildAt(index).translationY =
+                    when {
+                        index in target until from -> stride
+                        index in (from + 1)..target -> -stride
+                        else -> 0f
+                    }
             }
         }
 

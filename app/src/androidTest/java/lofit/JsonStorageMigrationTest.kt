@@ -4,20 +4,21 @@ import android.content.ContextWrapper
 import android.content.SharedPreferences
 import android.util.AtomicFile
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import org.json.JSONObject
+import java.io.File
+import java.io.IOException
 import org.json.JSONArray
+import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.io.File
-import java.io.IOException
 
 @RunWith(AndroidJUnit4::class)
 class JsonStorageMigrationTest {
     private val context = RepositoryTestContext("json-storage")
     private val preferences = context.getSharedPreferences("lofit-data", 0)
-    private val stateFile get() = context.repositoryStateFile
+    private val stateFile
+        get() = context.repositoryStateFile
 
     @Before
     fun clearTestData() {
@@ -33,10 +34,11 @@ class JsonStorageMigrationTest {
 
         assertEquals(raw, stateFile.readText())
         assertArrayEquals(xml, context.legacyXmlFile.readBytes())
-        val jsonOnlyContext = object : ContextWrapper(context) {
-            override fun getSharedPreferences(name: String, mode: Int): SharedPreferences =
-                error("JSON loads must not access XML preferences")
-        }
+        val jsonOnlyContext =
+            object : ContextWrapper(context) {
+                override fun getSharedPreferences(name: String, mode: Int): SharedPreferences =
+                    error("JSON loads must not access XML preferences")
+            }
         assertEquals(migrated.data, LofitRepository(jsonOnlyContext).data)
         assertEquals("custom.webp", migrated.data.exercises.single { it.id == "custom" }.imageFile)
         assertEquals(123L, migrated.data.exerciseLastSelectedAt["custom"])
@@ -44,16 +46,23 @@ class JsonStorageMigrationTest {
 
         migrated.data.routines.single().name = "Edited after migration"
         migrated.save()
-        assertEquals("Edited after migration", LofitRepository(jsonOnlyContext).data.routines.single().name)
+        assertEquals(
+            "Edited after migration",
+            LofitRepository(jsonOnlyContext).data.routines.single().name,
+        )
         assertArrayEquals(xml, context.legacyXmlFile.readBytes())
     }
 
     @Test
     fun xmlMigration_upgradesOlderSchemasWithoutChangingTheirXmlOrBackups() {
         val current = sampleJson()
-        val unversioned = """{"exercises":[],"routines":[{"id":"old","name":"Old","exercises":[{"exerciseId":"plank"}]}]}"""
-        val versionOne = JSONObject(current).put("schemaVersion", 1)
-            .put("history", org.json.JSONArray(context.repositoryHistoryFile.readText())).toString()
+        val unversioned =
+            """{"exercises":[],"routines":[{"id":"old","name":"Old","exercises":[{"exerciseId":"plank"}]}]}"""
+        val versionOne =
+            JSONObject(current)
+                .put("schemaVersion", 1)
+                .put("history", org.json.JSONArray(context.repositoryHistoryFile.readText()))
+                .toString()
         listOf(unversioned, versionOne).forEachIndexed { index, raw ->
             context.clearRepositoryTestData()
             val xml = seedXml(raw)
@@ -61,7 +70,10 @@ class JsonStorageMigrationTest {
             val loaded = LofitRepository(context)
 
             assertEquals(3, JSONObject(stateFile.readText()).getInt("schemaVersion"))
-            assertEquals(raw, File(context.filesDir, "state-before-migration-v${index + 1}.json").readText())
+            assertEquals(
+                raw,
+                File(context.filesDir, "state-before-migration-v${index + 1}.json").readText(),
+            )
             assertEquals(loaded.data, LofitRepository(context).data)
             assertArrayEquals(xml, context.legacyXmlFile.readBytes())
         }
@@ -144,10 +156,13 @@ class JsonStorageMigrationTest {
         repository.data.history.add(WorkoutSession(name = "Past", completedAt = 200))
         repository.saveHistory()
         repository.save()
-        val legacy = JSONObject(stateFile.readText()).apply {
-            put("schemaVersion", 2)
-            put("history", JSONArray(context.repositoryHistoryFile.readText()))
-        }.toString()
+        val legacy =
+            JSONObject(stateFile.readText())
+                .apply {
+                    put("schemaVersion", 2)
+                    put("history", JSONArray(context.repositoryHistoryFile.readText()))
+                }
+                .toString()
         stateFile.writeText(legacy)
         AtomicFile(context.repositoryHistoryFile).delete()
 
@@ -166,10 +181,13 @@ class JsonStorageMigrationTest {
         repository.data.history.add(WorkoutSession(name = "Past", completedAt = 200))
         repository.saveHistory()
         repository.save()
-        val legacy = JSONObject(stateFile.readText()).apply {
-            put("schemaVersion", 2)
-            put("history", JSONArray(context.repositoryHistoryFile.readText()))
-        }.toString()
+        val legacy =
+            JSONObject(stateFile.readText())
+                .apply {
+                    put("schemaVersion", 2)
+                    put("history", JSONArray(context.repositoryHistoryFile.readText()))
+                }
+                .toString()
         stateFile.writeText(legacy)
         AtomicFile(context.repositoryHistoryFile).delete()
         val pending = File("${context.repositoryHistoryFile.path}.new")
@@ -210,15 +228,19 @@ class JsonStorageMigrationTest {
     @Test
     fun invalidXmlState_doesNotCreateJsonAndCanRetryAfterCorrection() {
         val valid = sampleJson()
-        listOf("broken JSON", """{"schemaVersion":4}""",
-            """{"exercises":[{"id":"bad","name":"Bad","type":"UNKNOWN"}]}""").forEach { raw ->
-            val xml = seedXml(raw)
+        listOf(
+                "broken JSON",
+                """{"schemaVersion":4}""",
+                """{"exercises":[{"id":"bad","name":"Bad","type":"UNKNOWN"}]}""",
+            )
+            .forEach { raw ->
+                val xml = seedXml(raw)
 
-            assertThrows(Exception::class.java) { LofitRepository(context) }
+                assertThrows(Exception::class.java) { LofitRepository(context) }
 
-            assertFalse(stateFile.exists())
-            assertArrayEquals(xml, context.legacyXmlFile.readBytes())
-        }
+                assertFalse(stateFile.exists())
+                assertArrayEquals(xml, context.legacyXmlFile.readBytes())
+            }
         val xml = seedXml(valid)
         LofitRepository(context)
         assertEquals(valid, stateFile.readText())
@@ -256,7 +278,10 @@ class JsonStorageMigrationTest {
         assertEquals(raw, stateFile.readText())
         assertArrayEquals(xml, context.legacyXmlFile.readBytes())
         assertTrue(pending.delete())
-        assertEquals(JSONObject(raw).getBoolean("soundCuesEnabled"), LofitRepository(context).data.soundCuesEnabled)
+        assertEquals(
+            JSONObject(raw).getBoolean("soundCuesEnabled"),
+            LofitRepository(context).data.soundCuesEnabled,
+        )
     }
 
     @Test
@@ -302,34 +327,79 @@ class JsonStorageMigrationTest {
     }
 
     private fun seedXml(raw: String): ByteArray {
-        assertTrue(preferences.edit()
-            .putString("state", raw)
-            .putString("state-before-migration-v1", "existing XML backup")
-            .putString("state-before-migration-v2", "another XML backup")
-            .commit())
+        assertTrue(
+            preferences
+                .edit()
+                .putString("state", raw)
+                .putString("state-before-migration-v1", "existing XML backup")
+                .putString("state-before-migration-v2", "another XML backup")
+                .commit()
+        )
         return context.legacyXmlFile.readBytes()
     }
 
     private fun sampleJson(): String {
         val repository = LofitRepository(context)
-        val exercise = Exercise("custom", "Hold 🏋 & <test>", ExerciseType.TIMED, true,
-            "Core", "Glutes", custom = true, weighted = true, imageFile = "custom.webp")
-        val planned = PlannedSet(weightKg = 12.5, holdSeconds = 30, actualHoldSeconds = 25, side = Side.LEFT)
-        val routine = Routine(name = "Strength", exercises = mutableListOf(
-            RoutineExercise(exerciseId = exercise.id, note = "Brace & breathe\n\"Slow\"",
-                plannedSets = mutableListOf(planned.copy(actualHoldSeconds = null)))))
-        val workout = WorkoutSession(name = "Past", startedAt = 100, completedAt = 200,
-            bodyWeightKg = 72.25, sourceRoutine = routine,
-            exercises = mutableListOf(WorkoutExercise(exerciseId = exercise.id,
-                sourceRoutineExerciseId = routine.exercises.single().id,
-                note = "Keep", previousNote = "Previous", plannedSets = mutableListOf(planned),
-                sets = mutableListOf(LoggedSet(type = SetType.NORMAL, weightKg = 12.5,
-                    holdSeconds = 25, side = Side.LEFT, plannedSetId = planned.id)))))
+        val exercise =
+            Exercise(
+                "custom",
+                "Hold 🏋 & <test>",
+                ExerciseType.TIMED,
+                true,
+                "Core",
+                "Glutes",
+                custom = true,
+                weighted = true,
+                imageFile = "custom.webp",
+            )
+        val planned =
+            PlannedSet(weightKg = 12.5, holdSeconds = 30, actualHoldSeconds = 25, side = Side.LEFT)
+        val routine =
+            Routine(
+                name = "Strength",
+                exercises =
+                    mutableListOf(
+                        RoutineExercise(
+                            exerciseId = exercise.id,
+                            note = "Brace & breathe\n\"Slow\"",
+                            plannedSets = mutableListOf(planned.copy(actualHoldSeconds = null)),
+                        )
+                    ),
+            )
+        val workout =
+            WorkoutSession(
+                name = "Past",
+                startedAt = 100,
+                completedAt = 200,
+                bodyWeightKg = 72.25,
+                sourceRoutine = routine,
+                exercises =
+                    mutableListOf(
+                        WorkoutExercise(
+                            exerciseId = exercise.id,
+                            sourceRoutineExerciseId = routine.exercises.single().id,
+                            note = "Keep",
+                            previousNote = "Previous",
+                            plannedSets = mutableListOf(planned),
+                            sets =
+                                mutableListOf(
+                                    LoggedSet(
+                                        type = SetType.NORMAL,
+                                        weightKg = 12.5,
+                                        holdSeconds = 25,
+                                        side = Side.LEFT,
+                                        plannedSetId = planned.id,
+                                    )
+                                ),
+                        )
+                    ),
+            )
         repository.data.apply {
             exercises.add(exercise)
             routines.add(routine)
             history.add(workout)
-            activeWorkout = workout.copy(id = "active", intervals = mutableListOf(WorkoutInterval(300)))
+            activeWorkout =
+                workout.copy(id = "active", intervals = mutableListOf(WorkoutInterval(300)))
             recordWorkout(workout)
             exerciseLastSelectedAt[exercise.id] = 123
             soundCuesEnabled = false

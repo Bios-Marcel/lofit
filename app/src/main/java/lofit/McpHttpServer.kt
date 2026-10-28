@@ -4,8 +4,8 @@ import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
 import java.io.Closeable
 import java.io.IOException
-import java.net.InetSocketAddress
 import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.net.NetworkInterface
 import java.net.ServerSocket
 import java.net.Socket
@@ -43,21 +43,34 @@ internal class McpHttpServer(
                 (remote.isLoopbackAddress || isTailscaleAddress(remote))
 
         private fun tailscaleAddresses(): List<InetAddress> = runCatching {
-            NetworkInterface.getNetworkInterfaces().toList().flatMap { it.inetAddresses.toList() }
+            NetworkInterface.getNetworkInterfaces()
+                .toList()
+                .flatMap { it.inetAddresses.toList() }
                 .filter(::isTailscaleAddress)
-        }.getOrDefault(emptyList())
-
-        fun urls(port: Int = PORT): List<String> = listOf("http://127.0.0.1:$port/mcp") + tailscaleAddresses().map {
-            val host = it.hostAddress!!.substringBefore('%')
-            "http://${if (':' in host) "[$host]" else host}:$port/mcp"
         }
+            .getOrDefault(emptyList())
+
+        fun urls(port: Int = PORT): List<String> =
+            listOf("http://127.0.0.1:$port/mcp") +
+                tailscaleAddresses().map {
+                    val host = it.hostAddress!!.substringBefore('%')
+                    "http://${if (':' in host) "[$host]" else host}:$port/mcp"
+                }
     }
 
     private val listener = ServerSocket()
     private val clients = ConcurrentHashMap.newKeySet<Socket>()
-    private val workers = ThreadPoolExecutor(2, 2, 0, TimeUnit.SECONDS, ArrayBlockingQueue(8),
-        { task -> Thread(task, "lofit-mcp-request").apply { isDaemon = true } })
-    val port: Int get() = listener.localPort
+    private val workers =
+        ThreadPoolExecutor(
+            2,
+            2,
+            0,
+            TimeUnit.SECONDS,
+            ArrayBlockingQueue(8),
+            { task -> Thread(task, "lofit-mcp-request").apply { isDaemon = true } },
+        )
+    val port: Int
+        get() = listener.localPort
 
     init {
         try {
@@ -68,20 +81,36 @@ internal class McpHttpServer(
             close()
             throw failure
         }
-        Thread({
-            while (!listener.isClosed) {
-                val client = try { listener.accept() } catch (_: IOException) { break }
-                clients.add(client)
-                try {
-                    workers.execute {
-                        try { client.use(::serve) } finally { clients.remove(client) }
+        Thread(
+                {
+                    while (!listener.isClosed) {
+                        val client =
+                            try {
+                                listener.accept()
+                            } catch (_: IOException) {
+                                break
+                            }
+                        clients.add(client)
+                        try {
+                            workers.execute {
+                                try {
+                                    client.use(::serve)
+                                } finally {
+                                    clients.remove(client)
+                                }
+                            }
+                        } catch (_: RejectedExecutionException) {
+                            clients.remove(client)
+                            client.close()
+                        }
                     }
-                } catch (_: RejectedExecutionException) {
-                    clients.remove(client)
-                    client.close()
-                }
+                },
+                "lofit-mcp-listener",
+            )
+            .apply {
+                isDaemon = true
+                start()
             }
-        }, "lofit-mcp-listener").apply { isDaemon = true; start() }
     }
 
     override fun close() {
@@ -103,14 +132,16 @@ internal class McpHttpServer(
                 while (true) {
                     val byte = input.read()
                     if (byte == -1) throw HttpFailure(400, "Incomplete request")
-                    if (++headerBytes > MAX_HEADER_BYTES) throw HttpFailure(431, "Headers too large")
+                    if (++headerBytes > MAX_HEADER_BYTES)
+                        throw HttpFailure(431, "Headers too large")
                     if (byte == 10) break
                     bytes.write(byte)
                 }
                 return bytes.toString(Charsets.US_ASCII.name()).removeSuffix("\r")
             }
             val request = line().split(' ')
-            if (request.size != 3 || request[2] != "HTTP/1.1") throw HttpFailure(400, "Invalid request")
+            if (request.size != 3 || request[2] != "HTTP/1.1")
+                throw HttpFailure(400, "Invalid request")
             val headers = mutableMapOf<String, String>()
             while (true) {
                 val header = line()
@@ -122,12 +153,21 @@ internal class McpHttpServer(
                     throw HttpFailure(400, "Duplicate header")
                 }
             }
-            val addresses = tailscaleAddresses() + InetAddress.getByName("127.0.0.1") + InetAddress.getByName("::1")
+            val addresses =
+                tailscaleAddresses() +
+                    InetAddress.getByName("127.0.0.1") +
+                    InetAddress.getByName("::1")
             if (!allowsAuthority(headers["host"], addresses)) throw HttpFailure(403, "Invalid host")
             headers["origin"]?.let { origin ->
                 val uri = runCatching { URI(origin) }.getOrNull()
-                if (uri == null || uri.scheme != "http" || !allowsAuthority(uri.rawAuthority, addresses) ||
-                    !uri.rawPath.isNullOrEmpty() || uri.rawQuery != null || uri.rawFragment != null) {
+                if (
+                    uri == null ||
+                        uri.scheme != "http" ||
+                        !allowsAuthority(uri.rawAuthority, addresses) ||
+                        !uri.rawPath.isNullOrEmpty() ||
+                        uri.rawQuery != null ||
+                        uri.rawFragment != null
+                ) {
                     throw HttpFailure(403, "Invalid origin")
                 }
             }
@@ -137,36 +177,48 @@ internal class McpHttpServer(
                 return
             }
             headers["mcp-protocol-version"]?.let {
-                if (it !in PROTOCOL_VERSIONS) throw HttpFailure(400, "Unsupported MCP protocol version")
+                if (it !in PROTOCOL_VERSIONS)
+                    throw HttpFailure(400, "Unsupported MCP protocol version")
             }
             if (headers["content-type"]?.substringBefore(';')?.trim() != "application/json") {
                 throw HttpFailure(415, "Use application/json")
             }
-            val accept = headers["accept"].orEmpty().split(',').map { it.substringBefore(';').trim() }
-            if ("application/json" !in accept && "*/*" !in accept) throw HttpFailure(406, "Accept application/json")
-            val body = if (headers["transfer-encoding"] != null) {
-                if (headers.containsKey("content-length") || headers["transfer-encoding"] != "chunked") {
-                    throw HttpFailure(400, "Invalid transfer encoding")
-                }
-                val bytes = ByteArrayOutputStream()
-                while (true) {
-                    val size = line().substringBefore(';').toIntOrNull(16)
-                        ?: throw HttpFailure(400, "Invalid chunk")
-                    if (size < 0 || size > MAX_BODY_BYTES - bytes.size()) throw HttpFailure(413, "Body too large")
-                    if (size == 0) {
-                        if (line().isNotEmpty()) throw HttpFailure(400, "Trailers unsupported")
-                        break
+            val accept =
+                headers["accept"].orEmpty().split(',').map { it.substringBefore(';').trim() }
+            if ("application/json" !in accept && "*/*" !in accept)
+                throw HttpFailure(406, "Accept application/json")
+            val body =
+                if (headers["transfer-encoding"] != null) {
+                    if (
+                        headers.containsKey("content-length") ||
+                            headers["transfer-encoding"] != "chunked"
+                    ) {
+                        throw HttpFailure(400, "Invalid transfer encoding")
                     }
-                    bytes.write(readBody(input, size))
-                    if (input.read() != 13 || input.read() != 10) throw HttpFailure(400, "Invalid chunk")
+                    val bytes = ByteArrayOutputStream()
+                    while (true) {
+                        val size =
+                            line().substringBefore(';').toIntOrNull(16)
+                                ?: throw HttpFailure(400, "Invalid chunk")
+                        if (size < 0 || size > MAX_BODY_BYTES - bytes.size())
+                            throw HttpFailure(413, "Body too large")
+                        if (size == 0) {
+                            if (line().isNotEmpty()) throw HttpFailure(400, "Trailers unsupported")
+                            break
+                        }
+                        bytes.write(readBody(input, size))
+                        if (input.read() != 13 || input.read() != 10)
+                            throw HttpFailure(400, "Invalid chunk")
+                    }
+                    bytes.toByteArray()
+                } else {
+                    val size =
+                        headers["content-length"]?.toLongOrNull()
+                            ?: throw HttpFailure(411, "Length required")
+                    if (size < 0) throw HttpFailure(400, "Invalid length")
+                    if (size > MAX_BODY_BYTES) throw HttpFailure(413, "Body too large")
+                    readBody(input, size.toInt())
                 }
-                bytes.toByteArray()
-            } else {
-                val size = headers["content-length"]?.toLongOrNull() ?: throw HttpFailure(411, "Length required")
-                if (size < 0) throw HttpFailure(400, "Invalid length")
-                if (size > MAX_BODY_BYTES) throw HttpFailure(413, "Body too large")
-                readBody(input, size.toInt())
-            }
             val response = dispatch(body.toString(Charsets.UTF_8))
             if (response == null) respond(client, 202, "") else respond(client, 200, response)
         } catch (failure: HttpFailure) {
@@ -181,8 +233,14 @@ internal class McpHttpServer(
     private fun allowsAuthority(authority: String?, addresses: List<InetAddress>): Boolean {
         if (authority == null) return false
         val uri = runCatching { URI("http://$authority") }.getOrNull() ?: return false
-        if (uri.port != port || uri.rawUserInfo != null || !uri.rawPath.isNullOrEmpty() ||
-            uri.rawQuery != null || uri.rawFragment != null) return false
+        if (
+            uri.port != port ||
+                uri.rawUserInfo != null ||
+                !uri.rawPath.isNullOrEmpty() ||
+                uri.rawQuery != null ||
+                uri.rawFragment != null
+        )
+            return false
         val host = uri.host?.lowercase(Locale.ROOT) ?: return false
         if (host == "localhost") return true
         // Only numeric addresses: do not resolve untrusted DNS names from Host/Origin.
@@ -204,25 +262,30 @@ internal class McpHttpServer(
 
     private fun respond(client: Socket, status: Int, body: String, extraHeaders: String = "") {
         val bytes = body.toByteArray(Charsets.UTF_8)
-        val reason = when (status) {
-            200 -> "OK"
-            202 -> "Accepted"
-            400 -> "Bad Request"
-            403 -> "Forbidden"
-            404 -> "Not Found"
-            405 -> "Method Not Allowed"
-            406 -> "Not Acceptable"
-            411 -> "Length Required"
-            413 -> "Content Too Large"
-            415 -> "Unsupported Media Type"
-            431 -> "Request Header Fields Too Large"
-            else -> "Service Unavailable"
-        }
+        val reason =
+            when (status) {
+                200 -> "OK"
+                202 -> "Accepted"
+                400 -> "Bad Request"
+                403 -> "Forbidden"
+                404 -> "Not Found"
+                405 -> "Method Not Allowed"
+                406 -> "Not Acceptable"
+                411 -> "Length Required"
+                413 -> "Content Too Large"
+                415 -> "Unsupported Media Type"
+                431 -> "Request Header Fields Too Large"
+                else -> "Service Unavailable"
+            }
         val type = if (status == 200) "application/json" else "text/plain"
         client.getOutputStream().apply {
-            write(("HTTP/1.1 $status $reason\r\nContent-Type: $type; charset=utf-8\r\n" +
-                "Content-Length: ${bytes.size}\r\nConnection: close\r\nCache-Control: no-store\r\n" +
-                extraHeaders + "\r\n").toByteArray(Charsets.US_ASCII))
+            write(
+                ("HTTP/1.1 $status $reason\r\nContent-Type: $type; charset=utf-8\r\n" +
+                        "Content-Length: ${bytes.size}\r\nConnection: close\r\nCache-Control: no-store\r\n" +
+                        extraHeaders +
+                        "\r\n")
+                    .toByteArray(Charsets.US_ASCII)
+            )
             write(bytes)
             flush()
         }

@@ -19,25 +19,74 @@ class ExerciseRecordsStorageTest {
     @Test
     fun records_surviveRestartWithoutHistoryAndAppendToExistingLists() {
         val repository = LofitRepository(context)
-        val custom = Exercise(
-            id = "custom-reps", name = "Custom reps", type = ExerciseType.REPETITIONS,
-            asymmetric = true, primaryMuscle = "Chest", secondaryMuscles = "",
-            custom = true, weighted = false,
-        )
+        val custom =
+            Exercise(
+                id = "custom-reps",
+                name = "Custom reps",
+                type = ExerciseType.REPETITIONS,
+                asymmetric = true,
+                primaryMuscle = "Chest",
+                secondaryMuscles = "",
+                custom = true,
+                weighted = false,
+            )
         repository.data.exercises.add(custom)
-        val workout = WorkoutSession(name = "Records", exercises = mutableListOf(
-            WorkoutExercise(exerciseId = "bench-press", sets = mutableListOf(
-                LoggedSet(type = SetType.NORMAL, weightKg = 60.0, reps = 8, completedAt = 10),
-                LoggedSet(type = SetType.FAILURE, weightKg = 80.0, reps = 2, completedAt = 20, side = Side.LEFT),
-                LoggedSet(type = SetType.NORMAL, weightKg = 50.0, reps = 10, completedAt = 30),
-            )),
-            WorkoutExercise(exerciseId = "plank", sets = mutableListOf(
-                LoggedSet(type = SetType.NORMAL, weightKg = 0.0, holdSeconds = 45, completedAt = 10),
-            )),
-            WorkoutExercise(exerciseId = custom.id, sets = mutableListOf(
-                LoggedSet(type = SetType.NORMAL, weightKg = 0.0, reps = 12, completedAt = 10),
-            )),
-        ))
+        val workout =
+            WorkoutSession(
+                name = "Records",
+                exercises =
+                    mutableListOf(
+                        WorkoutExercise(
+                            exerciseId = "bench-press",
+                            sets =
+                                mutableListOf(
+                                    LoggedSet(
+                                        type = SetType.NORMAL,
+                                        weightKg = 60.0,
+                                        reps = 8,
+                                        completedAt = 10,
+                                    ),
+                                    LoggedSet(
+                                        type = SetType.FAILURE,
+                                        weightKg = 80.0,
+                                        reps = 2,
+                                        completedAt = 20,
+                                        side = Side.LEFT,
+                                    ),
+                                    LoggedSet(
+                                        type = SetType.NORMAL,
+                                        weightKg = 50.0,
+                                        reps = 10,
+                                        completedAt = 30,
+                                    ),
+                                ),
+                        ),
+                        WorkoutExercise(
+                            exerciseId = "plank",
+                            sets =
+                                mutableListOf(
+                                    LoggedSet(
+                                        type = SetType.NORMAL,
+                                        weightKg = 0.0,
+                                        holdSeconds = 45,
+                                        completedAt = 10,
+                                    )
+                                ),
+                        ),
+                        WorkoutExercise(
+                            exerciseId = custom.id,
+                            sets =
+                                mutableListOf(
+                                    LoggedSet(
+                                        type = SetType.NORMAL,
+                                        weightKg = 0.0,
+                                        reps = 12,
+                                        completedAt = 10,
+                                    )
+                                ),
+                        ),
+                    ),
+            )
         repository.data.recordWorkout(workout)
         repository.save()
 
@@ -47,19 +96,41 @@ class ExerciseRecordsStorageTest {
         val benchRecords = loaded.data.exerciseRecords.getValue("bench-press")
         assertEquals(listOf(60.0, 80.0, 80.0), benchRecords.map { it.set.weightKg })
         assertEquals(listOf(480.0, 480.0, 500.0), benchRecords.map { it.volumeSet!!.volume() })
-        assertSame(loaded.data.exercises.first { it.id == custom.id }, loaded.data.exerciseRecords.getValue(custom.id).last().exercise)
+        assertSame(
+            loaded.data.exercises.first { it.id == custom.id },
+            loaded.data.exerciseRecords.getValue(custom.id).last().exercise,
+        )
         assertNull(loaded.data.exerciseRecords.getValue(custom.id).last().volumeSet)
         assertNull(loaded.data.exerciseRecords.getValue("plank").last().volumeSet)
 
-        loaded.data.recordWorkout(WorkoutSession(name = "Next", exercises = mutableListOf(
-            WorkoutExercise(exerciseId = "bench-press", sets = mutableListOf(
-                LoggedSet(type = SetType.NORMAL, weightKg = 90.0, reps = 6, completedAt = 40),
-            )),
-        )))
+        loaded.data.recordWorkout(
+            WorkoutSession(
+                name = "Next",
+                exercises =
+                    mutableListOf(
+                        WorkoutExercise(
+                            exerciseId = "bench-press",
+                            sets =
+                                mutableListOf(
+                                    LoggedSet(
+                                        type = SetType.NORMAL,
+                                        weightKg = 90.0,
+                                        reps = 6,
+                                        completedAt = 40,
+                                    )
+                                ),
+                        )
+                    ),
+            )
+        )
         loaded.save()
         val next = LofitRepository(context)
         assertEquals(4, next.data.exerciseRecords.getValue("bench-press").size)
-        assertEquals(90.0, next.data.exerciseRecords.getValue("bench-press").last().set.weightKg, 0.0)
+        assertEquals(
+            90.0,
+            next.data.exerciseRecords.getValue("bench-press").last().set.weightKg,
+            0.0,
+        )
         assertEquals(3, next.data.exerciseRecords.size)
         next.reset()
         assertTrue(LofitRepository(context).data.exerciseRecords.isEmpty())
@@ -68,14 +139,26 @@ class ExerciseRecordsStorageTest {
     @Test
     fun oldData_startsWithEmptyMapAndNeverBackfillsHistory() {
         val repository = LofitRepository(context)
-        repository.data.history.add(WorkoutSession(name = "Old", completedAt = 200,
-            exercises = mutableListOf(WorkoutExercise(exerciseId = "bench-press", sets = mutableListOf(
-                LoggedSet(type = SetType.NORMAL, weightKg = 120.0, reps = 10),
-            ))),
-        ))
+        repository.data.history.add(
+            WorkoutSession(
+                name = "Old",
+                completedAt = 200,
+                exercises =
+                    mutableListOf(
+                        WorkoutExercise(
+                            exerciseId = "bench-press",
+                            sets =
+                                mutableListOf(
+                                    LoggedSet(type = SetType.NORMAL, weightKg = 120.0, reps = 10)
+                                ),
+                        )
+                    ),
+            )
+        )
         repository.saveHistory()
         repository.save()
-        val oldState = JSONObject(context.repositoryStateFile.readText()).apply { remove("exerciseRecords") }
+        val oldState =
+            JSONObject(context.repositoryStateFile.readText()).apply { remove("exerciseRecords") }
         context.repositoryStateFile.writeText(oldState.toString())
 
         val loaded = LofitRepository(context)
@@ -86,12 +169,32 @@ class ExerciseRecordsStorageTest {
         loaded.save()
         assertTrue(LofitRepository(context).data.exerciseRecords.isEmpty())
 
-        loaded.data.recordWorkout(WorkoutSession(name = "New", exercises = mutableListOf(
-            WorkoutExercise(exerciseId = "bench-press", sets = mutableListOf(
-                LoggedSet(type = SetType.NORMAL, weightKg = 40.0, reps = 5),
-            )),
-        )))
+        loaded.data.recordWorkout(
+            WorkoutSession(
+                name = "New",
+                exercises =
+                    mutableListOf(
+                        WorkoutExercise(
+                            exerciseId = "bench-press",
+                            sets =
+                                mutableListOf(
+                                    LoggedSet(type = SetType.NORMAL, weightKg = 40.0, reps = 5)
+                                ),
+                        )
+                    ),
+            )
+        )
         loaded.save()
-        assertEquals(40.0, LofitRepository(context).data.exerciseRecords.getValue("bench-press").single().set.weightKg, 0.0)
+        assertEquals(
+            40.0,
+            LofitRepository(context)
+                .data
+                .exerciseRecords
+                .getValue("bench-press")
+                .single()
+                .set
+                .weightKg,
+            0.0,
+        )
     }
 }

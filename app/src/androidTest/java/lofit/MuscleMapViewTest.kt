@@ -21,13 +21,22 @@ class MuscleMapViewTest {
                     val group = if (side == MuscleMapSide.FRONT) "Chest" else "Triceps"
                     val offSideGroup = if (side == MuscleMapSide.FRONT) "Lats" else "Chest"
                     fun render(sets: Int, secondary: Boolean = false): Bitmap {
-                        val exercise = Exercise(
-                            id = "test", name = "Test", type = ExerciseType.REPETITIONS, asymmetric = false,
-                            primaryMuscle = if (secondary) offSideGroup else group,
-                            secondaryMuscles = if (secondary) group else "",
-                        )
-                        val view = MuscleMapView(instrumentation.targetContext, side,
-                            MuscleWorkload(listOf(exercise to sets)), gender)
+                        val exercise =
+                            Exercise(
+                                id = "test",
+                                name = "Test",
+                                type = ExerciseType.REPETITIONS,
+                                asymmetric = false,
+                                primaryMuscle = if (secondary) offSideGroup else group,
+                                secondaryMuscles = if (secondary) group else "",
+                            )
+                        val view =
+                            MuscleMapView(
+                                instrumentation.targetContext,
+                                side,
+                                MuscleWorkload(listOf(exercise to sets)),
+                                gender,
+                            )
                         view.measure(
                             View.MeasureSpec.makeMeasureSpec(296, View.MeasureSpec.EXACTLY),
                             View.MeasureSpec.makeMeasureSpec(528, View.MeasureSpec.EXACTLY),
@@ -45,9 +54,18 @@ class MuscleMapViewTest {
                     val secondaryAboveCap = render(80, secondary = true)
                     val quarterPrimary = render(2)
                     val abovePrimaryCap = render(80)
-                    assertTrue("Secondary color stops at 25%", secondaryAtCap.sameAs(secondaryAboveCap))
-                    assertTrue("Secondary cap equals two primary sets", secondaryAtCap.sameAs(quarterPrimary))
-                    assertTrue("Primary color stops at eight sets", levels.last().sameAs(abovePrimaryCap))
+                    assertTrue(
+                        "Secondary color stops at 25%",
+                        secondaryAtCap.sameAs(secondaryAboveCap),
+                    )
+                    assertTrue(
+                        "Secondary cap equals two primary sets",
+                        secondaryAtCap.sameAs(quarterPrimary),
+                    )
+                    assertTrue(
+                        "Primary color stops at eight sets",
+                        levels.last().sameAs(abovePrimaryCap),
+                    )
                     (levels + secondaryAtCap + secondaryAboveCap + quarterPrimary + abovePrimaryCap)
                         .forEach(Bitmap::recycle)
                 }

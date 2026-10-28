@@ -6,8 +6,7 @@ import java.util.UUID
 
 enum class ExerciseType(val label: String) {
     REPETITIONS("Repetitions"),
-    TIMED("Timed"),
-    ;
+    TIMED("Timed");
 
     val tracksDuration: Boolean
         get() = this == TIMED
@@ -72,7 +71,9 @@ data class PlannedSet(
         require(weightKg >= 0) { "Weight cannot be negative" }
         require(reps >= 0) { "Repetitions cannot be negative" }
         require(holdSeconds >= 0) { "Hold duration cannot be negative" }
-        require(actualHoldSeconds == null || actualHoldSeconds!! >= 0) { "Active hold duration cannot be negative" }
+        require(actualHoldSeconds == null || actualHoldSeconds!! >= 0) {
+            "Active hold duration cannot be negative"
+        }
     }
 }
 
@@ -88,7 +89,8 @@ data class WorkoutExercise(
 ) {
     fun restSeconds(defaultRestSeconds: Int): Int = restSecondsOverride ?: defaultRestSeconds
 
-    val effectiveNote: String get() = note.ifBlank { previousNote }
+    val effectiveNote: String
+        get() = note.ifBlank { previousNote }
 }
 
 data class WorkoutInterval(
@@ -116,17 +118,32 @@ data class WorkoutSession(
         exercises: MutableList<WorkoutExercise> = mutableListOf(),
         bodyWeightKg: Double? = null,
         sourceRoutine: Routine? = null,
-    ) : this(id, name, mutableListOf(WorkoutInterval(startedAt, completedAt)), defaultRestSeconds, exercises, bodyWeightKg, sourceRoutine)
+    ) : this(
+        id,
+        name,
+        mutableListOf(WorkoutInterval(startedAt, completedAt)),
+        defaultRestSeconds,
+        exercises,
+        bodyWeightKg,
+        sourceRoutine,
+    )
 
     init {
         require(intervals.isNotEmpty()) { "Workout needs a start time" }
-        require(intervals.dropLast(1).all { it.endedAt != null }) { "Only the last interval can be active" }
+        require(intervals.dropLast(1).all { it.endedAt != null }) {
+            "Only the last interval can be active"
+        }
     }
 
-    val startedAt: Long get() = intervals.first().startedAt
-    val completedAt: Long? get() = intervals.last().endedAt
+    val startedAt: Long
+        get() = intervals.first().startedAt
 
-    fun durationMillis(now: Long = System.currentTimeMillis()): Long = intervals.sumOf { it.durationMillis(now) }
+    val completedAt: Long?
+        get() = intervals.last().endedAt
+
+    fun durationMillis(now: Long = System.currentTimeMillis()): Long = intervals.sumOf {
+        it.durationMillis(now)
+    }
 
     fun finish(completedAt: Long = System.currentTimeMillis()) {
         if (this.completedAt != null) return
@@ -142,9 +159,13 @@ data class WorkoutSession(
         exercises.add(to, exercises.removeAt(from))
     }
 
-    fun totalVolume(): Double = exercises.sumOf { item ->
-        item.sets.sumOf { it.volume().toBigDecimal() }
-    }.toDouble()
+    fun totalVolume(): Double =
+        exercises
+            .sumOf { item ->
+                item.sets.sumOf { it.volume().toBigDecimal() }
+            }
+            .toDouble()
+
     fun setCount(): Int = exercises.sumOf { it.sets.size }
 
     fun wasCompletedToday(now: Long = System.currentTimeMillis()): Boolean {
@@ -154,35 +175,49 @@ data class WorkoutSession(
             Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
     }
 
-    fun toRoutine(): Routine = Routine(
-        name = name,
-        defaultRestSeconds = defaultRestSeconds,
-        exercises = exercises.map { item ->
-            val plannedSetOrder = item.plannedSets.mapIndexed { index, set -> set.id to index }.toMap()
-            val sets = item.sets.sortedBy { plannedSetOrder[it.plannedSetId] ?: Int.MAX_VALUE }
-            val plannedSets = if (sets.isNotEmpty()) {
-                sets.map { set ->
-                    PlannedSet(
-                        type = set.type,
-                        weightKg = set.weightKg,
-                        reps = set.reps,
-                        holdSeconds = set.holdSeconds,
-                        side = set.side,
-                    )
-                }.toMutableList()
-            } else {
-                item.plannedSets.map { set ->
-                    set.copy(id = UUID.randomUUID().toString(), actualHoldSeconds = null)
-                }.toMutableList()
-            }
-            RoutineExercise(
-                exerciseId = item.exerciseId,
-                restSecondsOverride = item.restSecondsOverride,
-                plannedSets = plannedSets,
-                note = item.effectiveNote,
-            )
-        }.toMutableList(),
-    )
+    fun toRoutine(): Routine =
+        Routine(
+            name = name,
+            defaultRestSeconds = defaultRestSeconds,
+            exercises =
+                exercises
+                    .map { item ->
+                        val plannedSetOrder =
+                            item.plannedSets.mapIndexed { index, set -> set.id to index }.toMap()
+                        val sets =
+                            item.sets.sortedBy { plannedSetOrder[it.plannedSetId] ?: Int.MAX_VALUE }
+                        val plannedSets =
+                            if (sets.isNotEmpty()) {
+                                sets
+                                    .map { set ->
+                                        PlannedSet(
+                                            type = set.type,
+                                            weightKg = set.weightKg,
+                                            reps = set.reps,
+                                            holdSeconds = set.holdSeconds,
+                                            side = set.side,
+                                        )
+                                    }
+                                    .toMutableList()
+                            } else {
+                                item.plannedSets
+                                    .map { set ->
+                                        set.copy(
+                                            id = UUID.randomUUID().toString(),
+                                            actualHoldSeconds = null,
+                                        )
+                                    }
+                                    .toMutableList()
+                            }
+                        RoutineExercise(
+                            exerciseId = item.exerciseId,
+                            restSecondsOverride = item.restSecondsOverride,
+                            plannedSets = plannedSets,
+                            note = item.effectiveNote,
+                        )
+                    }
+                    .toMutableList(),
+        )
 }
 
 data class Routine(
@@ -206,7 +241,10 @@ data class ExerciseRecord(
     val volumeSet: LoggedSet?,
 )
 
-enum class BiologicalGender(val label: String) { MALE("Male"), FEMALE("Female") }
+enum class BiologicalGender(val label: String) {
+    MALE("Male"),
+    FEMALE("Female"),
+}
 
 data class AppData(
     val exercises: MutableList<Exercise> = DefaultData.exercises().toMutableList(),
@@ -222,80 +260,121 @@ data class AppData(
     var mcpEnabled: Boolean = false,
     var mcpPort: Int = BuildConfig.MCP_PORT,
 ) {
-    fun resumeWorkout(workoutId: String, resumedAt: Long = System.currentTimeMillis()): WorkoutSession? {
+    fun resumeWorkout(
+        workoutId: String,
+        resumedAt: Long = System.currentTimeMillis(),
+    ): WorkoutSession? {
         if (activeWorkout != null) return null
         val historyIndex = history.indexOfFirst { it.id == workoutId }
         if (historyIndex < 0) return null
         if (!history[historyIndex].wasCompletedToday(resumedAt)) return null
         val finishedWorkout = history.removeAt(historyIndex)
-        return finishedWorkout.copy(
-            intervals = (finishedWorkout.intervals + WorkoutInterval(startedAt = resumedAt)).toMutableList(),
-            sourceRoutine = finishedWorkout.captureRoutineBaseline(),
-        ).also { activeWorkout = it }
+        return finishedWorkout
+            .copy(
+                intervals =
+                    (finishedWorkout.intervals + WorkoutInterval(startedAt = resumedAt))
+                        .toMutableList(),
+                sourceRoutine = finishedWorkout.captureRoutineBaseline(),
+            )
+            .also { activeWorkout = it }
     }
 
     fun lastKnownSets(
-        exerciseId: String, preferredRoutineId: String? = null, sameRoutineOnly: Boolean = false,
-    ): MutableList<PlannedSet>? = lastKnownExercise(exerciseId, preferredRoutineId, sameRoutineOnly)?.plannedSets
+        exerciseId: String,
+        preferredRoutineId: String? = null,
+        sameRoutineOnly: Boolean = false,
+    ): MutableList<PlannedSet>? =
+        lastKnownExercise(exerciseId, preferredRoutineId, sameRoutineOnly)?.plannedSets
 
-    // Saved prescriptions restrict history to their routine; newly added exercises can use other history.
+    // Saved prescriptions restrict history to their routine; newly added exercises can use other
+    // history.
     fun lastKnownExercise(
-        exerciseId: String, preferredRoutineId: String? = null, sameRoutineOnly: Boolean = false,
-    ): WorkoutExercise? = history
-        .withIndex()
-        .filter { !sameRoutineOnly || it.value.sourceRoutine?.id == preferredRoutineId }
-        .sortedWith(
-            compareByDescending<IndexedValue<WorkoutSession>> {
-                preferredRoutineId != null && it.value.sourceRoutine?.id == preferredRoutineId
-            }.thenByDescending { it.value.completedAt ?: it.value.startedAt }
-                .thenByDescending { it.index },
-        )
-        .firstNotNullOfOrNull { (_, workout) ->
-            workout.exercises.lastOrNull { it.exerciseId == exerciseId && it.sets.isNotEmpty() }
-                ?.let { workout to it }
-        }
-        ?.let { (workout, item) ->
-            WorkoutExercise(exerciseId = item.exerciseId,
-                previousNote = item.effectiveNote,
-                restSecondsOverride = item.restSecondsOverride ?: workout.defaultRestSeconds,
-                plannedSets = item.sets.map { set ->
-                    PlannedSet(type = set.type, weightKg = set.weightKg, reps = set.reps,
-                        holdSeconds = set.holdSeconds, side = set.side)
-                }.toMutableList())
-        }
+        exerciseId: String,
+        preferredRoutineId: String? = null,
+        sameRoutineOnly: Boolean = false,
+    ): WorkoutExercise? =
+        history
+            .withIndex()
+            .filter { !sameRoutineOnly || it.value.sourceRoutine?.id == preferredRoutineId }
+            .sortedWith(
+                compareByDescending<IndexedValue<WorkoutSession>> {
+                        preferredRoutineId != null &&
+                            it.value.sourceRoutine?.id == preferredRoutineId
+                    }
+                    .thenByDescending { it.value.completedAt ?: it.value.startedAt }
+                    .thenByDescending { it.index }
+            )
+            .firstNotNullOfOrNull { (_, workout) ->
+                workout.exercises
+                    .lastOrNull { it.exerciseId == exerciseId && it.sets.isNotEmpty() }
+                    ?.let { workout to it }
+            }
+            ?.let { (workout, item) ->
+                WorkoutExercise(
+                    exerciseId = item.exerciseId,
+                    previousNote = item.effectiveNote,
+                    restSecondsOverride = item.restSecondsOverride ?: workout.defaultRestSeconds,
+                    plannedSets =
+                        item.sets
+                            .map { set ->
+                                PlannedSet(
+                                    type = set.type,
+                                    weightKg = set.weightKg,
+                                    reps = set.reps,
+                                    holdSeconds = set.holdSeconds,
+                                    side = set.side,
+                                )
+                            }
+                            .toMutableList(),
+                )
+            }
 
     // Append snapshots only when a workout is saved; never rebuild records from history.
     fun recordWorkout(workout: WorkoutSession) {
         val exercisesById = exercises.associateBy { it.id }
-        workout.exercises.groupBy { it.exerciseId }.forEach { (exerciseId, items) ->
-            val exercise = exercisesById[exerciseId] ?: return@forEach
-            val sets = items.flatMap { it.sets }
-                .filter { it.isRecordEligible(exercise) }.sortedBy { it.completedAt }
-            val bestOrder = compareBy<LoggedSet> {
-                when {
-                    exercise.type.tracksDuration -> it.holdSeconds.toDouble()
-                    exercise.weighted -> it.weightKg
-                    else -> it.reps.toDouble()
-                }
-            }.thenBy { it.completedAt }
-            val volumeOrder = compareBy<LoggedSet> { it.volume() }.thenBy { it.completedAt }
-            val tracksVolume = exercise.weighted && !exercise.type.tracksDuration
-            sets.forEach { set ->
-                val previous = exerciseRecords[exerciseId]?.lastOrNull()
-                val best = previous?.set?.takeUnless { bestOrder.compare(set, it) > 0 } ?: set
-                val volumeSet = if (tracksVolume) {
-                    previous?.volumeSet?.takeUnless { volumeOrder.compare(set, it) > 0 } ?: set
-                } else null
-                if (previous == null || best != previous.set || volumeSet != previous.volumeSet) {
-                    exerciseRecords.getOrPut(exerciseId) { mutableListOf() }
-                        .add(ExerciseRecord(exercise, best.copy(), volumeSet?.copy()))
+        workout.exercises
+            .groupBy { it.exerciseId }
+            .forEach { (exerciseId, items) ->
+                val exercise = exercisesById[exerciseId] ?: return@forEach
+                val sets =
+                    items
+                        .flatMap { it.sets }
+                        .filter { it.isRecordEligible(exercise) }
+                        .sortedBy { it.completedAt }
+                val bestOrder =
+                    compareBy<LoggedSet> {
+                            when {
+                                exercise.type.tracksDuration -> it.holdSeconds.toDouble()
+                                exercise.weighted -> it.weightKg
+                                else -> it.reps.toDouble()
+                            }
+                        }
+                        .thenBy { it.completedAt }
+                val volumeOrder = compareBy<LoggedSet> { it.volume() }.thenBy { it.completedAt }
+                val tracksVolume = exercise.weighted && !exercise.type.tracksDuration
+                sets.forEach { set ->
+                    val previous = exerciseRecords[exerciseId]?.lastOrNull()
+                    val best = previous?.set?.takeUnless { bestOrder.compare(set, it) > 0 } ?: set
+                    val volumeSet =
+                        if (tracksVolume) {
+                            previous?.volumeSet?.takeUnless { volumeOrder.compare(set, it) > 0 }
+                                ?: set
+                        } else null
+                    if (
+                        previous == null || best != previous.set || volumeSet != previous.volumeSet
+                    ) {
+                        exerciseRecords
+                            .getOrPut(exerciseId) { mutableListOf() }
+                            .add(ExerciseRecord(exercise, best.copy(), volumeSet?.copy()))
+                    }
                 }
             }
-        }
     }
 
-    fun oneRepMaxes(): List<ExerciseRecord> = exerciseRecords.values.mapNotNull { it.lastOrNull() }
-        .sortedBy { it.exercise.name.lowercase() }
+    fun oneRepMaxes(): List<ExerciseRecord> =
+        exerciseRecords.values
+            .mapNotNull { it.lastOrNull() }
+            .sortedBy { it.exercise.name.lowercase() }
 
     fun recordSetIds(workout: WorkoutSession): Set<String> {
         val exercisesById = exercises.associateBy { it.id }
@@ -309,21 +388,35 @@ data class AppData(
                 val sets = loggedSets.filter { it.isRecordEligible(exercise) }
                 val previousRecord = exerciseRecords[exerciseId]?.lastOrNull() ?: return@forEach
                 if (exercise.type.tracksDuration) {
-                    sets.maxWithOrNull(compareBy<LoggedSet> { it.holdSeconds }.thenByDescending { it.completedAt })
+                    sets
+                        .maxWithOrNull(
+                            compareBy<LoggedSet> { it.holdSeconds }
+                                .thenByDescending { it.completedAt }
+                        )
                         ?.takeIf { it.holdSeconds > previousRecord.set.holdSeconds }
                         ?.let { recordIds.add(it.id) }
                 } else if (exercise.weighted) {
-                    sets.maxWithOrNull(compareBy<LoggedSet> { it.weightKg }.thenByDescending { it.completedAt })
+                    sets
+                        .maxWithOrNull(
+                            compareBy<LoggedSet> { it.weightKg }.thenByDescending { it.completedAt }
+                        )
                         ?.takeIf { it.weightKg > previousRecord.set.weightKg }
                         ?.let { recordIds.add(it.id) }
                     val previousVolume = previousRecord.volumeSet?.volume()
                     if (previousVolume != null) {
-                        sets.maxWithOrNull(compareBy<LoggedSet> { it.volume() }.thenByDescending { it.completedAt })
+                        sets
+                            .maxWithOrNull(
+                                compareBy<LoggedSet> { it.volume() }
+                                    .thenByDescending { it.completedAt }
+                            )
                             ?.takeIf { it.volume() > previousVolume }
                             ?.let { recordIds.add(it.id) }
                     }
                 } else {
-                    sets.maxWithOrNull(compareBy<LoggedSet> { it.reps }.thenByDescending { it.completedAt })
+                    sets
+                        .maxWithOrNull(
+                            compareBy<LoggedSet> { it.reps }.thenByDescending { it.completedAt }
+                        )
                         ?.takeIf { it.reps > previousRecord.set.reps }
                         ?.let { recordIds.add(it.id) }
                 }

@@ -98,6 +98,14 @@ the exercise's minimum hold duration. Existing routines are never overwritten.
 
 ## Development
 
+Kotlin uses ktfmt 0.64 (Kotlin style). Zed formats on save with the same version.
+To format or check all Kotlin source and Gradle scripts:
+
+```sh
+./gradlew spotlessApply
+./gradlew spotlessCheck
+```
+
 This is my first open source project that is PURELY vibecoded. I do NOT read the
 code and I do NOT care. It is somewhat of an experiment. UX/UI come first and
 there are GUI tests to ensure basic functionality stays stable to a certain

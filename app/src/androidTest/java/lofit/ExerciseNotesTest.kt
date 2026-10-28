@@ -27,21 +27,38 @@ class ExerciseNotesTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
 
-    @Before fun resetData() {
-        instrumentation.uiAutomation.grantRuntimePermission(context.packageName, Manifest.permission.POST_NOTIFICATIONS)
+    @Before
+    fun resetData() {
+        instrumentation.uiAutomation.grantRuntimePermission(
+            context.packageName,
+            Manifest.permission.POST_NOTIFICATIONS,
+        )
         context.clearRepositoryTestData()
         LofitRepository(context).apply {
             data.bodyMetricsEnabled = false
             data.onboardingComplete = true
-            data.routines.add(Routine(name = "Strength", exercises = mutableListOf(
-                RoutineExercise(exerciseId = "bench-press", plannedSets = mutableListOf(PlannedSet(weightKg = 60.0))),
-            )))
+            data.routines.add(
+                Routine(
+                    name = "Strength",
+                    exercises =
+                        mutableListOf(
+                            RoutineExercise(
+                                exerciseId = "bench-press",
+                                plannedSets = mutableListOf(PlannedSet(weightKg = 60.0)),
+                            )
+                        ),
+                )
+            )
             save()
         }
     }
 
-    private fun launch() = ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)
-        .setAction(Intent.ACTION_MAIN).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    private fun launch() =
+        ActivityScenario.launch<MainActivity>(
+            Intent(context, MainActivity::class.java)
+                .setAction(Intent.ACTION_MAIN)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
 
     private fun navigate(scenario: ActivityScenario<MainActivity>, label: Int) {
         scenario.onActivity { activity ->
@@ -51,71 +68,118 @@ class ExerciseNotesTest {
         onView(allOf(withText(label), isClickable())).perform(click())
     }
 
-    @Test fun routineAndWorkoutNotesPersistShowAboveSetsAndCarryForwardFromHistory() {
+    @Test
+    fun routineAndWorkoutNotesPersistShowAboveSetsAndCarryForwardFromHistory() {
         launch().use { scenario ->
             navigate(scenario, R.string.nav_routines)
             onView(withText("Edit")).perform(scrollTo(), click())
-            onView(withContentDescription("Bench press note")).check(matches(withHint("Type note here ...")))
+            onView(withContentDescription("Bench press note"))
+                .check(matches(withHint("Type note here ...")))
                 .check(isCompletelyAbove(withContentDescription("Set 1 weight")))
-                .perform(scrollTo(), replaceText("Keep elbows tucked\nSlow descent"), closeSoftKeyboard())
+                .perform(
+                    scrollTo(),
+                    replaceText("Keep elbows tucked\nSlow descent"),
+                    closeSoftKeyboard(),
+                )
             onView(withText("Save routine")).perform(scrollTo(), click())
-            assertEquals("Keep elbows tucked\nSlow descent", LofitRepository(context).data.routines.single().exercises.single().note)
+            assertEquals(
+                "Keep elbows tucked\nSlow descent",
+                LofitRepository(context).data.routines.single().exercises.single().note,
+            )
             scenario.recreate()
             navigate(scenario, R.string.nav_routines)
             onView(withText("Start")).perform(scrollTo(), click())
-            onView(withContentDescription("Bench press note")).check(matches(withText("Keep elbows tucked\nSlow descent")))
+            onView(withContentDescription("Bench press note"))
+                .check(matches(withText("Keep elbows tucked\nSlow descent")))
                 .check(isCompletelyAbove(withContentDescription("Set 1 weight")))
-                .perform(scrollTo(), replaceText("Pause at bottom\nBreathe out"), closeSoftKeyboard())
+                .perform(
+                    scrollTo(),
+                    replaceText("Pause at bottom\nBreathe out"),
+                    closeSoftKeyboard(),
+                )
             scenario.recreate()
-            onView(withContentDescription("Bench press note")).check(matches(withText("Pause at bottom\nBreathe out")))
+            onView(withContentDescription("Bench press note"))
+                .check(matches(withText("Pause at bottom\nBreathe out")))
             onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
             onView(withText("Finish workout")).perform(scrollTo(), click())
-            onView(withText("Update sets, weights and notes in Strength")).check(matches(not(isChecked())))
+            onView(withText("Update sets, weights and notes in Strength"))
+                .check(matches(not(isChecked())))
             onView(withText("Finish and save")).perform(scrollTo(), click())
             val data = LofitRepository(context).data
-            assertEquals("Pause at bottom\nBreathe out", data.history.single().exercises.single().note)
-            assertEquals("Keep elbows tucked\nSlow descent", data.routines.single().exercises.single().note)
+            assertEquals(
+                "Pause at bottom\nBreathe out",
+                data.history.single().exercises.single().note,
+            )
+            assertEquals(
+                "Keep elbows tucked\nSlow descent",
+                data.routines.single().exercises.single().note,
+            )
             navigate(scenario, R.string.nav_history)
             onView(withContentDescription("View Strength")).perform(scrollTo(), click())
-            onView(withContentDescription("Bench press note")).check(matches(withText("Pause at bottom\nBreathe out")))
+            onView(withContentDescription("Bench press note"))
+                .check(matches(withText("Pause at bottom\nBreathe out")))
                 .check(matches(not(isAssignableFrom(EditText::class.java))))
                 .check(isCompletelyAbove(withContentDescription("Set 1 weight")))
             pressBack()
-            onView(withContentDescription("Create routine from Strength")).perform(scrollTo(), click())
-            onView(withContentDescription("Bench press note")).check(matches(withText("Pause at bottom\nBreathe out")))
+            onView(withContentDescription("Create routine from Strength"))
+                .perform(scrollTo(), click())
+            onView(withContentDescription("Bench press note"))
+                .check(matches(withText("Pause at bottom\nBreathe out")))
             pressBack()
             navigate(scenario, R.string.nav_routines)
             onView(withText("Start")).perform(scrollTo(), click())
-            onView(withContentDescription("Bench press note")).check(matches(withText("")))
+            onView(withContentDescription("Bench press note"))
+                .check(matches(withText("")))
                 .check(matches(withHint("Pause at bottom\nBreathe out")))
             scenario.recreate()
-            onView(withContentDescription("Bench press note")).check(matches(withText("")))
+            onView(withContentDescription("Bench press note"))
+                .check(matches(withText("")))
                 .check(matches(withHint("Pause at bottom\nBreathe out")))
             onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
             onView(withText("Finish workout")).perform(scrollTo(), click())
             onView(withText("Finish and save")).perform(scrollTo(), click())
-            assertEquals("Pause at bottom\nBreathe out", LofitRepository(context).data.history.last().exercises.single().note)
+            assertEquals(
+                "Pause at bottom\nBreathe out",
+                LofitRepository(context).data.history.last().exercises.single().note,
+            )
         }
     }
 
-    @Test fun openWorkoutLoadsPreviousNoteAsHintAndSavesItUntouched() {
+    @Test
+    fun openWorkoutLoadsPreviousNoteAsHintAndSavesItUntouched() {
         LofitRepository(context).apply {
-            data.history.add(WorkoutSession(name = "Previous", completedAt = 200, exercises = mutableListOf(
-                WorkoutExercise(exerciseId = "bench-press", note = "Pause at bottom", sets = mutableListOf(
-                    LoggedSet(type = SetType.NORMAL, weightKg = 70.0, reps = 8))),
-            )))
+            data.history.add(
+                WorkoutSession(
+                    name = "Previous",
+                    completedAt = 200,
+                    exercises =
+                        mutableListOf(
+                            WorkoutExercise(
+                                exerciseId = "bench-press",
+                                note = "Pause at bottom",
+                                sets =
+                                    mutableListOf(
+                                        LoggedSet(type = SetType.NORMAL, weightKg = 70.0, reps = 8)
+                                    ),
+                            )
+                        ),
+                )
+            )
             saveHistory()
             save()
         }
         launch().use { scenario ->
             onView(withText(R.string.start_workout)).perform(scrollTo(), click())
             onView(withText("Add exercise")).perform(scrollTo(), click())
-            onView(withHint("Search name or muscle")).perform(replaceText("Bench press"), closeSoftKeyboard())
+            onView(withHint("Search name or muscle"))
+                .perform(replaceText("Bench press"), closeSoftKeyboard())
             onView(withContentDescription("Add Bench press")).perform(scrollTo(), click())
-            onView(withContentDescription("Bench press note")).check(matches(withText("")))
+            onView(withContentDescription("Bench press note"))
+                .check(matches(withText("")))
                 .check(matches(withHint("Pause at bottom")))
             scenario.recreate()
-            onView(withContentDescription("Bench press note")).check(matches(withText("")))
+            onView(withContentDescription("Bench press note"))
+                .check(matches(withText("")))
                 .check(matches(withHint("Pause at bottom")))
             onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
             onView(withText("Finish workout")).perform(scrollTo(), click())
@@ -126,46 +190,76 @@ class ExerciseNotesTest {
         }
     }
 
-    @Test fun typingNewNoteReplacesHintAndClearingRestoresIt() {
+    @Test
+    fun typingNewNoteReplacesHintAndClearingRestoresIt() {
         LofitRepository(context).apply {
-            data.activeWorkout = WorkoutSession(name = "Notes", exercises = mutableListOf(
-                WorkoutExercise(exerciseId = "bench-press", previousNote = "Old cue",
-                    plannedSets = mutableListOf(PlannedSet(weightKg = 60.0))),
-            ))
+            data.activeWorkout =
+                WorkoutSession(
+                    name = "Notes",
+                    exercises =
+                        mutableListOf(
+                            WorkoutExercise(
+                                exerciseId = "bench-press",
+                                previousNote = "Old cue",
+                                plannedSets = mutableListOf(PlannedSet(weightKg = 60.0)),
+                            )
+                        ),
+                )
             save()
         }
         launch().use { scenario ->
-            onView(withContentDescription("Bench press note")).check(matches(withText("")))
+            onView(withContentDescription("Bench press note"))
+                .check(matches(withText("")))
                 .check(matches(withHint("Old cue")))
                 .perform(scrollTo(), replaceText("New cue"), closeSoftKeyboard())
             scenario.recreate()
-            onView(withContentDescription("Bench press note")).check(matches(withText("New cue")))
+            onView(withContentDescription("Bench press note"))
+                .check(matches(withText("New cue")))
                 .perform(scrollTo(), replaceText(""), closeSoftKeyboard())
             scenario.recreate()
-            onView(withContentDescription("Bench press note")).check(matches(withText("")))
+            onView(withContentDescription("Bench press note"))
+                .check(matches(withText("")))
                 .check(matches(withHint("Old cue")))
                 .perform(scrollTo(), replaceText("Final cue"), closeSoftKeyboard())
             onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
             onView(withText("Finish workout")).perform(scrollTo(), click())
             onView(withText("Finish and save")).perform(scrollTo(), click())
-            assertEquals("Final cue", LofitRepository(context).data.history.last().exercises.single().note)
+            assertEquals(
+                "Final cue",
+                LofitRepository(context).data.history.last().exercises.single().note,
+            )
         }
     }
 
-    @Test fun existingDataWithoutNotesStillLoads() {
+    @Test
+    fun existingDataWithoutNotesStillLoads() {
         LofitRepository(context).apply {
             data.activeWorkout = data.workoutFromRoutine(data.routines.single())
-            data.history.add(data.activeWorkout!!.copy(id = "past", intervals = mutableListOf(WorkoutInterval(100, 200))))
+            data.history.add(
+                data.activeWorkout!!.copy(
+                    id = "past",
+                    intervals = mutableListOf(WorkoutInterval(100, 200)),
+                )
+            )
             saveHistory()
             save()
         }
         val root = JSONObject(context.repositoryStateFile.readText())
         val history = org.json.JSONArray(context.repositoryHistoryFile.readText())
-        root.getJSONArray("routines").getJSONObject(0).getJSONArray("exercises").getJSONObject(0).remove("note")
+        root
+            .getJSONArray("routines")
+            .getJSONObject(0)
+            .getJSONArray("exercises")
+            .getJSONObject(0)
+            .remove("note")
         listOf(root.getJSONObject("activeWorkout"), history.getJSONObject(0)).forEach { workout ->
             workout.getJSONArray("exercises").getJSONObject(0).remove("note")
             workout.getJSONArray("exercises").getJSONObject(0).remove("previousNote")
-            workout.getJSONObject("sourceRoutine").getJSONArray("exercises").getJSONObject(0).remove("note")
+            workout
+                .getJSONObject("sourceRoutine")
+                .getJSONArray("exercises")
+                .getJSONObject(0)
+                .remove("note")
         }
         context.repositoryStateFile.writeText(root.toString())
         context.repositoryHistoryFile.writeText(history.toString())

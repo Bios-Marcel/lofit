@@ -13,32 +13,45 @@ import kotlin.math.max
 class ExercisePictures(private val context: Context) {
     private val directory = File(context.filesDir, "exercise-pictures")
     private val drawableIds = mutableMapOf<String, Int>()
-    private val thumbnails = object : LruCache<String, Bitmap>(8 * 1024 * 1024) {
-        override fun sizeOf(key: String, value: Bitmap) = value.allocationByteCount
-    }
+    private val thumbnails =
+        object : LruCache<String, Bitmap>(8 * 1024 * 1024) {
+            override fun sizeOf(key: String, value: Bitmap) = value.allocationByteCount
+        }
 
     fun bundledResource(exercise: Exercise, gender: BiologicalGender): Int? {
-        val name = exercise.imageResource?.let(context.resources::getResourceEntryName)
-            ?: exercise.imageName ?: return null
-        fun resource(name: String) = drawableIds.getOrPut(name) {
-            context.resources.getIdentifier(name, "drawable", context.packageName)
-        }.takeIf { it != 0 }
+        val name =
+            exercise.imageResource?.let(context.resources::getResourceEntryName)
+                ?: exercise.imageName
+                ?: return null
+        fun resource(name: String) =
+            drawableIds
+                .getOrPut(name) {
+                    context.resources.getIdentifier(name, "drawable", context.packageName)
+                }
+                .takeIf { it != 0 }
         return if (gender == BiologicalGender.FEMALE) resource("${name}_female") ?: resource(name)
-            else resource(name)
+        else resource(name)
     }
 
     fun importPicture(uri: Uri): String {
-        val bitmap = ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri)) { decoder, info, _ ->
-            val longest = max(info.size.width, info.size.height)
-            if (longest > 1024) decoder.setTargetSize(
-                (info.size.width * 1024L / longest).toInt().coerceAtLeast(1),
-                (info.size.height * 1024L / longest).toInt().coerceAtLeast(1),
-            )
-            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-        }
+        val bitmap =
+            ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri)) {
+                decoder,
+                info,
+                _ ->
+                val longest = max(info.size.width, info.size.height)
+                if (longest > 1024)
+                    decoder.setTargetSize(
+                        (info.size.width * 1024L / longest).toInt().coerceAtLeast(1),
+                        (info.size.height * 1024L / longest).toInt().coerceAtLeast(1),
+                    )
+                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+            }
         val file = File(directory.apply { mkdirs() }, "${UUID.randomUUID()}.webp")
         try {
-            file.outputStream().use { check(bitmap.compress(Bitmap.CompressFormat.WEBP_LOSSY, 90, it)) }
+            file.outputStream().use {
+                check(bitmap.compress(Bitmap.CompressFormat.WEBP_LOSSY, 90, it))
+            }
             return file.name
         } catch (error: Exception) {
             file.delete()
@@ -50,13 +63,21 @@ class ExercisePictures(private val context: Context) {
 
     fun thumbnail(name: String, width: Int, height: Int): Bitmap? {
         val key = "$name:$width:$height"
-        thumbnails.get(key)?.let { return it }
+        thumbnails.get(key)?.let {
+            return it
+        }
         return runCatching {
             ImageDecoder.decodeBitmap(ImageDecoder.createSource(file(name))) { decoder, info, _ ->
-                val sample = minOf(info.size.width / width.coerceAtLeast(1), info.size.height / height.coerceAtLeast(1))
-                decoder.setTargetSampleSize(sample.coerceAtLeast(1))
-            }.also { thumbnails.put(key, it) }
-        }.getOrNull()
+                    val sample =
+                        minOf(
+                            info.size.width / width.coerceAtLeast(1),
+                            info.size.height / height.coerceAtLeast(1),
+                        )
+                    decoder.setTargetSampleSize(sample.coerceAtLeast(1))
+                }
+                .also { thumbnails.put(key, it) }
+        }
+            .getOrNull()
     }
 
     fun delete(name: String) {

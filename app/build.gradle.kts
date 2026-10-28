@@ -38,7 +38,8 @@ android {
         }
         release {
             buildConfigField("int", "MCP_PORT", "8766")
-            signingConfig = signingConfigs.getByName(if (releaseKeystore != null) "release" else "debug")
+            signingConfig =
+                signingConfigs.getByName(if (releaseKeystore != null) "release" else "debug")
             optimization {
                 enable = true
                 packageScope = setOf("androidx.**", "kotlinx.**")

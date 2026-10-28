@@ -5,11 +5,12 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class BodyWeightTest {
-    private val measurements = listOf(
-        BodyWeightMeasurement(400, 90.0),
-        BodyWeightMeasurement(100, 70.0),
-        BodyWeightMeasurement(300, 80.0),
-    )
+    private val measurements =
+        listOf(
+            BodyWeightMeasurement(400, 90.0),
+            BodyWeightMeasurement(100, 70.0),
+            BodyWeightMeasurement(300, 80.0),
+        )
 
     @Test
     fun betweenMeasurements_usesArithmeticMeanOfNearestNeighbors() {
@@ -30,10 +31,11 @@ class BodyWeightTest {
 
     @Test
     fun bodyWeight_roundsExactNearestAndAveragedMeasurementsToTwoDecimalPlaces() {
-        val precise = listOf(
-            BodyWeightMeasurement(100, 64.020001002032),
-            BodyWeightMeasurement(300, 64.03),
-        )
+        val precise =
+            listOf(
+                BodyWeightMeasurement(100, 64.020001002032),
+                BodyWeightMeasurement(300, 64.03),
+            )
         assertEquals(64.02, bodyWeightAt(100, precise)!!, 0.0)
         assertEquals(64.02, bodyWeightAt(50, precise)!!, 0.0)
         assertEquals(64.03, bodyWeightAt(500, precise)!!, 0.0)
@@ -44,10 +46,15 @@ class BodyWeightTest {
     @Test
     fun emptyOrInvalidMeasurements_leaveWeightUnknown() {
         assertNull(bodyWeightAt(200, emptyList()))
-        assertNull(bodyWeightAt(200, listOf(
-            BodyWeightMeasurement(100, Double.NaN),
-            BodyWeightMeasurement(300, 0.0),
-            BodyWeightMeasurement(400, -5.0),
-        )))
+        assertNull(
+            bodyWeightAt(
+                200,
+                listOf(
+                    BodyWeightMeasurement(100, Double.NaN),
+                    BodyWeightMeasurement(300, 0.0),
+                    BodyWeightMeasurement(400, -5.0),
+                ),
+            )
+        )
     }
 }

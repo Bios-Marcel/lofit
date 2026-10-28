@@ -27,17 +27,24 @@ object WorkoutPlanFile {
     fun decode(input: InputStream): SharedWorkoutPlan {
         val compressed = input.readNBytes(MAX_FILE_BYTES + 1)
         require(compressed.size <= MAX_FILE_BYTES) { "Workout file is too large" }
-        val json = GZIPInputStream(ByteArrayInputStream(compressed)).use {
-            it.readNBytes(SharedWorkoutPlan.MAX_BYTES + 1)
-        }
+        val json =
+            GZIPInputStream(ByteArrayInputStream(compressed)).use {
+                it.readNBytes(SharedWorkoutPlan.MAX_BYTES + 1)
+            }
         return SharedWorkoutPlan.decode(json)
     }
 
     fun shareIntent(context: Context, workout: WorkoutSession, catalog: List<Exercise>): Intent {
         val bytes = encode(workout, catalog)
-        val directory = File(context.cacheDir, "shared-workouts/${UUID.randomUUID()}").apply { mkdirs() }
-        val name = workout.name.map { if (it.isLetterOrDigit() || it in " -_") it else '_' }
-            .joinToString("").trim(' ', '_').take(64).ifBlank { "workout" }
+        val directory =
+            File(context.cacheDir, "shared-workouts/${UUID.randomUUID()}").apply { mkdirs() }
+        val name =
+            workout.name
+                .map { if (it.isLetterOrDigit() || it in " -_") it else '_' }
+                .joinToString("")
+                .trim(' ', '_')
+                .take(64)
+                .ifBlank { "workout" }
         val file = File(directory, "$name.lofit").apply { writeBytes(bytes) }
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.workout-files", file)
         return Intent(Intent.ACTION_SEND).apply {
@@ -52,5 +59,6 @@ object WorkoutPlanFile {
 
 class WorkoutFileProvider : FileProvider() {
     override fun getType(uri: Uri): String? =
-        if (uri.lastPathSegment?.endsWith(".lofit") == true) WorkoutPlanFile.MIME_TYPE else super.getType(uri)
+        if (uri.lastPathSegment?.endsWith(".lofit") == true) WorkoutPlanFile.MIME_TYPE
+        else super.getType(uri)
 }

@@ -12,10 +12,11 @@ fun bodyWeightAt(time: Long, measurements: List<BodyWeightMeasurement>): Double?
     val before = valid.filter { it.time <= time }.maxByOrNull { it.time }
     if (before?.time == time) return roundBodyWeight(before.kilograms)
     val after = valid.filter { it.time > time }.minByOrNull { it.time }
-    val kilograms = if (before != null && after != null) {
-        (before.kilograms + after.kilograms) / 2
-    } else {
-        before?.kilograms ?: after?.kilograms
-    }
+    val kilograms =
+        if (before != null && after != null) {
+            (before.kilograms + after.kilograms) / 2
+        } else {
+            before?.kilograms ?: after?.kilograms
+        }
     return kilograms?.let(::roundBodyWeight)
 }

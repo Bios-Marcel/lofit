@@ -25,10 +25,11 @@ class StartupDataMigrationTest {
         repository.data.bodyMetricsEnabled = true
         repository.saveHistory()
         repository.save()
-        val root = JSONObject(stored()).apply {
-            remove("biologicalGender")
-            remove("onboardingComplete")
-        }
+        val root =
+            JSONObject(stored()).apply {
+                remove("biologicalGender")
+                remove("onboardingComplete")
+            }
         store(root.toString())
 
         val loaded = LofitRepository(context)
@@ -82,7 +83,8 @@ class StartupDataMigrationTest {
     @Test
     fun bodyWeight_roundsStoredAndExistingWorkoutsToTwoDecimalPlaces() {
         val repository = LofitRepository(context)
-        repository.data.activeWorkout = WorkoutSession(name = "Active", bodyWeightKg = 64.020001002032)
+        repository.data.activeWorkout =
+            WorkoutSession(name = "Active", bodyWeightKg = 64.020001002032)
         repository.data.history.add(WorkoutSession(name = "Past", bodyWeightKg = 72.255))
         repository.saveHistory()
         repository.save()
@@ -100,7 +102,11 @@ class StartupDataMigrationTest {
         assertEquals(64.02, loaded.data.activeWorkout!!.bodyWeightKg!!, 0.0)
         assertEquals(72.26, loaded.data.history.single().bodyWeightKg!!, 0.0)
         loaded.save()
-        assertEquals(64.02, JSONObject(stored()).getJSONObject("activeWorkout").getDouble("bodyWeightKg"), 0.0)
+        assertEquals(
+            64.02,
+            JSONObject(stored()).getJSONObject("activeWorkout").getDouble("bodyWeightKg"),
+            0.0,
+        )
     }
 
     @Test
@@ -124,7 +130,8 @@ class StartupDataMigrationTest {
 
     @Test
     fun startup_migratesAllOldTypesAndFieldsAndKeepsExactBackup() {
-        val raw = """{
+        val raw =
+            """{
             "exercises":[
                 {"id":"reps","name":"Reps","type":"WEIGHTED_REPS","custom":true},
                 {"id":"hold","name":"Hold","type":"WEIGHTED_HOLD","custom":true},
@@ -189,7 +196,8 @@ class StartupDataMigrationTest {
 
     @Test
     fun startup_runsOnceAndKeepsIdsAndLaterEditsAcrossRestarts() {
-        val raw = """{"exercises":[],"routines":[{"id":"r","name":"Old","exercises":[{"exerciseId":"plank"}]}]}"""
+        val raw =
+            """{"exercises":[],"routines":[{"id":"r","name":"Old","exercises":[{"exerciseId":"plank"}]}]}"""
         store(raw)
         val first = LofitRepository(context)
         val migrated = stored()
@@ -199,7 +207,10 @@ class StartupDataMigrationTest {
         val second = LofitRepository(context)
         assertEquals(migrated, stored())
         assertEquals(routineItem.id, second.data.routines.single().exercises.single().id)
-        assertEquals(ids, second.data.routines.single().exercises.single().plannedSets.map { it.id })
+        assertEquals(
+            ids,
+            second.data.routines.single().exercises.single().plannedSets.map { it.id },
+        )
         second.data.routines.single().name = "Edited"
         second.data.routines.single().exercises.single().plannedSets.clear()
         second.save()
@@ -214,7 +225,8 @@ class StartupDataMigrationTest {
 
     @Test
     fun startup_keepsExistingLinksAndMatchesHoldTimesById() {
-        store("""{"exercises":[],"history":[{"id":"w","name":"Sparse","startedAt":100,"exercises":[
+        store(
+            """{"exercises":[],"history":[{"id":"w","name":"Sparse","startedAt":100,"exercises":[
             {"id":"e","exerciseId":"plank","plannedSets":[
                 {"id":"a","holdSeconds":30},
                 {"id":"b","holdSeconds":45},
@@ -226,7 +238,8 @@ class StartupDataMigrationTest {
                 {"id":"l4","type":"NORMAL","holdSeconds":70,"plannedSetId":"missing"},
                 {"id":"l5","type":"NORMAL","holdSeconds":80}
             ]}
-        ]}]}""")
+        ]}]}"""
+        )
 
         val item = LofitRepository(context).data.history.single().exercises.single()
 
@@ -241,53 +254,101 @@ class StartupDataMigrationTest {
 
     @Test
     fun startup_doesNotRebuildExplicitlyEmptyPlans() {
-        store("""{"exercises":[],"routines":[{"id":"r","name":"Empty","exercises":[
+        store(
+            """{"exercises":[],"routines":[{"id":"r","name":"Empty","exercises":[
             {"exerciseId":"plank","targetSets":3,"plannedSets":[]}
-        ]}]}""")
+        ]}]}"""
+        )
 
-        assertTrue(LofitRepository(context).data.routines.single().exercises.single().plannedSets.isEmpty())
-        assertTrue(LofitRepository(context).data.routines.single().exercises.single().plannedSets.isEmpty())
+        assertTrue(
+            LofitRepository(context).data.routines.single().exercises.single().plannedSets.isEmpty()
+        )
+        assertTrue(
+            LofitRepository(context).data.routines.single().exercises.single().plannedSets.isEmpty()
+        )
     }
 
     @Test
     fun startup_preservesCurrentUnversionedData() {
         val repository = LofitRepository(context)
         val data = repository.data
-        data.exercises.add(Exercise(
-            id = "custom", name = "My hold", type = ExerciseType.TIMED, asymmetric = true,
-            primaryMuscle = "Core", secondaryMuscles = "Glutes", minimumHoldSeconds = 55,
-            custom = true, imageName = "my_image", weighted = false,
-        ))
-        val plan = PlannedSet(
-            id = "plan", type = SetType.FAILURE, weightKg = 17.5, reps = 7,
-            holdSeconds = 55, actualHoldSeconds = 49, side = Side.RIGHT,
+        data.exercises.add(
+            Exercise(
+                id = "custom",
+                name = "My hold",
+                type = ExerciseType.TIMED,
+                asymmetric = true,
+                primaryMuscle = "Core",
+                secondaryMuscles = "Glutes",
+                minimumHoldSeconds = 55,
+                custom = true,
+                imageName = "my_image",
+                weighted = false,
+            )
         )
-        data.routines.add(Routine(
-            name = "My routine", defaultRestSeconds = 75,
-            exercises = mutableListOf(RoutineExercise(
-                exerciseId = "custom", restSecondsOverride = 40,
-                plannedSets = mutableListOf(plan.copy(actualHoldSeconds = null)),
-            )),
-        ))
-        val workout = WorkoutSession(
-            name = "My workout", startedAt = 100, completedAt = 250, defaultRestSeconds = 80,
-            exercises = mutableListOf(WorkoutExercise(
-                exerciseId = "custom", restSecondsOverride = 35, plannedSets = mutableListOf(plan),
-                sets = mutableListOf(LoggedSet(
-                    id = "log", type = SetType.FAILURE, weightKg = 17.5, reps = 7,
-                    holdSeconds = 49, side = Side.RIGHT, completedAt = 200, plannedSetId = plan.id,
-                )),
-            )),
+        val plan =
+            PlannedSet(
+                id = "plan",
+                type = SetType.FAILURE,
+                weightKg = 17.5,
+                reps = 7,
+                holdSeconds = 55,
+                actualHoldSeconds = 49,
+                side = Side.RIGHT,
+            )
+        data.routines.add(
+            Routine(
+                name = "My routine",
+                defaultRestSeconds = 75,
+                exercises =
+                    mutableListOf(
+                        RoutineExercise(
+                            exerciseId = "custom",
+                            restSecondsOverride = 40,
+                            plannedSets = mutableListOf(plan.copy(actualHoldSeconds = null)),
+                        )
+                    ),
+            )
         )
+        val workout =
+            WorkoutSession(
+                name = "My workout",
+                startedAt = 100,
+                completedAt = 250,
+                defaultRestSeconds = 80,
+                exercises =
+                    mutableListOf(
+                        WorkoutExercise(
+                            exerciseId = "custom",
+                            restSecondsOverride = 35,
+                            plannedSets = mutableListOf(plan),
+                            sets =
+                                mutableListOf(
+                                    LoggedSet(
+                                        id = "log",
+                                        type = SetType.FAILURE,
+                                        weightKg = 17.5,
+                                        reps = 7,
+                                        holdSeconds = 49,
+                                        side = Side.RIGHT,
+                                        completedAt = 200,
+                                        plannedSetId = plan.id,
+                                    )
+                                ),
+                        )
+                    ),
+            )
         data.history.add(workout)
-        data.activeWorkout = workout.copy(id = "active", intervals = mutableListOf(WorkoutInterval(100)))
+        data.activeWorkout =
+            workout.copy(id = "active", intervals = mutableListOf(WorkoutInterval(100)))
         data.soundCuesEnabled = false
         repository.saveHistory()
         repository.save()
-        val root = JSONObject(stored()).apply {
-            remove("schemaVersion")
-            put("history", org.json.JSONArray(context.repositoryHistoryFile.readText()))
-        }
+        val root =
+            JSONObject(stored()).apply {
+                remove("schemaVersion")
+                put("history", org.json.JSONArray(context.repositoryHistoryFile.readText()))
+            }
         val raw = root.toString()
         store(raw)
 
@@ -299,20 +360,24 @@ class StartupDataMigrationTest {
     @Test
     fun startup_migratesVersionOneWorkoutTimesAndKeepsBackup() {
         val repository = LofitRepository(context)
-        repository.data.history.add(WorkoutSession(name = "Past", startedAt = 100, completedAt = 250))
+        repository.data.history.add(
+            WorkoutSession(name = "Past", startedAt = 100, completedAt = 250)
+        )
         repository.data.activeWorkout = WorkoutSession(name = "Active", startedAt = 300)
         repository.saveHistory()
         repository.save()
-        val root = JSONObject(stored()).apply {
-            put("schemaVersion", 1)
-            put("history", org.json.JSONArray(context.repositoryHistoryFile.readText()))
-        }
-        listOf(root.getJSONArray("history").getJSONObject(0), root.getJSONObject("activeWorkout")).forEach { workout ->
-            val interval = workout.getJSONArray("intervals").getJSONObject(0)
-            workout.put("startedAt", interval.getLong("startedAt"))
-            workout.put("completedAt", interval.get("endedAt"))
-            workout.remove("intervals")
-        }
+        val root =
+            JSONObject(stored()).apply {
+                put("schemaVersion", 1)
+                put("history", org.json.JSONArray(context.repositoryHistoryFile.readText()))
+            }
+        listOf(root.getJSONArray("history").getJSONObject(0), root.getJSONObject("activeWorkout"))
+            .forEach { workout ->
+                val interval = workout.getJSONArray("intervals").getJSONObject(0)
+                workout.put("startedAt", interval.getLong("startedAt"))
+                workout.put("completedAt", interval.get("endedAt"))
+                workout.remove("intervals")
+            }
         val raw = root.toString()
         store(raw)
 
@@ -323,7 +388,12 @@ class StartupDataMigrationTest {
         assertEquals(raw, File(context.filesDir, "state-before-migration-v2.json").readText())
         val migrated = stored()
         assertEquals(3, JSONObject(migrated).getInt("schemaVersion"))
-        assertFalse(org.json.JSONArray(context.repositoryHistoryFile.readText()).getJSONObject(0).has("startedAt"))
+        assertFalse(
+            org.json
+                .JSONArray(context.repositoryHistoryFile.readText())
+                .getJSONObject(0)
+                .has("startedAt")
+        )
         assertEquals(loaded.data, LofitRepository(context).data)
         assertEquals(migrated, stored())
     }
@@ -331,10 +401,16 @@ class StartupDataMigrationTest {
     @Test
     fun workoutIntervals_surviveRestartsWhileActiveAndAfterFinishing() {
         val repository = LofitRepository(context)
-        repository.data.activeWorkout = WorkoutSession(
-            name = "Resumed",
-            intervals = mutableListOf(WorkoutInterval(100, 250), WorkoutInterval(500, 700), WorkoutInterval(900)),
-        )
+        repository.data.activeWorkout =
+            WorkoutSession(
+                name = "Resumed",
+                intervals =
+                    mutableListOf(
+                        WorkoutInterval(100, 250),
+                        WorkoutInterval(500, 700),
+                        WorkoutInterval(900),
+                    ),
+            )
         repository.save()
 
         val restarted = LofitRepository(context)
@@ -348,7 +424,14 @@ class StartupDataMigrationTest {
         restarted.save()
 
         val saved = LofitRepository(context).data.history.single()
-        assertEquals(listOf(WorkoutInterval(100, 250), WorkoutInterval(500, 700), WorkoutInterval(900, 1_100)), saved.intervals)
+        assertEquals(
+            listOf(
+                WorkoutInterval(100, 250),
+                WorkoutInterval(500, 700),
+                WorkoutInterval(900, 1_100),
+            ),
+            saved.intervals,
+        )
         assertEquals(100L, saved.startedAt)
         assertEquals(1_100L, saved.completedAt)
         assertEquals(550L, saved.durationMillis(5_000))
@@ -358,18 +441,36 @@ class StartupDataMigrationTest {
     fun startup_currentSchemaDoesNotRepairOrRewriteData() {
         val repository = LofitRepository(context)
         val plan = PlannedSet(id = "p", holdSeconds = 45)
-        repository.data.history.add(WorkoutSession(name = "Current", exercises = mutableListOf(
-            WorkoutExercise(exerciseId = "plank", plannedSets = mutableListOf(plan), sets = mutableListOf(
-                LoggedSet(type = SetType.NORMAL, weightKg = 0.0, holdSeconds = 42, plannedSetId = plan.id),
-            )),
-        )))
+        repository.data.history.add(
+            WorkoutSession(
+                name = "Current",
+                exercises =
+                    mutableListOf(
+                        WorkoutExercise(
+                            exerciseId = "plank",
+                            plannedSets = mutableListOf(plan),
+                            sets =
+                                mutableListOf(
+                                    LoggedSet(
+                                        type = SetType.NORMAL,
+                                        weightKg = 0.0,
+                                        holdSeconds = 42,
+                                        plannedSetId = plan.id,
+                                    )
+                                ),
+                        )
+                    ),
+            )
+        )
         repository.saveHistory()
         repository.save()
         val raw = stored()
 
         val loaded = LofitRepository(context)
 
-        assertNull(loaded.data.history.single().exercises.single().plannedSets.single().actualHoldSeconds)
+        assertNull(
+            loaded.data.history.single().exercises.single().plannedSets.single().actualHoldSeconds
+        )
         assertEquals(raw, stored())
         assertFalse(File(context.filesDir, "$backupKey.json").exists())
     }
@@ -384,7 +485,10 @@ class StartupDataMigrationTest {
         assertFalse(File(context.filesDir, "$backupKey.json").exists())
 
         store(raw.replace("UNKNOWN", "STRETCH"))
-        assertEquals(ExerciseType.TIMED, LofitRepository(context).data.exercises.single { it.id == "bad" }.type)
+        assertEquals(
+            ExerciseType.TIMED,
+            LofitRepository(context).data.exercises.single { it.id == "bad" }.type,
+        )
         assertTrue(File(context.filesDir, "$backupKey.json").exists())
     }
 
@@ -401,10 +505,17 @@ class StartupDataMigrationTest {
     @Test
     fun startup_versionedLegacyTypesAreRejectedWithoutChangingState() {
         val repository = LofitRepository(context)
-        repository.data.exercises.add(Exercise(
-            id = "custom", name = "Custom", type = ExerciseType.TIMED,
-            asymmetric = false, primaryMuscle = "Core", secondaryMuscles = "", custom = true,
-        ))
+        repository.data.exercises.add(
+            Exercise(
+                id = "custom",
+                name = "Custom",
+                type = ExerciseType.TIMED,
+                asymmetric = false,
+                primaryMuscle = "Core",
+                secondaryMuscles = "",
+                custom = true,
+            )
+        )
         repository.save()
         val root = JSONObject(stored())
         val exercises = root.getJSONArray("exercises")

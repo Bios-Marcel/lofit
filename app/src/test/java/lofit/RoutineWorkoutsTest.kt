@@ -4,21 +4,63 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class RoutineWorkoutsTest {
-    private fun routine() = Routine(name = "Strength", exercises = mutableListOf(
-        RoutineExercise(exerciseId = "bench", plannedSets = MutableList(3) {
-            PlannedSet(weightKg = 60.0, reps = 5, type = SetType.NORMAL, side = Side.RIGHT)
-        }),
-    ))
-    private fun data(routine: Routine) = AppData(routines = mutableListOf(routine), history = mutableListOf(
-        WorkoutSession(name = "Previous", completedAt = 200, sourceRoutine = routine, exercises = mutableListOf(
-            WorkoutExercise(exerciseId = "bench", restSecondsOverride = 45, sets = mutableListOf(
-                LoggedSet(type = SetType.WARMUP, weightKg = 20.0, reps = 12, side = Side.LEFT),
-                LoggedSet(type = SetType.FAILURE, weightKg = 80.0, reps = 6, side = Side.LEFT),
-            )),
-        )),
-    ))
+    private fun routine() =
+        Routine(
+            name = "Strength",
+            exercises =
+                mutableListOf(
+                    RoutineExercise(
+                        exerciseId = "bench",
+                        plannedSets =
+                            MutableList(3) {
+                                PlannedSet(
+                                    weightKg = 60.0,
+                                    reps = 5,
+                                    type = SetType.NORMAL,
+                                    side = Side.RIGHT,
+                                )
+                            },
+                    )
+                ),
+        )
 
-    @Test fun routineKeepsCountAndKindsButUsesLatestLoadsAndLastRowForExtraSets() {
+    private fun data(routine: Routine) =
+        AppData(
+            routines = mutableListOf(routine),
+            history =
+                mutableListOf(
+                    WorkoutSession(
+                        name = "Previous",
+                        completedAt = 200,
+                        sourceRoutine = routine,
+                        exercises =
+                            mutableListOf(
+                                WorkoutExercise(
+                                    exerciseId = "bench",
+                                    restSecondsOverride = 45,
+                                    sets =
+                                        mutableListOf(
+                                            LoggedSet(
+                                                type = SetType.WARMUP,
+                                                weightKg = 20.0,
+                                                reps = 12,
+                                                side = Side.LEFT,
+                                            ),
+                                            LoggedSet(
+                                                type = SetType.FAILURE,
+                                                weightKg = 80.0,
+                                                reps = 6,
+                                                side = Side.LEFT,
+                                            ),
+                                        ),
+                                )
+                            ),
+                    )
+                ),
+        )
+
+    @Test
+    fun routineKeepsCountAndKindsButUsesLatestLoadsAndLastRowForExtraSets() {
         val saved = routine()
         val data = data(saved)
         val workout = data.workoutFromRoutine(saved)
@@ -31,24 +73,43 @@ class RoutineWorkoutsTest {
         assertEquals(List(3) { 60.0 }, saved.exercises.single().plannedSets.map { it.weightKg })
         assertNull(workout.routineChanges(data.routines))
         sets.first().actualHoldSeconds = 15
-        workout.exercises.single().sets.add(LoggedSet(type = SetType.NORMAL, weightKg = 20.0, reps = 12))
+        workout.exercises
+            .single()
+            .sets
+            .add(LoggedSet(type = SetType.NORMAL, weightKg = 20.0, reps = 12))
         assertNull(workout.routineChanges(data.routines))
     }
 
-    @Test fun sameRoutineHistoryWinsOverNewerOpenAndOtherRoutineWorkouts() {
+    @Test
+    fun sameRoutineHistoryWinsOverNewerOpenAndOtherRoutineWorkouts() {
         val saved = routine()
         val other = Routine(name = saved.name)
         val data = AppData(routines = mutableListOf(saved))
-        fun session(at: Long, source: Routine?, weight: Double, count: Int) = WorkoutSession(
-            name = saved.name, completedAt = at, sourceRoutine = source,
-            exercises = mutableListOf(WorkoutExercise(exerciseId = "bench", sets = MutableList(count) {
-                LoggedSet(type = SetType.NORMAL, weightKg = weight, reps = 7)
-            })))
-        data.history.addAll(listOf(
-            session(500, other, 150.0, 4), session(100, saved, 50.0, 1),
-            session(600, null, 120.0, 5), session(300, saved, 70.0, 2),
-            session(700, saved, 0.0, 0),
-        ))
+        fun session(at: Long, source: Routine?, weight: Double, count: Int) =
+            WorkoutSession(
+                name = saved.name,
+                completedAt = at,
+                sourceRoutine = source,
+                exercises =
+                    mutableListOf(
+                        WorkoutExercise(
+                            exerciseId = "bench",
+                            sets =
+                                MutableList(count) {
+                                    LoggedSet(type = SetType.NORMAL, weightKg = weight, reps = 7)
+                                },
+                        )
+                    ),
+            )
+        data.history.addAll(
+            listOf(
+                session(500, other, 150.0, 4),
+                session(100, saved, 50.0, 1),
+                session(600, null, 120.0, 5),
+                session(300, saved, 70.0, 2),
+                session(700, saved, 0.0, 0),
+            )
+        )
         val sets = data.workoutFromRoutine(saved).exercises.single().plannedSets
         assertEquals(List(3) { 70.0 }, sets.map { it.weightKg })
         assertEquals(List(3) { 7 }, sets.map { it.reps })
@@ -56,46 +117,115 @@ class RoutineWorkoutsTest {
         assertEquals(List(5) { 120.0 }, data.lastKnownSets("bench")!!.map { it.weightKg })
     }
 
-    @Test fun missingRoutineExerciseHistoryUsesSavedPrescription() {
+    @Test
+    fun missingRoutineExerciseHistoryUsesSavedPrescription() {
         val saved = routine()
-        saved.exercises.add(RoutineExercise(exerciseId = "plank", plannedSets = mutableListOf(PlannedSet(holdSeconds = 30))))
-        val data = AppData(routines = mutableListOf(saved), history = mutableListOf(
-            WorkoutSession(name = "Own", completedAt = 100, sourceRoutine = saved,
-                exercises = mutableListOf(
-                    WorkoutExercise(exerciseId = "bench", sets = mutableListOf(
-                        LoggedSet(type = SetType.NORMAL, weightKg = 70.0, reps = 8))),
-                    WorkoutExercise(exerciseId = "plank"),
-                )),
-            WorkoutSession(name = "Open", completedAt = 300, exercises = mutableListOf(
-                WorkoutExercise(exerciseId = "bench", sets = mutableListOf(
-                    LoggedSet(type = SetType.NORMAL, weightKg = 120.0, reps = 2))),
-                WorkoutExercise(exerciseId = "plank", sets = mutableListOf(
-                    LoggedSet(type = SetType.NORMAL, weightKg = 0.0, holdSeconds = 90))),
-            )),
-        ))
+        saved.exercises.add(
+            RoutineExercise(
+                exerciseId = "plank",
+                plannedSets = mutableListOf(PlannedSet(holdSeconds = 30)),
+            )
+        )
+        val data =
+            AppData(
+                routines = mutableListOf(saved),
+                history =
+                    mutableListOf(
+                        WorkoutSession(
+                            name = "Own",
+                            completedAt = 100,
+                            sourceRoutine = saved,
+                            exercises =
+                                mutableListOf(
+                                    WorkoutExercise(
+                                        exerciseId = "bench",
+                                        sets =
+                                            mutableListOf(
+                                                LoggedSet(
+                                                    type = SetType.NORMAL,
+                                                    weightKg = 70.0,
+                                                    reps = 8,
+                                                )
+                                            ),
+                                    ),
+                                    WorkoutExercise(exerciseId = "plank"),
+                                ),
+                        ),
+                        WorkoutSession(
+                            name = "Open",
+                            completedAt = 300,
+                            exercises =
+                                mutableListOf(
+                                    WorkoutExercise(
+                                        exerciseId = "bench",
+                                        sets =
+                                            mutableListOf(
+                                                LoggedSet(
+                                                    type = SetType.NORMAL,
+                                                    weightKg = 120.0,
+                                                    reps = 2,
+                                                )
+                                            ),
+                                    ),
+                                    WorkoutExercise(
+                                        exerciseId = "plank",
+                                        sets =
+                                            mutableListOf(
+                                                LoggedSet(
+                                                    type = SetType.NORMAL,
+                                                    weightKg = 0.0,
+                                                    holdSeconds = 90,
+                                                )
+                                            ),
+                                    ),
+                                ),
+                        ),
+                    ),
+            )
         val workout = data.workoutFromRoutine(saved)
         assertEquals(List(3) { 70.0 }, workout.exercises.first().plannedSets.map { it.weightKg })
         assertEquals(30, workout.exercises.last().plannedSets.single().holdSeconds)
     }
 
-    @Test fun routineWithoutOwnHistoryUsesExactSavedPrescriptionDespiteOtherHistory() {
+    @Test
+    fun routineWithoutOwnHistoryUsesExactSavedPrescriptionDespiteOtherHistory() {
         val saved = routine()
         saved.exercises.single().plannedSets.apply {
             clear()
-            add(PlannedSet(type = SetType.WARMUP, weightKg = 20.0, reps = 12, holdSeconds = 15, side = Side.LEFT))
-            add(PlannedSet(type = SetType.NORMAL, weightKg = 60.0, reps = 5, holdSeconds = 30, side = Side.RIGHT))
+            add(
+                PlannedSet(
+                    type = SetType.WARMUP,
+                    weightKg = 20.0,
+                    reps = 12,
+                    holdSeconds = 15,
+                    side = Side.LEFT,
+                )
+            )
+            add(
+                PlannedSet(
+                    type = SetType.NORMAL,
+                    weightKg = 60.0,
+                    reps = 5,
+                    holdSeconds = 30,
+                    side = Side.RIGHT,
+                )
+            )
             add(PlannedSet(type = SetType.FAILURE, weightKg = 65.0, reps = 3, holdSeconds = 45))
         }
         val data = data(saved)
         data.history[0] = data.history[0].copy(sourceRoutine = null)
         data.history.add(data.history[0].copy(sourceRoutine = Routine(name = saved.name)))
         val sets = data.workoutFromRoutine(saved).exercises.single().plannedSets
-        assertEquals(saved.exercises.single().plannedSets.map { it.copy(id = "") }, sets.map { it.copy(id = "") })
+        assertEquals(
+            saved.exercises.single().plannedSets.map { it.copy(id = "") },
+            sets.map { it.copy(id = "") },
+        )
         assertNotEquals(saved.exercises.single().plannedSets.first().id, sets.first().id)
         assertNull(data.workoutFromRoutine(saved).routineChanges(data.routines))
     }
 
-    @Test fun matchingWorkingSetsDoNotUseWarmupLoads() {
+    @Test
+    fun matchingWorkingSetsDoNotUseWarmupLoads() {
         val saved = routine()
         val data = data(saved)
         data.history.single().exercises.single().sets.last().type = SetType.NORMAL
@@ -104,7 +234,8 @@ class RoutineWorkoutsTest {
         assertEquals(List(3) { 6 }, sets.map { it.reps })
     }
 
-    @Test fun routineWithFewerRowsTruncatesHistoryAndEmptyPrescriptionStaysEmpty() {
+    @Test
+    fun routineWithFewerRowsTruncatesHistoryAndEmptyPrescriptionStaysEmpty() {
         val saved = routine()
         saved.exercises.single().plannedSets.removeAt(2)
         saved.exercises.single().plannedSets.removeAt(1)
@@ -114,7 +245,8 @@ class RoutineWorkoutsTest {
         assertTrue(data.workoutFromRoutine(saved).exercises.single().plannedSets.isEmpty())
     }
 
-    @Test fun noHistoryUsesSavedPrescriptionAndCopiesWithoutMutatingRoutine() {
+    @Test
+    fun noHistoryUsesSavedPrescriptionAndCopiesWithoutMutatingRoutine() {
         val saved = routine()
         val data = AppData(routines = mutableListOf(saved))
         val workout = data.workoutFromRoutine(saved)
@@ -123,7 +255,8 @@ class RoutineWorkoutsTest {
         assertEquals(60.0, saved.exercises.single().plannedSets.first().weightKg, 0.0)
     }
 
-    @Test fun emptyWorkoutCopiesExactLoggedExerciseIncludingRestAndSetCount() {
+    @Test
+    fun emptyWorkoutCopiesExactLoggedExerciseIncludingRestAndSetCount() {
         val data = data(routine())
         val item = data.lastKnownExercise("bench")!!
         assertEquals(45, item.restSecondsOverride)
@@ -138,22 +271,36 @@ class RoutineWorkoutsTest {
         assertEquals(20.0, data.history.single().exercises.single().sets.first().weightKg, 0.0)
     }
 
-    @Test fun emptyWorkoutKeepsPreviousEffectiveRestWhenExerciseInheritedIt() {
+    @Test
+    fun emptyWorkoutKeepsPreviousEffectiveRestWhenExerciseInheritedIt() {
         val data = data(routine())
         data.history.single().defaultRestSeconds = 75
         data.history.single().exercises.single().restSecondsOverride = null
         assertEquals(75, data.lastKnownExercise("bench")!!.restSecondsOverride)
     }
 
-    @Test fun notesUseSavedRoutineUntilItsOwnPreviousSetsAreAvailable() {
+    @Test
+    fun notesUseSavedRoutineUntilItsOwnPreviousSetsAreAvailable() {
         val saved = routine()
         saved.exercises.single().note = "Keep elbows tucked"
         val data = AppData(routines = mutableListOf(saved))
         assertEquals("Keep elbows tucked", data.workoutFromRoutine(saved).exercises.single().note)
-        val previous = WorkoutSession(name = "Open", completedAt = 200, exercises = mutableListOf(
-            WorkoutExercise(exerciseId = "bench", note = "Pause at the bottom", sets = mutableListOf(
-                LoggedSet(type = SetType.NORMAL, weightKg = 70.0, reps = 8))),
-        ))
+        val previous =
+            WorkoutSession(
+                name = "Open",
+                completedAt = 200,
+                exercises =
+                    mutableListOf(
+                        WorkoutExercise(
+                            exerciseId = "bench",
+                            note = "Pause at the bottom",
+                            sets =
+                                mutableListOf(
+                                    LoggedSet(type = SetType.NORMAL, weightKg = 70.0, reps = 8)
+                                ),
+                        )
+                    ),
+            )
         data.history.add(previous)
         assertEquals("Keep elbows tucked", data.workoutFromRoutine(saved).exercises.single().note)
         assertEquals("", data.lastKnownExercise("bench")!!.note)
@@ -170,7 +317,8 @@ class RoutineWorkoutsTest {
         assertEquals("", data.workoutFromRoutine(saved).exercises.single().previousNote)
     }
 
-    @Test fun noteEditsCanUpdateRoutineAndHistoryCanBecomeRoutineWithoutLosingNotes() {
+    @Test
+    fun noteEditsCanUpdateRoutineAndHistoryCanBecomeRoutineWithoutLosingNotes() {
         val saved = routine()
         saved.exercises.single().note = "Old cue"
         val data = AppData(routines = mutableListOf(saved))
@@ -188,14 +336,24 @@ class RoutineWorkoutsTest {
         assertEquals("Brace core", saved.exercises.last().note)
     }
 
-    @Test fun changesAndAdditionsAreIndependentOptInsAndKeepUnchangedRows() {
+    @Test
+    fun changesAndAdditionsAreIndependentOptInsAndKeepUnchangedRows() {
         val saved = routine()
-        saved.exercises.add(RoutineExercise(exerciseId = "bench", plannedSets = mutableListOf(PlannedSet(weightKg = 30.0))))
+        saved.exercises.add(
+            RoutineExercise(
+                exerciseId = "bench",
+                plannedSets = mutableListOf(PlannedSet(weightKg = 30.0)),
+            )
+        )
         val data = data(saved)
         val workout = data.workoutFromRoutine(saved)
         workout.exercises.first().plannedSets.add(PlannedSet(weightKg = 85.0, reps = 7))
-        val added = WorkoutExercise(exerciseId = "plank", restSecondsOverride = 15,
-            plannedSets = mutableListOf(PlannedSet(holdSeconds = 45, actualHoldSeconds = 12)))
+        val added =
+            WorkoutExercise(
+                exerciseId = "plank",
+                restSecondsOverride = 15,
+                plannedSets = mutableListOf(PlannedSet(holdSeconds = 45, actualHoldSeconds = 12)),
+            )
         workout.exercises.add(added)
         val changes = workout.routineChanges(data.routines)!!
         assertEquals(1, changes.changed.size)
@@ -213,7 +371,8 @@ class RoutineWorkoutsTest {
         assertEquals(30.0, saved.exercises[1].plannedSets.single().weightKg, 0.0)
     }
 
-    @Test fun declinedChangesAndDeletedSourceNeverAlterRoutine() {
+    @Test
+    fun declinedChangesAndDeletedSourceNeverAlterRoutine() {
         val saved = routine()
         val data = data(saved)
         val workout = data.workoutFromRoutine(saved)
@@ -225,7 +384,8 @@ class RoutineWorkoutsTest {
         assertNull(workout.routineChanges(data.routines))
     }
 
-    @Test fun resumedWorkoutUsesFreshBaselineAndDoesNotAskAgainAboutOldEdits() {
+    @Test
+    fun resumedWorkoutUsesFreshBaselineAndDoesNotAskAgainAboutOldEdits() {
         val saved = routine()
         val data = data(saved)
         val workout = data.workoutFromRoutine(saved)
