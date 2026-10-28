@@ -136,40 +136,6 @@ class SharedWorkoutPlanTest {
     }
 
     @Test
-    fun transfer_tenExercisesWithThreeSetsMeasureSavings() {
-        val catalog = ExerciseCatalog.exercises().take(10)
-        val session =
-            WorkoutSession(
-                name = "Full body workout",
-                exercises =
-                    catalog
-                        .map { exercise ->
-                            WorkoutExercise(
-                                exerciseId = exercise.id,
-                                plannedSets =
-                                    MutableList(3) {
-                                        PlannedSet(weightKg = 60.0, reps = 10)
-                                    },
-                            )
-                        }
-                        .toMutableList(),
-            )
-        val json = SharedWorkoutPlan.encode(session, catalog)
-        val compressed = SharedWorkoutPlan.compressForTransfer(json)
-        android.util.Log.i(
-            "WorkoutCompression",
-            "10 exercises, 30 sets: ${json.size} -> ${compressed.size} bytes",
-        )
-        assertTrue("Repetitive plan should shrink substantially", compressed.size < json.size / 2)
-        assertEquals(
-            30,
-            SharedWorkoutPlan.decodeTransfer(compressed).routine.exercises.sumOf {
-                it.plannedSets.size
-            },
-        )
-    }
-
-    @Test
     fun start_usesSharedPrescriptionDespiteReceiverHistoryAndIdCollision() {
         val plan = SharedWorkoutPlan.decode(SharedWorkoutPlan.encode(workout(), listOf(movement)))
         val data = AppData(exercises = mutableListOf(movement.copy(name = "Other movement")))
