@@ -8,35 +8,50 @@ import java.io.File
 
 class LofitRepository(context: Context) {
     private companion object {
-        const val SCHEMA_VERSION = 2
+        const val SCHEMA_VERSION = 3
     }
 
     private val stateFile = AtomicFile(File(context.filesDir, "lofit-data.json"))
+    private val historyFile = AtomicFile(File(context.filesDir, "lofit-history.json"))
     private val preferences by lazy { context.getSharedPreferences("lofit-data", Context.MODE_PRIVATE) }
     var data: AppData = load()
         private set
 
+    // Save exercises, routines, the active workout, and settings only. Call saveHistory()
+    // separately whenever history changes so frequent saves do not encode or write it.
     fun save() {
         write(encode(data).toString())
     }
 
+    fun saveHistory() {
+        write(encodeHistory(data.history).toString(), historyFile)
+    }
+
     fun reset() {
         val fresh = AppData()
+        val history = encodeHistory(fresh.history).toString()
         write(encode(fresh).toString())
+        write(history, historyFile)
         data = fresh
     }
 
     private fun load(): AppData {
         val hasJson = exists(stateFile)
         val raw = if (hasJson) stateFile.readFully().toString(Charsets.UTF_8)
-            else preferences.getString("state", null) ?: return AppData()
+            else preferences.getString("state", null) ?: return AppData().also {
+                write("[]", historyFile)
+            }
         val root = JSONObject(raw)
         return when (val version = if (root.has("schemaVersion")) root.getInt("schemaVersion") else 0) {
             0 -> persistMigration(raw, StartupDataMigration.migrate(root), "state-before-migration-v1")
             1 -> persistMigration(raw, decode(root), "state-before-migration-v2")
-            SCHEMA_VERSION -> decode(root).also {
-                // Copy only after validation. Keep the original XML and its backups untouched.
-                if (!hasJson) write(raw)
+            2 -> persistMigration(raw, decode(root), "state-before-migration-v3")
+            SCHEMA_VERSION -> {
+                val history = historyFile.readFully().toString(Charsets.UTF_8)
+                decode(root, JSONArray(history).mapObjects(::decodeWorkout).toMutableList()).also {
+                    // Copy only after validation. Keep the original XML and its backups untouched.
+                    if (!hasJson) write(raw)
+                }
             }
             else -> error("Unsupported data schema: $version")
         }
@@ -44,10 +59,12 @@ class LofitRepository(context: Context) {
 
     private fun persistMigration(raw: String, data: AppData, backupKey: String): AppData {
         val migrated = encode(data)
+        val history = encodeHistory(data.history).toString()
         // Validate before changing stored data, and keep the original for recovery.
-        val loaded = decode(migrated)
+        val loaded = decode(migrated, JSONArray(history).mapObjects(::decodeWorkout).toMutableList())
         val backup = AtomicFile(File(stateFile.baseFile.parentFile, "$backupKey.json"))
         if (!exists(backup)) write(raw, backup)
+        write(history, historyFile)
         write(migrated.toString())
         return loaded
     }
@@ -70,7 +87,6 @@ class LofitRepository(context: Context) {
         put("schemaVersion", SCHEMA_VERSION)
         put("exercises", JSONArray().apply { data.exercises.forEach { put(encodeExercise(it)) } })
         put("routines", JSONArray().apply { data.routines.forEach { put(encodeRoutine(it)) } })
-        put("history", JSONArray().apply { data.history.forEach { put(encodeWorkout(it)) } })
         put("exerciseRecords", JSONObject().apply {
             data.exerciseRecords.forEach { (exerciseId, records) ->
                 put(exerciseId, JSONArray().apply {
@@ -91,6 +107,10 @@ class LofitRepository(context: Context) {
         put("biologicalGender", data.biologicalGender.name)
         put("onboardingComplete", data.onboardingComplete)
         put("exerciseLastSelectedAt", JSONObject(data.exerciseLastSelectedAt))
+    }
+
+    private fun encodeHistory(history: List<WorkoutSession>) = JSONArray().apply {
+        history.forEach { put(encodeWorkout(it)) }
     }
 
     internal fun encodeExercise(exercise: Exercise) = JSONObject().apply {
@@ -170,7 +190,10 @@ class LofitRepository(context: Context) {
         put("plannedSetId", set.plannedSetId ?: JSONObject.NULL)
     }
 
-    private fun decode(root: JSONObject): AppData {
+    private fun decode(
+        root: JSONObject,
+        history: MutableList<WorkoutSession> = root.getJSONArray("history").mapObjects(::decodeWorkout).toMutableList(),
+    ): AppData {
         val savedExercises = root.getJSONArray("exercises").mapObjects(::decodeExercise)
         val defaults = DefaultData.exercises()
         val defaultIds = defaults.mapTo(mutableSetOf()) { it.id }
@@ -178,7 +201,7 @@ class LofitRepository(context: Context) {
         return AppData(
             exercises = exercises,
             routines = root.getJSONArray("routines").mapObjects(::decodeRoutine).toMutableList(),
-            history = root.getJSONArray("history").mapObjects(::decodeWorkout).toMutableList(),
+            history = history,
             activeWorkout = if (root.isNull("activeWorkout")) null else decodeWorkout(root.getJSONObject("activeWorkout")),
             soundCuesEnabled = root.getBoolean("soundCuesEnabled"),
             mcpEnabled = root.optBoolean("mcpEnabled", false),

@@ -104,6 +104,7 @@ class ExerciseNotesTest {
                 WorkoutExercise(exerciseId = "bench-press", note = "Pause at bottom", sets = mutableListOf(
                     LoggedSet(type = SetType.NORMAL, weightKg = 70.0, reps = 8))),
             )))
+            saveHistory()
             save()
         }
         launch().use { scenario ->
@@ -155,16 +156,19 @@ class ExerciseNotesTest {
         LofitRepository(context).apply {
             data.activeWorkout = data.workoutFromRoutine(data.routines.single())
             data.history.add(data.activeWorkout!!.copy(id = "past", intervals = mutableListOf(WorkoutInterval(100, 200))))
+            saveHistory()
             save()
         }
         val root = JSONObject(context.repositoryStateFile.readText())
+        val history = org.json.JSONArray(context.repositoryHistoryFile.readText())
         root.getJSONArray("routines").getJSONObject(0).getJSONArray("exercises").getJSONObject(0).remove("note")
-        listOf(root.getJSONObject("activeWorkout"), root.getJSONArray("history").getJSONObject(0)).forEach { workout ->
+        listOf(root.getJSONObject("activeWorkout"), history.getJSONObject(0)).forEach { workout ->
             workout.getJSONArray("exercises").getJSONObject(0).remove("note")
             workout.getJSONArray("exercises").getJSONObject(0).remove("previousNote")
             workout.getJSONObject("sourceRoutine").getJSONArray("exercises").getJSONObject(0).remove("note")
         }
         context.repositoryStateFile.writeText(root.toString())
+        context.repositoryHistoryFile.writeText(history.toString())
         val loaded = LofitRepository(context).data
         assertEquals("", loaded.routines.single().exercises.single().note)
         assertEquals("", loaded.activeWorkout!!.exercises.single().note)

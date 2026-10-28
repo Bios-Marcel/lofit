@@ -42,6 +42,7 @@ class ExerciseRecencyTest {
                 WorkoutExercise(exerciseId = "recent-custom", sets = mutableListOf(
                     LoggedSet(type = SetType.NORMAL, weightKg = 10.0, reps = 8, completedAt = 10))),
             )))
+            saveHistory()
             save()
         }
     }

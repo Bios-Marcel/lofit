@@ -73,6 +73,7 @@ class ExerciseRecordsStorageTest {
                 LoggedSet(type = SetType.NORMAL, weightKg = 120.0, reps = 10),
             ))),
         ))
+        repository.saveHistory()
         repository.save()
         val oldState = JSONObject(context.repositoryStateFile.readText()).apply { remove("exerciseRecords") }
         context.repositoryStateFile.writeText(oldState.toString())

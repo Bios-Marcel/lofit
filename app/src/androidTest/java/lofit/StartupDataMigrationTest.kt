@@ -23,6 +23,7 @@ class StartupDataMigrationTest {
         val repository = LofitRepository(context)
         repository.data.history.add(WorkoutSession(name = "Existing workout", completedAt = 200))
         repository.data.bodyMetricsEnabled = true
+        repository.saveHistory()
         repository.save()
         val root = JSONObject(stored()).apply {
             remove("biologicalGender")
@@ -70,6 +71,7 @@ class StartupDataMigrationTest {
         workout.finish()
         restarted.data.activeWorkout = null
         restarted.data.history.add(workout)
+        restarted.saveHistory()
         restarted.save()
 
         val saved = LofitRepository(context)
@@ -82,15 +84,18 @@ class StartupDataMigrationTest {
         val repository = LofitRepository(context)
         repository.data.activeWorkout = WorkoutSession(name = "Active", bodyWeightKg = 64.020001002032)
         repository.data.history.add(WorkoutSession(name = "Past", bodyWeightKg = 72.255))
+        repository.saveHistory()
         repository.save()
 
         val root = JSONObject(stored())
         assertEquals(64.02, root.getJSONObject("activeWorkout").getDouble("bodyWeightKg"), 0.0)
-        assertEquals(72.26, root.getJSONArray("history").getJSONObject(0).getDouble("bodyWeightKg"), 0.0)
+        val history = org.json.JSONArray(context.repositoryHistoryFile.readText())
+        assertEquals(72.26, history.getJSONObject(0).getDouble("bodyWeightKg"), 0.0)
 
         root.getJSONObject("activeWorkout").put("bodyWeightKg", 64.020001002032)
-        root.getJSONArray("history").getJSONObject(0).put("bodyWeightKg", 72.255)
+        history.getJSONObject(0).put("bodyWeightKg", 72.255)
         store(root.toString())
+        context.repositoryHistoryFile.writeText(history.toString())
         val loaded = LofitRepository(context)
         assertEquals(64.02, loaded.data.activeWorkout!!.bodyWeightKg!!, 0.0)
         assertEquals(72.26, loaded.data.history.single().bodyWeightKg!!, 0.0)
@@ -103,11 +108,14 @@ class StartupDataMigrationTest {
         val repository = LofitRepository(context)
         repository.data.history.add(WorkoutSession(name = "Old", completedAt = 200))
         repository.data.activeWorkout = WorkoutSession(name = "Active")
+        repository.saveHistory()
         repository.save()
         val root = JSONObject(stored())
-        root.getJSONArray("history").getJSONObject(0).remove("bodyWeightKg")
+        val history = org.json.JSONArray(context.repositoryHistoryFile.readText())
+        history.getJSONObject(0).remove("bodyWeightKg")
         root.getJSONObject("activeWorkout").remove("bodyWeightKg")
         store(root.toString())
+        context.repositoryHistoryFile.writeText(history.toString())
 
         val loaded = LofitRepository(context).data
         assertNull(loaded.history.single().bodyWeightKg)
@@ -143,7 +151,7 @@ class StartupDataMigrationTest {
         val data = LofitRepository(context).data
 
         assertEquals(raw, File(context.filesDir, "$backupKey.json").readText())
-        assertEquals(2, JSONObject(stored()).getInt("schemaVersion"))
+        assertEquals(3, JSONObject(stored()).getInt("schemaVersion"))
         assertFalse(stored().contains("targetSets"))
         assertFalse(stored().contains("targetReps"))
         assertFalse(stored().contains("targetHoldSeconds"))
@@ -274,8 +282,12 @@ class StartupDataMigrationTest {
         data.history.add(workout)
         data.activeWorkout = workout.copy(id = "active", intervals = mutableListOf(WorkoutInterval(100)))
         data.soundCuesEnabled = false
+        repository.saveHistory()
         repository.save()
-        val root = JSONObject(stored()).apply { remove("schemaVersion") }
+        val root = JSONObject(stored()).apply {
+            remove("schemaVersion")
+            put("history", org.json.JSONArray(context.repositoryHistoryFile.readText()))
+        }
         val raw = root.toString()
         store(raw)
 
@@ -289,8 +301,12 @@ class StartupDataMigrationTest {
         val repository = LofitRepository(context)
         repository.data.history.add(WorkoutSession(name = "Past", startedAt = 100, completedAt = 250))
         repository.data.activeWorkout = WorkoutSession(name = "Active", startedAt = 300)
+        repository.saveHistory()
         repository.save()
-        val root = JSONObject(stored()).apply { put("schemaVersion", 1) }
+        val root = JSONObject(stored()).apply {
+            put("schemaVersion", 1)
+            put("history", org.json.JSONArray(context.repositoryHistoryFile.readText()))
+        }
         listOf(root.getJSONArray("history").getJSONObject(0), root.getJSONObject("activeWorkout")).forEach { workout ->
             val interval = workout.getJSONArray("intervals").getJSONObject(0)
             workout.put("startedAt", interval.getLong("startedAt"))
@@ -306,8 +322,8 @@ class StartupDataMigrationTest {
         assertEquals(listOf(WorkoutInterval(300)), loaded.data.activeWorkout!!.intervals)
         assertEquals(raw, File(context.filesDir, "state-before-migration-v2.json").readText())
         val migrated = stored()
-        assertEquals(2, JSONObject(migrated).getInt("schemaVersion"))
-        assertFalse(JSONObject(migrated).getJSONArray("history").getJSONObject(0).has("startedAt"))
+        assertEquals(3, JSONObject(migrated).getInt("schemaVersion"))
+        assertFalse(org.json.JSONArray(context.repositoryHistoryFile.readText()).getJSONObject(0).has("startedAt"))
         assertEquals(loaded.data, LofitRepository(context).data)
         assertEquals(migrated, stored())
     }
@@ -328,6 +344,7 @@ class StartupDataMigrationTest {
         workout.finish(1_100)
         restarted.data.history.add(workout)
         restarted.data.activeWorkout = null
+        restarted.saveHistory()
         restarted.save()
 
         val saved = LofitRepository(context).data.history.single()
@@ -346,6 +363,7 @@ class StartupDataMigrationTest {
                 LoggedSet(type = SetType.NORMAL, weightKg = 0.0, holdSeconds = 42, plannedSetId = plan.id),
             )),
         )))
+        repository.saveHistory()
         repository.save()
         val raw = stored()
 
@@ -372,7 +390,7 @@ class StartupDataMigrationTest {
 
     @Test
     fun startup_badJsonAndNewerSchemaNeverBecomeEmptyData() {
-        listOf("broken JSON", """{"schemaVersion":3,"exercises":[]}""").forEach { raw ->
+        listOf("broken JSON", """{"schemaVersion":4,"exercises":[]}""").forEach { raw ->
             store(raw)
             assertThrows(Exception::class.java) { LofitRepository(context) }
             assertEquals(raw, stored())

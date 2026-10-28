@@ -1843,6 +1843,7 @@ class MainActivity : AppCompatActivity() {
                             repository.data.recordExerciseRecency(workout)
                             repository.data.recordWorkout(workout)
                             repository.data.history.add(workout)
+                            repository.saveHistory()
                             discardActiveWorkout()
                         }
                     }
@@ -2190,7 +2191,8 @@ class MainActivity : AppCompatActivity() {
             result.onSuccess { weight ->
                 if (weight != null && savedWorkout.bodyWeightKg == null) {
                     savedWorkout.bodyWeightKg = weight
-                    repository.save()
+                    if (savedWorkout === repository.data.activeWorkout) repository.save()
+                    else repository.saveHistory()
                     if (currentScreen == Screen.HISTORY || route is Route.WorkoutHistory) render()
                 }
             }.onFailure {
@@ -2213,6 +2215,7 @@ class MainActivity : AppCompatActivity() {
                 return
             }
             repository.save()
+            repository.saveHistory()
             ensureWorkoutNotification()
         }
         openActiveWorkout()

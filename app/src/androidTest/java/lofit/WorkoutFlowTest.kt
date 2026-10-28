@@ -149,6 +149,7 @@ class WorkoutFlowTest {
                         plannedSets = MutableList(8) { PlannedSet() }),
                 ),
             ))
+            saveHistory()
             save()
         }
         ActivityScenario.launch(MainActivity::class.java).use {
@@ -193,6 +194,7 @@ class WorkoutFlowTest {
                 name = "Map workout", completedAt = 200,
                 exercises = mutableListOf(WorkoutExercise(exerciseId = "bench-press")),
             ))
+            saveHistory()
             save()
         }
         val intent = Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -638,6 +640,7 @@ class WorkoutFlowTest {
                 sets = mutableListOf(LoggedSet(type = SetType.NORMAL, weightKg = 67.5, reps = 6)),
             )),
         ))
+        repository.saveHistory()
         repository.save()
         val storedState = context.repositoryStateFile.readText()
         val activity = instrumentation.startActivitySync(
@@ -679,6 +682,7 @@ class WorkoutFlowTest {
                 name = name, startedAt = completedAt - 60_000, completedAt = completedAt,
             ))
         }
+        repository.saveHistory()
         repository.save()
         val storedState = context.repositoryStateFile.readText()
         val activity = instrumentation.startActivitySync(
@@ -1377,6 +1381,7 @@ class WorkoutFlowTest {
                     plannedSets = mutableListOf(PlannedSet(holdSeconds = 60))),
             )))
         repository.data.history[0] = repository.data.history[0].copy(sourceRoutine = repository.data.routines.single())
+        repository.saveHistory()
         repository.save()
         val activity = instrumentation.startActivitySync(Intent(context, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -1420,6 +1425,7 @@ class WorkoutFlowTest {
             )),
         ))
         repository.data.history[0] = repository.data.history[0].copy(sourceRoutine = repository.data.routines.single())
+        repository.saveHistory()
         repository.save()
         val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -1458,6 +1464,7 @@ class WorkoutFlowTest {
             ))),
         ))
         repository.data.recordWorkout(repository.data.history.single())
+        repository.saveHistory()
         repository.save()
         instrumentation.startActivitySync(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
@@ -1522,6 +1529,7 @@ class WorkoutFlowTest {
             ),
         ))
         repository.data.recordWorkout(repository.data.history.single())
+        repository.saveHistory()
         repository.save()
         val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -1592,6 +1600,7 @@ class WorkoutFlowTest {
             )),
         )
         repository.data.recordWorkout(repository.data.history.single())
+        repository.saveHistory()
         repository.save()
         val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -1694,6 +1703,7 @@ class WorkoutFlowTest {
                 ),
             ),
         ))
+        repository.saveHistory()
         repository.save()
         val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -1775,6 +1785,7 @@ class WorkoutFlowTest {
             ),
         )
         repository.data.history.add(workout)
+        repository.saveHistory()
         repository.save()
         val storedState = context.repositoryStateFile.readText()
         val intent = Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -1832,6 +1843,7 @@ class WorkoutFlowTest {
             name = "Two spans",
             intervals = mutableListOf(WorkoutInterval(startedAt, startedAt + 60_000), WorkoutInterval(resumedAt, resumedAt + 120_000)),
         ))
+        repository.saveHistory()
         repository.save()
         val activity = instrumentation.startActivitySync(
             Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -1880,6 +1892,7 @@ class WorkoutFlowTest {
         repository.data.history.add(workout)
         val olderWorkout = WorkoutSession(name = "Older workout", startedAt = 10, completedAt = 50)
         repository.data.history.add(olderWorkout)
+        repository.saveHistory()
         repository.save()
         val intent = Intent(instrumentation.targetContext, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -1925,6 +1938,7 @@ class WorkoutFlowTest {
             .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         val workout = WorkoutSession(name = "Yesterday", startedAt = completedAt - 60_000, completedAt = completedAt)
         repository.data.history.add(workout)
+        repository.saveHistory()
         repository.save()
         val storedState = context.repositoryStateFile.readText()
         val activity = instrumentation.startActivitySync(

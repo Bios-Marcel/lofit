@@ -11,10 +11,14 @@ import java.io.File
 internal val Context.repositoryStateFile: File
     get() = File(filesDir, "lofit-data.json")
 
+internal val Context.repositoryHistoryFile: File
+    get() = File(filesDir, "lofit-history.json")
+
 internal fun Context.clearRepositoryTestData() {
     assertTrue(getSharedPreferences("lofit-data", 0).edit().clear().commit())
     AtomicFile(repositoryStateFile).delete()
-    listOf("state-before-migration-v1.json", "state-before-migration-v2.json").forEach {
+    AtomicFile(repositoryHistoryFile).delete()
+    listOf("state-before-migration-v1.json", "state-before-migration-v2.json", "state-before-migration-v3.json").forEach {
         AtomicFile(File(filesDir, it)).delete()
     }
 }

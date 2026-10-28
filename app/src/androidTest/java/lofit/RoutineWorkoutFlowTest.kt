@@ -52,6 +52,7 @@ class RoutineWorkoutFlowTest {
                     LoggedSet(type = SetType.NORMAL, weightKg = 80.0, reps = 6),
                 )),
             )))
+            saveHistory()
             save()
         }
     }
@@ -270,6 +271,7 @@ class RoutineWorkoutFlowTest {
                         LoggedSet(type = SetType.NORMAL, weightKg = 0.0, holdSeconds = 90))),
                 ))
             data.history.addAll(listOf(other, open, own))
+            saveHistory()
             save() // Exercise source preference must survive storage, not rely on object identity.
         }
         launch().use {
@@ -322,6 +324,7 @@ class RoutineWorkoutFlowTest {
                     WorkoutExercise(exerciseId = "plank", sets = mutableListOf(
                         LoggedSet(type = SetType.NORMAL, weightKg = 0.0, holdSeconds = 180))),
                 )))
+            saveHistory()
             save()
         }
         launch().use {
