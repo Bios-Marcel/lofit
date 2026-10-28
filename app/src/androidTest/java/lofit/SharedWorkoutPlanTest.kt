@@ -5,6 +5,7 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
+import java.util.zip.ZipException
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
@@ -93,7 +94,7 @@ class SharedWorkoutPlanTest {
     }
 
     @Test
-    fun transfer_compressesFullPlanAndReceivesLegacyJson() {
+    fun transfer_compressesFullPlan() {
         val json = SharedWorkoutPlan.encode(workout(), listOf(movement))
         val compressed = SharedWorkoutPlan.compressForTransfer(json)
         assertTrue(compressed.size < json.size)
@@ -102,14 +103,12 @@ class SharedWorkoutPlanTest {
             GZIPInputStream(ByteArrayInputStream(compressed)).use { it.readBytes() },
         )
         val expected = SharedWorkoutPlan.decode(json)
-        for (bytes in listOf(compressed, json)) {
-            val plan = SharedWorkoutPlan.decodeTransfer(bytes)
-            assertEquals(expected.exercises, plan.exercises)
-            assertEquals(expected.routine.name, plan.routine.name)
-            assertEquals(expected.routine.defaultRestSeconds, plan.routine.defaultRestSeconds)
-            val data = AppData(exercises = plan.exercises.toMutableList())
-            assertArrayEquals(json, SharedWorkoutPlan.encode(plan.startIn(data), plan.exercises))
-        }
+        val plan = SharedWorkoutPlan.decodeTransfer(compressed)
+        assertEquals(expected.exercises, plan.exercises)
+        assertEquals(expected.routine.name, plan.routine.name)
+        assertEquals(expected.routine.defaultRestSeconds, plan.routine.defaultRestSeconds)
+        val data = AppData(exercises = plan.exercises.toMutableList())
+        assertArrayEquals(json, SharedWorkoutPlan.encode(plan.startIn(data), plan.exercises))
     }
 
     @Test
@@ -120,6 +119,9 @@ class SharedWorkoutPlanTest {
             )
         assertThrows(Exception::class.java) {
             SharedWorkoutPlan.decodeTransfer(compressed.copyOf(compressed.size - 8))
+        }
+        assertThrows(ZipException::class.java) {
+            SharedWorkoutPlan.decodeTransfer(SharedWorkoutPlan.encode(workout(), listOf(movement)))
         }
         assertThrows(IllegalArgumentException::class.java) {
             SharedWorkoutPlan.decodeTransfer(ByteArray(SharedWorkoutPlan.MAX_TRANSFER_BYTES + 1))
@@ -219,11 +221,10 @@ class SharedWorkoutPlanTest {
     }
 
     @Test
-    fun legacyExerciseWithoutPlan_sharesLoggedSetsAsFreshTargets() {
+    fun exerciseWithoutPlan_doesNotShareLoggedSets() {
         val source = workout()
         source.exercises.single().plannedSets.clear()
         val plan = SharedWorkoutPlan.decode(SharedWorkoutPlan.encode(source, listOf(movement)))
-        assertEquals(17, plan.routine.exercises.single().plannedSets.single().holdSeconds)
-        assertNull(plan.routine.exercises.single().plannedSets.single().actualHoldSeconds)
+        assertTrue(plan.routine.exercises.single().plannedSets.isEmpty())
     }
 }

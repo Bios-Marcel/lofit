@@ -58,13 +58,8 @@ data class SharedWorkoutPlan(val routine: Routine, val exercises: List<Exercise>
 
         fun decodeTransfer(bytes: ByteArray): SharedWorkoutPlan {
             require(bytes.size in 1..MAX_TRANSFER_BYTES)
-            // Keep receiving plain JSON from older senders.
             val json =
-                if (bytes.size >= 2 && bytes[0] == 0x1f.toByte() && bytes[1] == 0x8b.toByte()) {
-                    GZIPInputStream(ByteArrayInputStream(bytes)).use {
-                        it.readNBytes(MAX_BYTES + 1)
-                    }
-                } else bytes
+                GZIPInputStream(ByteArrayInputStream(bytes)).use { it.readNBytes(MAX_BYTES + 1) }
             return decode(json)
         }
 
@@ -113,18 +108,6 @@ data class SharedWorkoutPlan(val routine: Routine, val exercises: List<Exercise>
                             workout.exercises.forEach { item ->
                                 // Unlike history-to-routine conversion, keep unfinished prescribed
                                 // sets too.
-                                val sets =
-                                    item.plannedSets.ifEmpty {
-                                        item.sets.map {
-                                            PlannedSet(
-                                                type = it.type,
-                                                weightKg = it.weightKg,
-                                                reps = it.reps,
-                                                holdSeconds = it.holdSeconds,
-                                                side = it.side,
-                                            )
-                                        }
-                                    }
                                 put(
                                     JSONObject()
                                         .put("movement", item.exerciseId)
@@ -133,7 +116,7 @@ data class SharedWorkoutPlan(val routine: Routine, val exercises: List<Exercise>
                                         .put(
                                             "sets",
                                             JSONArray().apply {
-                                                sets.forEach { s ->
+                                                item.plannedSets.forEach { s ->
                                                     put(
                                                         JSONObject()
                                                             .put("type", s.type.name)
