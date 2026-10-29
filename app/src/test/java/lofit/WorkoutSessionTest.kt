@@ -336,7 +336,7 @@ class WorkoutSessionTest {
         val exercises = DefaultData.exercises()
 
         assertEquals(listOf("Repetitions", "Timed"), ExerciseType.entries.map { it.label })
-        assertEquals(466, exercises.size)
+        assertEquals(473, exercises.size)
         assert(
             exercises
                 .map { it.id }
@@ -365,7 +365,7 @@ class WorkoutSessionTest {
         assertTrue(exercises.single { it.id == "farmer-carry" }.weighted)
         assertFalse(exercises.single { it.id == "fedb-bodyweight-flyes" }.weighted)
         val weightedCopies = exercises.filter { it.id.startsWith("weighted-") }
-        assertEquals(38, weightedCopies.size)
+        assertEquals(40, weightedCopies.size)
         weightedCopies.forEach { copy ->
             val original = exercises.single { it.id == copy.id.removePrefix("weighted-") }
             assertFalse(original.weighted)
@@ -376,8 +376,23 @@ class WorkoutSessionTest {
             assertEquals(original.primaryMuscle, copy.primaryMuscle)
             assertEquals(original.secondaryMuscles, copy.secondaryMuscles)
             assertEquals(original.imageResource, copy.imageResource)
-            assertEquals(original.imageName, copy.imageName)
+            val expectedImageName =
+                when (original.id) {
+                    "pistol-squat" -> "exercise_weighted_pistol_squat"
+                    "cossack-squat" -> "exercise_weighted_cossack_squat"
+                    else -> original.imageName
+                }
+            assertEquals(expectedImageName, copy.imageName)
         }
+        assertTrue(exercises.single { it.id == "pistol-squat" }.asymmetric)
+        assertTrue(exercises.single { it.id == "cossack-squat" }.asymmetric)
+        assertTrue(exercises.single { it.id == "back-extension" }.weighted)
+        assertTrue(exercises.single { it.id == "back-extension-hold" }.weighted)
+        assertEquals(
+            ExerciseType.TIMED,
+            exercises.single { it.id == "back-extension-hold" }.type,
+        )
+        assertTrue(exercises.single { it.id == "jefferson-curl" }.weighted)
         assert(exercises.count { it.asymmetric } >= 50)
         val shoulderRotations = exercises.filter {
             it.name.contains("Rotation", ignoreCase = true) && it.primaryMuscle == "Rotator cuff"

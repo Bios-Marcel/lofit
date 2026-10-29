@@ -16,6 +16,61 @@ object ExerciseCatalog {
                         imageResource = R.drawable.exercise_squat,
                     ),
                     Exercise(
+                        "pistol-squat",
+                        "Pistol squat",
+                        ExerciseType.REPETITIONS,
+                        true,
+                        "Quadriceps",
+                        "Glutes, hamstrings, core",
+                        30,
+                        imageName = "exercise_pistol_squat",
+                        weighted = false,
+                    ),
+                    Exercise(
+                        "cossack-squat",
+                        "Cossack squat",
+                        ExerciseType.REPETITIONS,
+                        true,
+                        "Quadriceps",
+                        "Adductors, glutes, hamstrings",
+                        30,
+                        imageName = "exercise_cossack_squat",
+                        weighted = false,
+                    ),
+                    Exercise(
+                        "back-extension",
+                        "Back extension",
+                        ExerciseType.REPETITIONS,
+                        false,
+                        "Erector spinae",
+                        "Glutes, hamstrings",
+                        30,
+                        imageName = "exercise_back_extension",
+                        weighted = true,
+                    ),
+                    Exercise(
+                        "back-extension-hold",
+                        "Back extension hold",
+                        ExerciseType.TIMED,
+                        false,
+                        "Erector spinae",
+                        "Glutes, hamstrings",
+                        30,
+                        imageName = "exercise_back_extension_hold",
+                        weighted = true,
+                    ),
+                    Exercise(
+                        "jefferson-curl",
+                        "Jefferson curl",
+                        ExerciseType.REPETITIONS,
+                        false,
+                        "Erector spinae",
+                        "Hamstrings, glutes",
+                        30,
+                        imageName = "exercise_jefferson_curl",
+                        weighted = true,
+                    ),
+                    Exercise(
                         "bench-press",
                         "Bench press",
                         ExerciseType.REPETITIONS,
@@ -4300,6 +4355,9 @@ object ExerciseCatalog {
                 .copy(
                     id = "weighted-$sourceId",
                     name = "Weighted ${exercisesById.getValue(sourceId).name}",
+                    imageName =
+                        weightedVariantImageNames[sourceId]
+                            ?: exercisesById.getValue(sourceId).imageName,
                     weighted = true,
                 )
         }
@@ -4308,6 +4366,8 @@ object ExerciseCatalog {
 
     private val weightedVariantSourceIds =
         listOf(
+            "pistol-squat",
+            "cossack-squat",
             "push-up",
             "close-grip-push-up",
             "wide-grip-push-up",
@@ -4346,6 +4406,12 @@ object ExerciseCatalog {
             "fedb-jackknife-sit-up",
             "fedb-leg-lift",
             "fedb-leg-pull-in",
+        )
+
+    private val weightedVariantImageNames =
+        mapOf(
+            "pistol-squat" to "exercise_weighted_pistol_squat",
+            "cossack-squat" to "exercise_weighted_cossack_squat",
         )
 
     private val bodyweightRepetitionIds =
