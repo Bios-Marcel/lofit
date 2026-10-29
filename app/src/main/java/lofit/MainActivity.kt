@@ -2724,7 +2724,10 @@ class MainActivity : AppCompatActivity() {
         val weekLabel = DateTimeFormatter.ofPattern("d MMM", Locale.getDefault())
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            addView(titleText("Weekly rhythm"))
+            addView(
+                titleText("Weekly rhythm").apply { gravity = Gravity.CENTER_VERTICAL },
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(42)),
+            )
             addView(
                 LinearLayout(this@MainActivity).apply {
                     gravity = Gravity.CENTER_VERTICAL
@@ -3086,9 +3089,11 @@ class MainActivity : AppCompatActivity() {
                                                 }
                                             }
                                     },
-                                    LinearLayout.LayoutParams(0, dp(40), 1f).apply {
+                                    LinearLayout.LayoutParams(0, dp(36), 1f).apply {
                                         marginStart = dp(2)
                                         marginEnd = dp(2)
+                                        topMargin = dp(2)
+                                        bottomMargin = dp(2)
                                     },
                                 )
                                 date = date.plusDays(1)
