@@ -3597,7 +3597,7 @@ object ExerciseCatalog {
                         "fedb-dumbbell-side-bend",
                         "Dumbbell Side Bend",
                         ExerciseType.REPETITIONS,
-                        false,
+                        true,
                         "Abdominals",
                         "—",
                         30,
