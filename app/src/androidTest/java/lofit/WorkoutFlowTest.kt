@@ -1857,7 +1857,7 @@ class WorkoutFlowTest {
                 )
             onView(allOf(withContentDescription("Set 3 Repetitions"), inCard("Bench press")))
                 .check(matches(withText("1")))
-            onView(allOf(withContentDescription("Set 1 Target time in seconds"), inCard("Plank")))
+            onView(allOf(withContentDescription("Set 1 Goal time in seconds"), inCard("Plank")))
                 .check(matches(withText("20")))
             onView(allOf(withContentDescription("Set 2 row"), inCard("Plank")))
                 .check(doesNotExist())
@@ -2172,7 +2172,7 @@ class WorkoutFlowTest {
         onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
         assertSetDoneState(1, "Done, record")
         onView(withContentDescription("Set 1 done")).check { view, _ ->
-            assertTrue(view.width <= (48 * view.resources.displayMetrics.density).toInt())
+            assertEquals(view.minimumWidth, view.width)
             assertEquals(1, (view.parent as ViewGroup).childCount)
         }
         onView(withContentDescription("Set 2 done")).perform(scrollTo(), click())
@@ -2203,10 +2203,10 @@ class WorkoutFlowTest {
         val repository = LofitRepository(instrumentation.targetContext)
         repository.data.exercises.add(
             Exercise(
-                id = "weighted-plank",
+                id = "custom-weighted-hold",
                 name = "Weighted plank",
                 type = ExerciseType.TIMED,
-                asymmetric = false,
+                asymmetric = true,
                 primaryMuscle = "Abs",
                 secondaryMuscles = "",
                 custom = true,
@@ -2220,7 +2220,7 @@ class WorkoutFlowTest {
                 exercises =
                     mutableListOf(
                         loggedWorkoutExercise(
-                            exerciseId = "weighted-plank",
+                            exerciseId = "custom-weighted-hold",
                             sets =
                                 mutableListOf(
                                     LoggedSet(
@@ -2239,7 +2239,7 @@ class WorkoutFlowTest {
                 exercises =
                     mutableListOf(
                         WorkoutExercise(
-                            exerciseId = "weighted-plank",
+                            exerciseId = "custom-weighted-hold",
                             plannedSets =
                                 mutableListOf(
                                     PlannedSet(
@@ -2257,17 +2257,28 @@ class WorkoutFlowTest {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         ActivityScenario.launch<MainActivity>(intent).use { scenario ->
             onView(withContentDescription("Set 1 weight")).check(matches(isDisplayed()))
-            onView(withContentDescription("Set 1 Target time in seconds"))
+            onView(withContentDescription("Set 1 side: Both")).check(matches(withText("B")))
+            onView(withText("Goal")).check(matches(isDisplayed()))
+            onView(withContentDescription("Set 1 Goal time in seconds"))
                 .check(matches(isDisplayed()))
-            onView(withContentDescription("Set 1 Active time in seconds"))
-                .check(matches(isDisplayed()))
+            onView(withContentDescription("Set 1 Active time in seconds")).check { field, _ ->
+                val control = field.parent as ViewGroup
+                assertEquals(2, control.childCount)
+                val play = control.getChildAt(1)
+                assertEquals("Start set 1 hold", play.contentDescription)
+                assertEquals(null, play.background)
+                assertEquals(
+                    0,
+                    play.paddingLeft + play.paddingTop + play.paddingRight + play.paddingBottom,
+                )
+            }
             onView(withContentDescription("Start set 1 hold")).check(matches(isDisplayed()))
             onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
             assertSetDoneState(1, "Done, record")
             onView(withContentDescription("Set 1 done")).check { view, _ ->
                 val actions = view.parent as ViewGroup
-                assertEquals(2, actions.childCount)
-                assertEquals((96 * view.resources.displayMetrics.density).toInt(), actions.width)
+                assertEquals(1, actions.childCount)
+                assertEquals(view.minimumWidth, actions.width)
             }
             onView(withContentDescription("Set 1 Active time in seconds"))
                 .perform(replaceText("20"), closeSoftKeyboard())
@@ -2361,6 +2372,59 @@ class WorkoutFlowTest {
         assertEquals(listOf(20.0, 67.5), routine.exercises[0].plannedSets.map { it.weightKg })
         assertEquals(listOf(10, 6), routine.exercises[0].plannedSets.map { it.reps })
         assertEquals(listOf(45), routine.exercises[1].plannedSets.map { it.holdSeconds })
+    }
+
+    @Test
+    fun asymmetricSet_sideColumnCyclesAndUpdatesLoggedSet() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val repository = LofitRepository(context)
+        repository.data.exercises.add(
+            Exercise(
+                id = "single-leg",
+                name = "Single leg",
+                type = ExerciseType.REPETITIONS,
+                asymmetric = true,
+                primaryMuscle = "Quads",
+                secondaryMuscles = "",
+                custom = true,
+                weighted = false,
+            )
+        )
+        repository.data.activeWorkout =
+            WorkoutSession(
+                name = "Side workout",
+                exercises =
+                    mutableListOf(
+                        WorkoutExercise(
+                            exerciseId = "single-leg",
+                            plannedSets = mutableListOf(PlannedSet(reps = 12)),
+                        )
+                    ),
+            )
+        repository.save()
+        val intent =
+            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        ActivityScenario.launch<MainActivity>(intent).use { scenario ->
+            onView(withText("Side")).check(matches(isDisplayed()))
+            onView(withContentDescription("Set 1 side: Both"))
+                .check(matches(withText("B")))
+                .check { view, _ -> assertTrue(view.parent.parent is android.widget.GridLayout) }
+                .perform(scrollTo(), click())
+            onView(withContentDescription("Set 1 side: Left"))
+                .check(matches(withText("L")))
+                .perform(click())
+            onView(withContentDescription("Set 1 side: Right")).check(matches(withText("R")))
+            onView(withContentDescription("Set 1 done")).perform(click())
+            assertEquals(
+                Side.RIGHT,
+                LofitRepository(context).data.activeWorkout!!.exercises.single().sets.single().side,
+            )
+            scenario.recreate()
+            onView(withContentDescription("Set 1 side: Right"))
+                .check(matches(withText("R")))
+                .perform(click())
+            onView(withContentDescription("Set 1 side: Both")).check(matches(withText("B")))
+        }
     }
 
     @Test
@@ -2479,13 +2543,13 @@ class WorkoutFlowTest {
         onView(benchField("Set 2 done")).check(matches(not(isChecked())))
         onView(benchField("Set 2 weight")).check(matches(withText("50")))
         onView(withText("Set Rest: 75s")).perform(scrollTo()).check(matches(isDisplayed()))
-        onView(holdField("Set 1 Target time in seconds"))
+        onView(holdField("Set 1 Goal time in seconds"))
             .perform(scrollTo())
             .check(matches(withText("45")))
         onView(holdField("Set 1 Active time in seconds")).check(matches(withText("42")))
-        onView(withContentDescription("Set 1 side"))
-            .perform(scrollTo(), click())
-            .check(matches(withText("Left")))
+        onView(withContentDescription("Set 1 side: Left"))
+            .perform(scrollTo())
+            .check(matches(withText("L")))
         onView(
                 allOf(
                     withContentDescription("Set 1 Repetitions"),
@@ -2752,15 +2816,13 @@ class WorkoutFlowTest {
             )
             .perform(click())
         onView(withText("Start")).perform(scrollTo(), click())
-        onView(withContentDescription("Set 1 Target time in seconds"))
-            .check(matches(withText("45")))
+        onView(withContentDescription("Set 1 Goal time in seconds")).check(matches(withText("45")))
         onView(withContentDescription("Set 1 Active time in seconds")).check(matches(withText("0")))
         onView(withContentDescription("Start set 1 hold")).perform(scrollTo(), click())
         onView(withContentDescription("Stop set 1 hold")).check(matches(isDisplayed()))
         onView(withContentDescription("Stop set 1 hold")).perform(click())
         onView(withContentDescription("Start set 1 hold")).check(matches(isDisplayed()))
-        onView(withContentDescription("Set 1 Target time in seconds"))
-            .check(matches(withText("45")))
+        onView(withContentDescription("Set 1 Goal time in seconds")).check(matches(withText("45")))
         onView(withContentDescription("Set 1 Active time in seconds"))
             .check(matches(isEnabled()))
             .perform(replaceText("12"), closeSoftKeyboard())

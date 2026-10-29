@@ -18,10 +18,10 @@ enum class SetType(val label: String) {
     FAILURE("Failure"),
 }
 
-enum class Side(val label: String) {
-    BOTH("Both"),
-    LEFT("Left"),
-    RIGHT("Right"),
+enum class Side(val label: String, val marker: String) {
+    BOTH("Both", "B"),
+    LEFT("Left", "L"),
+    RIGHT("Right", "R"),
 }
 
 data class Exercise(

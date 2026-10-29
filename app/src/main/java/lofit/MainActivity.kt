@@ -93,8 +93,9 @@ class MainActivity : AppCompatActivity() {
         const val ACTION_SKIP_REST = "lofit.action.SKIP_REST"
         const val ACTION_OPEN_WORKOUT = "lofit.action.OPEN_WORKOUT"
         const val SET_ROW_PADDING_DP = 4
-        const val SET_HOLD_ACTION_WIDTH_DP = 48
-        const val SET_DONE_ACTION_WIDTH_DP = 48
+        const val SET_HOLD_BUTTON_WIDTH_DP = 30
+        const val SET_ACTIVE_FIELD_EXTRA_WIDTH_DP = 24
+        const val SET_CHECKBOX_WIDTH_DP = 40
         // Same Android 14+ action as AndroidX HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS.
         const val ACTION_HEALTH_CONNECT_SETTINGS =
             "android.health.connect.action.HEALTH_HOME_SETTINGS"
@@ -233,7 +234,7 @@ class MainActivity : AppCompatActivity() {
         }
     private var timerText: TextView? = null
     private var holdTimerText: TextView? = null
-    private var holdTimerButton: MaterialButton? = null
+    private var holdTimerButton: TextView? = null
     private var holdDoneCheckBox: CheckBox? = null
     private var activeHoldWorkoutExerciseId: String? = null
     private var activeHoldPlannedSetId: String? = null
@@ -1255,14 +1256,10 @@ class MainActivity : AppCompatActivity() {
                     bottomMargin = dp(8)
                 },
             )
-            val actionWidth =
-                SET_DONE_ACTION_WIDTH_DP +
-                    if (exercise.type.tracksDuration) SET_HOLD_ACTION_WIDTH_DP else 0
             addView(
                 plannedSetHeader(
                     exercise,
-                    if (exercise.type.tracksDuration) "Start  Done" else "Done",
-                    endWidth = actionWidth,
+                    showDone = true,
                     showActiveHold = exercise.type.tracksDuration,
                 )
             )
@@ -1318,7 +1315,7 @@ class MainActivity : AppCompatActivity() {
                             ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_crown),
                             dp(8),
                         ),
-                        40,
+                        SET_CHECKBOX_WIDTH_DP,
                     )
                 onDoneStateUpdaterReady(plannedSet.id) { recordSetIds ->
                     val isRecord = loggedSetFor(item, plannedSet)?.id in recordSetIds
@@ -1334,41 +1331,38 @@ class MainActivity : AppCompatActivity() {
                 lateinit var activeHoldAmount: EditText
                 val holdButton =
                     if (exercise.type.tracksDuration)
-                        smallButton(if (isActiveHold(item, plannedSet)) "■" else "▶") {}
-                            .apply {
-                                textSize = 18f
-                                contentDescription =
-                                    if (isActiveHold(item, plannedSet))
-                                        "Stop set ${setIndex + 1} hold"
-                                    else "Start set ${setIndex + 1} hold"
-                                setOnClickListener {
-                                    if (isActiveHold(item, plannedSet)) {
-                                        stopActiveHold()
-                                    } else {
-                                        startInlineHold(
-                                            item,
-                                            plannedSet,
-                                            activeHoldAmount,
-                                            this,
-                                            done,
-                                        )
-                                    }
+                        TextView(this@MainActivity).apply {
+                            text = if (isActiveHold(item, plannedSet)) "■" else "▶"
+                            textSize = 18f
+                            includeFontPadding = false
+                            gravity = Gravity.CENTER
+                            setPadding(0, 0, 0, 0)
+                            setTextColor(color(R.color.cream))
+                            contentDescription =
+                                if (isActiveHold(item, plannedSet)) "Stop set ${setIndex + 1} hold"
+                                else "Start set ${setIndex + 1} hold"
+                            setOnClickListener {
+                                if (isActiveHold(item, plannedSet)) {
+                                    stopActiveHold()
+                                } else {
+                                    startInlineHold(
+                                        item,
+                                        plannedSet,
+                                        activeHoldAmount,
+                                        this,
+                                        done,
+                                    )
                                 }
                             }
+                        }
                     else null
                 val rowActions =
                     LinearLayout(this@MainActivity).apply {
                         orientation = LinearLayout.HORIZONTAL
                         gravity = Gravity.CENTER_VERTICAL
-                        holdButton?.let {
-                            addView(
-                                setGridControl(it),
-                                LinearLayout.LayoutParams(dp(SET_HOLD_ACTION_WIDTH_DP), dp(48)),
-                            )
-                        }
                         addView(
                             done,
-                            LinearLayout.LayoutParams(dp(SET_DONE_ACTION_WIDTH_DP), dp(56)),
+                            LinearLayout.LayoutParams(dp(SET_CHECKBOX_WIDTH_DP), dp(56)),
                         )
                     }
                 val setRow =
@@ -1377,7 +1371,6 @@ class MainActivity : AppCompatActivity() {
                         plannedSet = plannedSet,
                         setIndex = setIndex,
                         endAction = rowActions,
-                        endActionWidth = actionWidth,
                         endActionHeight = 56,
                         completed = loggedSet != null,
                         onRemove = {
@@ -1393,6 +1386,7 @@ class MainActivity : AppCompatActivity() {
                                 ?.let { removeWorkoutSets(it, true) }
                         },
                         showActiveHold = exercise.type.tracksDuration,
+                        activeHoldAction = holdButton,
                         activeHoldRunning = isActiveHold(item, plannedSet),
                         onActiveAmountReady = { amount ->
                             activeHoldAmount = amount
@@ -1625,7 +1619,7 @@ class MainActivity : AppCompatActivity() {
                             rowViews[plannedSet.id] = row
                             setRows.addView(row)
                         }
-                        setRows.addView(plannedSetHeader(movement, null))
+                        setRows.addView(plannedSetHeader(movement))
                         item.plannedSets.forEachIndexed { setIndex, plannedSet ->
                             addRoutineSetRow(plannedSet, setIndex)
                         }
@@ -2429,14 +2423,11 @@ class MainActivity : AppCompatActivity() {
                                     bottomMargin = dp(8)
                                 },
                             )
-                            val actionWidth = SET_DONE_ACTION_WIDTH_DP
                             addView(
                                 plannedSetHeader(
                                     movement,
-                                    "Done",
-                                    endWidth = actionWidth,
+                                    showDone = true,
                                     showActiveHold = movement.type.tracksDuration,
-                                    showHoldAction = false,
                                 )
                             )
                             fun addSet(plannedSet: PlannedSet, loggedSet: LoggedSet?, index: Int) {
@@ -2465,12 +2456,11 @@ class MainActivity : AppCompatActivity() {
                                                         contentDescription = "Set ${index + 1} done"
                                                     },
                                                     LinearLayout.LayoutParams(
-                                                        dp(SET_DONE_ACTION_WIDTH_DP),
+                                                        dp(SET_CHECKBOX_WIDTH_DP),
                                                         dp(56),
                                                     ),
                                                 )
                                             },
-                                        endActionWidth = actionWidth,
                                         endActionHeight = 56,
                                         completed = loggedSet != null,
                                         showActiveHold = movement.type.tracksDuration,
@@ -3910,7 +3900,7 @@ class MainActivity : AppCompatActivity() {
         item: WorkoutExercise,
         set: PlannedSet,
         amount: EditText,
-        button: MaterialButton,
+        button: TextView,
         done: CheckBox,
     ) {
         stopActiveHold()
@@ -4707,11 +4697,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun largeCheckBox(): CheckBox =
         CheckBox(this).apply {
-            buttonDrawable = sizedButtonDrawable(buttonDrawable, 40)
+            buttonDrawable = sizedButtonDrawable(buttonDrawable, SET_CHECKBOX_WIDTH_DP)
             buttonTintList = toggleTint()
             gravity = Gravity.CENTER
-            minWidth = dp(56)
-            minHeight = dp(56)
+            minimumWidth = dp(SET_CHECKBOX_WIDTH_DP)
+            minimumHeight = dp(56)
             setPadding(0, 0, 0, 0)
         }
 
@@ -4723,12 +4713,12 @@ class MainActivity : AppCompatActivity() {
         plannedSet: PlannedSet,
         setIndex: Int,
         endAction: View? = null,
-        endActionWidth: Int = 48,
         endActionHeight: Int = 42,
         completed: Boolean = false,
         onRemove: (() -> Unit)? = null,
         onRemoveAndBelow: (() -> Unit)? = null,
         showActiveHold: Boolean = false,
+        activeHoldAction: View? = null,
         activeHoldRunning: Boolean = false,
         readOnly: Boolean = false,
         onAmountReady: (EditText) -> Unit = {},
@@ -4763,6 +4753,28 @@ class MainActivity : AppCompatActivity() {
                                 updateType(nextSetType(plannedSet.type))
                             }
                         }
+            val sideControl: TextView? =
+                if (!exercise.asymmetric) null
+                else if (readOnly)
+                    readOnlySetField(
+                            plannedSet.side.marker,
+                            "Set ${currentSetIndex + 1} side: ${plannedSet.side.label}",
+                        )
+                        .apply { gravity = Gravity.CENTER }
+                else
+                    smallButton(plannedSet.side.marker) {}
+                        .apply {
+                            contentDescription =
+                                "Set ${currentSetIndex + 1} side: ${plannedSet.side.label}"
+                            setOnClickListener {
+                                plannedSet.side =
+                                    Side.entries[(plannedSet.side.ordinal + 1) % Side.entries.size]
+                                text = plannedSet.side.marker
+                                contentDescription =
+                                    "Set ${currentSetIndex + 1} side: ${plannedSet.side.label}"
+                                onChanged()
+                            }
+                        }
             val weight =
                 if (exercise.weighted) {
                     if (readOnly)
@@ -4788,7 +4800,7 @@ class MainActivity : AppCompatActivity() {
             val amountLabel =
                 when {
                     !exercise.type.tracksDuration -> "Repetitions"
-                    showActiveHold -> "Target time in seconds"
+                    showActiveHold -> "Goal time in seconds"
                     else -> "Hold duration in seconds"
                 }
             val amountValue =
@@ -4851,7 +4863,8 @@ class MainActivity : AppCompatActivity() {
                         setGridColumnWidths(
                             exercise.weighted,
                             activeGrid,
-                            endAction?.let { endActionWidth } ?: 0,
+                            endAction?.let { SET_CHECKBOX_WIDTH_DP } ?: 0,
+                            exercise.asymmetric,
                         )
                     columnCount = columns.size
                     rowCount = 1
@@ -4865,59 +4878,126 @@ class MainActivity : AppCompatActivity() {
                         dp(SET_ROW_PADDING_DP),
                     )
                     addView(setGridControl(setNumber), setGridCell(columns[0], heightDp = 48))
+                    val sideOffset = if (sideControl != null) 1 else 0
+                    sideControl?.let {
+                        addView(setGridControl(it), setGridCell(columns[1], heightDp = 48))
+                    }
+                    val activeControl = activeAmount?.let { active ->
+                        FrameLayout(this@MainActivity).apply {
+                            addView(
+                                active,
+                                FrameLayout.LayoutParams(
+                                    ViewGroup.LayoutParams.MATCH_PARENT,
+                                    ViewGroup.LayoutParams.MATCH_PARENT,
+                                ),
+                            )
+                            activeHoldAction?.let { action ->
+                                (active as? EditText)?.setPadding(
+                                    dp(6),
+                                    0,
+                                    dp(SET_HOLD_BUTTON_WIDTH_DP + 2),
+                                    0,
+                                )
+                                addView(
+                                    action,
+                                    FrameLayout.LayoutParams(
+                                        dp(SET_HOLD_BUTTON_WIDTH_DP),
+                                        ViewGroup.LayoutParams.MATCH_PARENT,
+                                        Gravity.END,
+                                    ),
+                                )
+                            }
+                        }
+                    }
                     when {
                         activeGrid && exercise.weighted -> {
                             addView(
                                 setGridControl(weight!!),
-                                setGridCell(columns[1], heightDp = 48),
+                                setGridCell(columns[1 + sideOffset], heightDp = 48),
                             )
-                            addView(setGridControl(amount), setGridCell(columns[2], heightDp = 48))
                             addView(
-                                setGridControl(activeAmount!!),
-                                setGridCell(columns[3], heightDp = 48),
+                                setGridControl(amount),
+                                setGridCell(columns[2 + sideOffset], heightDp = 48),
+                            )
+                            addView(
+                                setGridControl(activeControl!!),
+                                setGridCell(columns[3 + sideOffset], heightDp = 48),
                             )
                             endAction?.let {
-                                addView(it, setGridCell(columns[4], heightDp = endActionHeight))
+                                addView(
+                                    it,
+                                    setGridCell(
+                                        columns[4 + sideOffset],
+                                        heightDp = endActionHeight,
+                                    ),
+                                )
                             }
                         }
                         activeGrid -> {
-                            addView(setGridControl(amount), setGridCell(columns[1], heightDp = 48))
                             addView(
-                                setGridControl(activeAmount!!),
-                                setGridCell(columns[2], heightDp = 48),
+                                setGridControl(amount),
+                                setGridCell(columns[1 + sideOffset], heightDp = 48),
+                            )
+                            addView(
+                                setGridControl(activeControl!!),
+                                setGridCell(columns[2 + sideOffset], heightDp = 48),
                             )
                             endAction?.let {
-                                addView(it, setGridCell(columns[3], heightDp = endActionHeight))
+                                addView(
+                                    it,
+                                    setGridCell(
+                                        columns[3 + sideOffset],
+                                        heightDp = endActionHeight,
+                                    ),
+                                )
                             }
                         }
                         exercise.weighted -> {
                             addView(
                                 setGridControl(weight!!),
-                                setGridCell(columns[1], heightDp = 48),
+                                setGridCell(columns[1 + sideOffset], heightDp = 48),
                             )
                             addView(
                                 metaText("kg ×").apply { gravity = Gravity.CENTER },
-                                setGridCell(columns[2], heightDp = 48),
+                                setGridCell(columns[2 + sideOffset], heightDp = 48),
                             )
-                            addView(setGridControl(amount), setGridCell(columns[3], heightDp = 48))
+                            addView(
+                                setGridControl(amount),
+                                setGridCell(columns[3 + sideOffset], heightDp = 48),
+                            )
                             addView(
                                 metaText(if (!exercise.type.tracksDuration) "reps" else "sec")
                                     .apply { gravity = Gravity.CENTER },
-                                setGridCell(columns[4], heightDp = 48),
+                                setGridCell(columns[4 + sideOffset], heightDp = 48),
                             )
                             endAction?.let {
-                                addView(it, setGridCell(columns[5], heightDp = endActionHeight))
+                                addView(
+                                    it,
+                                    setGridCell(
+                                        columns[5 + sideOffset],
+                                        heightDp = endActionHeight,
+                                    ),
+                                )
                             }
                         }
                         else -> {
-                            addView(setGridControl(amount), setGridCell(columns[1], heightDp = 48))
+                            addView(
+                                setGridControl(amount),
+                                setGridCell(columns[1 + sideOffset], heightDp = 48),
+                            )
                             addView(
                                 metaText(if (!exercise.type.tracksDuration) "reps" else "sec")
                                     .apply { gravity = Gravity.CENTER },
-                                setGridCell(columns[2], heightDp = 48),
+                                setGridCell(columns[2 + sideOffset], heightDp = 48),
                             )
                             endAction?.let {
-                                addView(it, setGridCell(columns[3], heightDp = endActionHeight))
+                                addView(
+                                    it,
+                                    setGridCell(
+                                        columns[3 + sideOffset],
+                                        heightDp = endActionHeight,
+                                    ),
+                                )
                             }
                         }
                     }
@@ -4970,19 +5050,6 @@ class MainActivity : AppCompatActivity() {
             } else {
                 addView(fields)
             }
-            val sideChoice =
-                if (exercise.asymmetric && readOnly) {
-                    readOnlySetField(plannedSet.side.label, "Set ${currentSetIndex + 1} side")
-                } else if (exercise.asymmetric)
-                    choiceGroup(Side.entries.map { it.label }, plannedSet.side.ordinal).apply {
-                        contentDescription = "Set ${currentSetIndex + 1} side"
-                        setOnCheckedChangeListener { _, checkedId ->
-                            plannedSet.side = Side.entries[(checkedId - 1).coerceAtLeast(0)]
-                            onChanged()
-                        }
-                    }
-                else null
-            sideChoice?.let(::addView)
             onIndexUpdaterReady { newIndex ->
                 currentSetIndex = newIndex
                 setNumber.text = setKindMarker(newIndex, plannedSet.type)
@@ -4993,7 +5060,8 @@ class MainActivity : AppCompatActivity() {
                 swipeRow?.contentDescription = "Set ${newIndex + 1} row"
                 deleteButton?.contentDescription = "Delete set ${newIndex + 1}"
                 deleteBelowButton?.contentDescription = "Delete set ${newIndex + 1} and all below"
-                sideChoice?.contentDescription = "Set ${newIndex + 1} side"
+                sideControl?.contentDescription =
+                    "Set ${newIndex + 1} side: ${plannedSet.side.label}"
             }
         }
     }
@@ -5021,15 +5089,19 @@ class MainActivity : AppCompatActivity() {
 
     private fun plannedSetHeader(
         exercise: Exercise,
-        endLabel: String?,
-        endWidth: Int = 48,
+        showDone: Boolean = false,
         showActiveHold: Boolean = false,
-        showHoldAction: Boolean = true,
     ): View =
         GridLayout(this).apply {
             val activeGrid = exercise.type.tracksDuration && showActiveHold
             val columns =
-                setGridColumnWidths(exercise.weighted, activeGrid, endLabel?.let { endWidth } ?: 0)
+                setGridColumnWidths(
+                    exercise.weighted,
+                    activeGrid,
+                    if (showDone) SET_CHECKBOX_WIDTH_DP else 0,
+                    exercise.asymmetric,
+                )
+            val sideOffset = if (exercise.asymmetric) 1 else 0
             columnCount = columns.size
             rowCount = 1
             alignmentMode = GridLayout.ALIGN_BOUNDS
@@ -5045,80 +5117,40 @@ class MainActivity : AppCompatActivity() {
                     topMargin = dp(8)
                 }
             addView(setGridHeader("Set"), setGridCell(columns[0]))
+            if (exercise.asymmetric) {
+                addView(
+                    setGridHeader("Side"),
+                    setGridCell(columns[1]),
+                )
+            }
             when {
                 activeGrid && exercise.weighted -> {
-                    addView(setGridHeader("Weight"), setGridCell(columns[1]))
-                    addView(setGridHeader("Target"), setGridCell(columns[2]))
-                    addView(setGridHeader("Active"), setGridCell(columns[3]))
-                    endLabel?.let {
-                        addView(
-                            if (showHoldAction) timedSetActionHeader() else doneSetActionHeader(),
-                            setGridCell(columns[4]),
-                        )
-                    }
+                    addView(setGridHeader("Weight"), setGridCell(columns[1 + sideOffset]))
+                    addView(setGridHeader("Goal"), setGridCell(columns[2 + sideOffset]))
+                    addView(setGridHeader("Active"), setGridCell(columns[3 + sideOffset]))
                 }
                 activeGrid -> {
-                    addView(setGridHeader("Target"), setGridCell(columns[1]))
-                    addView(setGridHeader("Active"), setGridCell(columns[2]))
-                    endLabel?.let {
-                        addView(
-                            if (showHoldAction) timedSetActionHeader() else doneSetActionHeader(),
-                            setGridCell(columns[3]),
-                        )
-                    }
+                    addView(setGridHeader("Goal"), setGridCell(columns[1 + sideOffset]))
+                    addView(setGridHeader("Active"), setGridCell(columns[2 + sideOffset]))
                 }
                 exercise.weighted -> {
-                    addView(setGridHeader("Weight"), setGridCell(columns[1]))
-                    addView(View(this@MainActivity), setGridCell(columns[2]))
+                    addView(setGridHeader("Weight"), setGridCell(columns[1 + sideOffset]))
+                    addView(View(this@MainActivity), setGridCell(columns[2 + sideOffset]))
                     addView(
                         setGridHeader(if (!exercise.type.tracksDuration) "Reps" else "Hold"),
-                        setGridCell(columns[3]),
+                        setGridCell(columns[3 + sideOffset]),
                     )
-                    addView(View(this@MainActivity), setGridCell(columns[4]))
-                    endLabel?.let { addView(doneSetActionHeader(), setGridCell(columns[5])) }
+                    addView(View(this@MainActivity), setGridCell(columns[4 + sideOffset]))
                 }
                 else -> {
                     addView(
                         setGridHeader(if (!exercise.type.tracksDuration) "Reps" else "Hold"),
-                        setGridCell(columns[1]),
+                        setGridCell(columns[1 + sideOffset]),
                     )
-                    addView(View(this@MainActivity), setGridCell(columns[2]))
-                    endLabel?.let { addView(doneSetActionHeader(), setGridCell(columns[3])) }
+                    addView(View(this@MainActivity), setGridCell(columns[2 + sideOffset]))
                 }
             }
-        }
-
-    private fun doneSetActionHeader(): View =
-        LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.END
-            addView(
-                setGridHeader("Done").apply { gravity = Gravity.CENTER },
-                LinearLayout.LayoutParams(
-                    dp(SET_DONE_ACTION_WIDTH_DP),
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                ),
-            )
-        }
-
-    private fun timedSetActionHeader(): View =
-        LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.END
-            addView(
-                setGridHeader("Start").apply { gravity = Gravity.CENTER },
-                LinearLayout.LayoutParams(
-                    dp(SET_HOLD_ACTION_WIDTH_DP),
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                ),
-            )
-            addView(
-                setGridHeader("Done").apply { gravity = Gravity.CENTER },
-                LinearLayout.LayoutParams(
-                    dp(SET_DONE_ACTION_WIDTH_DP),
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                ),
-            )
+            if (showDone) addView(View(this@MainActivity), setGridCell(columns.last()))
         }
 
     private fun setGridHeader(value: String) =
@@ -5131,37 +5163,46 @@ class MainActivity : AppCompatActivity() {
         weighted: Boolean,
         activeHold: Boolean,
         endWidth: Int,
+        asymmetric: Boolean,
     ): IntArray {
+        val sideWidth = if (asymmetric) 48 else 0
         val totalWidth =
-            (resources.configuration.screenWidthDp - 28 - SET_ROW_PADDING_DP * 2).coerceAtLeast(280)
-        return when {
-            weighted && activeHold -> {
-                val fieldWidth = ((totalWidth - 48 - endWidth) / 3).coerceAtLeast(40)
-                intArrayOf(
-                    48,
-                    fieldWidth,
-                    fieldWidth,
-                    totalWidth - 48 - endWidth - fieldWidth * 2,
-                    endWidth,
-                )
+            (resources.configuration.screenWidthDp - 28 - SET_ROW_PADDING_DP * 2).coerceAtLeast(
+                280
+            ) - sideWidth
+        val widths =
+            when {
+                weighted && activeHold -> {
+                    val fieldWidth =
+                        ((totalWidth - 48 - endWidth - SET_ACTIVE_FIELD_EXTRA_WIDTH_DP) / 3)
+                            .coerceAtLeast(40)
+                    intArrayOf(
+                        48,
+                        fieldWidth,
+                        fieldWidth,
+                        totalWidth - 48 - endWidth - fieldWidth * 2,
+                        endWidth,
+                    )
+                }
+                activeHold -> {
+                    val fieldWidth = ((totalWidth - 48 - endWidth) / 2).coerceAtLeast(64)
+                    intArrayOf(48, fieldWidth, totalWidth - 48 - endWidth - fieldWidth, endWidth)
+                }
+                weighted -> {
+                    val fieldWidth = ((totalWidth - 48 - 44 - 40 - endWidth) / 2).coerceAtLeast(48)
+                    intArrayOf(
+                        48,
+                        fieldWidth,
+                        44,
+                        totalWidth - 48 - 44 - 40 - endWidth - fieldWidth,
+                        40,
+                        endWidth,
+                    )
+                }
+                else -> intArrayOf(48, totalWidth - 48 - 40 - endWidth, 40, endWidth)
             }
-            activeHold -> {
-                val fieldWidth = ((totalWidth - 48 - endWidth) / 2).coerceAtLeast(64)
-                intArrayOf(48, fieldWidth, totalWidth - 48 - endWidth - fieldWidth, endWidth)
-            }
-            weighted -> {
-                val fieldWidth = ((totalWidth - 48 - 44 - 40 - endWidth) / 2).coerceAtLeast(48)
-                intArrayOf(
-                    48,
-                    fieldWidth,
-                    44,
-                    totalWidth - 48 - 44 - 40 - endWidth - fieldWidth,
-                    40,
-                    endWidth,
-                )
-            }
-            else -> intArrayOf(48, totalWidth - 48 - 40 - endWidth, 40, endWidth)
-        }
+        return if (asymmetric) intArrayOf(widths[0], sideWidth) + widths.copyOfRange(1, widths.size)
+        else widths
     }
 
     private fun setTableWidth(): Int = resources.displayMetrics.widthPixels - dp(14) * 2

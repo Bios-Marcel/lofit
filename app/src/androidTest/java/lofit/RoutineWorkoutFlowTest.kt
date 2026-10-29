@@ -111,6 +111,55 @@ class RoutineWorkoutFlowTest {
     }
 
     @Test
+    fun asymmetricRoutineSet_sideColumnSavesSelection() {
+        LofitRepository(context).apply {
+            data.exercises.add(
+                Exercise(
+                    id = "single-leg",
+                    name = "Single leg",
+                    type = ExerciseType.REPETITIONS,
+                    asymmetric = true,
+                    primaryMuscle = "Quads",
+                    secondaryMuscles = "",
+                    custom = true,
+                    weighted = false,
+                )
+            )
+            data.routines
+                .single()
+                .exercises
+                .add(
+                    RoutineExercise(
+                        exerciseId = "single-leg",
+                        plannedSets = mutableListOf(PlannedSet(reps = 12, side = Side.LEFT)),
+                    )
+                )
+            save()
+        }
+        launch().use { scenario ->
+            editRoutine(scenario)
+            onView(allOf(withContentDescription("Set 1 side: Left"), inCard("Single leg")))
+                .check(matches(withText("L")))
+                .perform(scrollTo(), click())
+            onView(allOf(withContentDescription("Set 1 side: Right"), inCard("Single leg")))
+                .check(matches(withText("R")))
+            onView(withText("Save routine")).perform(scrollTo(), click())
+            assertEquals(
+                Side.RIGHT,
+                LofitRepository(context)
+                    .data
+                    .routines
+                    .single()
+                    .exercises
+                    .last()
+                    .plannedSets
+                    .single()
+                    .side,
+            )
+        }
+    }
+
+    @Test
     fun cancelUnchangedOrRevertedRoutineDoesNotAskToDiscard() {
         LofitRepository(context).apply {
             data.routines
@@ -395,7 +444,7 @@ class RoutineWorkoutFlowTest {
             onView(withHint("Search name or muscle"))
                 .perform(replaceText("Plank"), closeSoftKeyboard())
             onView(withContentDescription("Add Plank")).perform(scrollTo(), click())
-            onView(withContentDescription("Set 1 Target time in seconds"))
+            onView(withContentDescription("Set 1 Goal time in seconds"))
                 .check(matches(withText("45")))
             onView(withText("Discard workout")).perform(scrollTo(), click())
             onView(withText("Discard workout")).inRoot(isDialog()).perform(click())
@@ -500,9 +549,9 @@ class RoutineWorkoutFlowTest {
             onView(withContentDescription("Set 1 Repetitions")).check(matches(withText("12")))
             onView(withContentDescription("Set 2 Repetitions")).check(matches(withText("5")))
             onView(withContentDescription("Set 3 Repetitions")).check(matches(withText("3")))
-            onView(withContentDescription("Set 1 Target time in seconds"))
+            onView(withContentDescription("Set 1 Goal time in seconds"))
                 .check(matches(withText("45")))
-            onView(withContentDescription("Set 2 Target time in seconds"))
+            onView(withContentDescription("Set 2 Goal time in seconds"))
                 .check(matches(withText("60")))
             onView(allOf(withContentDescription("Set 4 row"), inCard("Bench press")))
                 .check(doesNotExist())
