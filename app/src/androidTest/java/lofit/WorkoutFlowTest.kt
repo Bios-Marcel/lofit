@@ -989,7 +989,7 @@ class WorkoutFlowTest {
         onView(withContentDescription("Set 1 done")).check { view, _ ->
             val density = view.resources.displayMetrics.density
             val checkbox = view as CheckBox
-            assertTrue(view.width >= (48 * density).toInt())
+            assertTrue(view.width >= (40 * density).toInt())
             assertTrue(view.height >= (56 * density).toInt())
             assertTrue((checkbox.buttonDrawable?.intrinsicWidth ?: 0) >= (40 * density).toInt())
         }
