@@ -2010,23 +2010,30 @@ class MainActivity : AppCompatActivity() {
                     multiple = true,
                 )
             val typeGroup = choiceGroup(ExerciseType.entries.map { it.label }, draft.getInt("type"))
-            val weightGroup = choiceGroup(listOf("Bodyweight", "Weighted"), draft.getInt("weight"))
-            val trackingGroup =
-                choiceGroup(
-                    listOf("Track both sides together", "Track left and right"),
-                    draft.getInt("tracking"),
-                )
+            fun exerciseOption(label: String, checked: Boolean): CheckBox =
+                CheckBox(this).apply {
+                    text = label
+                    textSize = 15f
+                    setTextColor(color(R.color.cream))
+                    buttonTintList = toggleTint()
+                    buttonDrawable = sizedButtonDrawable(buttonDrawable, 30)
+                    isChecked = checked
+                    minHeight = dp(48)
+                    setPadding(dp(4), dp(4), dp(10), dp(4))
+                }
+            val weighted = exerciseOption("Weighted", draft.getInt("weight") == 1)
+            val asymmetric = exerciseOption("Asymmetrical", draft.getInt("tracking") == 1)
             name.doAfterTextChanged { draft.putString("name", it.toString()) }
             primary.doAfterTextChanged { draft.putString("primary", it.toString()) }
             secondary.doAfterTextChanged { draft.putString("secondary", it.toString()) }
             typeGroup.setOnCheckedChangeListener { _, _ ->
                 draft.putInt("type", selectedChoice(typeGroup))
             }
-            weightGroup.setOnCheckedChangeListener { _, _ ->
-                draft.putInt("weight", selectedChoice(weightGroup))
+            weighted.setOnCheckedChangeListener { _, checked ->
+                draft.putInt("weight", if (checked) 1 else 0)
             }
-            trackingGroup.setOnCheckedChangeListener { _, _ ->
-                draft.putInt("tracking", selectedChoice(trackingGroup))
+            asymmetric.setOnCheckedChangeListener { _, checked ->
+                draft.putInt("tracking", if (checked) 1 else 0)
             }
             val preview = FrameLayout(this)
             val choosePicture =
@@ -2126,10 +2133,27 @@ class MainActivity : AppCompatActivity() {
             body.addView(name)
             body.addView(fieldLabel("Exercise type"))
             body.addView(typeGroup)
-            body.addView(fieldLabel("Load"))
-            body.addView(weightGroup)
-            body.addView(fieldLabel("Side tracking"))
-            body.addView(trackingGroup)
+            body.addView(fieldLabel("Modifiers"))
+            body.addView(
+                LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    addView(
+                        weighted,
+                        LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ),
+                    )
+                    addView(
+                        asymmetric,
+                        LinearLayout.LayoutParams(
+                                ViewGroup.LayoutParams.WRAP_CONTENT,
+                                ViewGroup.LayoutParams.WRAP_CONTENT,
+                            )
+                            .apply { marginStart = dp(16) },
+                    )
+                }
+            )
             body.addView(fieldLabel("Primary muscle"))
             body.addView(primary)
             body.addView(fieldLabel("Secondary muscles"))
@@ -2173,8 +2197,8 @@ class MainActivity : AppCompatActivity() {
                             )
                     movement.name = name.text.toString().trim()
                     movement.type = ExerciseType.entries[selectedChoice(typeGroup)]
-                    movement.weighted = selectedChoice(weightGroup) == 1
-                    movement.asymmetric = selectedChoice(trackingGroup) == 1
+                    movement.weighted = weighted.isChecked
+                    movement.asymmetric = asymmetric.isChecked
                     movement.primaryMuscle = primaryMuscle
                     movement.secondaryMuscles = secondaryMuscles
                     val oldPicture = movement.imageFile
