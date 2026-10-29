@@ -64,6 +64,8 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.doOnPreDraw
 import androidx.core.widget.doAfterTextChanged
 import androidx.drawerlayout.widget.DrawerLayout
+import androidx.viewpager.widget.PagerAdapter
+import androidx.viewpager.widget.ViewPager
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import java.text.DateFormat
@@ -209,6 +211,8 @@ class MainActivity : AppCompatActivity() {
     private var currentScreen = Screen.HOME
     private var route: Route = Route.Root
     private var calendarMonth = YearMonth.now()
+    private var calendarPage = 0
+    private var muscleSpanDays = 28L
     private var routineDraft: Routine? = null
     private var exerciseDraft: Bundle? = null
     private val exercisePictures by lazy { ExercisePictures(this) }
@@ -964,7 +968,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun workoutHome(): View =
-        page("Ready to move?", "Local, focused, yours.") { body ->
+        page("Ready to move?") { body ->
             repository.data.activeWorkout?.let { workout ->
                 body.addView(
                     card {
@@ -986,7 +990,11 @@ class MainActivity : AppCompatActivity() {
                     }
                 )
             }
-            body.addView(workoutCalendar())
+            body.addView(
+                workoutCalendar().apply {
+                    (layoutParams as LinearLayout.LayoutParams).topMargin = dp(12)
+                }
+            )
             body.addView(sectionTitle("Routines"))
             if (repository.data.activeWorkout == null) {
                 body.addView(
@@ -2619,7 +2627,301 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun workoutCalendar(): View {
+    private fun workoutCalendar(): View = card {
+        val names = listOf("Calendar", "Weekly rhythm", "Muscle balance")
+        val pages = listOf(calendarGrid(), weeklyRhythmPage(), muscleBalancePage())
+        val pager =
+            ViewPager(this@MainActivity).apply {
+                contentDescription = "Calendar and training stats"
+                offscreenPageLimit = 2
+                adapter =
+                    object : PagerAdapter() {
+                        override fun getCount() = pages.size
+
+                        override fun isViewFromObject(view: View, item: Any) = view === item
+
+                        override fun instantiateItem(container: ViewGroup, position: Int): Any =
+                            pages[position].also { container.addView(it) }
+
+                        override fun destroyItem(
+                            container: ViewGroup,
+                            position: Int,
+                            item: Any,
+                        ) {
+                            container.removeView(item as View)
+                        }
+
+                        override fun getPageTitle(position: Int) = names[position]
+                    }
+                currentItem = calendarPage
+            }
+        addView(
+            pager,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(304 + (16 * resources.configuration.fontScale).toInt()),
+            ),
+        )
+        val dots = names.mapIndexed { index, name ->
+            FrameLayout(this@MainActivity).apply {
+                contentDescription = "$name, page ${index + 1} of ${names.size}"
+                isFocusable = true
+                setOnClickListener { pager.setCurrentItem(index, true) }
+                addView(
+                    View(this@MainActivity).apply {
+                        background = GradientDrawable().apply { shape = GradientDrawable.OVAL }
+                    },
+                    FrameLayout.LayoutParams(dp(8), dp(8), Gravity.CENTER),
+                )
+            }
+        }
+        fun selectPage(position: Int) {
+            calendarPage = position
+            pager.stateDescription = "Page ${position + 1} of ${names.size}"
+            dots.forEachIndexed { index, dot ->
+                dot.isSelected = index == position
+                (dot.getChildAt(0).background as GradientDrawable).setColor(
+                    color(if (dot.isSelected) R.color.coral else R.color.sage)
+                )
+                dot.getChildAt(0).alpha = if (dot.isSelected) 1f else 0.4f
+            }
+        }
+        addView(
+            LinearLayout(this@MainActivity).apply {
+                gravity = Gravity.CENTER
+                dots.forEach { addView(it, LinearLayout.LayoutParams(dp(48), dp(40))) }
+            },
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+        pager.addOnPageChangeListener(
+            object : ViewPager.SimpleOnPageChangeListener() {
+                override fun onPageSelected(position: Int) = selectPage(position)
+            }
+        )
+        selectPage(calendarPage)
+        setPadding(paddingLeft, paddingTop, paddingRight, dp(6))
+    }
+
+    private fun weeklyRhythmPage(): View {
+        val rhythm = repository.data.history.weeklyRhythm()
+        val weekLabel = DateTimeFormatter.ofPattern("d MMM", Locale.getDefault())
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(titleText("Weekly rhythm"))
+            addView(
+                LinearLayout(this@MainActivity).apply {
+                    gravity = Gravity.CENTER_VERTICAL
+                    addView(
+                        LinearLayout(this@MainActivity).apply {
+                            orientation = LinearLayout.VERTICAL
+                            addView(accentText("${rhythm.thisWeekDays}").apply { textSize = 27f })
+                            addView(metaText("This week"))
+                        },
+                        LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
+                    )
+                    addView(
+                        LinearLayout(this@MainActivity).apply {
+                            orientation = LinearLayout.VERTICAL
+                            addView(
+                                accentText(
+                                        String.format(
+                                            Locale.getDefault(),
+                                            "%.1f",
+                                            rhythm.previousFourWeekAverage,
+                                        )
+                                    )
+                                    .apply { textSize = 27f }
+                            )
+                            addView(metaText("Past 4 weeks avg"))
+                        },
+                        LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
+                    )
+                },
+                LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    )
+                    .apply { topMargin = dp(10) },
+            )
+            addView(
+                LinearLayout(this@MainActivity).apply {
+                    gravity = Gravity.BOTTOM
+                    rhythm.weeks.forEachIndexed { index, week ->
+                        addView(
+                            LinearLayout(this@MainActivity).apply {
+                                orientation = LinearLayout.VERTICAL
+                                gravity = Gravity.CENTER_HORIZONTAL
+                                contentDescription =
+                                    "Week of ${week.startsOn.format(weekLabel)}, ${week.days} training days"
+                                addView(
+                                    accentText(week.days.toString()).apply {
+                                        gravity = Gravity.CENTER
+                                        setTextColor(color(R.color.cream))
+                                    }
+                                )
+                                addView(
+                                    FrameLayout(this@MainActivity).apply {
+                                        addView(
+                                            View(this@MainActivity).apply {
+                                                setBackgroundColor(
+                                                    color(
+                                                        if (index == rhythm.weeks.lastIndex)
+                                                            R.color.coral
+                                                        else R.color.sage
+                                                    )
+                                                )
+                                            },
+                                            FrameLayout.LayoutParams(
+                                                    ViewGroup.LayoutParams.MATCH_PARENT,
+                                                    dp(4 + 15 * week.days),
+                                                    Gravity.BOTTOM,
+                                                )
+                                                .apply {
+                                                    marginStart = dp(8)
+                                                    marginEnd = dp(8)
+                                                },
+                                        )
+                                    },
+                                    LinearLayout.LayoutParams(
+                                        ViewGroup.LayoutParams.MATCH_PARENT,
+                                        dp(116),
+                                    ),
+                                )
+                                addView(
+                                    metaText(week.startsOn.format(weekLabel)).apply {
+                                        gravity = Gravity.CENTER
+                                        textSize = 11f
+                                    }
+                                )
+                            },
+                            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
+                        )
+                    }
+                },
+                LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    )
+                    .apply { topMargin = dp(14) },
+            )
+        }
+    }
+
+    private fun muscleBalancePage(): View {
+        val graph = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        lateinit var refresh: () -> Unit
+        val buttons =
+            listOf(7L, 28L).associateWith { span ->
+                smallButton("${span}d") {
+                    muscleSpanDays = span
+                    refresh()
+                }
+            }
+        refresh = {
+            buttons.forEach { (span, button) ->
+                button.isSelected = muscleSpanDays == span
+                button.backgroundTintList =
+                    ColorStateList.valueOf(
+                        color(
+                            if (button.isSelected) R.color.coral else R.color.charcoal_surface_high
+                        )
+                    )
+                button.setTextColor(color(if (button.isSelected) R.color.white else R.color.cream))
+            }
+            graph.removeAllViews()
+            val percentages =
+                repository.data.recentMuscleWorkload(muscleSpanDays).regionPercentages()
+            if (percentages.values.all { it == 0 }) {
+                graph.addView(emptyText("No sets in this period."))
+            }
+            if (percentages.values.any { it > 0 })
+                percentages.forEach { (name, percentage) ->
+                    graph.addView(
+                        LinearLayout(this).apply {
+                            orientation = LinearLayout.VERTICAL
+                            contentDescription = "$name, $percentage% of credited sets"
+                            addView(
+                                LinearLayout(this@MainActivity).apply {
+                                    addView(
+                                        metaText(name).apply { setTextColor(color(R.color.cream)) },
+                                        LinearLayout.LayoutParams(
+                                            0,
+                                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                                            1f,
+                                        ),
+                                    )
+                                    addView(metaText("$percentage%"))
+                                }
+                            )
+                            addView(
+                                android.widget
+                                    .ProgressBar(
+                                        this@MainActivity,
+                                        null,
+                                        android.R.attr.progressBarStyleHorizontal,
+                                    )
+                                    .apply {
+                                        max = 100
+                                        progress = percentage
+                                        progressTintList =
+                                            ColorStateList.valueOf(color(R.color.coral))
+                                        progressBackgroundTintList =
+                                            ColorStateList.valueOf(
+                                                color(R.color.charcoal_surface_high)
+                                            )
+                                        importantForAccessibility =
+                                            View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                                    },
+                                LinearLayout.LayoutParams(
+                                        ViewGroup.LayoutParams.MATCH_PARENT,
+                                        dp(7),
+                                    )
+                                    .apply { topMargin = dp(2) },
+                            )
+                        },
+                        LinearLayout.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.WRAP_CONTENT,
+                            )
+                            .apply { bottomMargin = dp(7) },
+                    )
+                }
+        }
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(
+                LinearLayout(this@MainActivity).apply {
+                    gravity = Gravity.CENTER_VERTICAL
+                    addView(
+                        titleText("Muscle balance"),
+                        LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
+                    )
+                    buttons.values.forEach { button ->
+                        addView(
+                            button,
+                            LinearLayout.LayoutParams(dp(48), dp(42)).apply {
+                                marginStart = dp(6)
+                            },
+                        )
+                    }
+                }
+            )
+            addView(
+                graph,
+                LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    )
+                    .apply { topMargin = dp(8) },
+            )
+            refresh()
+        }
+    }
+
+    private fun calendarGrid(): View {
         val zone = ZoneId.systemDefault()
         val today = LocalDate.now(zone)
         val month = calendarMonth
@@ -2630,150 +2932,157 @@ class MainActivity : AppCompatActivity() {
                 .groupBy { Instant.ofEpochMilli(it.startedAt).atZone(zone).toLocalDate() }
         val monthTitle = month.format(DateTimeFormatter.ofPattern("MMMM yyyy", Locale.getDefault()))
 
-        return card {
-            addView(
-                LinearLayout(this@MainActivity).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    gravity = Gravity.CENTER_VERTICAL
-                    addView(
-                        metaText(monthTitle).apply {
-                            gravity = Gravity.START or Gravity.CENTER_VERTICAL
-                            textSize = 18f
-                            setTextColor(color(R.color.white))
-                            setTypeface(typeface, Typeface.BOLD)
-                        },
-                        LinearLayout.LayoutParams(0, dp(42), 1f),
-                    )
-                    addView(
-                        smallButton("‹") {
-                                calendarMonth = calendarMonth.minusMonths(1)
-                                render()
-                            }
-                            .apply {
-                                contentDescription = "Previous month"
-                                textSize = 20f
-                                setPadding(dp(2), 0, dp(2), 0)
-                            },
-                        LinearLayout.LayoutParams(dp(44), dp(42)).apply {
-                            marginEnd = dp(6)
-                        },
-                    )
-                    addView(
-                        smallButton("›") {
-                                calendarMonth = calendarMonth.plusMonths(1)
-                                render()
-                            }
-                            .apply {
-                                contentDescription = "Next month"
-                                textSize = 20f
-                                setPadding(dp(2), 0, dp(2), 0)
-                            },
-                        LinearLayout.LayoutParams(dp(44), dp(42)),
-                    )
-                }
-            )
-            addView(
-                LinearLayout(this@MainActivity).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    DayOfWeek.entries.forEach { weekday ->
-                        addView(
-                            metaText(weekday.getDisplayName(TextStyle.NARROW, Locale.getDefault()))
-                                .apply {
-                                    gravity = Gravity.CENTER
-                                    setTypeface(typeface, Typeface.BOLD)
-                                },
-                            LinearLayout.LayoutParams(0, dp(30), 1f),
-                        )
-                    }
-                }
-            )
-
-            val firstOffset = month.atDay(1).dayOfWeek.value - DayOfWeek.MONDAY.value
-            var date = month.atDay(1).minusDays(firstOffset.toLong())
-            repeat(6) {
+        return LinearLayout(this)
+            .apply {
+                orientation = LinearLayout.VERTICAL
                 addView(
                     LinearLayout(this@MainActivity).apply {
                         orientation = LinearLayout.HORIZONTAL
-                        repeat(7) {
-                            val cellDate = date
-                            val isInMonth = YearMonth.from(cellDate) == month
+                        gravity = Gravity.CENTER_VERTICAL
+                        addView(
+                            metaText(monthTitle).apply {
+                                gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                                textSize = 18f
+                                setTextColor(color(R.color.white))
+                                setTypeface(typeface, Typeface.BOLD)
+                            },
+                            LinearLayout.LayoutParams(0, dp(42), 1f),
+                        )
+                        addView(
+                            smallButton("‹") {
+                                    calendarMonth = calendarMonth.minusMonths(1)
+                                    render()
+                                }
+                                .apply {
+                                    contentDescription = "Previous month"
+                                    textSize = 20f
+                                    setPadding(dp(2), 0, dp(2), 0)
+                                },
+                            LinearLayout.LayoutParams(dp(44), dp(42)).apply {
+                                marginEnd = dp(6)
+                            },
+                        )
+                        addView(
+                            smallButton("›") {
+                                    calendarMonth = calendarMonth.plusMonths(1)
+                                    render()
+                                }
+                                .apply {
+                                    contentDescription = "Next month"
+                                    textSize = 20f
+                                    setPadding(dp(2), 0, dp(2), 0)
+                                },
+                            LinearLayout.LayoutParams(dp(44), dp(42)),
+                        )
+                    }
+                )
+                addView(
+                    LinearLayout(this@MainActivity).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        DayOfWeek.entries.forEach { weekday ->
                             addView(
-                                TextView(this@MainActivity).apply {
-                                    text = cellDate.dayOfMonth.toString()
-                                    textSize = 14f
-                                    gravity = Gravity.CENTER
-                                    setTextColor(
-                                        color(if (isInMonth) R.color.cream else R.color.sage)
+                                metaText(
+                                        weekday.getDisplayName(
+                                            TextStyle.NARROW,
+                                            Locale.getDefault(),
+                                        )
                                     )
-                                    val workouts = trainingDays[cellDate].orEmpty()
-                                    val workoutCount = workouts.size
-                                    val trained = workoutCount > 0
-                                    contentDescription =
-                                        "$cellDate, ${when (workoutCount) {
+                                    .apply {
+                                        gravity = Gravity.CENTER
+                                        setTypeface(typeface, Typeface.BOLD)
+                                    },
+                                LinearLayout.LayoutParams(0, dp(30), 1f),
+                            )
+                        }
+                    }
+                )
+
+                val firstOffset = month.atDay(1).dayOfWeek.value - DayOfWeek.MONDAY.value
+                var date = month.atDay(1).minusDays(firstOffset.toLong())
+                repeat(6) {
+                    addView(
+                        LinearLayout(this@MainActivity).apply {
+                            orientation = LinearLayout.HORIZONTAL
+                            repeat(7) {
+                                val cellDate = date
+                                val isInMonth = YearMonth.from(cellDate) == month
+                                addView(
+                                    TextView(this@MainActivity).apply {
+                                        text = cellDate.dayOfMonth.toString()
+                                        textSize = 14f
+                                        gravity = Gravity.CENTER
+                                        setTextColor(
+                                            color(if (isInMonth) R.color.cream else R.color.sage)
+                                        )
+                                        val workouts = trainingDays[cellDate].orEmpty()
+                                        val workoutCount = workouts.size
+                                        val trained = workoutCount > 0
+                                        contentDescription =
+                                            "$cellDate, ${when (workoutCount) {
                                 0 -> "no workout"
                                 1 -> "workout completed"
                                 else -> "$workoutCount workouts completed"
                             }}"
-                                    if (trained || cellDate == today) {
-                                        textSize = 16f
-                                        setTypeface(typeface, Typeface.BOLD)
-                                    }
-                                    if (trained) {
-                                        setTextColor(color(R.color.charcoal))
-                                        elevation = 0f
-                                        isFocusable = true
-                                        setOnClickListener {
-                                            if (workouts.size == 1) {
-                                                openWorkoutHistory(workouts.single())
-                                            } else {
-                                                val timeFormat =
-                                                    DateFormat.getTimeInstance(DateFormat.SHORT)
-                                                AlertDialog.Builder(this@MainActivity)
-                                                    .setTitle(
-                                                        DateFormat.getDateInstance(
-                                                                DateFormat.MEDIUM
-                                                            )
-                                                            .format(
-                                                                Date(workouts.first().startedAt)
-                                                            )
-                                                    )
-                                                    .setItems(
-                                                        workouts
-                                                            .map { workout ->
-                                                                "${workout.name} · ${timeFormat.format(Date(workout.startedAt))}"
-                                                            }
-                                                            .toTypedArray()
-                                                    ) { _, index ->
-                                                        openWorkoutHistory(workouts[index])
-                                                    }
-                                                    .show()
+                                        if (trained || cellDate == today) {
+                                            textSize = 16f
+                                            setTypeface(typeface, Typeface.BOLD)
+                                        }
+                                        if (trained) {
+                                            setTextColor(color(R.color.charcoal))
+                                            elevation = 0f
+                                            isFocusable = true
+                                            setOnClickListener {
+                                                if (workouts.size == 1) {
+                                                    openWorkoutHistory(workouts.single())
+                                                } else {
+                                                    val timeFormat =
+                                                        DateFormat.getTimeInstance(DateFormat.SHORT)
+                                                    AlertDialog.Builder(this@MainActivity)
+                                                        .setTitle(
+                                                            DateFormat.getDateInstance(
+                                                                    DateFormat.MEDIUM
+                                                                )
+                                                                .format(
+                                                                    Date(workouts.first().startedAt)
+                                                                )
+                                                        )
+                                                        .setItems(
+                                                            workouts
+                                                                .map { workout ->
+                                                                    "${workout.name} · ${timeFormat.format(Date(workout.startedAt))}"
+                                                                }
+                                                                .toTypedArray()
+                                                        ) { _, index ->
+                                                            openWorkoutHistory(workouts[index])
+                                                        }
+                                                        .show()
+                                                }
                                             }
                                         }
-                                    }
-                                    background =
-                                        GradientDrawable().apply {
-                                            shape = GradientDrawable.RECTANGLE
-                                            cornerRadius = dp(2).toFloat()
-                                            setColor(
-                                                if (trained) color(R.color.coral)
-                                                else Color.TRANSPARENT
-                                            )
-                                            if (cellDate == today) {
-                                                setStroke(dp(1), color(R.color.sage))
+                                        background =
+                                            GradientDrawable().apply {
+                                                shape = GradientDrawable.RECTANGLE
+                                                cornerRadius = dp(2).toFloat()
+                                                setColor(
+                                                    if (trained) color(R.color.coral)
+                                                    else Color.TRANSPARENT
+                                                )
+                                                if (cellDate == today) {
+                                                    setStroke(dp(1), color(R.color.sage))
+                                                }
                                             }
-                                        }
-                                },
-                                LinearLayout.LayoutParams(0, dp(40), 1f).apply {
-                                    marginStart = dp(2)
-                                    marginEnd = dp(2)
-                                },
-                            )
-                            date = date.plusDays(1)
+                                    },
+                                    LinearLayout.LayoutParams(0, dp(40), 1f).apply {
+                                        marginStart = dp(2)
+                                        marginEnd = dp(2)
+                                    },
+                                )
+                                date = date.plusDays(1)
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
-        }
             .apply { contentDescription = "Workout calendar" }
     }
 

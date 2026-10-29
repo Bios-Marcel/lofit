@@ -43,6 +43,7 @@ class MuscleWorkload(exerciseSets: List<Pair<Exercise, Int>>) {
                     ),
                 "Chest" to setOf("Chest", "Upper chest", "Serratus anterior"),
             )
+        private val coreGroups = setOf("Abdominals", "Core", "Obliques")
     }
 
     private data class Work(val primary: String?, val secondary: Set<String>, val sets: Int)
@@ -60,6 +61,32 @@ class MuscleWorkload(exerciseSets: List<Pair<Exercise, Int>>) {
                     sets,
                 )
             }
+
+    /** Primary sets count once; secondary sets count a quarter, including for core. */
+    fun regionSetCredits(): Map<String, Double> =
+        (targetGroups + ("Core" to coreGroups)).mapValues { (_, groups) ->
+            work.sumOf { exercise ->
+                exercise.sets.toDouble() *
+                    when {
+                        exercise.primary in groups -> 1.0
+                        exercise.secondary.any(groups::contains) -> 0.25
+                        else -> 0.0
+                    }
+            }
+        }
+
+    fun regionPercentages(): Map<String, Int> {
+        val credits = regionSetCredits()
+        val total = credits.values.sum()
+        if (total == 0.0) return credits.mapValues { 0 }
+        val exact = credits.mapValues { it.value / total * 100 }
+        val rounded = exact.mapValues { it.value.toInt() }.toMutableMap()
+        exact.keys
+            .sortedByDescending { exact.getValue(it) - rounded.getValue(it) }
+            .take(100 - rounded.values.sum())
+            .forEach { rounded[it] = rounded.getValue(it) + 1 }
+        return rounded
+    }
 
     /**
      * Relative share within these five regions; core and neck work is outside this breakdown. Each
