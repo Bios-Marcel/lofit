@@ -400,7 +400,7 @@ class WorkoutSessionTest {
         val exercises = DefaultData.exercises()
 
         assertEquals(listOf("Repetitions", "Timed"), ExerciseType.entries.map { it.label })
-        assertEquals(473, exercises.size)
+        assertEquals(475, exercises.size)
         assert(
             exercises
                 .map { it.id }
@@ -418,6 +418,8 @@ class WorkoutSessionTest {
                         "one-arm-push-up",
                         "clap-push-up",
                         "spiderman-push-up",
+                        "leg-raise",
+                        "seated-leg-raise",
                     )
                 )
         )
