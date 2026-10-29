@@ -1099,18 +1099,19 @@ class WorkoutFlowTest {
                 onView(withContentDescription("Set 2 done")).perform(scrollTo(), click())
 
                 val active = LofitRepository(context).data.activeWorkout!!
+                val exerciseCatalog = LofitRepository(context).data.exercises
                 assertEquals(
                     listOf(1.25, 1.25),
                     active.exercises.single().plannedSets.map { it.weightKg },
                 )
                 assertEquals(listOf(1.25, 1.25), active.exercises.single().sets.map { it.weightKg })
-                assertEquals(3.75, active.totalVolume(), 0.0)
+                assertEquals(3.75, active.totalVolume(exerciseCatalog), 0.0)
 
                 onView(withText("Finish workout")).perform(scrollTo(), click())
                 onView(withText("Finish and save")).perform(click())
                 assertEquals(
                     3.75,
-                    LofitRepository(context).data.history.single().totalVolume(),
+                    LofitRepository(context).data.history.single().totalVolume(exerciseCatalog),
                     0.0,
                 )
                 onView(withContentDescription("${LocalDate.now()}, workout completed"))

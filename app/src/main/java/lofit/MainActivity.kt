@@ -2282,7 +2282,7 @@ class MainActivity : AppCompatActivity() {
                         )
                         addView(
                             metaText(
-                                "${workout.setCount()} sets · ${formatWeight(workout.totalVolume())} kg volume · ${formatDuration(workout.durationMillis())}"
+                                "${workout.setCount()} sets · ${formatWeight(workout.totalVolume(repository.data.exercises))} kg volume · ${formatDuration(workout.durationMillis())}"
                             )
                         )
                         workout.bodyWeightKg?.let { addView(bodyWeightText(it)) }
@@ -2400,7 +2400,7 @@ class MainActivity : AppCompatActivity() {
         ) { body ->
             body.addView(
                 metaText(
-                    "${workout.setCount()} sets · ${formatWeight(workout.totalVolume())} kg volume"
+                    "${workout.setCount()} sets · ${formatWeight(workout.totalVolume(repository.data.exercises))} kg volume"
                 )
             )
             workout.bodyWeightKg?.let { body.addView(bodyWeightText(it)) }
@@ -2543,9 +2543,12 @@ class MainActivity : AppCompatActivity() {
                         addView(metaText(label))
                         record.volumeSet?.let { set ->
                             addView(
-                                accentText("${formatWeight(set.volume())} kg").apply {
-                                    textSize = 22f
-                                }
+                                accentText(
+                                        "${formatWeight(set.volume(record.exercise.asymmetric))} kg"
+                                    )
+                                    .apply {
+                                        textSize = 22f
+                                    }
                             )
                             addView(metaText("Highest set volume"))
                         }

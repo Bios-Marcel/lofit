@@ -321,7 +321,71 @@ class WorkoutSessionTest {
             )
 
         assertEquals(3, workout.setCount())
-        assertEquals(500.0, workout.totalVolume(), 0.001)
+        assertEquals(500.0, workout.totalVolume(emptyList()), 0.001)
+    }
+
+    @Test
+    fun bothSidesCountTwiceInWorkoutAndVolumeRecords() {
+        val row = Exercise("row", "Row", ExerciseType.REPETITIONS, true, "Back", "")
+        val press = Exercise("press", "Press", ExerciseType.REPETITIONS, false, "Chest", "")
+        val both =
+            LoggedSet(
+                type = SetType.NORMAL,
+                weightKg = 10.0,
+                reps = 10,
+                side = Side.BOTH,
+                completedAt = 1_000_000,
+            )
+        val left =
+            both.copy(id = "left", weightKg = 15.0, side = Side.LEFT, completedAt = 2_000_000)
+        val right =
+            both.copy(id = "right", weightKg = 5.0, side = Side.RIGHT, completedAt = 3_000_000)
+        val first =
+            WorkoutSession(
+                name = "Both sides",
+                exercises =
+                    mutableListOf(
+                        WorkoutExercise(
+                            exerciseId = row.id,
+                            sets = mutableListOf(both, left, right),
+                        ),
+                        WorkoutExercise(
+                            exerciseId = press.id,
+                            sets = mutableListOf(both.copy(id = "press", side = Side.BOTH)),
+                        ),
+                    ),
+            )
+        val data = AppData(exercises = mutableListOf(row, press))
+
+        assertEquals(500.0, first.totalVolume(data.exercises), 0.0)
+        data.recordWorkout(first)
+        assertEquals(both.id, data.exerciseRecords.getValue(row.id).last().volumeSet?.id)
+        assertEquals(
+            200.0,
+            data
+                .oneRepMaxes()
+                .first { it.exercise.id == row.id }
+                .volumeSet!!
+                .volume(row.asymmetric),
+            0.0,
+        )
+
+        val next = left.copy(id = "next", weightKg = 5.0, reps = 50, completedAt = 100_000_000)
+        val second =
+            WorkoutSession(
+                name = "Left side",
+                exercises =
+                    mutableListOf(WorkoutExercise(exerciseId = row.id, sets = mutableListOf(next))),
+            )
+        assertEquals(setOf(next.id), data.recordSetIds(second))
+        data.recordWorkout(second)
+        assertEquals(next.id, data.exerciseRecords.getValue(row.id).last().volumeSet?.id)
+        assertEquals(
+            listOf(200.0, 250.0),
+            data.exerciseTrend(row.id, TrendSpan.ALL, now = 200_000_000).series.last().points.map {
+                it.value
+            },
+        )
     }
 
     @Test

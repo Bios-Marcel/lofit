@@ -55,7 +55,11 @@ data class LoggedSet(
         require(holdSeconds >= 0) { "Hold duration cannot be negative" }
     }
 
-    fun volume(): Double = (weightKg.toBigDecimal() * reps.toBigDecimal()).toDouble()
+    fun volume(asymmetric: Boolean = false): Double =
+        (weightKg.toBigDecimal() *
+                reps.toBigDecimal() *
+                (if (asymmetric && side == Side.BOTH) 2 else 1).toBigDecimal())
+            .toDouble()
 }
 
 data class PlannedSet(
@@ -159,12 +163,14 @@ data class WorkoutSession(
         exercises.add(to, exercises.removeAt(from))
     }
 
-    fun totalVolume(): Double =
-        exercises
+    fun totalVolume(exerciseCatalog: List<Exercise>): Double {
+        val asymmetricIds = exerciseCatalog.filter { it.asymmetric }.map { it.id }.toSet()
+        return exercises
             .sumOf { item ->
-                item.sets.sumOf { it.volume().toBigDecimal() }
+                item.sets.sumOf { it.volume(item.exerciseId in asymmetricIds).toBigDecimal() }
             }
             .toDouble()
+    }
 
     fun setCount(): Int = exercises.sumOf { it.sets.size }
 
@@ -350,7 +356,9 @@ data class AppData(
                             }
                         }
                         .thenBy { it.completedAt }
-                val volumeOrder = compareBy<LoggedSet> { it.volume() }.thenBy { it.completedAt }
+                val volumeOrder =
+                    compareBy<LoggedSet> { it.volume(exercise.asymmetric) }
+                        .thenBy { it.completedAt }
                 val tracksVolume = exercise.weighted && !exercise.type.tracksDuration
                 sets.forEach { set ->
                     val previous = exerciseRecords[exerciseId]?.lastOrNull()
@@ -402,14 +410,14 @@ data class AppData(
                         )
                         ?.takeIf { it.weightKg > previousRecord.set.weightKg }
                         ?.let { recordIds.add(it.id) }
-                    val previousVolume = previousRecord.volumeSet?.volume()
+                    val previousVolume = previousRecord.volumeSet?.volume(exercise.asymmetric)
                     if (previousVolume != null) {
                         sets
                             .maxWithOrNull(
-                                compareBy<LoggedSet> { it.volume() }
+                                compareBy<LoggedSet> { it.volume(exercise.asymmetric) }
                                     .thenByDescending { it.completedAt }
                             )
-                            ?.takeIf { it.volume() > previousVolume }
+                            ?.takeIf { it.volume(exercise.asymmetric) > previousVolume }
                             ?.let { recordIds.add(it.id) }
                     }
                 } else {

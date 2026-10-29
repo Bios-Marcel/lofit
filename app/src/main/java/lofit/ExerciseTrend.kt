@@ -21,12 +21,12 @@ enum class TrendMetric(val label: String, val unit: String) {
     REPS("Most repetitions", "reps"),
     VOLUME("Highest set volume", "kg·reps");
 
-    fun value(set: LoggedSet): Double =
+    fun value(set: LoggedSet, asymmetric: Boolean = false): Double =
         when (this) {
             WEIGHT -> set.weightKg
             HOLD -> set.holdSeconds.toDouble()
             REPS -> set.reps.toDouble()
-            VOLUME -> set.volume()
+            VOLUME -> set.volume(asymmetric)
         }
 }
 
@@ -63,7 +63,10 @@ fun AppData.exerciseTrend(
                 .distinctBy { it.id }
                 .filter { it.completedAt <= now }
                 .sortedBy { it.completedAt }
-        TrendSeries(metric, sets.map { TrendPoint(it.completedAt, metric.value(it)) })
+        TrendSeries(
+            metric,
+            sets.map { TrendPoint(it.completedAt, metric.value(it, exercise?.asymmetric == true)) },
+        )
     }
     val startedAt =
         span.startedAt(now, zone)

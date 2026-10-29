@@ -57,7 +57,7 @@ class WeightFormattingTest {
                         ),
                     ),
             )
-        assertEquals(4.25, workout.totalVolume(), 0.0)
-        assertEquals("4.25", formatWeight(workout.totalVolume(), Locale.US))
+        assertEquals(4.25, workout.totalVolume(emptyList()), 0.0)
+        assertEquals("4.25", formatWeight(workout.totalVolume(emptyList()), Locale.US))
     }
 }
