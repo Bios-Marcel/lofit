@@ -41,6 +41,34 @@ class HevyExerciseMappingTest {
     }
 
     @Test
+    fun newDefaultExercisesMapToHevyTemplates() {
+        val templates =
+            listOf(
+                HevyTemplate("incline", "Incline Bench Press (Dumbbell)", "weight_reps"),
+                HevyTemplate("cable", "Triceps Extension (Cable)", "weight_reps"),
+            )
+        val exercises = ExerciseCatalog.exercises()
+        assertEquals(
+            "incline",
+            HevyExerciseMapping.find(
+                    exercises.single { it.id == "incline-dumbbell-bench-press" },
+                    listOf(set(20.0)),
+                    templates,
+                )
+                ?.id,
+        )
+        assertEquals(
+            "cable",
+            HevyExerciseMapping.find(
+                    exercises.single { it.id == "cable-tricep-extension" },
+                    listOf(set(20.0)),
+                    templates,
+                )
+                ?.id,
+        )
+    }
+
+    @Test
     fun bodyweightTemplateCannotLoseAddedWeight() {
         val pushUp = exercise("push-up", "Push-up")
         val templates = listOf(HevyTemplate("push", "Push Up", "bodyweight_reps"))

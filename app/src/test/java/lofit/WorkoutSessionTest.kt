@@ -400,7 +400,7 @@ class WorkoutSessionTest {
         val exercises = DefaultData.exercises()
 
         assertEquals(listOf("Repetitions", "Timed"), ExerciseType.entries.map { it.label })
-        assertEquals(475, exercises.size)
+        assertEquals(477, exercises.size)
         assert(
             exercises
                 .map { it.id }
@@ -408,6 +408,8 @@ class WorkoutSessionTest {
                     listOf(
                         "push-up",
                         "close-grip-push-up",
+                        "incline-dumbbell-bench-press",
+                        "cable-tricep-extension",
                         "wide-grip-push-up",
                         "diamond-push-up",
                         "knee-push-up",
@@ -427,6 +429,8 @@ class WorkoutSessionTest {
         assert(exercises.count { it.type == ExerciseType.TIMED } >= 80)
         assertFalse(exercises.single { it.id == "push-up" }.weighted)
         assertTrue(exercises.single { it.id == "bench-press" }.weighted)
+        assertTrue(exercises.single { it.id == "incline-dumbbell-bench-press" }.weighted)
+        assertTrue(exercises.single { it.id == "cable-tricep-extension" }.weighted)
         assertFalse(exercises.single { it.id == "plank" }.weighted)
         assertTrue(exercises.single { it.id == "farmer-carry" }.weighted)
         assertFalse(exercises.single { it.id == "fedb-bodyweight-flyes" }.weighted)

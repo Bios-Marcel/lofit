@@ -81,6 +81,16 @@ object ExerciseCatalog {
                         imageResource = R.drawable.exercise_bench,
                     ),
                     Exercise(
+                        "incline-dumbbell-bench-press",
+                        "Incline Dumbbell Bench Press",
+                        ExerciseType.REPETITIONS,
+                        false,
+                        "Chest",
+                        "Shoulders, Triceps",
+                        30,
+                        imageName = "exercise_incline_dumbbell_bench_press",
+                    ),
+                    Exercise(
                         "push-up",
                         "Push-up",
                         ExerciseType.REPETITIONS,
@@ -99,6 +109,16 @@ object ExerciseCatalog {
                         "Chest, Shoulders, Abdominals",
                         30,
                         imageName = "exercise_close_grip_push_up",
+                    ),
+                    Exercise(
+                        "cable-tricep-extension",
+                        "Cable Tricep Extension",
+                        ExerciseType.REPETITIONS,
+                        false,
+                        "Triceps",
+                        "—",
+                        30,
+                        imageName = "exercise_cable_tricep_extension",
                     ),
                     Exercise(
                         "wide-grip-push-up",

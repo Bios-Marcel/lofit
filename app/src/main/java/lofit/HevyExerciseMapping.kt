@@ -13,6 +13,8 @@ internal object HevyExerciseMapping {
         mapOf(
             "back-squat" to "Squat (Barbell)",
             "bench-press" to "Bench Press (Barbell)",
+            "incline-dumbbell-bench-press" to "Incline Bench Press (Dumbbell)",
+            "cable-tricep-extension" to "Triceps Extension (Cable)",
             "deadlift" to "Deadlift (Barbell)",
             "overhead-press" to "Shoulder Press (Barbell)",
             "dumbbell-curl" to "Bicep Curl (Dumbbell)",

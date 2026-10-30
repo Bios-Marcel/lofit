@@ -11,3 +11,5 @@ Generated with built-in `image_gen`. Each male image uses `style-seed.png` as th
 | Cossack squat | Wide stance, right knee deeply bent, left leg straight to the side with toes raised; hands together for balance; no equipment. |
 | Weighted Cossack squat | Same Cossack squat, holding one small dumbbell vertically at chest. |
 | Jefferson curl | Standing on a low step, knees straight, spine rounded forward, holding a light short barbell close to shins. |
+| Incline Dumbbell Bench Press | Reclining on a 35-degree adjustable incline bench, feet flat, pressing two separate dumbbells above upper chest with arms nearly extended; three-quarter side view. |
+| Cable Tricep Extension | Standing at a high-pulley cable station, upper arms fixed close to sides, pressing a short straight bar toward upper thighs; three-quarter front view. |
