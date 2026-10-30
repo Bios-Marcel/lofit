@@ -21,12 +21,16 @@ import android.graphics.drawable.InsetDrawable
 import android.graphics.drawable.LayerDrawable
 import android.health.connect.HealthPermissions
 import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.media.SoundPool
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.os.VibrationEffect
+import android.os.VibratorManager
 import android.text.InputType
 import android.view.Gravity
 import android.view.MotionEvent
@@ -241,6 +245,11 @@ class MainActivity : AppCompatActivity() {
     private var holdStartedAt = 0L
     private var holdCuePlayed = false
     private lateinit var cueSounds: SoundPool
+    private lateinit var cueAudioManager: AudioManager
+    private lateinit var cueAudioFocusRequest: AudioFocusRequest
+    private val releaseCueAudioFocus = Runnable {
+        cueAudioManager.abandonAudioFocusRequest(cueAudioFocusRequest)
+    }
     private var completionCueId = 0
     private var updatingHoldTimer = false
     private var completingHoldAutomatically = false
@@ -314,16 +323,18 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         hevySettings
         repository = LofitRepository(this)
-        cueSounds =
-            SoundPool.Builder()
-                .setMaxStreams(1)
-                .setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build()
-                )
+        val cueAudioAttributes =
+            AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .build()
+        cueAudioManager = getSystemService(AudioManager::class.java)
+        cueAudioFocusRequest =
+            AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+                .setAudioAttributes(cueAudioAttributes)
+                .build()
+        cueSounds =
+            SoundPool.Builder().setMaxStreams(1).setAudioAttributes(cueAudioAttributes).build()
         completionCueId = cueSounds.load(this, R.raw.completion_chime, 1)
         if (
             repository.data.activeWorkout != null &&
@@ -432,6 +443,8 @@ class MainActivity : AppCompatActivity() {
         workoutTogetherDialog?.dismiss()
         workoutBluetooth.stop()
         handler.removeCallbacks(tick)
+        handler.removeCallbacks(releaseCueAudioFocus)
+        cueAudioManager.abandonAudioFocusRequest(cueAudioFocusRequest)
         cueSounds.release()
         unregisterReceiver(notificationActionReceiver)
         super.onDestroy()
@@ -674,9 +687,7 @@ class MainActivity : AppCompatActivity() {
                                     orientation = LinearLayout.VERTICAL
                                     addView(titleText("Sound cues"))
                                     addView(
-                                        metaText(
-                                            "Play rest and hold cues, even in silent or vibration mode."
-                                        )
+                                        metaText("Play rest and hold sounds. Cues always vibrate.")
                                     )
                                 },
                                 LinearLayout.LayoutParams(
@@ -4025,8 +4036,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun playCue() {
+        getSystemService(VibratorManager::class.java)
+            ?.defaultVibrator
+            ?.takeIf { it.hasVibrator() }
+            ?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 180, 100, 180), -1))
         if (!repository.data.soundCuesEnabled) return
-        cueSounds.play(completionCueId, 0.85f, 0.85f, 1, 0, 1f)
+        handler.removeCallbacks(releaseCueAudioFocus)
+        cueAudioManager.requestAudioFocus(cueAudioFocusRequest)
+        cueSounds.play(completionCueId, 1f, 1f, 1, 0, 1f)
+        handler.postDelayed(releaseCueAudioFocus, 1_200L)
     }
 
     private fun createWorkoutNotificationChannel() {
