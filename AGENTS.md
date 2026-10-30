@@ -22,6 +22,7 @@
 - Set `ANDROID_SERIAL` when more than one device is connected.
 - Start emulator: [`scripts/start-emulator.sh`](scripts/start-emulator.sh). It selects the sole AVD, or takes an AVD name as its argument. It stays running after the script exits and waits until Android boots.
 - Local deploy: [`scripts/deploy.sh`](scripts/deploy.sh). When targeting emulator, it starts one if needed and waits for boot.
+- Phone debug deploy: [`scripts/deploy-phone.sh`](scripts/deploy-phone.sh). It uses serial `RFCTC0T2CYP` (SM-S911B). Run it directly; do not look up the device first. If it fails, ask me to replug the phone and stop.
 - Restart: [`scripts/restart.sh`](scripts/restart.sh)
 - Stop: [`scripts/stop.sh`](scripts/stop.sh)
 - If `adb` cannot open its local socket in the sandbox, run emulator and ADB commands outside the sandbox. A background `emulator ... &` can stop when its shell exits; use the start script.
@@ -32,6 +33,7 @@ Run:
 ```sh
 ./scripts/start-emulator.sh
 ./scripts/deploy.sh
+./scripts/deploy-phone.sh
 ./scripts/restart.sh
 ./scripts/stop.sh
 ```
