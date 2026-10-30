@@ -12,6 +12,8 @@ import androidx.core.view.accessibility.AccessibilityNodeInfoCompat.Accessibilit
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
+private const val DRAG_HOLD_MILLIS = 250L
+
 /** Keeps the existing cards and their editors alive while changing exercise order. */
 internal class ExerciseReorderController(
     private val cards: LinearLayout,
@@ -91,9 +93,19 @@ internal class ExerciseReorderController(
         private var startScrollY = 0
         private var scroll: ScrollView? = null
         private var dragging = false
+        private var autoScrollStarted = false
         private var tracking = false
         private var target = -1
         private var elevation = 0f
+
+        private val startDrag = Runnable {
+            if (!tracking || !handle.isAttachedToWindow) return@Runnable
+            dragging = true
+            card.elevation = elevation + 8 * density
+            card.alpha = 0.9f
+            cards.parent.requestDisallowInterceptTouchEvent(true)
+            updatePreview()
+        }
 
         private val autoScroll =
             object : Runnable {
@@ -113,7 +125,10 @@ internal class ExerciseReorderController(
                                     ((pointerY - bottom + edge) / edge).coerceIn(0f, 1f)
                                 else -> 0f
                             }
-                        viewport.scrollBy(0, (speed * 16 * density).roundToInt())
+                        viewport.scrollBy(
+                            0,
+                            (speed * (16f + 12f * abs(speed)) * density).roundToInt(),
+                        )
                     }
                     updatePreview()
                     handle.postOnAnimation(this)
@@ -135,18 +150,21 @@ internal class ExerciseReorderController(
                     target = cards.indexOfChild(card)
                     elevation = card.elevation
                     handle.isPressed = true
-                    cards.parent.requestDisallowInterceptTouchEvent(true)
+                    handle.postDelayed(startDrag, DRAG_HOLD_MILLIS)
                 }
                 MotionEvent.ACTION_MOVE -> {
                     if (!tracking) return true
                     pointerY = event.rawY
                     if (!dragging && abs(pointerY - startY) > touchSlop) {
-                        dragging = true
-                        card.elevation = elevation + 8 * density
-                        card.alpha = 0.9f
-                        handle.postOnAnimation(autoScroll)
+                        finish(commit = false)
                     }
-                    if (dragging) updatePreview()
+                    if (dragging) {
+                        updatePreview()
+                        if (!autoScrollStarted) {
+                            autoScrollStarted = true
+                            handle.postOnAnimation(autoScroll)
+                        }
+                    }
                 }
                 MotionEvent.ACTION_UP -> finish(commit = true)
                 MotionEvent.ACTION_CANCEL,
@@ -189,6 +207,8 @@ internal class ExerciseReorderController(
             tracking = false
             val shouldMove = dragging && commit
             dragging = false
+            autoScrollStarted = false
+            handle.removeCallbacks(startDrag)
             handle.removeCallbacks(autoScroll)
             handle.isPressed = false
             card.elevation = elevation

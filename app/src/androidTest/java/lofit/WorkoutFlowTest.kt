@@ -1652,6 +1652,14 @@ class WorkoutFlowTest {
         onView(isAssignableFrom(ScrollView::class.java)).check { view, _ -> page[0] = view }
         onView(withText("Plank")).check { view, _ -> survivingHeading[0] = view }
         onView(withContentDescription("Reorder Plank"))
+            .perform(scrollTo(), dragExercise(-1, holdMillis = 0))
+        assertEquals(
+            listOf("bench-press", "plank", "back-squat"),
+            LofitRepository(instrumentation.targetContext).data.activeWorkout!!.exercises.map {
+                it.exerciseId
+            },
+        )
+        onView(withContentDescription("Reorder Plank"))
             .perform(scrollTo(), dragExercise(-1, cancel = true))
         assertEquals(
             listOf("bench-press", "plank", "back-squat"),
@@ -3011,7 +3019,7 @@ class WorkoutFlowTest {
         }
     }
 
-    private fun dragExercise(direction: Int, cancel: Boolean = false) =
+    private fun dragExercise(direction: Int, cancel: Boolean = false, holdMillis: Long = 300L) =
         object : ViewAction {
             override fun getDescription() =
                 "drag exercise one place ${if (direction < 0) "up" else "down"}"
@@ -3053,6 +3061,7 @@ class WorkoutFlowTest {
                     }
                 }
                 send(MotionEvent.ACTION_DOWN, startY)
+                if (holdMillis > 0) uiController.loopMainThreadForAtLeast(holdMillis)
                 for (step in 1..20) {
                     send(MotionEvent.ACTION_MOVE, startY + (endY - startY) * step / 20)
                     uiController.loopMainThreadForAtLeast(16)
