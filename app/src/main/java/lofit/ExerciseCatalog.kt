@@ -546,7 +546,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_144",
                     ),
                     Exercise(
-                        "fedb-isometric-chest-squeezes",
+                        "isometric-chest-squeezes",
                         "Isometric Chest Squeezes",
                         ExerciseType.TIMED,
                         false,
@@ -556,7 +556,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_001",
                     ),
                     Exercise(
-                        "fedb-isometric-neck-exercise-front-and-back",
+                        "isometric-neck-exercise-front-and-back",
                         "Isometric Neck Exercise - Front And Back",
                         ExerciseType.TIMED,
                         false,
@@ -566,7 +566,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_002",
                     ),
                     Exercise(
-                        "fedb-isometric-neck-exercise-sides",
+                        "isometric-neck-exercise-sides",
                         "Isometric Neck Exercise - Sides",
                         ExerciseType.TIMED,
                         false,
@@ -576,7 +576,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_003",
                     ),
                     Exercise(
-                        "fedb-isometric-wipers",
+                        "isometric-wipers",
                         "Isometric Wipers",
                         ExerciseType.TIMED,
                         false,
@@ -586,7 +586,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_004",
                     ),
                     Exercise(
-                        "fedb-push-up-to-side-plank",
+                        "push-up-to-side-plank",
                         "Push Up to Side Plank",
                         ExerciseType.TIMED,
                         false,
@@ -596,7 +596,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_005",
                     ),
                     Exercise(
-                        "fedb-side-bridge",
+                        "side-bridge",
                         "Side Bridge",
                         ExerciseType.TIMED,
                         false,
@@ -606,7 +606,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_006",
                     ),
                     Exercise(
-                        "fedb-alternate-hammer-curl",
+                        "alternate-hammer-curl",
                         "Alternate Hammer Curl",
                         ExerciseType.REPETITIONS,
                         true,
@@ -616,7 +616,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_007",
                     ),
                     Exercise(
-                        "fedb-alternate-heel-touchers",
+                        "alternate-heel-touchers",
                         "Alternate Heel Touchers",
                         ExerciseType.REPETITIONS,
                         true,
@@ -626,7 +626,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_008",
                     ),
                     Exercise(
-                        "fedb-alternate-incline-dumbbell-curl",
+                        "alternate-incline-dumbbell-curl",
                         "Alternate Incline Dumbbell Curl",
                         ExerciseType.REPETITIONS,
                         true,
@@ -636,7 +636,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_009",
                     ),
                     Exercise(
-                        "fedb-alternate-leg-diagonal-bound",
+                        "alternate-leg-diagonal-bound",
                         "Alternate Leg Diagonal Bound",
                         ExerciseType.REPETITIONS,
                         true,
@@ -646,7 +646,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_010",
                     ),
                     Exercise(
-                        "fedb-alternating-cable-shoulder-press",
+                        "alternating-cable-shoulder-press",
                         "Alternating Cable Shoulder Press",
                         ExerciseType.REPETITIONS,
                         true,
@@ -656,7 +656,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_011",
                     ),
                     Exercise(
-                        "fedb-alternating-deltoid-raise",
+                        "alternating-deltoid-raise",
                         "Alternating Deltoid Raise",
                         ExerciseType.REPETITIONS,
                         true,
@@ -666,7 +666,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_012",
                     ),
                     Exercise(
-                        "fedb-alternating-floor-press",
+                        "alternating-floor-press",
                         "Alternating Floor Press",
                         ExerciseType.REPETITIONS,
                         true,
@@ -676,7 +676,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_013",
                     ),
                     Exercise(
-                        "fedb-alternating-hang-clean",
+                        "alternating-hang-clean",
                         "Alternating Hang Clean",
                         ExerciseType.REPETITIONS,
                         true,
@@ -686,7 +686,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_014",
                     ),
                     Exercise(
-                        "fedb-alternating-kettlebell-press",
+                        "alternating-kettlebell-press",
                         "Alternating Kettlebell Press",
                         ExerciseType.REPETITIONS,
                         true,
@@ -696,7 +696,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_015",
                     ),
                     Exercise(
-                        "fedb-alternating-kettlebell-row",
+                        "alternating-kettlebell-row",
                         "Alternating Kettlebell Row",
                         ExerciseType.REPETITIONS,
                         true,
@@ -706,7 +706,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_016",
                     ),
                     Exercise(
-                        "fedb-alternating-renegade-row",
+                        "alternating-renegade-row",
                         "Alternating Renegade Row",
                         ExerciseType.REPETITIONS,
                         true,
@@ -716,7 +716,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_017",
                     ),
                     Exercise(
-                        "fedb-barbell-lunge",
+                        "barbell-lunge",
                         "Barbell Lunge",
                         ExerciseType.REPETITIONS,
                         true,
@@ -726,7 +726,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_018",
                     ),
                     Exercise(
-                        "fedb-barbell-side-split-squat",
+                        "barbell-side-split-squat",
                         "Barbell Side Split Squat",
                         ExerciseType.REPETITIONS,
                         true,
@@ -736,7 +736,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_019",
                     ),
                     Exercise(
-                        "fedb-barbell-step-ups",
+                        "barbell-step-ups",
                         "Barbell Step Ups",
                         ExerciseType.REPETITIONS,
                         true,
@@ -746,7 +746,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_020",
                     ),
                     Exercise(
-                        "fedb-barbell-walking-lunge",
+                        "barbell-walking-lunge",
                         "Barbell Walking Lunge",
                         ExerciseType.REPETITIONS,
                         true,
@@ -756,7 +756,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_021",
                     ),
                     Exercise(
-                        "fedb-bent-over-one-arm-long-bar-row",
+                        "bent-over-one-arm-long-bar-row",
                         "Bent Over One-Arm Long Bar Row",
                         ExerciseType.REPETITIONS,
                         true,
@@ -766,7 +766,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_022",
                     ),
                     Exercise(
-                        "fedb-bodyweight-walking-lunge",
+                        "bodyweight-walking-lunge",
                         "Bodyweight Walking Lunge",
                         ExerciseType.REPETITIONS,
                         true,
@@ -776,7 +776,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_023",
                     ),
                     Exercise(
-                        "fedb-cable-one-arm-tricep-extension",
+                        "cable-one-arm-tricep-extension",
                         "Cable One Arm Tricep Extension",
                         ExerciseType.REPETITIONS,
                         true,
@@ -786,7 +786,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_024",
                     ),
                     Exercise(
-                        "fedb-crossover-reverse-lunge",
+                        "crossover-reverse-lunge",
                         "Crossover Reverse Lunge",
                         ExerciseType.TIMED,
                         true,
@@ -796,7 +796,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_025",
                     ),
                     Exercise(
-                        "fedb-double-kettlebell-alternating-hang-clean",
+                        "double-kettlebell-alternating-hang-clean",
                         "Double Kettlebell Alternating Hang Clean",
                         ExerciseType.REPETITIONS,
                         true,
@@ -806,7 +806,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_026",
                     ),
                     Exercise(
-                        "fedb-dumbbell-alternate-bicep-curl",
+                        "dumbbell-alternate-bicep-curl",
                         "Dumbbell Alternate Bicep Curl",
                         ExerciseType.REPETITIONS,
                         true,
@@ -816,7 +816,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_027",
                     ),
                     Exercise(
-                        "fedb-dumbbell-lunges",
+                        "dumbbell-lunges",
                         "Dumbbell Lunges",
                         ExerciseType.REPETITIONS,
                         true,
@@ -826,7 +826,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_028",
                     ),
                     Exercise(
-                        "fedb-dumbbell-lying-one-arm-rear-lateral-raise",
+                        "dumbbell-lying-one-arm-rear-lateral-raise",
                         "Dumbbell Lying One-Arm Rear Lateral Raise",
                         ExerciseType.REPETITIONS,
                         true,
@@ -836,7 +836,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_029",
                     ),
                     Exercise(
-                        "fedb-dumbbell-one-arm-shoulder-press",
+                        "dumbbell-one-arm-shoulder-press",
                         "Dumbbell One-Arm Shoulder Press",
                         ExerciseType.REPETITIONS,
                         true,
@@ -846,7 +846,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_030",
                     ),
                     Exercise(
-                        "fedb-dumbbell-one-arm-triceps-extension",
+                        "dumbbell-one-arm-triceps-extension",
                         "Dumbbell One-Arm Triceps Extension",
                         ExerciseType.REPETITIONS,
                         true,
@@ -856,7 +856,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_031",
                     ),
                     Exercise(
-                        "fedb-dumbbell-one-arm-upright-row",
+                        "dumbbell-one-arm-upright-row",
                         "Dumbbell One-Arm Upright Row",
                         ExerciseType.REPETITIONS,
                         true,
@@ -866,7 +866,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_032",
                     ),
                     Exercise(
-                        "fedb-dumbbell-rear-lunge",
+                        "dumbbell-rear-lunge",
                         "Dumbbell Rear Lunge",
                         ExerciseType.REPETITIONS,
                         true,
@@ -876,7 +876,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_033",
                     ),
                     Exercise(
-                        "fedb-dumbbell-seated-one-leg-calf-raise",
+                        "dumbbell-seated-one-leg-calf-raise",
                         "Dumbbell Seated One-Leg Calf Raise",
                         ExerciseType.REPETITIONS,
                         true,
@@ -886,7 +886,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_034",
                     ),
                     Exercise(
-                        "fedb-dumbbell-step-ups",
+                        "dumbbell-step-ups",
                         "Dumbbell Step Ups",
                         ExerciseType.REPETITIONS,
                         true,
@@ -896,7 +896,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_035",
                     ),
                     Exercise(
-                        "fedb-elevated-back-lunge",
+                        "elevated-back-lunge",
                         "Elevated Back Lunge",
                         ExerciseType.REPETITIONS,
                         true,
@@ -906,7 +906,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_036",
                     ),
                     Exercise(
-                        "fedb-extended-range-one-arm-kettlebell-floor-press",
+                        "extended-range-one-arm-kettlebell-floor-press",
                         "Extended Range One-Arm Kettlebell Floor Press",
                         ExerciseType.REPETITIONS,
                         true,
@@ -916,7 +916,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_037",
                     ),
                     Exercise(
-                        "fedb-kettlebell-one-legged-deadlift",
+                        "kettlebell-one-legged-deadlift",
                         "Kettlebell One-Legged Deadlift",
                         ExerciseType.REPETITIONS,
                         true,
@@ -926,7 +926,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_038",
                     ),
                     Exercise(
-                        "fedb-kettlebell-turkish-get-up-lunge-style",
+                        "kettlebell-turkish-get-up-lunge-style",
                         "Kettlebell Turkish Get-Up (Lunge style)",
                         ExerciseType.REPETITIONS,
                         true,
@@ -936,7 +936,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_039",
                     ),
                     Exercise(
-                        "fedb-kneeling-cable-crunch-with-alternating-oblique-twists",
+                        "kneeling-cable-crunch-with-alternating-oblique-twists",
                         "Kneeling Cable Crunch With Alternating Oblique Twists",
                         ExerciseType.REPETITIONS,
                         true,
@@ -946,7 +946,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_040",
                     ),
                     Exercise(
-                        "fedb-kneeling-single-arm-high-pulley-row",
+                        "kneeling-single-arm-high-pulley-row",
                         "Kneeling Single-Arm High Pulley Row",
                         ExerciseType.REPETITIONS,
                         true,
@@ -956,7 +956,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_041",
                     ),
                     Exercise(
-                        "fedb-lunge-pass-through",
+                        "lunge-pass-through",
                         "Lunge Pass Through",
                         ExerciseType.REPETITIONS,
                         true,
@@ -966,7 +966,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_042",
                     ),
                     Exercise(
-                        "fedb-lunge-sprint",
+                        "lunge-sprint",
                         "Lunge Sprint",
                         ExerciseType.REPETITIONS,
                         true,
@@ -976,7 +976,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_043",
                     ),
                     Exercise(
-                        "fedb-lying-one-arm-lateral-raise",
+                        "lying-one-arm-lateral-raise",
                         "Lying One-Arm Lateral Raise",
                         ExerciseType.REPETITIONS,
                         true,
@@ -986,7 +986,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_044",
                     ),
                     Exercise(
-                        "fedb-one-arm-dumbbell-row",
+                        "one-arm-dumbbell-row",
                         "One-Arm Dumbbell Row",
                         ExerciseType.REPETITIONS,
                         true,
@@ -996,7 +996,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_045",
                     ),
                     Exercise(
-                        "fedb-one-arm-flat-bench-dumbbell-flye",
+                        "one-arm-flat-bench-dumbbell-flye",
                         "One-Arm Flat Bench Dumbbell Flye",
                         ExerciseType.REPETITIONS,
                         true,
@@ -1006,7 +1006,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_046",
                     ),
                     Exercise(
-                        "fedb-one-arm-high-pulley-cable-side-bends",
+                        "one-arm-high-pulley-cable-side-bends",
                         "One-Arm High-Pulley Cable Side Bends",
                         ExerciseType.REPETITIONS,
                         true,
@@ -1016,7 +1016,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_047",
                     ),
                     Exercise(
-                        "fedb-one-arm-incline-lateral-raise",
+                        "one-arm-incline-lateral-raise",
                         "One-Arm Incline Lateral Raise",
                         ExerciseType.REPETITIONS,
                         true,
@@ -1026,7 +1026,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_048",
                     ),
                     Exercise(
-                        "fedb-one-arm-kettlebell-clean",
+                        "one-arm-kettlebell-clean",
                         "One-Arm Kettlebell Clean",
                         ExerciseType.REPETITIONS,
                         true,
@@ -1036,7 +1036,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_049",
                     ),
                     Exercise(
-                        "fedb-one-arm-kettlebell-clean-and-jerk",
+                        "one-arm-kettlebell-clean-and-jerk",
                         "One-Arm Kettlebell Clean and Jerk",
                         ExerciseType.REPETITIONS,
                         true,
@@ -1046,7 +1046,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_050",
                     ),
                     Exercise(
-                        "fedb-one-arm-kettlebell-floor-press",
+                        "one-arm-kettlebell-floor-press",
                         "One-Arm Kettlebell Floor Press",
                         ExerciseType.REPETITIONS,
                         true,
@@ -1056,7 +1056,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_051",
                     ),
                     Exercise(
-                        "fedb-one-arm-kettlebell-jerk",
+                        "one-arm-kettlebell-jerk",
                         "One-Arm Kettlebell Jerk",
                         ExerciseType.REPETITIONS,
                         true,
@@ -1066,7 +1066,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_052",
                     ),
                     Exercise(
-                        "fedb-one-arm-kettlebell-military-press-to-the-side",
+                        "one-arm-kettlebell-military-press-to-the-side",
                         "One-Arm Kettlebell Military Press To The Side",
                         ExerciseType.REPETITIONS,
                         true,
@@ -1076,7 +1076,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_053",
                     ),
                     Exercise(
-                        "fedb-one-arm-kettlebell-para-press",
+                        "one-arm-kettlebell-para-press",
                         "One-Arm Kettlebell Para Press",
                         ExerciseType.REPETITIONS,
                         true,
@@ -1086,7 +1086,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_054",
                     ),
                     Exercise(
-                        "fedb-one-arm-kettlebell-push-press",
+                        "one-arm-kettlebell-push-press",
                         "One-Arm Kettlebell Push Press",
                         ExerciseType.REPETITIONS,
                         true,
@@ -1096,7 +1096,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_055",
                     ),
                     Exercise(
-                        "fedb-one-arm-kettlebell-row",
+                        "one-arm-kettlebell-row",
                         "One-Arm Kettlebell Row",
                         ExerciseType.REPETITIONS,
                         true,
@@ -1106,7 +1106,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_056",
                     ),
                     Exercise(
-                        "fedb-one-arm-kettlebell-snatch",
+                        "one-arm-kettlebell-snatch",
                         "One-Arm Kettlebell Snatch",
                         ExerciseType.REPETITIONS,
                         true,
@@ -1116,7 +1116,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_057",
                     ),
                     Exercise(
-                        "fedb-one-arm-kettlebell-split-jerk",
+                        "one-arm-kettlebell-split-jerk",
                         "One-Arm Kettlebell Split Jerk",
                         ExerciseType.REPETITIONS,
                         true,
@@ -1126,7 +1126,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_058",
                     ),
                     Exercise(
-                        "fedb-one-arm-kettlebell-split-snatch",
+                        "one-arm-kettlebell-split-snatch",
                         "One-Arm Kettlebell Split Snatch",
                         ExerciseType.REPETITIONS,
                         true,
@@ -1136,7 +1136,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_059",
                     ),
                     Exercise(
-                        "fedb-one-arm-kettlebell-swings",
+                        "one-arm-kettlebell-swings",
                         "One-Arm Kettlebell Swings",
                         ExerciseType.REPETITIONS,
                         true,
@@ -1146,7 +1146,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_060",
                     ),
                     Exercise(
-                        "fedb-one-arm-long-bar-row",
+                        "one-arm-long-bar-row",
                         "One-Arm Long Bar Row",
                         ExerciseType.REPETITIONS,
                         true,
@@ -1156,7 +1156,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_061",
                     ),
                     Exercise(
-                        "fedb-90-90-hamstring",
+                        "90-90-hamstring",
                         "90/90 Hamstring",
                         ExerciseType.TIMED,
                         false,
@@ -1166,7 +1166,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_062",
                     ),
                     Exercise(
-                        "fedb-adductor",
+                        "adductor",
                         "Adductor",
                         ExerciseType.TIMED,
                         false,
@@ -1176,7 +1176,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_063",
                     ),
                     Exercise(
-                        "fedb-adductor-groin",
+                        "adductor-groin",
                         "Adductor/Groin",
                         ExerciseType.TIMED,
                         false,
@@ -1186,7 +1186,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_064",
                     ),
                     Exercise(
-                        "fedb-all-fours-quad-stretch",
+                        "all-fours-quad-stretch",
                         "All Fours Quad Stretch",
                         ExerciseType.TIMED,
                         false,
@@ -1196,7 +1196,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_065",
                     ),
                     Exercise(
-                        "fedb-ankle-circles",
+                        "ankle-circles",
                         "Ankle Circles",
                         ExerciseType.TIMED,
                         false,
@@ -1206,7 +1206,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_066",
                     ),
                     Exercise(
-                        "fedb-ankle-on-the-knee",
+                        "ankle-on-the-knee",
                         "Ankle On The Knee",
                         ExerciseType.TIMED,
                         false,
@@ -1216,7 +1216,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_067",
                     ),
                     Exercise(
-                        "fedb-anterior-tibialis-smr",
+                        "anterior-tibialis-smr",
                         "Anterior Tibialis-SMR",
                         ExerciseType.TIMED,
                         false,
@@ -1226,7 +1226,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_068",
                     ),
                     Exercise(
-                        "fedb-arm-circles",
+                        "arm-circles",
                         "Arm Circles",
                         ExerciseType.TIMED,
                         false,
@@ -1236,7 +1236,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_069",
                     ),
                     Exercise(
-                        "fedb-behind-head-chest-stretch",
+                        "behind-head-chest-stretch",
                         "Behind Head Chest Stretch",
                         ExerciseType.TIMED,
                         false,
@@ -1246,7 +1246,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_070",
                     ),
                     Exercise(
-                        "fedb-brachialis-smr",
+                        "brachialis-smr",
                         "Brachialis-SMR",
                         ExerciseType.TIMED,
                         false,
@@ -1256,7 +1256,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_071",
                     ),
                     Exercise(
-                        "fedb-calf-stretch-elbows-against-wall",
+                        "calf-stretch-elbows-against-wall",
                         "Calf Stretch Elbows Against Wall",
                         ExerciseType.TIMED,
                         false,
@@ -1266,7 +1266,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_072",
                     ),
                     Exercise(
-                        "fedb-calf-stretch-hands-against-wall",
+                        "calf-stretch-hands-against-wall",
                         "Calf Stretch Hands Against Wall",
                         ExerciseType.TIMED,
                         false,
@@ -1276,7 +1276,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_073",
                     ),
                     Exercise(
-                        "fedb-calves-smr",
+                        "calves-smr",
                         "Calves-SMR",
                         ExerciseType.TIMED,
                         false,
@@ -1286,7 +1286,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_074",
                     ),
                     Exercise(
-                        "fedb-cat-stretch",
+                        "cat-stretch",
                         "Cat Stretch",
                         ExerciseType.TIMED,
                         false,
@@ -1296,7 +1296,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_075",
                     ),
                     Exercise(
-                        "fedb-chair-leg-extended-stretch",
+                        "chair-leg-extended-stretch",
                         "Chair Leg Extended Stretch",
                         ExerciseType.TIMED,
                         false,
@@ -1306,7 +1306,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_076",
                     ),
                     Exercise(
-                        "fedb-chair-lower-back-stretch",
+                        "chair-lower-back-stretch",
                         "Chair Lower Back Stretch",
                         ExerciseType.TIMED,
                         false,
@@ -1316,7 +1316,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_077",
                     ),
                     Exercise(
-                        "fedb-chair-upper-body-stretch",
+                        "chair-upper-body-stretch",
                         "Chair Upper Body Stretch",
                         ExerciseType.TIMED,
                         false,
@@ -1326,7 +1326,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_078",
                     ),
                     Exercise(
-                        "fedb-chest-and-front-of-shoulder-stretch",
+                        "chest-and-front-of-shoulder-stretch",
                         "Chest And Front Of Shoulder Stretch",
                         ExerciseType.TIMED,
                         false,
@@ -1336,7 +1336,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_079",
                     ),
                     Exercise(
-                        "fedb-chest-stretch-on-stability-ball",
+                        "chest-stretch-on-stability-ball",
                         "Chest Stretch on Stability Ball",
                         ExerciseType.TIMED,
                         false,
@@ -1346,7 +1346,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_080",
                     ),
                     Exercise(
-                        "fedb-childs-pose",
+                        "childs-pose",
                         "Child's Pose",
                         ExerciseType.TIMED,
                         false,
@@ -1356,7 +1356,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_081",
                     ),
                     Exercise(
-                        "fedb-chin-to-chest-stretch",
+                        "chin-to-chest-stretch",
                         "Chin To Chest Stretch",
                         ExerciseType.TIMED,
                         false,
@@ -1366,7 +1366,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_082",
                     ),
                     Exercise(
-                        "fedb-dancers-stretch",
+                        "dancers-stretch",
                         "Dancer's Stretch",
                         ExerciseType.TIMED,
                         false,
@@ -1376,7 +1376,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_083",
                     ),
                     Exercise(
-                        "fedb-dynamic-back-stretch",
+                        "dynamic-back-stretch",
                         "Dynamic Back Stretch",
                         ExerciseType.TIMED,
                         false,
@@ -1386,7 +1386,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_084",
                     ),
                     Exercise(
-                        "fedb-dynamic-chest-stretch",
+                        "dynamic-chest-stretch",
                         "Dynamic Chest Stretch",
                         ExerciseType.TIMED,
                         false,
@@ -1396,7 +1396,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_085",
                     ),
                     Exercise(
-                        "fedb-elbow-circles",
+                        "elbow-circles",
                         "Elbow Circles",
                         ExerciseType.TIMED,
                         false,
@@ -1406,7 +1406,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_086",
                     ),
                     Exercise(
-                        "fedb-elbows-back",
+                        "elbows-back",
                         "Elbows Back",
                         ExerciseType.TIMED,
                         false,
@@ -1416,7 +1416,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_087",
                     ),
                     Exercise(
-                        "fedb-foot-smr",
+                        "foot-smr",
                         "Foot-SMR",
                         ExerciseType.TIMED,
                         false,
@@ -1426,7 +1426,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_088",
                     ),
                     Exercise(
-                        "fedb-frog-hops",
+                        "frog-hops",
                         "Frog Hops",
                         ExerciseType.TIMED,
                         false,
@@ -1436,7 +1436,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_089",
                     ),
                     Exercise(
-                        "fedb-front-leg-raises",
+                        "front-leg-raises",
                         "Front Leg Raises",
                         ExerciseType.TIMED,
                         false,
@@ -1446,7 +1446,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_090",
                     ),
                     Exercise(
-                        "fedb-groin-and-back-stretch",
+                        "groin-and-back-stretch",
                         "Groin and Back Stretch",
                         ExerciseType.TIMED,
                         false,
@@ -1456,7 +1456,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_091",
                     ),
                     Exercise(
-                        "fedb-groiners",
+                        "groiners",
                         "Groiners",
                         ExerciseType.TIMED,
                         false,
@@ -1466,7 +1466,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_092",
                     ),
                     Exercise(
-                        "fedb-hamstring-smr",
+                        "hamstring-smr",
                         "Hamstring-SMR",
                         ExerciseType.TIMED,
                         false,
@@ -1476,7 +1476,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_093",
                     ),
                     Exercise(
-                        "fedb-hamstring-stretch",
+                        "hamstring-stretch",
                         "Hamstring Stretch",
                         ExerciseType.TIMED,
                         false,
@@ -1486,7 +1486,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_094",
                     ),
                     Exercise(
-                        "fedb-hip-circles-prone",
+                        "hip-circles-prone",
                         "Hip Circles (prone)",
                         ExerciseType.TIMED,
                         false,
@@ -1496,7 +1496,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_095",
                     ),
                     Exercise(
-                        "fedb-hug-a-ball",
+                        "hug-a-ball",
                         "Hug A Ball",
                         ExerciseType.TIMED,
                         false,
@@ -1506,7 +1506,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_096",
                     ),
                     Exercise(
-                        "fedb-hug-knees-to-chest",
+                        "hug-knees-to-chest",
                         "Hug Knees To Chest",
                         ExerciseType.TIMED,
                         false,
@@ -1516,7 +1516,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_097",
                     ),
                     Exercise(
-                        "fedb-it-band-and-glute-stretch",
+                        "it-band-and-glute-stretch",
                         "IT Band and Glute Stretch",
                         ExerciseType.TIMED,
                         false,
@@ -1526,7 +1526,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_098",
                     ),
                     Exercise(
-                        "fedb-iliotibial-tract-smr",
+                        "iliotibial-tract-smr",
                         "Iliotibial Tract-SMR",
                         ExerciseType.TIMED,
                         false,
@@ -1536,7 +1536,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_099",
                     ),
                     Exercise(
-                        "fedb-inchworm",
+                        "inchworm",
                         "Inchworm",
                         ExerciseType.TIMED,
                         false,
@@ -1546,7 +1546,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_100",
                     ),
                     Exercise(
-                        "fedb-intermediate-groin-stretch",
+                        "intermediate-groin-stretch",
                         "Intermediate Groin Stretch",
                         ExerciseType.TIMED,
                         false,
@@ -1556,7 +1556,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_101",
                     ),
                     Exercise(
-                        "fedb-intermediate-hip-flexor-and-quad-stretch",
+                        "intermediate-hip-flexor-and-quad-stretch",
                         "Intermediate Hip Flexor and Quad Stretch",
                         ExerciseType.TIMED,
                         false,
@@ -1566,7 +1566,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_102",
                     ),
                     Exercise(
-                        "fedb-iron-crosses-stretch",
+                        "iron-crosses-stretch",
                         "Iron Crosses (stretch)",
                         ExerciseType.TIMED,
                         false,
@@ -1576,7 +1576,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_103",
                     ),
                     Exercise(
-                        "fedb-knee-across-the-body",
+                        "knee-across-the-body",
                         "Knee Across The Body",
                         ExerciseType.TIMED,
                         false,
@@ -1586,7 +1586,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_104",
                     ),
                     Exercise(
-                        "fedb-knee-circles",
+                        "knee-circles",
                         "Knee Circles",
                         ExerciseType.TIMED,
                         false,
@@ -1596,7 +1596,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_105",
                     ),
                     Exercise(
-                        "fedb-kneeling-forearm-stretch",
+                        "kneeling-forearm-stretch",
                         "Kneeling Forearm Stretch",
                         ExerciseType.TIMED,
                         false,
@@ -1606,7 +1606,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_106",
                     ),
                     Exercise(
-                        "fedb-kneeling-hip-flexor",
+                        "kneeling-hip-flexor",
                         "Kneeling Hip Flexor",
                         ExerciseType.TIMED,
                         false,
@@ -1616,7 +1616,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_107",
                     ),
                     Exercise(
-                        "fedb-latissimus-dorsi-smr",
+                        "latissimus-dorsi-smr",
                         "Latissimus Dorsi-SMR",
                         ExerciseType.TIMED,
                         false,
@@ -1626,7 +1626,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_108",
                     ),
                     Exercise(
-                        "fedb-leg-up-hamstring-stretch",
+                        "leg-up-hamstring-stretch",
                         "Leg-Up Hamstring Stretch",
                         ExerciseType.TIMED,
                         false,
@@ -1636,7 +1636,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_109",
                     ),
                     Exercise(
-                        "fedb-looking-at-ceiling",
+                        "looking-at-ceiling",
                         "Looking At Ceiling",
                         ExerciseType.TIMED,
                         false,
@@ -1646,7 +1646,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_110",
                     ),
                     Exercise(
-                        "fedb-lower-back-smr",
+                        "lower-back-smr",
                         "Lower Back-SMR",
                         ExerciseType.TIMED,
                         false,
@@ -1656,7 +1656,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_111",
                     ),
                     Exercise(
-                        "fedb-lower-back-curl",
+                        "lower-back-curl",
                         "Lower Back Curl",
                         ExerciseType.TIMED,
                         false,
@@ -1666,7 +1666,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_112",
                     ),
                     Exercise(
-                        "fedb-lying-bent-leg-groin",
+                        "lying-bent-leg-groin",
                         "Lying Bent Leg Groin",
                         ExerciseType.TIMED,
                         false,
@@ -1676,7 +1676,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_113",
                     ),
                     Exercise(
-                        "fedb-lying-crossover",
+                        "lying-crossover",
                         "Lying Crossover",
                         ExerciseType.TIMED,
                         false,
@@ -1686,7 +1686,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_114",
                     ),
                     Exercise(
-                        "fedb-lying-glute",
+                        "lying-glute",
                         "Lying Glute",
                         ExerciseType.TIMED,
                         false,
@@ -1696,7 +1696,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_115",
                     ),
                     Exercise(
-                        "fedb-lying-hamstring",
+                        "lying-hamstring",
                         "Lying Hamstring",
                         ExerciseType.TIMED,
                         false,
@@ -1706,7 +1706,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_116",
                     ),
                     Exercise(
-                        "fedb-lying-prone-quadriceps",
+                        "lying-prone-quadriceps",
                         "Lying Prone Quadriceps",
                         ExerciseType.TIMED,
                         false,
@@ -1716,7 +1716,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_117",
                     ),
                     Exercise(
-                        "fedb-middle-back-stretch",
+                        "middle-back-stretch",
                         "Middle Back Stretch",
                         ExerciseType.TIMED,
                         false,
@@ -1726,7 +1726,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_118",
                     ),
                     Exercise(
-                        "fedb-neck-smr",
+                        "neck-smr",
                         "Neck-SMR",
                         ExerciseType.TIMED,
                         false,
@@ -1736,7 +1736,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_119",
                     ),
                     Exercise(
-                        "fedb-on-your-back-quad-stretch",
+                        "on-your-back-quad-stretch",
                         "On-Your-Back Quad Stretch",
                         ExerciseType.TIMED,
                         false,
@@ -1746,7 +1746,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_120",
                     ),
                     Exercise(
-                        "fedb-on-your-side-quad-stretch",
+                        "on-your-side-quad-stretch",
                         "On Your Side Quad Stretch",
                         ExerciseType.TIMED,
                         false,
@@ -1756,7 +1756,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_121",
                     ),
                     Exercise(
-                        "fedb-one-arm-against-wall",
+                        "one-arm-against-wall",
                         "One Arm Against Wall",
                         ExerciseType.TIMED,
                         true,
@@ -1766,7 +1766,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_122",
                     ),
                     Exercise(
-                        "fedb-one-half-locust",
+                        "one-half-locust",
                         "One Half Locust",
                         ExerciseType.TIMED,
                         false,
@@ -1776,7 +1776,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_123",
                     ),
                     Exercise(
-                        "fedb-one-handed-hang",
+                        "one-handed-hang",
                         "One Handed Hang",
                         ExerciseType.TIMED,
                         false,
@@ -1786,7 +1786,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_124",
                     ),
                     Exercise(
-                        "fedb-one-knee-to-chest",
+                        "one-knee-to-chest",
                         "One Knee To Chest",
                         ExerciseType.TIMED,
                         false,
@@ -1796,7 +1796,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_125",
                     ),
                     Exercise(
-                        "fedb-overhead-lat",
+                        "overhead-lat",
                         "Overhead Lat",
                         ExerciseType.TIMED,
                         false,
@@ -1806,7 +1806,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_126",
                     ),
                     Exercise(
-                        "fedb-overhead-stretch",
+                        "overhead-stretch",
                         "Overhead Stretch",
                         ExerciseType.TIMED,
                         false,
@@ -1816,7 +1816,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_127",
                     ),
                     Exercise(
-                        "fedb-overhead-triceps",
+                        "overhead-triceps",
                         "Overhead Triceps",
                         ExerciseType.TIMED,
                         false,
@@ -1826,7 +1826,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_128",
                     ),
                     Exercise(
-                        "fedb-pelvic-tilt-into-bridge",
+                        "pelvic-tilt-into-bridge",
                         "Pelvic Tilt Into Bridge",
                         ExerciseType.TIMED,
                         false,
@@ -1836,7 +1836,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_129",
                     ),
                     Exercise(
-                        "fedb-peroneals-smr",
+                        "peroneals-smr",
                         "Peroneals-SMR",
                         ExerciseType.TIMED,
                         false,
@@ -1846,7 +1846,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_130",
                     ),
                     Exercise(
-                        "fedb-ab-crunch-machine",
+                        "ab-crunch-machine",
                         "Ab Crunch Machine",
                         ExerciseType.REPETITIONS,
                         false,
@@ -1856,7 +1856,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_131",
                     ),
                     Exercise(
-                        "fedb-bent-over-low-pulley-side-lateral",
+                        "bent-over-low-pulley-side-lateral",
                         "Bent Over Low-Pulley Side Lateral",
                         ExerciseType.REPETITIONS,
                         false,
@@ -1866,7 +1866,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_132",
                     ),
                     Exercise(
-                        "fedb-bicycling-stationary",
+                        "bicycling-stationary",
                         "Bicycling, Stationary",
                         ExerciseType.REPETITIONS,
                         false,
@@ -1876,7 +1876,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_133",
                     ),
                     Exercise(
-                        "fedb-bosu-ball-cable-crunch-with-side-bends",
+                        "bosu-ball-cable-crunch-with-side-bends",
                         "Bosu Ball Cable Crunch With Side Bends",
                         ExerciseType.REPETITIONS,
                         false,
@@ -1886,7 +1886,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_134",
                     ),
                     Exercise(
-                        "fedb-butterfly",
+                        "butterfly",
                         "Butterfly",
                         ExerciseType.REPETITIONS,
                         false,
@@ -1896,7 +1896,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_135",
                     ),
                     Exercise(
-                        "fedb-cable-chest-press",
+                        "cable-chest-press",
                         "Cable Chest Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -1906,7 +1906,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_136",
                     ),
                     Exercise(
-                        "fedb-cable-crossover",
+                        "cable-crossover",
                         "Cable Crossover",
                         ExerciseType.REPETITIONS,
                         false,
@@ -1916,7 +1916,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_137",
                     ),
                     Exercise(
-                        "fedb-cable-crunch",
+                        "cable-crunch",
                         "Cable Crunch",
                         ExerciseType.REPETITIONS,
                         false,
@@ -1926,7 +1926,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_138",
                     ),
                     Exercise(
-                        "fedb-cable-deadlifts",
+                        "cable-deadlifts",
                         "Cable Deadlifts",
                         ExerciseType.REPETITIONS,
                         false,
@@ -1936,7 +1936,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_139",
                     ),
                     Exercise(
-                        "fedb-cable-hammer-curls-rope-attachment",
+                        "cable-hammer-curls-rope-attachment",
                         "Cable Hammer Curls - Rope Attachment",
                         ExerciseType.REPETITIONS,
                         false,
@@ -1946,7 +1946,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_140",
                     ),
                     Exercise(
-                        "fedb-cable-hip-adduction",
+                        "cable-hip-adduction",
                         "Cable Hip Adduction",
                         ExerciseType.REPETITIONS,
                         false,
@@ -1956,7 +1956,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_141",
                     ),
                     Exercise(
-                        "fedb-cable-incline-pushdown",
+                        "cable-incline-pushdown",
                         "Cable Incline Pushdown",
                         ExerciseType.REPETITIONS,
                         false,
@@ -1966,7 +1966,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_142",
                     ),
                     Exercise(
-                        "fedb-cable-incline-triceps-extension",
+                        "cable-incline-triceps-extension",
                         "Cable Incline Triceps Extension",
                         ExerciseType.REPETITIONS,
                         false,
@@ -1976,7 +1976,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_143",
                     ),
                     Exercise(
-                        "fedb-cable-internal-rotation",
+                        "cable-internal-rotation",
                         "Cable Internal Rotation",
                         ExerciseType.REPETITIONS,
                         false,
@@ -1986,7 +1986,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_144",
                     ),
                     Exercise(
-                        "fedb-cable-iron-cross",
+                        "cable-iron-cross",
                         "Cable Iron Cross",
                         ExerciseType.REPETITIONS,
                         false,
@@ -1996,7 +1996,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_145",
                     ),
                     Exercise(
-                        "fedb-cable-judo-flip",
+                        "cable-judo-flip",
                         "Cable Judo Flip",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2006,7 +2006,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_146",
                     ),
                     Exercise(
-                        "fedb-cable-lying-triceps-extension",
+                        "cable-lying-triceps-extension",
                         "Cable Lying Triceps Extension",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2016,7 +2016,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_147",
                     ),
                     Exercise(
-                        "fedb-cable-preacher-curl",
+                        "cable-preacher-curl",
                         "Cable Preacher Curl",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2026,7 +2026,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_148",
                     ),
                     Exercise(
-                        "fedb-cable-rear-delt-fly",
+                        "cable-rear-delt-fly",
                         "Cable Rear Delt Fly",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2036,7 +2036,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_149",
                     ),
                     Exercise(
-                        "fedb-cable-reverse-crunch",
+                        "cable-reverse-crunch",
                         "Cable Reverse Crunch",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2046,7 +2046,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_150",
                     ),
                     Exercise(
-                        "fedb-cable-rope-overhead-triceps-extension",
+                        "cable-rope-overhead-triceps-extension",
                         "Cable Rope Overhead Triceps Extension",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2056,7 +2056,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_151",
                     ),
                     Exercise(
-                        "fedb-cable-rope-rear-delt-rows",
+                        "cable-rope-rear-delt-rows",
                         "Cable Rope Rear-Delt Rows",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2066,7 +2066,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_152",
                     ),
                     Exercise(
-                        "fedb-cable-russian-twists",
+                        "cable-russian-twists",
                         "Cable Russian Twists",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2076,7 +2076,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_153",
                     ),
                     Exercise(
-                        "fedb-cable-seated-crunch",
+                        "cable-seated-crunch",
                         "Cable Seated Crunch",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2086,7 +2086,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_154",
                     ),
                     Exercise(
-                        "fedb-cable-seated-lateral-raise",
+                        "cable-seated-lateral-raise",
                         "Cable Seated Lateral Raise",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2096,7 +2096,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_155",
                     ),
                     Exercise(
-                        "fedb-cable-shoulder-press",
+                        "cable-shoulder-press",
                         "Cable Shoulder Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2106,7 +2106,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_156",
                     ),
                     Exercise(
-                        "fedb-cable-shrugs",
+                        "cable-shrugs",
                         "Cable Shrugs",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2116,7 +2116,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_157",
                     ),
                     Exercise(
-                        "fedb-cable-wrist-curl",
+                        "cable-wrist-curl",
                         "Cable Wrist Curl",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2126,7 +2126,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_158",
                     ),
                     Exercise(
-                        "fedb-calf-machine-shoulder-shrug",
+                        "calf-machine-shoulder-shrug",
                         "Calf-Machine Shoulder Shrug",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2136,7 +2136,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_159",
                     ),
                     Exercise(
-                        "fedb-calf-press",
+                        "calf-press",
                         "Calf Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2146,7 +2146,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_160",
                     ),
                     Exercise(
-                        "fedb-calf-press-on-the-leg-press-machine",
+                        "calf-press-on-the-leg-press-machine",
                         "Calf Press On The Leg Press Machine",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2156,7 +2156,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_161",
                     ),
                     Exercise(
-                        "fedb-chair-squat",
+                        "chair-squat",
                         "Chair Squat",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2166,7 +2166,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_162",
                     ),
                     Exercise(
-                        "fedb-close-grip-front-lat-pulldown",
+                        "close-grip-front-lat-pulldown",
                         "Close-Grip Front Lat Pulldown",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2176,7 +2176,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_163",
                     ),
                     Exercise(
-                        "fedb-decline-smith-press",
+                        "decline-smith-press",
                         "Decline Smith Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2186,7 +2186,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_164",
                     ),
                     Exercise(
-                        "fedb-dip-machine",
+                        "dip-machine",
                         "Dip Machine",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2196,7 +2196,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_165",
                     ),
                     Exercise(
-                        "fedb-elevated-cable-rows",
+                        "elevated-cable-rows",
                         "Elevated Cable Rows",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2206,7 +2206,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_166",
                     ),
                     Exercise(
-                        "fedb-elliptical-trainer",
+                        "elliptical-trainer",
                         "Elliptical Trainer",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2216,7 +2216,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_167",
                     ),
                     Exercise(
-                        "fedb-external-rotation-with-cable",
+                        "external-rotation-with-cable",
                         "External Rotation with Cable",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2226,7 +2226,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_168",
                     ),
                     Exercise(
-                        "fedb-face-pull",
+                        "face-pull",
                         "Face Pull",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2236,7 +2236,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_169",
                     ),
                     Exercise(
-                        "fedb-flat-bench-cable-flyes",
+                        "flat-bench-cable-flyes",
                         "Flat Bench Cable Flyes",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2246,7 +2246,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_170",
                     ),
                     Exercise(
-                        "fedb-front-cable-raise",
+                        "front-cable-raise",
                         "Front Cable Raise",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2256,7 +2256,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_171",
                     ),
                     Exercise(
-                        "fedb-full-range-of-motion-lat-pulldown",
+                        "full-range-of-motion-lat-pulldown",
                         "Full Range-Of-Motion Lat Pulldown",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2266,7 +2266,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_172",
                     ),
                     Exercise(
-                        "fedb-glute-ham-raise",
+                        "glute-ham-raise",
                         "Glute Ham Raise",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2276,7 +2276,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_173",
                     ),
                     Exercise(
-                        "fedb-hack-squat",
+                        "hack-squat",
                         "Hack Squat",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2286,7 +2286,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_174",
                     ),
                     Exercise(
-                        "fedb-high-cable-curls",
+                        "high-cable-curls",
                         "High Cable Curls",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2296,7 +2296,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_175",
                     ),
                     Exercise(
-                        "fedb-incline-cable-chest-press",
+                        "incline-cable-chest-press",
                         "Incline Cable Chest Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2306,7 +2306,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_176",
                     ),
                     Exercise(
-                        "fedb-incline-cable-flye",
+                        "incline-cable-flye",
                         "Incline Cable Flye",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2316,7 +2316,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_177",
                     ),
                     Exercise(
-                        "fedb-jogging-treadmill",
+                        "jogging-treadmill",
                         "Jogging, Treadmill",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2326,7 +2326,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_178",
                     ),
                     Exercise(
-                        "fedb-kneeling-cable-triceps-extension",
+                        "kneeling-cable-triceps-extension",
                         "Kneeling Cable Triceps Extension",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2336,7 +2336,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_179",
                     ),
                     Exercise(
-                        "fedb-kneeling-high-pulley-row",
+                        "kneeling-high-pulley-row",
                         "Kneeling High Pulley Row",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2346,7 +2346,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_180",
                     ),
                     Exercise(
-                        "fedb-leg-extensions",
+                        "leg-extensions",
                         "Leg Extensions",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2356,7 +2356,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_181",
                     ),
                     Exercise(
-                        "fedb-leg-press",
+                        "leg-press",
                         "Leg Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2366,7 +2366,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_182",
                     ),
                     Exercise(
-                        "fedb-leverage-chest-press",
+                        "leverage-chest-press",
                         "Leverage Chest Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2376,7 +2376,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_183",
                     ),
                     Exercise(
-                        "fedb-leverage-deadlift",
+                        "leverage-deadlift",
                         "Leverage Deadlift",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2386,7 +2386,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_184",
                     ),
                     Exercise(
-                        "fedb-leverage-decline-chest-press",
+                        "leverage-decline-chest-press",
                         "Leverage Decline Chest Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2396,7 +2396,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_185",
                     ),
                     Exercise(
-                        "fedb-leverage-high-row",
+                        "leverage-high-row",
                         "Leverage High Row",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2406,7 +2406,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_186",
                     ),
                     Exercise(
-                        "fedb-leverage-incline-chest-press",
+                        "leverage-incline-chest-press",
                         "Leverage Incline Chest Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2416,7 +2416,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_187",
                     ),
                     Exercise(
-                        "fedb-leverage-iso-row",
+                        "leverage-iso-row",
                         "Leverage Iso Row",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2426,7 +2426,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_188",
                     ),
                     Exercise(
-                        "fedb-leverage-shoulder-press",
+                        "leverage-shoulder-press",
                         "Leverage Shoulder Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2436,7 +2436,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_189",
                     ),
                     Exercise(
-                        "fedb-leverage-shrug",
+                        "leverage-shrug",
                         "Leverage Shrug",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2446,7 +2446,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_190",
                     ),
                     Exercise(
-                        "fedb-low-cable-crossover",
+                        "low-cable-crossover",
                         "Low Cable Crossover",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2456,7 +2456,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_191",
                     ),
                     Exercise(
-                        "fedb-low-cable-triceps-extension",
+                        "low-cable-triceps-extension",
                         "Low Cable Triceps Extension",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2466,7 +2466,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_192",
                     ),
                     Exercise(
-                        "fedb-low-pulley-row-to-neck",
+                        "low-pulley-row-to-neck",
                         "Low Pulley Row To Neck",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2476,7 +2476,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_193",
                     ),
                     Exercise(
-                        "fedb-lying-cable-curl",
+                        "lying-cable-curl",
                         "Lying Cable Curl",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2486,7 +2486,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_194",
                     ),
                     Exercise(
-                        "fedb-lying-close-grip-bar-curl-on-high-pulley",
+                        "lying-close-grip-bar-curl-on-high-pulley",
                         "Lying Close-Grip Bar Curl On High Pulley",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2496,7 +2496,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_195",
                     ),
                     Exercise(
-                        "fedb-lying-leg-curls",
+                        "lying-leg-curls",
                         "Lying Leg Curls",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2506,7 +2506,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_196",
                     ),
                     Exercise(
-                        "fedb-lying-machine-squat",
+                        "lying-machine-squat",
                         "Lying Machine Squat",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2516,7 +2516,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_197",
                     ),
                     Exercise(
-                        "fedb-lying-t-bar-row",
+                        "lying-t-bar-row",
                         "Lying T-Bar Row",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2526,7 +2526,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_198",
                     ),
                     Exercise(
-                        "fedb-machine-bench-press",
+                        "machine-bench-press",
                         "Machine Bench Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2536,7 +2536,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_199",
                     ),
                     Exercise(
-                        "fedb-machine-bicep-curl",
+                        "machine-bicep-curl",
                         "Machine Bicep Curl",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2546,7 +2546,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_200",
                     ),
                     Exercise(
-                        "fedb-machine-preacher-curls",
+                        "machine-preacher-curls",
                         "Machine Preacher Curls",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2556,7 +2556,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_201",
                     ),
                     Exercise(
-                        "fedb-machine-shoulder-military-press",
+                        "machine-shoulder-military-press",
                         "Machine Shoulder (Military) Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2566,7 +2566,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_202",
                     ),
                     Exercise(
-                        "fedb-machine-triceps-extension",
+                        "machine-triceps-extension",
                         "Machine Triceps Extension",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2576,7 +2576,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_203",
                     ),
                     Exercise(
-                        "fedb-narrow-stance-hack-squats",
+                        "narrow-stance-hack-squats",
                         "Narrow Stance Hack Squats",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2586,7 +2586,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_204",
                     ),
                     Exercise(
-                        "fedb-narrow-stance-leg-press",
+                        "narrow-stance-leg-press",
                         "Narrow Stance Leg Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2596,7 +2596,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_205",
                     ),
                     Exercise(
-                        "fedb-one-legged-cable-kickback",
+                        "one-legged-cable-kickback",
                         "One-Legged Cable Kickback",
                         ExerciseType.REPETITIONS,
                         true,
@@ -2606,7 +2606,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_206",
                     ),
                     Exercise(
-                        "fedb-one-arm-lat-pulldown",
+                        "one-arm-lat-pulldown",
                         "One Arm Lat Pulldown",
                         ExerciseType.REPETITIONS,
                         true,
@@ -2616,7 +2616,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_207",
                     ),
                     Exercise(
-                        "fedb-overhead-cable-curl",
+                        "overhead-cable-curl",
                         "Overhead Cable Curl",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2626,7 +2626,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_208",
                     ),
                     Exercise(
-                        "fedb-pallof-press",
+                        "pallof-press",
                         "Pallof Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2636,7 +2636,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_209",
                     ),
                     Exercise(
-                        "fedb-pallof-press-with-rotation",
+                        "pallof-press-with-rotation",
                         "Pallof Press With Rotation",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2646,7 +2646,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_210",
                     ),
                     Exercise(
-                        "fedb-pull-through",
+                        "pull-through",
                         "Pull Through",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2656,7 +2656,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_211",
                     ),
                     Exercise(
-                        "fedb-recumbent-bike",
+                        "recumbent-bike",
                         "Recumbent Bike",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2666,7 +2666,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_212",
                     ),
                     Exercise(
-                        "fedb-reverse-cable-curl",
+                        "reverse-cable-curl",
                         "Reverse Cable Curl",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2676,7 +2676,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_213",
                     ),
                     Exercise(
-                        "fedb-reverse-grip-triceps-pushdown",
+                        "reverse-grip-triceps-pushdown",
                         "Reverse Grip Triceps Pushdown",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2686,7 +2686,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_214",
                     ),
                     Exercise(
-                        "fedb-reverse-hyperextension",
+                        "reverse-hyperextension",
                         "Reverse Hyperextension",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2696,7 +2696,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_215",
                     ),
                     Exercise(
-                        "fedb-reverse-machine-flyes",
+                        "reverse-machine-flyes",
                         "Reverse Machine Flyes",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2706,7 +2706,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_216",
                     ),
                     Exercise(
-                        "fedb-rope-crunch",
+                        "rope-crunch",
                         "Rope Crunch",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2716,7 +2716,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_217",
                     ),
                     Exercise(
-                        "fedb-advanced-kettlebell-windmill",
+                        "advanced-kettlebell-windmill",
                         "Advanced Kettlebell Windmill",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2726,7 +2726,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_218",
                     ),
                     Exercise(
-                        "fedb-anti-gravity-press",
+                        "anti-gravity-press",
                         "Anti-Gravity Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2736,7 +2736,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_219",
                     ),
                     Exercise(
-                        "fedb-arnold-dumbbell-press",
+                        "arnold-dumbbell-press",
                         "Arnold Dumbbell Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2746,7 +2746,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_220",
                     ),
                     Exercise(
-                        "fedb-around-the-worlds",
+                        "around-the-worlds",
                         "Around The Worlds",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2756,7 +2756,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_221",
                     ),
                     Exercise(
-                        "fedb-barbell-ab-rollout",
+                        "barbell-ab-rollout",
                         "Barbell Ab Rollout",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2766,7 +2766,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_222",
                     ),
                     Exercise(
-                        "fedb-barbell-ab-rollout-on-knees",
+                        "barbell-ab-rollout-on-knees",
                         "Barbell Ab Rollout - On Knees",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2776,7 +2776,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_223",
                     ),
                     Exercise(
-                        "fedb-barbell-bench-press-medium-grip",
+                        "barbell-bench-press-medium-grip",
                         "Barbell Bench Press - Medium Grip",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2786,7 +2786,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_224",
                     ),
                     Exercise(
-                        "fedb-barbell-curl",
+                        "barbell-curl",
                         "Barbell Curl",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2796,7 +2796,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_225",
                     ),
                     Exercise(
-                        "fedb-barbell-curls-lying-against-an-incline",
+                        "barbell-curls-lying-against-an-incline",
                         "Barbell Curls Lying Against An Incline",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2806,7 +2806,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_226",
                     ),
                     Exercise(
-                        "fedb-barbell-deadlift",
+                        "barbell-deadlift",
                         "Barbell Deadlift",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2816,7 +2816,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_227",
                     ),
                     Exercise(
-                        "fedb-barbell-full-squat",
+                        "barbell-full-squat",
                         "Barbell Full Squat",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2826,7 +2826,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_228",
                     ),
                     Exercise(
-                        "fedb-barbell-glute-bridge",
+                        "barbell-glute-bridge",
                         "Barbell Glute Bridge",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2836,7 +2836,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_229",
                     ),
                     Exercise(
-                        "fedb-barbell-guillotine-bench-press",
+                        "barbell-guillotine-bench-press",
                         "Barbell Guillotine Bench Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2846,7 +2846,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_230",
                     ),
                     Exercise(
-                        "fedb-barbell-hack-squat",
+                        "barbell-hack-squat",
                         "Barbell Hack Squat",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2856,7 +2856,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_231",
                     ),
                     Exercise(
-                        "fedb-barbell-hip-thrust",
+                        "barbell-hip-thrust",
                         "Barbell Hip Thrust",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2866,7 +2866,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_232",
                     ),
                     Exercise(
-                        "fedb-barbell-incline-bench-press-medium-grip",
+                        "barbell-incline-bench-press-medium-grip",
                         "Barbell Incline Bench Press - Medium Grip",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2876,7 +2876,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_233",
                     ),
                     Exercise(
-                        "fedb-barbell-incline-shoulder-raise",
+                        "barbell-incline-shoulder-raise",
                         "Barbell Incline Shoulder Raise",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2886,7 +2886,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_234",
                     ),
                     Exercise(
-                        "fedb-barbell-rear-delt-row",
+                        "barbell-rear-delt-row",
                         "Barbell Rear Delt Row",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2896,7 +2896,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_235",
                     ),
                     Exercise(
-                        "fedb-barbell-rollout-from-bench",
+                        "barbell-rollout-from-bench",
                         "Barbell Rollout from Bench",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2906,7 +2906,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_236",
                     ),
                     Exercise(
-                        "fedb-barbell-seated-calf-raise",
+                        "barbell-seated-calf-raise",
                         "Barbell Seated Calf Raise",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2916,7 +2916,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_237",
                     ),
                     Exercise(
-                        "fedb-barbell-shoulder-press",
+                        "barbell-shoulder-press",
                         "Barbell Shoulder Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2926,7 +2926,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_238",
                     ),
                     Exercise(
-                        "fedb-barbell-shrug",
+                        "barbell-shrug",
                         "Barbell Shrug",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2936,7 +2936,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_239",
                     ),
                     Exercise(
-                        "fedb-barbell-shrug-behind-the-back",
+                        "barbell-shrug-behind-the-back",
                         "Barbell Shrug Behind The Back",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2946,7 +2946,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_240",
                     ),
                     Exercise(
-                        "fedb-barbell-side-bend",
+                        "barbell-side-bend",
                         "Barbell Side Bend",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2956,7 +2956,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_241",
                     ),
                     Exercise(
-                        "fedb-barbell-squat",
+                        "barbell-squat",
                         "Barbell Squat",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2966,7 +2966,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_242",
                     ),
                     Exercise(
-                        "fedb-barbell-squat-to-a-bench",
+                        "barbell-squat-to-a-bench",
                         "Barbell Squat To A Bench",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2976,7 +2976,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_243",
                     ),
                     Exercise(
-                        "fedb-bench-press-powerlifting",
+                        "bench-press-powerlifting",
                         "Bench Press - Powerlifting",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2986,7 +2986,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_244",
                     ),
                     Exercise(
-                        "fedb-bench-press-with-chains",
+                        "bench-press-with-chains",
                         "Bench Press with Chains",
                         ExerciseType.REPETITIONS,
                         false,
@@ -2996,7 +2996,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_245",
                     ),
                     Exercise(
-                        "fedb-bent-arm-barbell-pullover",
+                        "bent-arm-barbell-pullover",
                         "Bent-Arm Barbell Pullover",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3006,7 +3006,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_246",
                     ),
                     Exercise(
-                        "fedb-bent-arm-dumbbell-pullover",
+                        "bent-arm-dumbbell-pullover",
                         "Bent-Arm Dumbbell Pullover",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3016,7 +3016,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_247",
                     ),
                     Exercise(
-                        "fedb-bent-over-barbell-row",
+                        "bent-over-barbell-row",
                         "Bent Over Barbell Row",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3026,7 +3026,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_248",
                     ),
                     Exercise(
-                        "fedb-bent-over-dumbbell-rear-delt-raise-with-head-on-bench",
+                        "bent-over-dumbbell-rear-delt-raise-with-head-on-bench",
                         "Bent Over Dumbbell Rear Delt Raise With Head On Bench",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3036,7 +3036,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_249",
                     ),
                     Exercise(
-                        "fedb-bent-over-two-arm-long-bar-row",
+                        "bent-over-two-arm-long-bar-row",
                         "Bent Over Two-Arm Long Bar Row",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3046,7 +3046,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_250",
                     ),
                     Exercise(
-                        "fedb-bent-over-two-dumbbell-row",
+                        "bent-over-two-dumbbell-row",
                         "Bent Over Two-Dumbbell Row",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3056,7 +3056,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_251",
                     ),
                     Exercise(
-                        "fedb-bent-over-two-dumbbell-row-with-palms-in",
+                        "bent-over-two-dumbbell-row-with-palms-in",
                         "Bent Over Two-Dumbbell Row With Palms In",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3066,7 +3066,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_252",
                     ),
                     Exercise(
-                        "fedb-bent-press",
+                        "bent-press",
                         "Bent Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3076,7 +3076,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_253",
                     ),
                     Exercise(
-                        "fedb-board-press",
+                        "board-press",
                         "Board Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3086,7 +3086,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_254",
                     ),
                     Exercise(
-                        "fedb-bodyweight-flyes",
+                        "bodyweight-flyes",
                         "Bodyweight Flyes",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3096,7 +3096,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_255",
                     ),
                     Exercise(
-                        "fedb-bottoms-up-clean-from-the-hang-position",
+                        "bottoms-up-clean-from-the-hang-position",
                         "Bottoms-Up Clean From The Hang Position",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3106,7 +3106,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_256",
                     ),
                     Exercise(
-                        "fedb-box-squat",
+                        "box-squat",
                         "Box Squat",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3116,7 +3116,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_257",
                     ),
                     Exercise(
-                        "fedb-box-squat-with-bands",
+                        "box-squat-with-bands",
                         "Box Squat with Bands",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3126,7 +3126,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_258",
                     ),
                     Exercise(
-                        "fedb-box-squat-with-chains",
+                        "box-squat-with-chains",
                         "Box Squat with Chains",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3136,7 +3136,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_259",
                     ),
                     Exercise(
-                        "fedb-bradford-rocky-presses",
+                        "bradford-rocky-presses",
                         "Bradford/Rocky Presses",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3146,7 +3146,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_260",
                     ),
                     Exercise(
-                        "fedb-calf-raise-on-a-dumbbell",
+                        "calf-raise-on-a-dumbbell",
                         "Calf Raise On A Dumbbell",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3156,7 +3156,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_261",
                     ),
                     Exercise(
-                        "fedb-car-drivers",
+                        "car-drivers",
                         "Car Drivers",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3166,7 +3166,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_262",
                     ),
                     Exercise(
-                        "fedb-clean",
+                        "clean",
                         "Clean",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3176,7 +3176,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_263",
                     ),
                     Exercise(
-                        "fedb-clean-deadlift",
+                        "clean-deadlift",
                         "Clean Deadlift",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3186,7 +3186,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_264",
                     ),
                     Exercise(
-                        "fedb-clean-pull",
+                        "clean-pull",
                         "Clean Pull",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3196,7 +3196,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_265",
                     ),
                     Exercise(
-                        "fedb-clean-shrug",
+                        "clean-shrug",
                         "Clean Shrug",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3206,7 +3206,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_266",
                     ),
                     Exercise(
-                        "fedb-clean-and-jerk",
+                        "clean-and-jerk",
                         "Clean and Jerk",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3216,7 +3216,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_267",
                     ),
                     Exercise(
-                        "fedb-clean-and-press",
+                        "clean-and-press",
                         "Clean and Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3226,7 +3226,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_268",
                     ),
                     Exercise(
-                        "fedb-clean-from-blocks",
+                        "clean-from-blocks",
                         "Clean from Blocks",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3236,7 +3236,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_269",
                     ),
                     Exercise(
-                        "fedb-close-grip-barbell-bench-press",
+                        "close-grip-barbell-bench-press",
                         "Close-Grip Barbell Bench Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3246,7 +3246,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_270",
                     ),
                     Exercise(
-                        "fedb-close-grip-dumbbell-press",
+                        "close-grip-dumbbell-press",
                         "Close-Grip Dumbbell Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3256,7 +3256,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_271",
                     ),
                     Exercise(
-                        "fedb-close-grip-ez-bar-curl-with-band",
+                        "close-grip-ez-bar-curl-with-band",
                         "Close-Grip EZ-Bar Curl with Band",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3266,7 +3266,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_272",
                     ),
                     Exercise(
-                        "fedb-close-grip-ez-bar-press",
+                        "close-grip-ez-bar-press",
                         "Close-Grip EZ-Bar Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3276,7 +3276,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_273",
                     ),
                     Exercise(
-                        "fedb-close-grip-ez-bar-curl",
+                        "close-grip-ez-bar-curl",
                         "Close-Grip EZ Bar Curl",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3286,7 +3286,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_274",
                     ),
                     Exercise(
-                        "fedb-close-grip-standing-barbell-curl",
+                        "close-grip-standing-barbell-curl",
                         "Close-Grip Standing Barbell Curl",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3296,7 +3296,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_275",
                     ),
                     Exercise(
-                        "fedb-concentration-curls",
+                        "concentration-curls",
                         "Concentration Curls",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3306,7 +3306,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_276",
                     ),
                     Exercise(
-                        "fedb-cross-body-hammer-curl",
+                        "cross-body-hammer-curl",
                         "Cross Body Hammer Curl",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3316,7 +3316,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_277",
                     ),
                     Exercise(
-                        "fedb-cuban-press",
+                        "cuban-press",
                         "Cuban Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3326,7 +3326,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_278",
                     ),
                     Exercise(
-                        "fedb-deadlift-with-bands",
+                        "deadlift-with-bands",
                         "Deadlift with Bands",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3336,7 +3336,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_279",
                     ),
                     Exercise(
-                        "fedb-deadlift-with-chains",
+                        "deadlift-with-chains",
                         "Deadlift with Chains",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3346,7 +3346,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_280",
                     ),
                     Exercise(
-                        "fedb-decline-barbell-bench-press",
+                        "decline-barbell-bench-press",
                         "Decline Barbell Bench Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3356,7 +3356,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_281",
                     ),
                     Exercise(
-                        "fedb-decline-close-grip-bench-to-skull-crusher",
+                        "decline-close-grip-bench-to-skull-crusher",
                         "Decline Close-Grip Bench To Skull Crusher",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3366,7 +3366,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_282",
                     ),
                     Exercise(
-                        "fedb-decline-dumbbell-bench-press",
+                        "decline-dumbbell-bench-press",
                         "Decline Dumbbell Bench Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3376,7 +3376,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_283",
                     ),
                     Exercise(
-                        "fedb-decline-dumbbell-flyes",
+                        "decline-dumbbell-flyes",
                         "Decline Dumbbell Flyes",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3386,7 +3386,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_284",
                     ),
                     Exercise(
-                        "fedb-decline-dumbbell-triceps-extension",
+                        "decline-dumbbell-triceps-extension",
                         "Decline Dumbbell Triceps Extension",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3396,7 +3396,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_285",
                     ),
                     Exercise(
-                        "fedb-decline-ez-bar-triceps-extension",
+                        "decline-ez-bar-triceps-extension",
                         "Decline EZ Bar Triceps Extension",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3406,7 +3406,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_286",
                     ),
                     Exercise(
-                        "fedb-deficit-deadlift",
+                        "deficit-deadlift",
                         "Deficit Deadlift",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3416,7 +3416,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_287",
                     ),
                     Exercise(
-                        "fedb-double-kettlebell-jerk",
+                        "double-kettlebell-jerk",
                         "Double Kettlebell Jerk",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3426,7 +3426,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_288",
                     ),
                     Exercise(
-                        "fedb-double-kettlebell-push-press",
+                        "double-kettlebell-push-press",
                         "Double Kettlebell Push Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3436,7 +3436,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_289",
                     ),
                     Exercise(
-                        "fedb-double-kettlebell-snatch",
+                        "double-kettlebell-snatch",
                         "Double Kettlebell Snatch",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3446,7 +3446,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_290",
                     ),
                     Exercise(
-                        "fedb-double-kettlebell-windmill",
+                        "double-kettlebell-windmill",
                         "Double Kettlebell Windmill",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3456,7 +3456,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_291",
                     ),
                     Exercise(
-                        "fedb-drag-curl",
+                        "drag-curl",
                         "Drag Curl",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3466,7 +3466,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_292",
                     ),
                     Exercise(
-                        "fedb-dumbbell-bench-press",
+                        "dumbbell-bench-press",
                         "Dumbbell Bench Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3476,7 +3476,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_293",
                     ),
                     Exercise(
-                        "fedb-dumbbell-bench-press-with-neutral-grip",
+                        "dumbbell-bench-press-with-neutral-grip",
                         "Dumbbell Bench Press with Neutral Grip",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3486,7 +3486,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_294",
                     ),
                     Exercise(
-                        "fedb-dumbbell-bicep-curl",
+                        "dumbbell-bicep-curl",
                         "Dumbbell Bicep Curl",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3496,7 +3496,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_295",
                     ),
                     Exercise(
-                        "fedb-dumbbell-clean",
+                        "dumbbell-clean",
                         "Dumbbell Clean",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3506,7 +3506,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_296",
                     ),
                     Exercise(
-                        "fedb-dumbbell-floor-press",
+                        "dumbbell-floor-press",
                         "Dumbbell Floor Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3516,7 +3516,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_297",
                     ),
                     Exercise(
-                        "fedb-dumbbell-flyes",
+                        "dumbbell-flyes",
                         "Dumbbell Flyes",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3526,7 +3526,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_298",
                     ),
                     Exercise(
-                        "fedb-dumbbell-incline-row",
+                        "dumbbell-incline-row",
                         "Dumbbell Incline Row",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3536,7 +3536,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_299",
                     ),
                     Exercise(
-                        "fedb-dumbbell-incline-shoulder-raise",
+                        "dumbbell-incline-shoulder-raise",
                         "Dumbbell Incline Shoulder Raise",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3546,7 +3546,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_300",
                     ),
                     Exercise(
-                        "fedb-dumbbell-lying-pronation",
+                        "dumbbell-lying-pronation",
                         "Dumbbell Lying Pronation",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3556,7 +3556,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_301",
                     ),
                     Exercise(
-                        "fedb-dumbbell-lying-rear-lateral-raise",
+                        "dumbbell-lying-rear-lateral-raise",
                         "Dumbbell Lying Rear Lateral Raise",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3566,7 +3566,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_302",
                     ),
                     Exercise(
-                        "fedb-dumbbell-lying-supination",
+                        "dumbbell-lying-supination",
                         "Dumbbell Lying Supination",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3576,7 +3576,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_303",
                     ),
                     Exercise(
-                        "fedb-dumbbell-prone-incline-curl",
+                        "dumbbell-prone-incline-curl",
                         "Dumbbell Prone Incline Curl",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3586,7 +3586,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_304",
                     ),
                     Exercise(
-                        "fedb-dumbbell-raise",
+                        "dumbbell-raise",
                         "Dumbbell Raise",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3596,7 +3596,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_305",
                     ),
                     Exercise(
-                        "fedb-dumbbell-scaption",
+                        "dumbbell-scaption",
                         "Dumbbell Scaption",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3606,7 +3606,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_306",
                     ),
                     Exercise(
-                        "fedb-dumbbell-seated-box-jump",
+                        "dumbbell-seated-box-jump",
                         "Dumbbell Seated Box Jump",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3616,7 +3616,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_307",
                     ),
                     Exercise(
-                        "fedb-dumbbell-shoulder-press",
+                        "dumbbell-shoulder-press",
                         "Dumbbell Shoulder Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3626,7 +3626,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_308",
                     ),
                     Exercise(
-                        "fedb-dumbbell-shrug",
+                        "dumbbell-shrug",
                         "Dumbbell Shrug",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3636,7 +3636,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_309",
                     ),
                     Exercise(
-                        "fedb-dumbbell-side-bend",
+                        "dumbbell-side-bend",
                         "Dumbbell Side Bend",
                         ExerciseType.REPETITIONS,
                         true,
@@ -3646,7 +3646,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_310",
                     ),
                     Exercise(
-                        "fedb-dumbbell-squat",
+                        "dumbbell-squat",
                         "Dumbbell Squat",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3656,7 +3656,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_311",
                     ),
                     Exercise(
-                        "fedb-dumbbell-squat-to-a-bench",
+                        "dumbbell-squat-to-a-bench",
                         "Dumbbell Squat To A Bench",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3666,7 +3666,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_312",
                     ),
                     Exercise(
-                        "fedb-dumbbell-tricep-extension-pronated-grip",
+                        "dumbbell-tricep-extension-pronated-grip",
                         "Dumbbell Tricep Extension -Pronated Grip",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3676,7 +3676,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_313",
                     ),
                     Exercise(
-                        "fedb-ez-bar-curl",
+                        "ez-bar-curl",
                         "EZ-Bar Curl",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3686,7 +3686,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_314",
                     ),
                     Exercise(
-                        "fedb-ez-bar-skullcrusher",
+                        "ez-bar-skullcrusher",
                         "EZ-Bar Skullcrusher",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3696,7 +3696,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_315",
                     ),
                     Exercise(
-                        "fedb-external-rotation",
+                        "external-rotation",
                         "External Rotation",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3706,7 +3706,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_316",
                     ),
                     Exercise(
-                        "fedb-finger-curls",
+                        "finger-curls",
                         "Finger Curls",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3716,7 +3716,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_317",
                     ),
                     Exercise(
-                        "fedb-flexor-incline-dumbbell-curls",
+                        "flexor-incline-dumbbell-curls",
                         "Flexor Incline Dumbbell Curls",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3726,7 +3726,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_318",
                     ),
                     Exercise(
-                        "fedb-floor-press",
+                        "floor-press",
                         "Floor Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3736,7 +3736,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_319",
                     ),
                     Exercise(
-                        "fedb-floor-press-with-chains",
+                        "floor-press-with-chains",
                         "Floor Press with Chains",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3746,7 +3746,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_320",
                     ),
                     Exercise(
-                        "fedb-frankenstein-squat",
+                        "frankenstein-squat",
                         "Frankenstein Squat",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3756,7 +3756,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_321",
                     ),
                     Exercise(
-                        "fedb-front-barbell-squat",
+                        "front-barbell-squat",
                         "Front Barbell Squat",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3766,7 +3766,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_322",
                     ),
                     Exercise(
-                        "fedb-front-barbell-squat-to-a-bench",
+                        "front-barbell-squat-to-a-bench",
                         "Front Barbell Squat To A Bench",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3776,7 +3776,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_323",
                     ),
                     Exercise(
-                        "fedb-front-dumbbell-raise",
+                        "front-dumbbell-raise",
                         "Front Dumbbell Raise",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3786,7 +3786,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_324",
                     ),
                     Exercise(
-                        "fedb-front-incline-dumbbell-raise",
+                        "front-incline-dumbbell-raise",
                         "Front Incline Dumbbell Raise",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3796,7 +3796,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_325",
                     ),
                     Exercise(
-                        "fedb-front-raise-and-pullover",
+                        "front-raise-and-pullover",
                         "Front Raise And Pullover",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3806,7 +3806,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_326",
                     ),
                     Exercise(
-                        "fedb-front-squat-clean-grip",
+                        "front-squat-clean-grip",
                         "Front Squat (Clean Grip)",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3816,7 +3816,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_327",
                     ),
                     Exercise(
-                        "fedb-front-squats-with-two-kettlebells",
+                        "front-squats-with-two-kettlebells",
                         "Front Squats With Two Kettlebells",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3826,7 +3826,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_328",
                     ),
                     Exercise(
-                        "fedb-3-4-sit-up",
+                        "3-4-sit-up",
                         "3/4 Sit-Up",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3836,7 +3836,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_329",
                     ),
                     Exercise(
-                        "fedb-air-bike",
+                        "air-bike",
                         "Air Bike",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3846,7 +3846,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_330",
                     ),
                     Exercise(
-                        "fedb-bench-dips",
+                        "bench-dips",
                         "Bench Dips",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3856,7 +3856,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_331",
                     ),
                     Exercise(
-                        "fedb-bench-jump",
+                        "bench-jump",
                         "Bench Jump",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3866,7 +3866,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_332",
                     ),
                     Exercise(
-                        "fedb-bent-knee-hip-raise",
+                        "bent-knee-hip-raise",
                         "Bent-Knee Hip Raise",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3876,7 +3876,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_333",
                     ),
                     Exercise(
-                        "fedb-body-up",
+                        "body-up",
                         "Body-Up",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3886,7 +3886,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_334",
                     ),
                     Exercise(
-                        "fedb-body-tricep-press",
+                        "body-tricep-press",
                         "Body Tricep Press",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3896,7 +3896,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_335",
                     ),
                     Exercise(
-                        "fedb-bodyweight-squat",
+                        "bodyweight-squat",
                         "Bodyweight Squat",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3906,7 +3906,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_336",
                     ),
                     Exercise(
-                        "fedb-bottoms-up",
+                        "bottoms-up",
                         "Bottoms Up",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3916,7 +3916,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_337",
                     ),
                     Exercise(
-                        "fedb-butt-ups",
+                        "butt-ups",
                         "Butt-Ups",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3926,7 +3926,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_338",
                     ),
                     Exercise(
-                        "fedb-butt-lift-bridge",
+                        "butt-lift-bridge",
                         "Butt Lift (Bridge)",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3936,7 +3936,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_339",
                     ),
                     Exercise(
-                        "fedb-chin-up",
+                        "chin-up",
                         "Chin-Up",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3946,7 +3946,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_340",
                     ),
                     Exercise(
-                        "fedb-clock-push-up",
+                        "clock-push-up",
                         "Clock Push-Up",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3956,7 +3956,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_341",
                     ),
                     Exercise(
-                        "fedb-close-grip-push-up-off-of-a-dumbbell",
+                        "close-grip-push-up-off-of-a-dumbbell",
                         "Close-Grip Push-Up off of a Dumbbell",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3966,7 +3966,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_342",
                     ),
                     Exercise(
-                        "fedb-cocoons",
+                        "cocoons",
                         "Cocoons",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3976,7 +3976,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_343",
                     ),
                     Exercise(
-                        "fedb-cross-body-crunch",
+                        "cross-body-crunch",
                         "Cross-Body Crunch",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3986,7 +3986,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_344",
                     ),
                     Exercise(
-                        "fedb-crunch-hands-overhead",
+                        "crunch-hands-overhead",
                         "Crunch - Hands Overhead",
                         ExerciseType.REPETITIONS,
                         false,
@@ -3996,7 +3996,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_345",
                     ),
                     Exercise(
-                        "fedb-crunch-legs-on-exercise-ball",
+                        "crunch-legs-on-exercise-ball",
                         "Crunch - Legs On Exercise Ball",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4006,7 +4006,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_346",
                     ),
                     Exercise(
-                        "fedb-crunches",
+                        "crunches",
                         "Crunches",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4016,7 +4016,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_347",
                     ),
                     Exercise(
-                        "fedb-dead-bug",
+                        "dead-bug",
                         "Dead Bug",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4026,7 +4026,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_348",
                     ),
                     Exercise(
-                        "fedb-decline-crunch",
+                        "decline-crunch",
                         "Decline Crunch",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4036,7 +4036,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_349",
                     ),
                     Exercise(
-                        "fedb-decline-oblique-crunch",
+                        "decline-oblique-crunch",
                         "Decline Oblique Crunch",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4046,7 +4046,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_350",
                     ),
                     Exercise(
-                        "fedb-decline-reverse-crunch",
+                        "decline-reverse-crunch",
                         "Decline Reverse Crunch",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4056,7 +4056,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_351",
                     ),
                     Exercise(
-                        "fedb-dips-triceps-version",
+                        "dips-triceps-version",
                         "Dips - Triceps Version",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4066,7 +4066,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_352",
                     ),
                     Exercise(
-                        "fedb-double-leg-butt-kick",
+                        "double-leg-butt-kick",
                         "Double Leg Butt Kick",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4076,7 +4076,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_353",
                     ),
                     Exercise(
-                        "fedb-elbow-to-knee",
+                        "elbow-to-knee",
                         "Elbow to Knee",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4086,7 +4086,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_354",
                     ),
                     Exercise(
-                        "fedb-fast-skipping",
+                        "fast-skipping",
                         "Fast Skipping",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4096,7 +4096,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_355",
                     ),
                     Exercise(
-                        "fedb-flat-bench-leg-pull-in",
+                        "flat-bench-leg-pull-in",
                         "Flat Bench Leg Pull-In",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4106,7 +4106,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_356",
                     ),
                     Exercise(
-                        "fedb-flat-bench-lying-leg-raise",
+                        "flat-bench-lying-leg-raise",
                         "Flat Bench Lying Leg Raise",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4116,7 +4116,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_357",
                     ),
                     Exercise(
-                        "fedb-flutter-kicks",
+                        "flutter-kicks",
                         "Flutter Kicks",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4126,7 +4126,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_358",
                     ),
                     Exercise(
-                        "fedb-freehand-jump-squat",
+                        "freehand-jump-squat",
                         "Freehand Jump Squat",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4136,7 +4136,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_359",
                     ),
                     Exercise(
-                        "fedb-frog-sit-ups",
+                        "frog-sit-ups",
                         "Frog Sit-Ups",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4146,7 +4146,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_360",
                     ),
                     Exercise(
-                        "fedb-glute-kickback",
+                        "glute-kickback",
                         "Glute Kickback",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4156,7 +4156,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_361",
                     ),
                     Exercise(
-                        "fedb-gorilla-chin-crunch",
+                        "gorilla-chin-crunch",
                         "Gorilla Chin/Crunch",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4166,7 +4166,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_362",
                     ),
                     Exercise(
-                        "fedb-handstand-push-ups",
+                        "handstand-push-ups",
                         "Handstand Push-Ups",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4176,7 +4176,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_363",
                     ),
                     Exercise(
-                        "fedb-hanging-leg-raise",
+                        "hanging-leg-raise",
                         "Hanging Leg Raise",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4186,7 +4186,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_364",
                     ),
                     Exercise(
-                        "fedb-hanging-pike",
+                        "hanging-pike",
                         "Hanging Pike",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4196,7 +4196,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_365",
                     ),
                     Exercise(
-                        "fedb-hyperextensions-with-no-hyperextension-bench",
+                        "hyperextensions-with-no-hyperextension-bench",
                         "Hyperextensions With No Hyperextension Bench",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4206,7 +4206,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_366",
                     ),
                     Exercise(
-                        "fedb-incline-push-up",
+                        "incline-push-up",
                         "Incline Push-Up",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4216,7 +4216,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_367",
                     ),
                     Exercise(
-                        "fedb-incline-push-up-close-grip",
+                        "incline-push-up-close-grip",
                         "Incline Push-Up Close-Grip",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4226,7 +4226,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_368",
                     ),
                     Exercise(
-                        "fedb-incline-push-up-medium",
+                        "incline-push-up-medium",
                         "Incline Push-Up Medium",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4236,7 +4236,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_369",
                     ),
                     Exercise(
-                        "fedb-incline-push-up-reverse-grip",
+                        "incline-push-up-reverse-grip",
                         "Incline Push-Up Reverse Grip",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4246,7 +4246,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_370",
                     ),
                     Exercise(
-                        "fedb-incline-push-up-wide",
+                        "incline-push-up-wide",
                         "Incline Push-Up Wide",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4256,7 +4256,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_371",
                     ),
                     Exercise(
-                        "fedb-jackknife-sit-up",
+                        "jackknife-sit-up",
                         "Jackknife Sit-Up",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4266,7 +4266,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_372",
                     ),
                     Exercise(
-                        "fedb-janda-sit-up",
+                        "janda-sit-up",
                         "Janda Sit-Up",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4276,7 +4276,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_373",
                     ),
                     Exercise(
-                        "fedb-knee-tuck-jump",
+                        "knee-tuck-jump",
                         "Knee Tuck Jump",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4286,7 +4286,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_374",
                     ),
                     Exercise(
-                        "fedb-lateral-bound",
+                        "lateral-bound",
                         "Lateral Bound",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4296,7 +4296,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_375",
                     ),
                     Exercise(
-                        "fedb-leg-lift",
+                        "leg-lift",
                         "Leg Lift",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4306,7 +4306,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_376",
                     ),
                     Exercise(
-                        "fedb-leg-pull-in",
+                        "leg-pull-in",
                         "Leg Pull-In",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4316,7 +4316,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_377",
                     ),
                     Exercise(
-                        "fedb-ab-roller",
+                        "ab-roller",
                         "Ab Roller",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4326,7 +4326,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_378",
                     ),
                     Exercise(
-                        "fedb-atlas-stone-trainer",
+                        "atlas-stone-trainer",
                         "Atlas Stone Trainer",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4336,7 +4336,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_379",
                     ),
                     Exercise(
-                        "fedb-atlas-stones",
+                        "atlas-stones",
                         "Atlas Stones",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4346,7 +4346,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_380",
                     ),
                     Exercise(
-                        "fedb-axle-deadlift",
+                        "axle-deadlift",
                         "Axle Deadlift",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4356,7 +4356,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_381",
                     ),
                     Exercise(
-                        "fedb-back-flyes-with-bands",
+                        "back-flyes-with-bands",
                         "Back Flyes - With Bands",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4366,7 +4366,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_382",
                     ),
                     Exercise(
-                        "fedb-backward-drag",
+                        "backward-drag",
                         "Backward Drag",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4376,7 +4376,7 @@ object ExerciseCatalog {
                         imageName = "exercise_db_383",
                     ),
                     Exercise(
-                        "fedb-backward-medicine-ball-throw",
+                        "backward-medicine-ball-throw",
                         "Backward Medicine Ball Throw",
                         ExerciseType.REPETITIONS,
                         false,
@@ -4423,31 +4423,31 @@ object ExerciseCatalog {
             "split-squat-hold",
             "calf-raise-hold",
             "horse-stance",
-            "fedb-side-bridge",
-            "fedb-bodyweight-walking-lunge",
-            "fedb-3-4-sit-up",
-            "fedb-bench-dips",
-            "fedb-bent-knee-hip-raise",
-            "fedb-bodyweight-squat",
-            "fedb-butt-lift-bridge",
-            "fedb-chin-up",
-            "fedb-cross-body-crunch",
-            "fedb-crunch-hands-overhead",
-            "fedb-crunch-legs-on-exercise-ball",
-            "fedb-crunches",
-            "fedb-decline-crunch",
-            "fedb-decline-oblique-crunch",
-            "fedb-decline-reverse-crunch",
-            "fedb-dips-triceps-version",
-            "fedb-flat-bench-leg-pull-in",
-            "fedb-flat-bench-lying-leg-raise",
-            "fedb-frog-sit-ups",
-            "fedb-glute-kickback",
-            "fedb-hanging-leg-raise",
-            "fedb-hyperextensions-with-no-hyperextension-bench",
-            "fedb-jackknife-sit-up",
-            "fedb-leg-lift",
-            "fedb-leg-pull-in",
+            "side-bridge",
+            "bodyweight-walking-lunge",
+            "3-4-sit-up",
+            "bench-dips",
+            "bent-knee-hip-raise",
+            "bodyweight-squat",
+            "butt-lift-bridge",
+            "chin-up",
+            "cross-body-crunch",
+            "crunch-hands-overhead",
+            "crunch-legs-on-exercise-ball",
+            "crunches",
+            "decline-crunch",
+            "decline-oblique-crunch",
+            "decline-reverse-crunch",
+            "dips-triceps-version",
+            "flat-bench-leg-pull-in",
+            "flat-bench-lying-leg-raise",
+            "frog-sit-ups",
+            "glute-kickback",
+            "hanging-leg-raise",
+            "hyperextensions-with-no-hyperextension-bench",
+            "jackknife-sit-up",
+            "leg-lift",
+            "leg-pull-in",
         )
 
     private val weightedVariantImageNames =
@@ -4477,60 +4477,60 @@ object ExerciseCatalog {
             "band-shoulder-internal-rotation",
             "band-shoulder-external-rotation-90",
             "band-shoulder-internal-rotation-90",
-            "fedb-alternate-heel-touchers",
-            "fedb-alternate-leg-diagonal-bound",
-            "fedb-bodyweight-walking-lunge",
-            "fedb-3-4-sit-up",
-            "fedb-air-bike",
-            "fedb-bench-dips",
-            "fedb-bench-jump",
-            "fedb-bent-knee-hip-raise",
-            "fedb-body-up",
-            "fedb-body-tricep-press",
-            "fedb-bodyweight-squat",
-            "fedb-bottoms-up",
-            "fedb-butt-ups",
-            "fedb-butt-lift-bridge",
-            "fedb-chin-up",
-            "fedb-clock-push-up",
-            "fedb-close-grip-push-up-off-of-a-dumbbell",
-            "fedb-cocoons",
-            "fedb-cross-body-crunch",
-            "fedb-crunch-hands-overhead",
-            "fedb-crunch-legs-on-exercise-ball",
-            "fedb-crunches",
-            "fedb-dead-bug",
-            "fedb-decline-crunch",
-            "fedb-decline-oblique-crunch",
-            "fedb-decline-reverse-crunch",
-            "fedb-dips-triceps-version",
-            "fedb-double-leg-butt-kick",
-            "fedb-elbow-to-knee",
-            "fedb-fast-skipping",
-            "fedb-flat-bench-leg-pull-in",
-            "fedb-flat-bench-lying-leg-raise",
-            "fedb-flutter-kicks",
-            "fedb-freehand-jump-squat",
-            "fedb-frog-sit-ups",
-            "fedb-glute-kickback",
-            "fedb-gorilla-chin-crunch",
-            "fedb-handstand-push-ups",
-            "fedb-hanging-leg-raise",
-            "fedb-hanging-pike",
-            "fedb-hyperextensions-with-no-hyperextension-bench",
-            "fedb-incline-push-up",
-            "fedb-incline-push-up-close-grip",
-            "fedb-incline-push-up-medium",
-            "fedb-incline-push-up-reverse-grip",
-            "fedb-incline-push-up-wide",
-            "fedb-jackknife-sit-up",
-            "fedb-janda-sit-up",
-            "fedb-knee-tuck-jump",
-            "fedb-lateral-bound",
-            "fedb-leg-lift",
-            "fedb-leg-pull-in",
-            "fedb-ab-roller",
-            "fedb-back-flyes-with-bands",
-            "fedb-bodyweight-flyes",
+            "alternate-heel-touchers",
+            "alternate-leg-diagonal-bound",
+            "bodyweight-walking-lunge",
+            "3-4-sit-up",
+            "air-bike",
+            "bench-dips",
+            "bench-jump",
+            "bent-knee-hip-raise",
+            "body-up",
+            "body-tricep-press",
+            "bodyweight-squat",
+            "bottoms-up",
+            "butt-ups",
+            "butt-lift-bridge",
+            "chin-up",
+            "clock-push-up",
+            "close-grip-push-up-off-of-a-dumbbell",
+            "cocoons",
+            "cross-body-crunch",
+            "crunch-hands-overhead",
+            "crunch-legs-on-exercise-ball",
+            "crunches",
+            "dead-bug",
+            "decline-crunch",
+            "decline-oblique-crunch",
+            "decline-reverse-crunch",
+            "dips-triceps-version",
+            "double-leg-butt-kick",
+            "elbow-to-knee",
+            "fast-skipping",
+            "flat-bench-leg-pull-in",
+            "flat-bench-lying-leg-raise",
+            "flutter-kicks",
+            "freehand-jump-squat",
+            "frog-sit-ups",
+            "glute-kickback",
+            "gorilla-chin-crunch",
+            "handstand-push-ups",
+            "hanging-leg-raise",
+            "hanging-pike",
+            "hyperextensions-with-no-hyperextension-bench",
+            "incline-push-up",
+            "incline-push-up-close-grip",
+            "incline-push-up-medium",
+            "incline-push-up-reverse-grip",
+            "incline-push-up-wide",
+            "jackknife-sit-up",
+            "janda-sit-up",
+            "knee-tuck-jump",
+            "lateral-bound",
+            "leg-lift",
+            "leg-pull-in",
+            "ab-roller",
+            "back-flyes-with-bands",
+            "bodyweight-flyes",
         )
 }

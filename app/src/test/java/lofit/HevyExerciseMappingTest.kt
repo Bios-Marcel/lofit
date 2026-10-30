@@ -1,7 +1,9 @@
 package lofit
 
+import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HevyExerciseMappingTest {
@@ -14,6 +16,66 @@ class HevyExerciseMappingTest {
 
     private fun set(weight: Double = 0.0) =
         LoggedSet(type = SetType.NORMAL, weightKg = weight, reps = 8)
+
+    @Test
+    fun staticMatchesExistInBundledCatalogAndKeepTheirMetrics() {
+        val text = File("src/main/assets/hevy_exercise_templates.json").readText()
+        val templates =
+            Regex("""\{\s*"id": "([^"]+)",\s*"title": "([^"]+)",\s*"type": "([^"]+)"""")
+                .findAll(text)
+                .map { match ->
+                    HevyTemplate(
+                        match.groupValues[1],
+                        match.groupValues[2],
+                        match.groupValues[3],
+                    )
+                }
+                .toList()
+        assertTrue(templates.isNotEmpty())
+        val exercises = ExerciseCatalog.exercises().associateBy { it.id }
+        HevyExerciseMapping.defaultTemplateIds.forEach { (exerciseId, templateId) ->
+            val exercise = requireNotNull(exercises[exerciseId])
+            assertEquals(
+                exerciseId,
+                templateId,
+                HevyExerciseMapping.find(
+                        exercise,
+                        listOf(set(if (exercise.weighted) 10.0 else 0.0)),
+                        templates,
+                    )
+                    ?.id,
+            )
+        }
+    }
+
+    @Test
+    fun staticMatchesChooseMovementAndEquipmentOverSimilarNames() {
+        val templates =
+            listOf(
+                HevyTemplate("AC5A4C58", "Hack Squat", "weight_reps"),
+                HevyTemplate("D04AC939", "Squat (Barbell)", "weight_reps"),
+                HevyTemplate("C7973E0E", "Leg Press (Machine)", "weight_reps"),
+            )
+        val exercises = ExerciseCatalog.exercises().associateBy { it.id }
+        assertEquals(
+            "D04AC939",
+            HevyExerciseMapping.find(
+                    exercises.getValue("back-squat"),
+                    listOf(set(60.0)),
+                    templates,
+                )
+                ?.id,
+        )
+        assertEquals(
+            "C7973E0E",
+            HevyExerciseMapping.find(
+                    exercises.getValue("leg-press"),
+                    listOf(set(60.0)),
+                    templates,
+                )
+                ?.id,
+        )
+    }
 
     @Test
     fun knownAliasMapsToCompatibleDefaultOnly() {

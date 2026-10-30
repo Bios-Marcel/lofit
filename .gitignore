@@ -14,4 +14,5 @@
 /captures
 .externalNativeBuild
 .cxx
+/hevy-cache/
 local.properties

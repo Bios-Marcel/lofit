@@ -144,9 +144,100 @@ class JsonStorageMigrationTest {
 
         assertEquals("Past", loaded.data.history.single().name)
         assertFalse(JSONObject(stateFile.readText()).has("history"))
-        assertEquals(3, JSONObject(stateFile.readText()).getInt("schemaVersion"))
+        assertEquals(4, JSONObject(stateFile.readText()).getInt("schemaVersion"))
         assertEquals(legacy, File(context.filesDir, "state-before-migration-v3.json").readText())
         assertEquals(loaded.data, LofitRepository(context).data)
+    }
+
+    @Test
+    fun versionThreeMigration_rewritesLegacyExerciseIdsAcrossStateAndHistory() {
+        val repository = LofitRepository(context)
+        val ids = listOf("barbell-curl", "weighted-crunches")
+        val routine =
+            Routine(
+                name = "Old routine",
+                exercises = ids.map { RoutineExercise(exerciseId = it) }.toMutableList(),
+            )
+        repository.data.routines.add(routine)
+        repository.data.activeWorkout =
+            WorkoutSession(
+                name = "Active",
+                sourceRoutine = routine,
+                exercises = ids.map { WorkoutExercise(exerciseId = it) }.toMutableList(),
+            )
+        repository.data.history.add(
+            WorkoutSession(
+                name = "Past",
+                completedAt = 200,
+                sourceRoutine = routine,
+                exercises = ids.map { WorkoutExercise(exerciseId = it) }.toMutableList(),
+            )
+        )
+        val exercise = repository.data.exercises.first { it.id == "barbell-curl" }
+        val set = LoggedSet(type = SetType.NORMAL, weightKg = 12.0, reps = 8)
+        repository.data.exerciseRecords[exercise.id] =
+            mutableListOf(ExerciseRecord(exercise, set, set))
+        repository.data.exerciseLastSelectedAt[exercise.id] = 123L
+        repository.saveHistory()
+        repository.save()
+
+        val legacyIds =
+            mapOf(
+                "barbell-curl" to "fedb-barbell-curl",
+                "weighted-crunches" to "weighted-fedb-crunches",
+            )
+        fun oldId(id: String) = legacyIds[id] ?: id
+        fun changeRoutine(value: JSONObject) {
+            val items = value.getJSONArray("exercises")
+            for (index in 0 until items.length()) {
+                val item = items.getJSONObject(index)
+                item.put("exerciseId", oldId(item.getString("exerciseId")))
+            }
+        }
+        fun changeWorkout(value: JSONObject) {
+            changeRoutine(value.getJSONObject("sourceRoutine"))
+            val items = value.getJSONArray("exercises")
+            for (index in 0 until items.length()) {
+                val item = items.getJSONObject(index)
+                item.put("exerciseId", oldId(item.getString("exerciseId")))
+            }
+        }
+        val root = JSONObject(stateFile.readText()).put("schemaVersion", 3)
+        val exercises = root.getJSONArray("exercises")
+        for (index in 0 until exercises.length()) {
+            val item = exercises.getJSONObject(index)
+            item.put("id", oldId(item.getString("id")))
+        }
+        changeRoutine(root.getJSONArray("routines").getJSONObject(0))
+        changeWorkout(root.getJSONObject("activeWorkout"))
+        val records = root.getJSONObject("exerciseRecords")
+        records.put(oldId(exercise.id), records.remove(exercise.id))
+        val selected = root.getJSONObject("exerciseLastSelectedAt")
+        selected.put(oldId(exercise.id), selected.remove(exercise.id))
+        val history = JSONArray(context.repositoryHistoryFile.readText())
+        changeWorkout(history.getJSONObject(0))
+        val oldState = root.toString()
+        val oldHistory = history.toString()
+        stateFile.writeText(oldState)
+        context.repositoryHistoryFile.writeText(oldHistory)
+
+        val migrated = LofitRepository(context).data
+
+        assertEquals(4, JSONObject(stateFile.readText()).getInt("schemaVersion"))
+        assertEquals(ids, migrated.routines.single().exercises.map { it.exerciseId })
+        assertEquals(ids, migrated.activeWorkout!!.exercises.map { it.exerciseId })
+        assertEquals(ids, migrated.activeWorkout!!.sourceRoutine!!.exercises.map { it.exerciseId })
+        assertEquals(ids, migrated.history.single().exercises.map { it.exerciseId })
+        assertEquals(ids, migrated.history.single().sourceRoutine!!.exercises.map { it.exerciseId })
+        assertEquals(1, migrated.exerciseRecords.getValue(exercise.id).size)
+        assertEquals(123L, migrated.exerciseLastSelectedAt[exercise.id])
+        assertFalse(migrated.exercises.any { it.id in legacyIds.values })
+        assertEquals(oldState, File(context.filesDir, "state-before-migration-v4.json").readText())
+        assertEquals(
+            oldHistory,
+            File(context.filesDir, "history-before-migration-v4.json").readText(),
+        )
+        assertEquals(migrated, LofitRepository(context).data)
     }
 
     @Test
@@ -189,7 +280,7 @@ class JsonStorageMigrationTest {
     @Test
     fun invalidOrFutureJson_doesNotFallBackToStaleXmlOrOverwriteEitherFile() {
         val xml = seedXml(sampleJson())
-        listOf("broken JSON", """{"schemaVersion":4}""").forEach { raw ->
+        listOf("broken JSON", """{"schemaVersion":5}""").forEach { raw ->
             stateFile.writeText(raw)
 
             assertThrows(Exception::class.java) { LofitRepository(context) }
@@ -216,7 +307,7 @@ class JsonStorageMigrationTest {
         val valid = sampleJson()
         listOf(
                 "broken JSON",
-                """{"schemaVersion":4}""",
+                """{"schemaVersion":5}""",
                 """{"exercises":[{"id":"bad","name":"Bad","type":"UNKNOWN"}]}""",
             )
             .forEach { raw ->
@@ -313,7 +404,7 @@ class JsonStorageMigrationTest {
         LofitRepository(context)
 
         assertEquals("original backup", backup.readText())
-        assertEquals(3, JSONObject(stateFile.readText()).getInt("schemaVersion"))
+        assertEquals(4, JSONObject(stateFile.readText()).getInt("schemaVersion"))
     }
 
     private fun seedXml(raw: String): ByteArray {

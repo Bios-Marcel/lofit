@@ -8,7 +8,7 @@ import org.json.JSONObject
 
 class LofitRepository(context: Context) {
     private companion object {
-        const val SCHEMA_VERSION = 3
+        const val SCHEMA_VERSION = 4
     }
 
     private val stateFile = AtomicFile(File(context.filesDir, "lofit-data.json"))
@@ -49,7 +49,22 @@ class LofitRepository(context: Context) {
         val root = JSONObject(raw)
         return when (val version = root.optInt("schemaVersion", 0)) {
             // LEGACY: Schema 2 embeds history in the state file; move it to its own file.
-            2 -> persistMigration(raw, decode(root), "state-before-migration-v3")
+            2 -> {
+                migrateLegacyExerciseIds(root, root.getJSONArray("history"))
+                persistMigration(raw, decode(root), "state-before-migration-v3")
+            }
+            // LEGACY: Schema 3 uses the old exercise IDs in state and separate history.
+            3 -> {
+                val historyRaw = historyFile.readFully().toString(Charsets.UTF_8)
+                val history = JSONArray(historyRaw)
+                migrateLegacyExerciseIds(root, history)
+                persistMigration(
+                    raw,
+                    decode(root, history.mapObjects(::decodeWorkout).toMutableList()),
+                    "state-before-migration-v4",
+                    historyRaw,
+                )
+            }
             SCHEMA_VERSION -> {
                 val history = historyFile.readFully().toString(Charsets.UTF_8)
                 decode(root, JSONArray(history).mapObjects(::decodeWorkout).toMutableList()).also {
@@ -61,7 +76,12 @@ class LofitRepository(context: Context) {
         }
     }
 
-    private fun persistMigration(raw: String, data: AppData, backupKey: String): AppData {
+    private fun persistMigration(
+        raw: String,
+        data: AppData,
+        backupKey: String,
+        historyBackupRaw: String? = null,
+    ): AppData {
         val migrated = encode(data)
         val history = encodeHistory(data.history).toString()
         // Validate before changing stored data, and keep the original for recovery.
@@ -69,9 +89,93 @@ class LofitRepository(context: Context) {
             decode(migrated, JSONArray(history).mapObjects(::decodeWorkout).toMutableList())
         val backup = AtomicFile(File(stateFile.baseFile.parentFile, "$backupKey.json"))
         if (!exists(backup)) write(raw, backup)
+        if (historyBackupRaw != null) {
+            val historyBackup =
+                AtomicFile(File(stateFile.baseFile.parentFile, "history-before-migration-v4.json"))
+            if (!exists(historyBackup)) write(historyBackupRaw, historyBackup)
+        }
         write(history, historyFile)
         write(migrated.toString())
         return loaded
+    }
+
+    private fun migrateLegacyExerciseIds(root: JSONObject, history: JSONArray) {
+        val defaultIds = DefaultData.exercises().mapTo(mutableSetOf()) { it.id }
+
+        // LEGACY: Previous built-in IDs used this prefix, including weighted copies.
+        fun candidateId(id: String): String =
+            when {
+                id.startsWith("weighted-fedb-") -> "weighted-" + id.removePrefix("weighted-fedb-")
+                id.startsWith("fedb-") -> id.removePrefix("fedb-")
+                else -> id
+            }
+
+        val exercises = root.getJSONArray("exercises")
+        val legacyDefaultIds =
+            (0 until exercises.length())
+                .map { exercises.getJSONObject(it) }
+                .filter { !it.getBoolean("custom") }
+                .map { it.getString("id") }
+                .filter { candidateId(it) != it && candidateId(it) in defaultIds }
+                .toSet()
+        fun currentId(id: String): String = if (id in legacyDefaultIds) candidateId(id) else id
+
+        fun migrateRoutine(routine: JSONObject) {
+            val exercises = routine.getJSONArray("exercises")
+            for (index in 0 until exercises.length()) {
+                val item = exercises.getJSONObject(index)
+                item.put("exerciseId", currentId(item.getString("exerciseId")))
+            }
+        }
+
+        fun migrateWorkout(workout: JSONObject) {
+            if (!workout.isNull("sourceRoutine"))
+                migrateRoutine(workout.getJSONObject("sourceRoutine"))
+            val exercises = workout.getJSONArray("exercises")
+            for (index in 0 until exercises.length()) {
+                val item = exercises.getJSONObject(index)
+                item.put("exerciseId", currentId(item.getString("exerciseId")))
+            }
+        }
+
+        for (index in 0 until exercises.length()) {
+            val item = exercises.getJSONObject(index)
+            if (!item.getBoolean("custom")) item.put("id", currentId(item.getString("id")))
+        }
+        val routines = root.getJSONArray("routines")
+        for (index in 0 until routines.length()) migrateRoutine(routines.getJSONObject(index))
+        if (!root.isNull("activeWorkout")) migrateWorkout(root.getJSONObject("activeWorkout"))
+        for (index in 0 until history.length()) migrateWorkout(history.getJSONObject(index))
+
+        root.optJSONObject("exerciseRecords")?.let { records ->
+            records.keys().asSequence().toList().forEach { oldId ->
+                val newId = currentId(oldId)
+                if (newId != oldId) {
+                    val oldEntries = records.getJSONArray(oldId)
+                    val newEntries = records.optJSONArray(newId)
+                    if (newEntries == null) records.put(newId, oldEntries)
+                    else
+                        for (index in 0 until oldEntries.length()) newEntries.put(
+                            oldEntries.get(index)
+                        )
+                    records.remove(oldId)
+                }
+            }
+        }
+        root.optJSONObject("exerciseLastSelectedAt")?.let { timestamps ->
+            timestamps.keys().asSequence().toList().forEach { oldId ->
+                val newId = currentId(oldId)
+                if (newId != oldId) {
+                    val timestamp = timestamps.getLong(oldId)
+                    timestamps.put(
+                        newId,
+                        if (timestamps.has(newId)) maxOf(timestamp, timestamps.getLong(newId))
+                        else timestamp,
+                    )
+                    timestamps.remove(oldId)
+                }
+            }
+        }
     }
 
     private fun exists(file: AtomicFile): Boolean =

@@ -186,7 +186,7 @@ class WorkoutFlowTest {
                                     },
                             ),
                             WorkoutExercise(
-                                exerciseId = "fedb-barbell-curl",
+                                exerciseId = "barbell-curl",
                                 plannedSets = MutableList(8) { PlannedSet() },
                             ),
                         ),

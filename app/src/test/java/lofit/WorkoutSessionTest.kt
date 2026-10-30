@@ -427,13 +427,15 @@ class WorkoutSessionTest {
         )
         assert(exercises.any { it.type == ExerciseType.REPETITIONS })
         assert(exercises.count { it.type == ExerciseType.TIMED } >= 80)
+        assertEquals(exercises.size, exercises.map { it.id }.toSet().size)
+        assertTrue(exercises.none { "fedb-" in it.id })
         assertFalse(exercises.single { it.id == "push-up" }.weighted)
         assertTrue(exercises.single { it.id == "bench-press" }.weighted)
         assertTrue(exercises.single { it.id == "incline-dumbbell-bench-press" }.weighted)
         assertTrue(exercises.single { it.id == "cable-tricep-extension" }.weighted)
         assertFalse(exercises.single { it.id == "plank" }.weighted)
         assertTrue(exercises.single { it.id == "farmer-carry" }.weighted)
-        assertFalse(exercises.single { it.id == "fedb-bodyweight-flyes" }.weighted)
+        assertFalse(exercises.single { it.id == "bodyweight-flyes" }.weighted)
         val weightedCopies = exercises.filter { it.id.startsWith("weighted-") }
         assertEquals(40, weightedCopies.size)
         weightedCopies.forEach { copy ->

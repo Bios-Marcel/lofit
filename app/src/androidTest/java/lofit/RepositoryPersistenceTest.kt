@@ -207,7 +207,7 @@ class RepositoryPersistenceTest {
 
     @Test
     fun startup_badJsonAndNewerSchemaNeverBecomeEmptyData() {
-        listOf("broken JSON", """{"schemaVersion":4,"exercises":[]}""").forEach { raw ->
+        listOf("broken JSON", """{"schemaVersion":5,"exercises":[]}""").forEach { raw ->
             store(raw)
             assertThrows(Exception::class.java) { LofitRepository(context) }
             assertEquals(raw, stored())

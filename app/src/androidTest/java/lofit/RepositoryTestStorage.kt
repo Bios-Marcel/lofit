@@ -19,6 +19,8 @@ internal fun Context.clearRepositoryTestData() {
     AtomicFile(repositoryStateFile).delete()
     AtomicFile(repositoryHistoryFile).delete()
     AtomicFile(File(filesDir, "state-before-migration-v3.json")).delete()
+    AtomicFile(File(filesDir, "state-before-migration-v4.json")).delete()
+    AtomicFile(File(filesDir, "history-before-migration-v4.json")).delete()
 }
 
 // Storage tests must not clear the installed app's workouts or migration backups.

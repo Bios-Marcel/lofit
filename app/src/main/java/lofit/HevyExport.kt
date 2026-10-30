@@ -115,14 +115,23 @@ class HevyExport(private val context: Context, private val settings: HevySetting
         check(key != null || bearer != null) { "Set a Hevy bearer token or API key in Settings" }
         val remoteId = settings.remoteWorkoutId(workout.id)
         if (key == null && remoteId != null) return "Already exported to Hevy"
-        val templates =
-            if (key != null) loadPublicTemplates(key) else loadPrivateTemplates(bearer!!)
+        val templates = loadBundledTemplates()
+        var accountTemplatesLoaded = false
         val exercises = catalog.associateBy { it.id }
         val hevyExercises = JSONArray()
         workout.exercises
             .filter { it.sets.isNotEmpty() }
             .forEach { item ->
                 val exercise = exercises[item.exerciseId] ?: error("Exercise missing from library")
+                if (
+                    !accountTemplatesLoaded &&
+                        HevyExerciseMapping.find(exercise, item.sets, templates) == null
+                ) {
+                    // LEGACY: Account templates still cover custom exercises and missing defaults.
+                    if (key == null) appendPrivateTemplates(bearer!!, templates)
+                    else templates.addAll(loadPublicTemplates(key))
+                    accountTemplatesLoaded = true
+                }
                 val template = resolveTemplate(exercise, item.sets, templates, key, bearer)
                 val note = exerciseNote(exercise, item, template)
                 val sets = JSONArray()
@@ -253,8 +262,15 @@ class HevyExport(private val context: Context, private val settings: HevySetting
         item: WorkoutExercise,
         template: HevyTemplate,
     ): String {
-        if (template.title.startsWith("Placeholder ")) return exercise.name
         return buildString {
+            // LEGACY: Generic templates need the Lofit name to keep the specific movement visible.
+            if (
+                template.title.startsWith("Placeholder ") ||
+                    (template.title in setOf("Stretching", "Warm Up") &&
+                        exercise.name != template.title)
+            ) {
+                append(exercise.name)
+            }
             if (exercise.asymmetric && item.sets.any { it.side != Side.BOTH }) {
                 if (isNotEmpty()) append("\n")
                 append("Set sides: ")
@@ -271,7 +287,7 @@ class HevyExport(private val context: Context, private val settings: HevySetting
         }
     }
 
-    private fun loadPrivateTemplates(token: String): MutableList<HevyTemplate> {
+    private fun loadBundledTemplates(): MutableList<HevyTemplate> {
         val templates = mutableListOf<HevyTemplate>()
         val bundled =
             JSONArray(
@@ -285,6 +301,10 @@ class HevyExport(private val context: Context, private val settings: HevySetting
                 HevyTemplate(item.getString("id"), item.getString("title"), item.getString("type"))
             )
         }
+        return templates
+    }
+
+    private fun appendPrivateTemplates(token: String, templates: MutableList<HevyTemplate>) {
         val custom =
             JSONArray(
                 request("GET", "/custom_exercise_templates", bearer = token).requireSuccess().body
@@ -302,7 +322,6 @@ class HevyExport(private val context: Context, private val settings: HevySetting
                 )
             }
         }
-        return templates
     }
 
     private fun loadPublicTemplates(key: String): MutableList<HevyTemplate> {
