@@ -117,6 +117,7 @@ class MainActivity : AppCompatActivity() {
 
     private enum class PickerTarget {
         WORKOUT,
+        HISTORY,
         ROUTINE,
     }
 
@@ -172,13 +173,19 @@ class MainActivity : AppCompatActivity() {
             val target: PickerTarget,
             val returnScrollY: Int? = null,
             val selectedIds: MutableSet<String> = linkedSetOf(),
+            val historyWorkoutId: String? = null,
+            val historyReturnScrollY: Int = 0,
         ) : Route()
 
         data class RoutineEditor(val originalId: String?) : Route()
 
         data class ExerciseEditor(val exerciseId: String?) : Route()
 
-        data class WorkoutHistory(val workoutId: String, val returnScrollY: Int) : Route()
+        data class WorkoutHistory(
+            val workoutId: String,
+            val returnScrollY: Int,
+            val editing: Boolean = false,
+        ) : Route()
 
         data class ExerciseTrend(
             val exerciseId: String,
@@ -219,6 +226,7 @@ class MainActivity : AppCompatActivity() {
     private var calendarPage = 0
     private var muscleSpanDays = 28L
     private var routineDraft: Routine? = null
+    private var historyEditDraft: WorkoutSession? = null
     private var exerciseDraft: Bundle? = null
     private val exercisePictures by lazy { ExercisePictures(this) }
     private val pictureWorker = Executors.newSingleThreadExecutor()
@@ -569,10 +577,13 @@ class MainActivity : AppCompatActivity() {
                 is Route.ExercisePicker -> exercisePickerScreen(activeRoute)
                 is Route.RoutineEditor -> routineEditorScreen(activeRoute.originalId)
                 is Route.ExerciseEditor -> exerciseEditorScreen(activeRoute.exerciseId)
-                is Route.WorkoutHistory ->
-                    repository.data.history
-                        .firstOrNull { it.id == activeRoute.workoutId }
-                        ?.let(::pastWorkoutScreen) ?: historyScreen()
+                is Route.WorkoutHistory -> {
+                    val workout =
+                        if (activeRoute.editing)
+                            historyEditDraft?.takeIf { it.id == activeRoute.workoutId }
+                        else repository.data.history.firstOrNull { it.id == activeRoute.workoutId }
+                    workout?.let { pastWorkoutScreen(it, activeRoute.editing) } ?: historyScreen()
+                }
                 is Route.ExerciseTrend -> exerciseTrendScreen(activeRoute)
                 is Route.Confirm -> confirmationScreen(activeRoute)
             }
@@ -1238,8 +1249,10 @@ class MainActivity : AppCompatActivity() {
         onReorderHandleReady: (View) -> Unit,
         onDoneStateUpdaterReady: (String, (Set<String>) -> Unit) -> Unit,
         onSetsChanged: () -> Unit,
+        editingHistory: Boolean = false,
     ): View =
         card(horizontalPadding = 0) {
+            val saveChanges: () -> Unit = if (editingHistory) ({}) else repository::save
             addView(
                 exerciseHeading(
                     exercise,
@@ -1260,7 +1273,7 @@ class MainActivity : AppCompatActivity() {
                     exercise,
                     previousNote = item.previousNote,
                     onChange = { item.note = it },
-                    onCommit = repository::save,
+                    onCommit = saveChanges,
                 ),
                 insetCardLayoutParams().apply {
                     topMargin = dp(8)
@@ -1307,9 +1320,9 @@ class MainActivity : AppCompatActivity() {
                 item.plannedSets.forEachIndexed { setIndex, set ->
                     updateRowIndices[set.id]?.invoke(setIndex)
                 }
-                repository.save()
+                saveChanges()
                 onSetsChanged()
-                updateWorkoutNotification(force = true)
+                if (!editingHistory) updateWorkoutNotification(force = true)
             }
             fun addWorkoutSetRow(plannedSet: PlannedSet, setIndex: Int) {
                 val loggedSet = loggedSetFor(item, plannedSet)
@@ -1341,7 +1354,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 lateinit var activeHoldAmount: EditText
                 val holdButton =
-                    if (exercise.type.tracksDuration)
+                    if (exercise.type.tracksDuration && !editingHistory)
                         TextView(this@MainActivity).apply {
                             text = if (isActiveHold(item, plannedSet)) "■" else "▶"
                             textSize = 18f
@@ -1423,7 +1436,7 @@ class MainActivity : AppCompatActivity() {
                             loggedSetFor(item, plannedSet)?.let {
                                 syncLoggedSet(it, plannedSet, exercise)
                             }
-                            repository.save()
+                            saveChanges()
                             onSetsChanged()
                         },
                     )
@@ -1435,12 +1448,13 @@ class MainActivity : AppCompatActivity() {
                             stopActiveHold()
                         val loggedSet = loggedSetFor(item, plannedSet)
                         if (loggedSet == null) {
-                            val newSet = loggedSetFrom(plannedSet, exercise)
+                            val newSet = loggedSetFrom(plannedSet, exercise, workout.completedAt)
                             item.sets.add(newSet)
                         } else {
                             syncLoggedSet(loggedSet, plannedSet, exercise)
                         }
-                        if (!completingHoldAutomatically) startRest(item, workout)
+                        if (!editingHistory && !completingHoldAutomatically)
+                            startRest(item, workout)
                     } else {
                         loggedSetFor(item, plannedSet)?.let { removedSet ->
                             item.sets.remove(removedSet)
@@ -1449,9 +1463,9 @@ class MainActivity : AppCompatActivity() {
                     setRow.setBackgroundColor(
                         if (checked) color(R.color.done_green) else Color.TRANSPARENT
                     )
-                    repository.save()
+                    saveChanges()
                     onSetsChanged()
-                    updateWorkoutNotification(force = true)
+                    if (!editingHistory) updateWorkoutNotification(force = true)
                 }
                 rowViews[plannedSet.id] = setRow
                 setRows.addView(setRow)
@@ -1468,15 +1482,15 @@ class MainActivity : AppCompatActivity() {
                             ?.copy(id = UUID.randomUUID().toString(), actualHoldSeconds = null)
                             ?: PlannedSet(holdSeconds = exercise.minimumHoldSeconds)
                     item.plannedSets.add(next)
-                    repository.save()
+                    saveChanges()
                     addWorkoutSetRow(next, item.plannedSets.lastIndex)
-                    updateWorkoutNotification(force = true)
+                    if (!editingHistory) updateWorkoutNotification(force = true)
                 }
             )
             addView(
                 restOverrideInput(item.restSecondsOverride) { seconds ->
                     item.restSecondsOverride = seconds
-                    repository.save()
+                    saveChanges()
                 },
                 insetCardLayoutParams(),
             )
@@ -1707,35 +1721,49 @@ class MainActivity : AppCompatActivity() {
             WindowCompat.getInsetsController(window, search).hide(WindowInsetsCompat.Type.ime())
             search.clearFocus()
             movements.forEach { movement ->
-                if (target == PickerTarget.WORKOUT) {
-                    val item =
-                        repository.data.lastKnownExercise(
-                            movement.id,
-                            preferredRoutineId = repository.data.activeWorkout?.sourceRoutine?.id,
-                        ) ?: WorkoutExercise(exerciseId = movement.id)
-                    repository.data.activeWorkout?.exercises?.add(item)
-                } else {
-                    routineDraft
-                        ?.exercises
-                        ?.add(
-                            RoutineExercise(
-                                exerciseId = movement.id,
-                                plannedSets =
-                                    MutableList(3) {
-                                        PlannedSet(holdSeconds = movement.minimumHoldSeconds)
-                                    },
+                when (target) {
+                    PickerTarget.WORKOUT,
+                    PickerTarget.HISTORY -> {
+                        val workout =
+                            if (target == PickerTarget.HISTORY)
+                                historyEditDraft?.takeIf { it.id == picker.historyWorkoutId }
+                            else repository.data.activeWorkout
+                        val item =
+                            repository.data.lastKnownExercise(
+                                movement.id,
+                                preferredRoutineId = workout?.sourceRoutine?.id,
+                            ) ?: WorkoutExercise(exerciseId = movement.id)
+                        workout?.exercises?.add(item)
+                    }
+                    PickerTarget.ROUTINE ->
+                        routineDraft
+                            ?.exercises
+                            ?.add(
+                                RoutineExercise(
+                                    exerciseId = movement.id,
+                                    plannedSets =
+                                        MutableList(3) {
+                                            PlannedSet(holdSeconds = movement.minimumHoldSeconds)
+                                        },
+                                )
                             )
-                        )
                 }
             }
             route =
-                if (target == PickerTarget.WORKOUT) Route.Root
-                else {
-                    Route.RoutineEditor(
-                        repository.data.routines.firstOrNull { it.id == routineDraft?.id }?.id
-                    )
+                when (target) {
+                    PickerTarget.WORKOUT -> Route.Root
+                    PickerTarget.HISTORY ->
+                        Route.WorkoutHistory(
+                            picker.historyWorkoutId ?: return,
+                            picker.historyReturnScrollY,
+                            editing = true,
+                        )
+                    PickerTarget.ROUTINE ->
+                        Route.RoutineEditor(
+                            repository.data.routines.firstOrNull { it.id == routineDraft?.id }?.id
+                        )
                 }
-            repository.save()
+            if (target != PickerTarget.HISTORY) repository.save()
             render(scrollToBottom = true)
         }
         val addSelected =
@@ -2324,7 +2352,7 @@ class MainActivity : AppCompatActivity() {
                                 orientation = LinearLayout.HORIZONTAL
                                 gravity = Gravity.CENTER_VERTICAL
                                 addView(
-                                    actionButton("View workout") {
+                                    actionButton("View") {
                                             openWorkoutHistory(workout)
                                         }
                                         .apply {
@@ -2336,11 +2364,25 @@ class MainActivity : AppCompatActivity() {
                                             1f,
                                         )
                                         .apply {
-                                            marginEnd = dp(12)
+                                            marginEnd = dp(8)
                                         },
                                 )
                                 addView(
-                                    actionButton("Create routine", secondary = true) {
+                                    actionButton("Edit", secondary = true) {
+                                            openWorkoutHistory(workout, editing = true)
+                                        }
+                                        .apply {
+                                            contentDescription = "Edit ${workout.name}"
+                                        },
+                                    LinearLayout.LayoutParams(
+                                            0,
+                                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                                            1f,
+                                        )
+                                        .apply { marginEnd = dp(8) },
+                                )
+                                addView(
+                                    actionButton("Create Routine", secondary = true) {
                                             routineDraft = workout.toRoutine()
                                             route = Route.RoutineEditor(null)
                                             render()
@@ -2393,13 +2435,48 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-    private fun openWorkoutHistory(workout: WorkoutSession) {
+    private fun openWorkoutHistory(workout: WorkoutSession, editing: Boolean = false) {
+        historyEditDraft = if (editing) workout.editableCopy() else null
         route =
-            Route.WorkoutHistory(workout.id, (content.getChildAt(0) as? ScrollView)?.scrollY ?: 0)
+            Route.WorkoutHistory(
+                workout.id,
+                (content.getChildAt(0) as? ScrollView)?.scrollY ?: 0,
+                editing,
+            )
         render()
     }
 
-    private fun pastWorkoutScreen(workout: WorkoutSession): View =
+    private fun WorkoutSession.editableCopy(): WorkoutSession =
+        copy(
+            intervals = intervals.toMutableList(),
+            exercises =
+                exercises
+                    .map { item ->
+                        item.copy(
+                            sets = item.sets.map { it.copy() }.toMutableList(),
+                            plannedSets = item.plannedSets.map { it.copy() }.toMutableList(),
+                        )
+                    }
+                    .toMutableList(),
+        )
+
+    private fun finishHistoryEdit(save: Boolean, activeRoute: Route.WorkoutHistory) {
+        val draft = historyEditDraft?.takeIf { it.id == activeRoute.workoutId }
+        if (save && draft != null) {
+            val index = repository.data.history.indexOfFirst { it.id == draft.id }
+            if (index >= 0) {
+                val original = repository.data.history[index]
+                repository.data.history[index] =
+                    draft.copy(intervals = original.intervals.toMutableList())
+                repository.saveHistory()
+            }
+        }
+        historyEditDraft = null
+        route = Route.Root
+        render(activeRoute.returnScrollY)
+    }
+
+    private fun pastWorkoutScreen(workout: WorkoutSession, editing: Boolean): View =
         page(
             workout.name,
             DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
@@ -2415,85 +2492,149 @@ class MainActivity : AppCompatActivity() {
                 )
             )
             workout.bodyWeightKg?.let { body.addView(bodyWeightText(it)) }
-            body.addView(metaText("Set Rest: ${workout.defaultRestSeconds}s"))
+            if (editing) {
+                body.addView(
+                    restInput(workout.defaultRestSeconds) { seconds ->
+                        workout.defaultRestSeconds = seconds
+                    }
+                )
+            } else body.addView(metaText("Set Rest: ${workout.defaultRestSeconds}s"))
+            val exerciseCards = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            val reorder =
+                ExerciseReorderController(exerciseCards) { from, to ->
+                    workout.moveExercise(from, to)
+                }
+            val doneStateUpdaters = mutableMapOf<String, (Set<String>) -> Unit>()
+            fun updateDoneStates() {
+                val recordSetIds = repository.data.recordSetIds(workout)
+                doneStateUpdaters.values.forEach { it(recordSetIds) }
+            }
             workout.exercises.forEach { item ->
                 exercise(item.exerciseId)?.let { movement ->
-                    body.addView(
-                        card(horizontalPadding = 0) {
-                            addView(
-                                exerciseHeading(movement, large = true, showMuscle = false).apply {
-                                    contentDescription = "View ${movement.name} trend"
-                                    setOnClickListener { openExerciseTrend(movement.id) }
+                    if (editing) {
+                        lateinit var handle: View
+                        val card =
+                            workoutExerciseCard(
+                                workout = workout,
+                                item = item,
+                                exercise = movement,
+                                onRemove = {
+                                    workout.exercises.remove(item)
+                                    render((content.getChildAt(0) as? ScrollView)?.scrollY)
                                 },
-                                insetCardLayoutParams(),
-                            )
-                            addView(
-                                exerciseNote(item.note, movement, readOnly = true),
-                                insetCardLayoutParams().apply {
-                                    topMargin = dp(8)
-                                    bottomMargin = dp(8)
+                                onReorderHandleReady = { handle = it },
+                                onDoneStateUpdaterReady = { setId, update ->
+                                    doneStateUpdaters[setId] = update
                                 },
+                                onSetsChanged = ::updateDoneStates,
+                                editingHistory = true,
                             )
-                            addView(
-                                plannedSetHeader(
-                                    movement,
-                                    showDone = true,
-                                    showActiveHold = movement.type.tracksDuration,
-                                )
-                            )
-                            fun addSet(plannedSet: PlannedSet, loggedSet: LoggedSet?, index: Int) {
-                                val displaySet =
-                                    plannedSet.copy(
-                                        type = loggedSet?.type ?: plannedSet.type,
-                                        weightKg = loggedSet?.weightKg ?: plannedSet.weightKg,
-                                        reps = loggedSet?.reps ?: plannedSet.reps,
-                                        actualHoldSeconds =
-                                            loggedSet?.holdSeconds ?: plannedSet.actualHoldSeconds,
-                                        side = loggedSet?.side ?: plannedSet.side,
-                                    )
+                        exerciseCards.addView(card)
+                        reorder.bind(handle, card)
+                    } else {
+                        exerciseCards.addView(
+                            card(horizontalPadding = 0) {
                                 addView(
-                                    plannedSetEditor(
-                                        exercise = movement,
-                                        plannedSet = displaySet,
-                                        setIndex = index,
-                                        endAction =
-                                            LinearLayout(this@MainActivity).apply {
-                                                addView(
-                                                    largeCheckBox().apply {
-                                                        isChecked = loggedSet != null
-                                                        isEnabled = false
-                                                        isClickable = false
-                                                        isFocusable = false
-                                                        contentDescription = "Set ${index + 1} done"
-                                                    },
-                                                    LinearLayout.LayoutParams(
-                                                        dp(SET_CHECKBOX_WIDTH_DP),
-                                                        dp(56),
-                                                    ),
-                                                )
-                                            },
-                                        endActionHeight = 56,
-                                        completed = loggedSet != null,
+                                    exerciseHeading(movement, large = true, showMuscle = false)
+                                        .apply {
+                                            contentDescription = "View ${movement.name} trend"
+                                            setOnClickListener { openExerciseTrend(movement.id) }
+                                        },
+                                    insetCardLayoutParams(),
+                                )
+                                addView(
+                                    exerciseNote(item.note, movement, readOnly = true),
+                                    insetCardLayoutParams().apply {
+                                        topMargin = dp(8)
+                                        bottomMargin = dp(8)
+                                    },
+                                )
+                                addView(
+                                    plannedSetHeader(
+                                        movement,
+                                        showDone = true,
                                         showActiveHold = movement.type.tracksDuration,
-                                        readOnly = true,
                                     )
                                 )
+                                fun addSet(
+                                    plannedSet: PlannedSet,
+                                    loggedSet: LoggedSet?,
+                                    index: Int,
+                                ) {
+                                    val displaySet =
+                                        plannedSet.copy(
+                                            type = loggedSet?.type ?: plannedSet.type,
+                                            weightKg = loggedSet?.weightKg ?: plannedSet.weightKg,
+                                            reps = loggedSet?.reps ?: plannedSet.reps,
+                                            actualHoldSeconds =
+                                                loggedSet?.holdSeconds
+                                                    ?: plannedSet.actualHoldSeconds,
+                                            side = loggedSet?.side ?: plannedSet.side,
+                                        )
+                                    addView(
+                                        plannedSetEditor(
+                                            exercise = movement,
+                                            plannedSet = displaySet,
+                                            setIndex = index,
+                                            endAction =
+                                                LinearLayout(this@MainActivity).apply {
+                                                    addView(
+                                                        largeCheckBox().apply {
+                                                            isChecked = loggedSet != null
+                                                            isEnabled = false
+                                                            isClickable = false
+                                                            isFocusable = false
+                                                            contentDescription =
+                                                                "Set ${index + 1} done"
+                                                        },
+                                                        LinearLayout.LayoutParams(
+                                                            dp(SET_CHECKBOX_WIDTH_DP),
+                                                            dp(56),
+                                                        ),
+                                                    )
+                                                },
+                                            endActionHeight = 56,
+                                            completed = loggedSet != null,
+                                            showActiveHold = movement.type.tracksDuration,
+                                            readOnly = true,
+                                        )
+                                    )
+                                }
+                                item.plannedSets.forEachIndexed { index, set ->
+                                    addSet(set, loggedSetFor(item, set), index)
+                                }
+                                addView(
+                                    metaText(
+                                        "Set Rest: ${item.restSeconds(workout.defaultRestSeconds)}s"
+                                    ),
+                                    insetCardLayoutParams(),
+                                )
                             }
-                            item.plannedSets.forEachIndexed { index, set ->
-                                addSet(set, loggedSetFor(item, set), index)
-                            }
-                            addView(
-                                metaText(
-                                    "Set Rest: ${item.restSeconds(workout.defaultRestSeconds)}s"
-                                ),
-                                insetCardLayoutParams(),
-                            )
-                        }
-                    )
+                        )
+                    }
                 }
             }
+            if (editing) {
+                updateDoneStates()
+                body.addView(exerciseCards)
+                body.addView(
+                    actionButton("Add exercise") {
+                        route =
+                            Route.ExercisePicker(
+                                target = PickerTarget.HISTORY,
+                                returnScrollY = (content.getChildAt(0) as? ScrollView)?.scrollY,
+                                historyWorkoutId = workout.id,
+                                historyReturnScrollY =
+                                    (route as? Route.WorkoutHistory)?.returnScrollY ?: 0,
+                            )
+                        render()
+                    }
+                )
+                body.addView(divider())
+            } else body.addView(exerciseCards)
             if (
-                workout.setCount() > 0 &&
+                !editing &&
+                    workout.setCount() > 0 &&
                     (hevySettings.apiKey.isNotBlank() ||
                         hevySettings.remoteWorkoutId(workout.id) == null)
             ) {
@@ -2510,6 +2651,20 @@ class MainActivity : AppCompatActivity() {
                             ViewGroup.LayoutParams.WRAP_CONTENT,
                         )
                         .apply { topMargin = dp(12) },
+                )
+            }
+            if (editing) {
+                val activeRoute = route as? Route.WorkoutHistory ?: return@page
+                body.addView(actionButton("Save changes") { finishHistoryEdit(true, activeRoute) })
+                body.addView(
+                    actionButton("Discard changes", secondary = true) {
+                        finishHistoryEdit(false, activeRoute)
+                    },
+                    LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                        )
+                        .apply { topMargin = dp(8) },
                 )
             }
         }
@@ -3796,14 +3951,28 @@ class MainActivity : AppCompatActivity() {
             when (previousRoute) {
                 is Route.ExerciseTrend -> previousRoute.returnRoute
                 is Route.ExercisePicker ->
-                    if (previousRoute.target == PickerTarget.ROUTINE) {
-                        Route.RoutineEditor(
-                            repository.data.routines.firstOrNull { it.id == routineDraft?.id }?.id
-                        )
-                    } else Route.Root
+                    when (previousRoute.target) {
+                        PickerTarget.ROUTINE ->
+                            Route.RoutineEditor(
+                                repository.data.routines
+                                    .firstOrNull { it.id == routineDraft?.id }
+                                    ?.id
+                            )
+                        PickerTarget.HISTORY ->
+                            Route.WorkoutHistory(
+                                previousRoute.historyWorkoutId ?: return,
+                                previousRoute.historyReturnScrollY,
+                                editing = true,
+                            )
+                        PickerTarget.WORKOUT -> Route.Root
+                    }
                 is Route.Confirm -> Route.Root
                 is Route.RoutineEditor -> {
                     routineDraft = null
+                    Route.Root
+                }
+                is Route.WorkoutHistory -> {
+                    if (previousRoute.editing) historyEditDraft = null
                     Route.Root
                 }
                 else -> Route.Root
@@ -3812,7 +3981,7 @@ class MainActivity : AppCompatActivity() {
             restoreScrollY =
                 when (previousRoute) {
                     is Route.ExercisePicker ->
-                        previousRoute.takeIf { it.target == PickerTarget.WORKOUT }?.returnScrollY
+                        previousRoute.takeIf { it.target != PickerTarget.ROUTINE }?.returnScrollY
                     is Route.WorkoutHistory -> previousRoute.returnScrollY
                     is Route.ExerciseTrend -> previousRoute.returnScrollY
                     else -> null
@@ -5259,7 +5428,11 @@ class MainActivity : AppCompatActivity() {
     private fun loggedSetFor(item: WorkoutExercise, plannedSet: PlannedSet): LoggedSet? =
         item.sets.firstOrNull { it.plannedSetId == plannedSet.id }
 
-    private fun loggedSetFrom(plannedSet: PlannedSet, exercise: Exercise) =
+    private fun loggedSetFrom(
+        plannedSet: PlannedSet,
+        exercise: Exercise,
+        completedAt: Long? = null,
+    ) =
         LoggedSet(
             type = plannedSet.type,
             weightKg = plannedSet.weightKg.takeIf { exercise.weighted } ?: 0.0,
@@ -5267,6 +5440,7 @@ class MainActivity : AppCompatActivity() {
             holdSeconds =
                 if (exercise.type.tracksDuration) plannedSet.actualHoldSeconds ?: 0 else 0,
             side = plannedSet.side,
+            completedAt = completedAt ?: System.currentTimeMillis(),
             plannedSetId = plannedSet.id,
         )
 

@@ -2716,6 +2716,114 @@ class WorkoutFlowTest {
     }
 
     @Test
+    fun historyEntry_editAddsExerciseWithoutChangingWorkoutTimes() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val repository = LofitRepository(context)
+        val finishedAt = System.currentTimeMillis() - 86_400_000L
+        val workout =
+            WorkoutSession(
+                name = "Past workout",
+                startedAt = finishedAt - 120_000L,
+                completedAt = finishedAt,
+                exercises =
+                    mutableListOf(
+                        WorkoutExercise(
+                            exerciseId = "bench-press",
+                            plannedSets = mutableListOf(PlannedSet(weightKg = 60.0, reps = 8)),
+                        )
+                    ),
+            )
+        repository.data.history.add(workout)
+        repository.data.activeWorkout = WorkoutSession(name = "Live workout")
+        repository.saveHistory()
+        repository.save()
+        val originalIntervals = workout.intervals.toList()
+        val activeId = repository.data.activeWorkout!!.id
+        val activity =
+            instrumentation.startActivitySync(
+                Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+
+        onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+        onView(withText(R.string.nav_history)).perform(click())
+        onView(withContentDescription("Edit Past workout")).perform(scrollTo(), click())
+        onView(withContentDescription("Workout duration")).check(matches(withText("2:00")))
+        onView(withText("Add exercise")).perform(scrollTo(), click())
+        onView(withContentDescription("Add Plank")).perform(scrollTo(), click())
+        val plankCard =
+            allOf(isAssignableFrom(MaterialCardView::class.java), hasDescendant(withText("Plank")))
+        onView(allOf(withText("Add set"), isDescendantOfA(plankCard))).perform(scrollTo(), click())
+        onView(
+                allOf(
+                    withContentDescription("Set 1 Active time in seconds"),
+                    isDescendantOfA(plankCard),
+                )
+            )
+            .perform(scrollTo(), replaceText("45"), closeSoftKeyboard())
+        onView(allOf(withContentDescription("Set 1 done"), isDescendantOfA(plankCard)))
+            .perform(scrollTo(), click())
+
+        assertEquals(
+            null,
+            LofitRepository(context).data.history.single().exercises.firstOrNull {
+                it.exerciseId == "plank"
+            },
+        )
+        onView(withText("Save changes")).perform(scrollTo(), click())
+        val saved = LofitRepository(context).data
+        val edited = saved.history.single { it.id == workout.id }
+        assertEquals(originalIntervals, edited.intervals)
+        assertEquals(activeId, saved.activeWorkout?.id)
+        assertEquals(1, edited.exercises.single { it.exerciseId == "plank" }.sets.size)
+        assertEquals(finishedAt, edited.exercises.last().sets.single().completedAt)
+        onView(withContentDescription("View Past workout")).perform(scrollTo(), click())
+        onView(withContentDescription("Workout duration")).check(matches(withText("2:00")))
+        onView(withText("Plank")).perform(scrollTo()).check(matches(isDisplayed()))
+        instrumentation.runOnMainSync { activity.finish() }
+    }
+
+    @Test
+    fun historyEntry_discardChangesKeepsOriginalWorkout() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val repository = LofitRepository(context)
+        val workout =
+            WorkoutSession(
+                name = "Past workout",
+                startedAt = 100_000,
+                completedAt = 220_000,
+                exercises =
+                    mutableListOf(
+                        WorkoutExercise(
+                            exerciseId = "bench-press",
+                            plannedSets = mutableListOf(PlannedSet(weightKg = 60.0, reps = 8)),
+                        )
+                    ),
+            )
+        repository.data.history.add(workout)
+        repository.saveHistory()
+        repository.save()
+        val originalHistory = context.repositoryHistoryFile.readText()
+        val activity =
+            instrumentation.startActivitySync(
+                Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+
+        onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+        onView(withText(R.string.nav_history)).perform(click())
+        onView(withContentDescription("Edit Past workout")).perform(scrollTo(), click())
+        onView(withContentDescription("Set 1 weight"))
+            .perform(scrollTo(), replaceText("70"), closeSoftKeyboard())
+        onView(withText("Discard changes")).perform(scrollTo(), click())
+
+        assertEquals(originalHistory, context.repositoryHistoryFile.readText())
+        onView(withContentDescription("View Past workout")).perform(scrollTo(), click())
+        onView(withContentDescription("Set 1 weight")).check(matches(withText("60")))
+        instrumentation.runOnMainSync { activity.finish() }
+    }
+
+    @Test
     fun historyEntry_cannotContinueYesterdayWorkout() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
