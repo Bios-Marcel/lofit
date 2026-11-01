@@ -8,9 +8,14 @@ fun matchesSearchQuery(query: String, vararg values: String): Boolean {
 }
 
 internal fun exerciseSearchTerms(exercise: Exercise): String =
-    listOf(exercise.type.label, "Weighted".takeIf { exercise.weighted })
+    listOf(
+            exercise.type.label,
+            "Weighted".takeIf { exercise.weighted },
+            "Live measurement".takeIf { exercise.supportsLiveMeasurement },
+        )
         .filterNotNull()
         .joinToString(" ")
 
 internal fun exerciseTrackingLabel(exercise: Exercise): String =
-    "${exercise.type.label} · ${if (exercise.weighted) "Weighted" else "Bodyweight"}"
+    "${exercise.type.label} · ${if (exercise.weighted) "Weighted" else "Bodyweight"}" +
+        if (exercise.supportsLiveMeasurement) " · Live measurement" else ""

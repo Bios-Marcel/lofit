@@ -133,6 +133,21 @@ internal class RoutineScreens(
                                 bottomMargin = ui.dp(8)
                             },
                         )
+                        if (movement.supportsLiveMeasurement) {
+                            addView(
+                                ui.choiceGroup(
+                                        listOf("use scale", "Manual"),
+                                        if (item.manualMeasurement) 1 else 0,
+                                    )
+                                    .apply {
+                                        contentDescription = "${movement.name} measurement mode"
+                                        setOnCheckedChangeListener { _, _ ->
+                                            item.manualMeasurement = ui.selectedChoice(this) == 1
+                                        }
+                                    },
+                                ui.insetCardLayoutParams().apply { bottomMargin = ui.dp(8) },
+                            )
+                        }
                         val setRows =
                             LinearLayout(activityContext).apply {
                                 orientation = LinearLayout.VERTICAL

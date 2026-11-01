@@ -29,6 +29,7 @@ data class SharedWorkoutPlan(val routine: Routine, val exercises: List<Exercise>
                         WorkoutExercise(
                             exerciseId = mapped.getValue(item.exerciseId),
                             note = item.note,
+                            manualMeasurement = item.manualMeasurement,
                             restSecondsOverride = item.restSecondsOverride,
                             plannedSets =
                                 item.plannedSets
@@ -70,7 +71,8 @@ data class SharedWorkoutPlan(val routine: Routine, val exercises: List<Exercise>
                 a.primaryMuscle == b.primaryMuscle &&
                 a.secondaryMuscles == b.secondaryMuscles &&
                 a.minimumHoldSeconds == b.minimumHoldSeconds &&
-                a.weighted == b.weighted
+                a.weighted == b.weighted &&
+                a.supportsLiveMeasurement == b.supportsLiveMeasurement
 
         fun encode(workout: WorkoutSession, catalog: List<Exercise>): ByteArray {
             val movements =
@@ -98,6 +100,7 @@ data class SharedWorkoutPlan(val routine: Routine, val exercises: List<Exercise>
                                         .put("secondary", e.secondaryMuscles)
                                         .put("hold", e.minimumHoldSeconds)
                                         .put("weighted", e.weighted)
+                                        .put("liveMeasurement", e.supportsLiveMeasurement)
                                 )
                             }
                         },
@@ -112,6 +115,7 @@ data class SharedWorkoutPlan(val routine: Routine, val exercises: List<Exercise>
                                     JSONObject()
                                         .put("movement", item.exerciseId)
                                         .put("note", item.effectiveNote)
+                                        .put("manualMeasurement", item.manualMeasurement)
                                         .put("rest", item.restSecondsOverride ?: JSONObject.NULL)
                                         .put(
                                             "sets",
@@ -154,6 +158,7 @@ data class SharedWorkoutPlan(val routine: Routine, val exercises: List<Exercise>
                             e.getString("secondary").also { require(it.length <= 500) },
                         minimumHoldSeconds = e.number("hold", 1, 3_600),
                         weighted = e.getBoolean("weighted"),
+                        liveMeasurement = e.optBoolean("liveMeasurement", false),
                         custom = true,
                     )
                 }
@@ -172,6 +177,7 @@ data class SharedWorkoutPlan(val routine: Routine, val exercises: List<Exercise>
                                 RoutineExercise(
                                     exerciseId = movement,
                                     note = e.optString("note", ""),
+                                    manualMeasurement = e.optBoolean("manualMeasurement", false),
                                     restSecondsOverride =
                                         if (e.isNull("rest")) null else e.number("rest", 0, 3_600),
                                     plannedSets =

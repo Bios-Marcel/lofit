@@ -22,6 +22,7 @@ internal class SettingsScreen(
     private val onHealthChanged: (Boolean) -> Unit,
     private val onMcpChanged: () -> Unit,
     private val onMcpPortChange: (Int) -> Boolean,
+    private val craneScaleSettings: () -> View,
     private val onReset: () -> Unit,
     private val onRefresh: () -> Unit,
 ) {
@@ -137,6 +138,7 @@ internal class SettingsScreen(
                     )
                 }
             )
+            body.addView(craneScaleSettings())
             body.addView(mcpSettings())
             body.addView(hevySettingsCard())
             body.addView(ui.sectionTitle("Android health integration"))

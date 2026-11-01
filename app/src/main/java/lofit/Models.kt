@@ -37,7 +37,17 @@ data class Exercise(
     val imageName: String? = null,
     var weighted: Boolean = type == ExerciseType.REPETITIONS,
     var imageFile: String? = null,
-)
+    var liveMeasurement: Boolean = false,
+) {
+    init {
+        require(!liveMeasurement || (type.tracksDuration && weighted)) {
+            "Live measurement requires a timed weighted exercise"
+        }
+    }
+
+    val supportsLiveMeasurement: Boolean
+        get() = liveMeasurement && type.tracksDuration && weighted
+}
 
 data class LoggedSet(
     val id: String = UUID.randomUUID().toString(),
@@ -90,6 +100,7 @@ data class WorkoutExercise(
     var sourceRoutineExerciseId: String? = null,
     var note: String = "",
     var previousNote: String = "",
+    var manualMeasurement: Boolean = false,
 ) {
     fun restSeconds(defaultRestSeconds: Int): Int = restSecondsOverride ?: defaultRestSeconds
 
@@ -220,6 +231,7 @@ data class WorkoutSession(
                             restSecondsOverride = item.restSecondsOverride,
                             plannedSets = plannedSets,
                             note = item.effectiveNote,
+                            manualMeasurement = item.manualMeasurement,
                         )
                     }
                     .toMutableList(),
@@ -239,6 +251,7 @@ data class RoutineExercise(
     var restSecondsOverride: Int? = null,
     val plannedSets: MutableList<PlannedSet> = MutableList(3) { PlannedSet() },
     var note: String = "",
+    var manualMeasurement: Boolean = false,
 )
 
 data class ExerciseRecord(
@@ -265,6 +278,7 @@ data class AppData(
     val exerciseLastSelectedAt: MutableMap<String, Long> = mutableMapOf(),
     var mcpEnabled: Boolean = false,
     var mcpPort: Int = BuildConfig.MCP_PORT,
+    var craneScale: CraneScaleDevice? = null,
 ) {
     fun resumeWorkout(
         workoutId: String,

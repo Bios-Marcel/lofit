@@ -19,6 +19,24 @@ class RepositoryPersistenceTest {
     }
 
     @Test
+    fun craneScaleSelectionIsOptionalPersistsAndResets() {
+        val repository = LofitRepository(context)
+        assertNull(repository.data.craneScale)
+        val scale = CraneScaleDevice("AA:BB:CC:DD:EE:FF", "IF_B7")
+        repository.data.craneScale = scale
+        repository.save()
+        assertEquals(scale, LofitRepository(context).data.craneScale)
+        val root = JSONObject(stored()).apply { remove("craneScale") }
+        store(root.toString())
+        assertNull(LofitRepository(context).data.craneScale)
+        root.put("craneScale", JSONObject().put("address", "bad address").put("name", "IF_B7"))
+        store(root.toString())
+        assertNull(LofitRepository(context).data.craneScale)
+        repository.reset()
+        assertNull(LofitRepository(context).data.craneScale)
+    }
+
+    @Test
     fun onboarding_oldDataKeepsWorkoutsAndHealthChoiceAndNewChoicesPersist() {
         val repository = LofitRepository(context)
         repository.data.history.add(WorkoutSession(name = "Existing workout", completedAt = 200))

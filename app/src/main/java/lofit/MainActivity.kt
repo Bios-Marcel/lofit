@@ -85,6 +85,7 @@ class MainActivity : AppCompatActivity() {
         EXERCISES,
         RECORDS,
         HISTORY,
+        LIVE_MEASUREMENT,
         SETTINGS,
     }
 
@@ -210,6 +211,7 @@ class MainActivity : AppCompatActivity() {
             onHealthChanged = ::setBodyMetricsEnabled,
             onMcpChanged = ::updateMcpServer,
             onMcpPortChange = ::changeMcpPort,
+            craneScaleSettings = { craneScaleScreens.settingsCard() },
             onReset = {
                 route = Route.Confirm(ConfirmAction.RESET_DATA)
                 render()
@@ -239,6 +241,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var content: FrameLayout
     private lateinit var root: LinearLayout
     private lateinit var drawerLayout: DrawerLayout
+    private var liveMeasurementMenuItem: View? = null
     private lateinit var restBar: LinearLayout
     private lateinit var historyPager: LinearLayout
     private lateinit var restTimeText: TextView
@@ -292,6 +295,44 @@ class MainActivity : AppCompatActivity() {
             uri?.let(::importWorkoutFile)
         }
     private val workoutBluetooth by lazy { WorkoutBluetooth(this) }
+    private val craneScaleScreens by lazy {
+        CraneScaleScreens(
+            context = this,
+            ui = ui,
+            data = { repository.data },
+            save = repository::save,
+            withBluetooth = ::withBluetooth,
+            onRefresh = { render() },
+        )
+    }
+    private val liveWorkoutMeasurement by lazy { LiveWorkoutMeasurement { repository.data } }
+    private val liveGraphs = mutableListOf<LiveMeasurementGraphView>()
+    private val liveStatusViews = mutableListOf<TextView>()
+    private val liveWeightViews = mutableMapOf<String, EditText>()
+    private val liveTimeViews = mutableMapOf<String, EditText>()
+    private var workoutForeground = false
+    private var workoutScaleStatus: String? = "Waiting for scale…"
+    private val workoutScaleReader by lazy {
+        WorkoutScaleReader(
+            scanner = BluetoothCraneScaleScanner(this),
+            withBluetooth = ::withBluetooth,
+            onReading = { onWorkoutScaleReading(SystemClock.elapsedRealtime(), it) },
+            onInterrupted = {
+                liveWorkoutMeasurement.interrupt()?.let {
+                    refreshLiveSetValues(it.pull.set)
+                    repository.save()
+                    updateWorkoutNotification(force = true)
+                }
+            },
+            onStatus = { message ->
+                workoutScaleStatus = message
+                liveStatusViews.forEach { view ->
+                    view.text = message.orEmpty()
+                    view.visibility = if (message == null) View.GONE else View.VISIBLE
+                }
+            },
+        )
+    }
     private var workoutTogetherDialog: AlertDialog? = null
     private var pendingBluetoothAction: (() -> Unit)? = null
     private val bluetoothPermissions =
@@ -300,7 +341,7 @@ class MainActivity : AppCompatActivity() {
             pendingBluetoothAction = null
             if (result.isNotEmpty() && result.values.all { it }) action?.let(::withBluetooth)
             else
-                Toast.makeText(this, "Allow Nearby devices to share workouts", Toast.LENGTH_SHORT)
+                Toast.makeText(this, "Allow Nearby devices to use Bluetooth", Toast.LENGTH_SHORT)
                     .show()
         }
     private val enableBluetooth =
@@ -384,6 +425,10 @@ class MainActivity : AppCompatActivity() {
             currentScreen = Screen.EXERCISES
             route = Route.ExerciseEditor(it.getString("exerciseId"))
         }
+        if (savedInstanceState?.getBoolean("showLiveMeasurement") == true) {
+            currentScreen = Screen.LIVE_MEASUREMENT
+            route = Route.Root
+        }
         WindowCompat.setDecorFitsSystemWindows(window, false)
         onBackPressedDispatcher.addCallback(
             this,
@@ -427,6 +472,13 @@ class MainActivity : AppCompatActivity() {
         handleWorkoutFileIntent(intent)
     }
 
+    override fun onStart() {
+        super.onStart()
+        craneScaleScreens.onStart()
+        workoutForeground = true
+        updateWorkoutScaleScan()
+    }
+
     override fun onPostResume() {
         super.onPostResume()
         showPendingImportedPlan()
@@ -441,6 +493,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putBoolean("showActiveWorkout", currentScreen == Screen.WORKOUT)
+        outState.putBoolean("showLiveMeasurement", currentScreen == Screen.LIVE_MEASUREMENT)
         outState.putBoolean("healthPermissionPending", healthPermissionPending)
         outState.putString("onboardingGender", onboardingGender.name)
         outState.putBoolean("onboardingHealthEnabled", onboardingHealthEnabled)
@@ -449,12 +502,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onStop() {
+        craneScaleScreens.onStop()
+        workoutForeground = false
+        updateWorkoutScaleScan()
         workoutTogetherDialog?.dismiss()
         workoutBluetooth.stop()
         super.onStop()
     }
 
     override fun onDestroy() {
+        craneScaleScreens.clear()
         mcpServer?.close()
         mcpServer = null
         workoutFileGeneration++
@@ -558,14 +615,18 @@ class MainActivity : AppCompatActivity() {
                     Screen.EXERCISES to getString(R.string.nav_exercises),
                     Screen.RECORDS to getString(R.string.nav_records),
                     Screen.HISTORY to getString(R.string.nav_history),
+                    Screen.LIVE_MEASUREMENT to getString(R.string.nav_live_measurement),
                     Screen.SETTINGS to getString(R.string.nav_settings),
                 )
                 .forEach { (screen, label) ->
                     addView(
                         ui.actionButton(label, secondary = true) {
-                            drawerLayout.closeDrawer(GravityCompat.START, false)
-                            openScreen(screen)
-                        },
+                                drawerLayout.closeDrawer(GravityCompat.START, false)
+                                openScreen(screen)
+                            }
+                            .also {
+                                if (screen == Screen.LIVE_MEASUREMENT) liveMeasurementMenuItem = it
+                            },
                         LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ui.dp(58))
                             .apply { bottomMargin = ui.dp(8) },
                     )
@@ -577,6 +638,14 @@ class MainActivity : AppCompatActivity() {
         scrollToBottom: Boolean = false,
         focusExerciseId: String? = null,
     ) {
+        craneScaleScreens.clear()
+        liveWorkoutMeasurement.reconcile()
+        liveGraphs.clear()
+        liveStatusViews.clear()
+        liveWeightViews.clear()
+        liveTimeViews.clear()
+        liveMeasurementMenuItem?.visibility =
+            if (repository.data.craneScale != null) View.VISIBLE else View.GONE
         exerciseEditUndo?.dismiss()
         exerciseEditUndo = null
         content.setPadding(0, 0, 0, 0)
@@ -589,10 +658,15 @@ class MainActivity : AppCompatActivity() {
             }
             exerciseDraft = null
         }
-        if (repository.data.activeWorkout != null) {
+        if (
+            repository.data.activeWorkout != null ||
+                (currentScreen == Screen.LIVE_MEASUREMENT && route == Route.Root)
+        ) {
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         } else {
             window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        if (repository.data.activeWorkout == null) {
             restEndsAt = 0L
             if (::restBar.isInitialized) restBar.visibility = View.GONE
             clearActiveHold()
@@ -644,6 +718,8 @@ class MainActivity : AppCompatActivity() {
                 is Route.Confirm -> confirmationScreen(activeRoute)
             }
         content.addView(view)
+        craneScaleScreens.startLive()
+        updateWorkoutScaleScan()
         if (focusExerciseId != null && view is ScrollView) {
             view.doOnPreDraw {
                 val card = view.findViewWithTag<View>(focusExerciseId) ?: return@doOnPreDraw
@@ -658,7 +734,7 @@ class MainActivity : AppCompatActivity() {
             (view as? ScrollView)?.doOnPreDraw { view.scrollTo(0, view.getChildAt(0).height) }
         } else
             restoreScrollY?.let { scrollY ->
-                (view as? ScrollView)?.post { view.scrollTo(0, scrollY) }
+                (view as? ScrollView)?.doOnPreDraw { view.scrollTo(0, scrollY) }
             }
         updateWorkoutNotification()
     }
@@ -672,6 +748,7 @@ class MainActivity : AppCompatActivity() {
             Screen.EXERCISES -> exerciseScreens.exercisesScreen()
             Screen.RECORDS -> records.recordsScreen()
             Screen.HISTORY -> historyScreen()
+            Screen.LIVE_MEASUREMENT -> craneScaleScreens.liveScreen()
             Screen.SETTINGS -> settings.settingsScreen()
         }
 
@@ -1056,6 +1133,60 @@ class MainActivity : AppCompatActivity() {
                     bottomMargin = ui.dp(8)
                 },
             )
+            val liveMeasurement = !editingHistory && liveWorkoutMeasurement.isLive(item)
+            if (!editingHistory && exercise.supportsLiveMeasurement) {
+                addView(
+                    ui.choiceGroup(
+                            listOf("use scale", "Manual"),
+                            if (item.manualMeasurement) 1 else 0,
+                        )
+                        .apply {
+                            contentDescription = "${exercise.name} measurement mode"
+                            setOnCheckedChangeListener { _, _ ->
+                                if (activeHoldWorkoutExerciseId == item.id) stopActiveHold()
+                                if (liveWorkoutMeasurement.active?.item?.id == item.id) {
+                                    liveWorkoutMeasurement.interrupt()?.let {
+                                        refreshLiveSetValues(it.pull.set)
+                                    }
+                                }
+                                item.manualMeasurement = ui.selectedChoice(this) == 1
+                                repository.save()
+                                render(
+                                    restoreScrollY = (content.getChildAt(0) as? ScrollView)?.scrollY
+                                )
+                            }
+                        },
+                    ui.insetCardLayoutParams().apply { bottomMargin = ui.dp(8) },
+                )
+            }
+            if (liveMeasurement) {
+                addView(
+                    LiveMeasurementGraphView(
+                            this@MainActivity,
+                            series = liveWorkoutMeasurement.seriesFor(item.id),
+                        )
+                        .also {
+                            it.contentDescription = "${exercise.name} live weight graph"
+                            liveGraphs.add(it)
+                        },
+                    ui.insetCardLayoutParams(),
+                )
+                addView(
+                    ui.metaText(workoutScaleStatus.orEmpty()).apply {
+                        contentDescription = "${exercise.name} scale status"
+                        visibility = if (workoutScaleStatus == null) View.GONE else View.VISIBLE
+                        liveStatusViews.add(this)
+                    },
+                    ui.insetCardLayoutParams(),
+                )
+                addView(
+                    ui.actionButton("Retry scale", secondary = true) { workoutScaleReader.retry() },
+                    ui.insetCardLayoutParams().apply {
+                        topMargin = ui.dp(8)
+                        bottomMargin = ui.dp(8)
+                    },
+                )
+            }
             addView(
                 setViews.plannedSetHeader(
                     exercise,
@@ -1105,6 +1236,7 @@ class MainActivity : AppCompatActivity() {
                 val done =
                     ui.largeCheckBox().apply {
                         isChecked = loggedSet != null
+                        isEnabled = !liveMeasurement
                         contentDescription = "Set ${setIndex + 1} done"
                         stateDescription = if (isChecked) "Done" else "Not done"
                     }
@@ -1130,7 +1262,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 lateinit var activeHoldAmount: EditText
                 val holdButton =
-                    if (exercise.type.tracksDuration && !editingHistory)
+                    if (exercise.type.tracksDuration && !editingHistory && !liveMeasurement)
                         TextView(this@MainActivity).apply {
                             text = if (isActiveHold(item, plannedSet)) "■" else "▶"
                             textSize = 18f
@@ -1191,8 +1323,13 @@ class MainActivity : AppCompatActivity() {
                         showActiveHold = exercise.type.tracksDuration,
                         activeHoldAction = holdButton,
                         activeHoldRunning = isActiveHold(item, plannedSet),
+                        measured = liveMeasurement,
+                        onWeightReady = {
+                            if (liveMeasurement) liveWeightViews[plannedSet.id] = it
+                        },
                         onActiveAmountReady = { amount ->
                             activeHoldAmount = amount
+                            if (liveMeasurement) liveTimeViews[plannedSet.id] = amount
                             if (isActiveHold(item, plannedSet)) {
                                 holdTimerText = amount
                                 holdTimerButton = holdButton
@@ -1427,6 +1564,7 @@ class MainActivity : AppCompatActivity() {
                             anchor.copy(
                                 exerciseId = movement.id,
                                 note = "",
+                                manualMeasurement = false,
                                 plannedSets =
                                     replacementSets(
                                         anchor.plannedSets,
@@ -3005,6 +3143,53 @@ class MainActivity : AppCompatActivity() {
         restBar.visibility = View.VISIBLE
     }
 
+    private fun updateWorkoutScaleScan() {
+        val workout = repository.data.activeWorkout
+        workoutScaleReader.update(
+            repository.data.craneScale,
+            workoutForeground &&
+                currentScreen == Screen.WORKOUT &&
+                route == Route.Root &&
+                workout?.exercises?.any(liveWorkoutMeasurement::isLive) == true,
+        )
+    }
+
+    private fun onWorkoutScaleReading(atMillis: Long, kilograms: Double) {
+        val change =
+            liveWorkoutMeasurement.read(
+                atMillis,
+                kilograms,
+                allowStart = activeHoldWorkoutExerciseId == null,
+            )
+        liveGraphs.forEach { it.showReading(kilograms) }
+        if (change == null) return
+        refreshLiveSetValues(change.pull.set)
+        if (change.started) {
+            restEndsAt = 0L
+            updateRestBar()
+        } else {
+            if (change.completed) {
+                repository.data.activeWorkout?.let { startRest(change.pull.item, it) }
+            }
+            render(restoreScrollY = (content.getChildAt(0) as? ScrollView)?.scrollY)
+        }
+        repository.save()
+        updateWorkoutNotification(force = true)
+    }
+
+    private fun refreshLiveSetValues(set: PlannedSet) {
+        updatingHoldTimer = true
+        liveWeightViews[set.id]?.let { view ->
+            val value = formatWeight(set.weightKg)
+            if (view.text.toString() != value) view.setText(value)
+        }
+        liveTimeViews[set.id]?.let { view ->
+            val value = (set.actualHoldSeconds ?: 0).toString()
+            if (view.text.toString() != value) view.setText(value)
+        }
+        updatingHoldTimer = false
+    }
+
     private fun isActiveHold(item: WorkoutExercise, set: PlannedSet): Boolean =
         activeHoldWorkoutExerciseId == item.id && activeHoldPlannedSetId == set.id
 
@@ -3015,6 +3200,7 @@ class MainActivity : AppCompatActivity() {
         button: TextView,
         done: CheckBox,
     ) {
+        liveWorkoutMeasurement.interrupt()?.let { refreshLiveSetValues(it.pull.set) }
         stopActiveHold()
         restEndsAt = 0L
         updateRestBar()
@@ -3092,6 +3278,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateHoldTimer() {
+        liveWorkoutMeasurement.reconcile()
+        if (liveWorkoutMeasurement.tick(SystemClock.elapsedRealtime())) playCue()
+        liveWorkoutMeasurement.active?.let { pull ->
+            refreshLiveSetValues(pull.set)
+            updateWorkoutNotification()
+        }
         val itemId = activeHoldWorkoutExerciseId ?: return
         val setId = activeHoldPlannedSetId ?: return
         if (holdStartedAt == 0L) return
@@ -3119,6 +3311,7 @@ class MainActivity : AppCompatActivity() {
             holdCuePlayed = true
             plannedSet.actualHoldSeconds = elapsed
             loggedSetFor(item, plannedSet)?.let { syncLoggedSet(it, plannedSet, movement) }
+                // LEGACY: Manual timers still mark done at the goal while continuing to run.
                 ?: item.sets.add(loggedSetFrom(plannedSet, movement))
             repository.save()
             completingHoldAutomatically = true
@@ -3207,14 +3400,17 @@ class MainActivity : AppCompatActivity() {
             }
         val restSeconds =
             ((restEndsAt - SystemClock.elapsedRealtime() + 999L) / 1_000L).toInt().coerceAtLeast(0)
+        val livePull = liveWorkoutMeasurement.active
         val holdSeconds =
-            if (holdStartedAt > 0L && activeHoldWorkoutExerciseId != null) {
+            if (livePull != null) {
+                livePull.set.actualHoldSeconds ?: 0
+            } else if (holdStartedAt > 0L && activeHoldWorkoutExerciseId != null) {
                 ((SystemClock.elapsedRealtime() - holdStartedAt) / 1_000L).toInt().coerceAtLeast(0)
             } else 0
         val detail =
             when {
                 restSeconds > 0 -> "$setText · Rest ${formatSeconds(restSeconds)}"
-                activeHoldWorkoutExerciseId != null ->
+                activeHoldWorkoutExerciseId != null || livePull != null ->
                     "$setText · Hold ${formatSeconds(holdSeconds)}"
                 else -> setText
             }

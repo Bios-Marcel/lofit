@@ -228,6 +228,12 @@ class LofitRepository(context: Context) {
             put("soundCuesEnabled", data.soundCuesEnabled)
             put("mcpEnabled", data.mcpEnabled)
             put("mcpPort", data.mcpPort)
+            put(
+                "craneScale",
+                data.craneScale?.let {
+                    JSONObject().put("address", it.address).put("name", it.name)
+                } ?: JSONObject.NULL,
+            )
             put("bodyMetricsEnabled", data.bodyMetricsEnabled ?: JSONObject.NULL)
             put("biologicalGender", data.biologicalGender.name)
             put("onboardingComplete", data.onboardingComplete)
@@ -249,6 +255,7 @@ class LofitRepository(context: Context) {
             put("secondaryMuscles", exercise.secondaryMuscles)
             put("minimumHoldSeconds", exercise.minimumHoldSeconds)
             put("weighted", exercise.weighted)
+            put("liveMeasurement", exercise.supportsLiveMeasurement)
             put("custom", exercise.custom)
             put("imageResource", exercise.imageResource ?: JSONObject.NULL)
             put("imageName", exercise.imageName ?: JSONObject.NULL)
@@ -273,6 +280,7 @@ class LofitRepository(context: Context) {
                                     item.restSecondsOverride ?: JSONObject.NULL,
                                 )
                                 put("note", item.note)
+                                put("manualMeasurement", item.manualMeasurement)
                                 put("plannedSets", encodePlannedSets(item.plannedSets))
                             }
                         )
@@ -318,6 +326,7 @@ class LofitRepository(context: Context) {
                                     item.sourceRoutineExerciseId ?: JSONObject.NULL,
                                 )
                                 put("note", item.note)
+                                put("manualMeasurement", item.manualMeasurement)
                                 put("previousNote", item.previousNote)
                                 put("plannedSets", encodePlannedSets(item.plannedSets))
                                 put(
@@ -368,6 +377,17 @@ class LofitRepository(context: Context) {
             mcpPort =
                 root.optInt("mcpPort", BuildConfig.MCP_PORT).takeIf { it in 1..65535 }
                     ?: BuildConfig.MCP_PORT,
+            craneScale =
+                root.optJSONObject("craneScale")?.let { scale ->
+                    scale
+                        .optString("address")
+                        .takeIf {
+                            it.matches(Regex("(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}"))
+                        }
+                        ?.let { address ->
+                            CraneScaleDevice(address.uppercase(), scale.optString("name", "WH-C06"))
+                        }
+                },
             bodyMetricsEnabled =
                 if (root.isNull("bodyMetricsEnabled")) null
                 else root.getBoolean("bodyMetricsEnabled"),
@@ -426,6 +446,7 @@ class LofitRepository(context: Context) {
                 if (value.isNull("imageResource")) null else value.getInt("imageResource"),
             imageName = if (value.isNull("imageName")) null else value.getString("imageName"),
             weighted = value.getBoolean("weighted"),
+            liveMeasurement = value.optBoolean("liveMeasurement", false),
             imageFile = if (value.isNull("imageFile")) null else value.getString("imageFile"),
         )
 
@@ -442,6 +463,7 @@ class LofitRepository(context: Context) {
                             id = item.getString("id"),
                             note = item.optString("note", ""),
                             exerciseId = item.getString("exerciseId"),
+                            manualMeasurement = item.optBoolean("manualMeasurement", false),
                             restSecondsOverride =
                                 if (item.isNull("restSecondsOverride")) null
                                 else item.getInt("restSecondsOverride"),
@@ -483,6 +505,7 @@ class LofitRepository(context: Context) {
                             note = item.optString("note", ""),
                             previousNote = item.optString("previousNote", ""),
                             exerciseId = item.getString("exerciseId"),
+                            manualMeasurement = item.optBoolean("manualMeasurement", false),
                             sourceRoutineExerciseId =
                                 if (item.isNull("sourceRoutineExerciseId")) null
                                 else item.getString("sourceRoutineExerciseId"),

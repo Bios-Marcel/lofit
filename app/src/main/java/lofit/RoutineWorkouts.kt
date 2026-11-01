@@ -16,6 +16,7 @@ fun AppData.workoutFromRoutine(routine: Routine): WorkoutSession {
                 val latest = previousExercise?.plannedSets
                 WorkoutExercise(
                     exerciseId = item.exerciseId,
+                    manualMeasurement = item.manualMeasurement,
                     restSecondsOverride = item.restSecondsOverride,
                     sourceRoutineExerciseId = item.id,
                     note = if (previousExercise == null) item.note else "",
@@ -71,6 +72,7 @@ fun WorkoutSession.captureRoutineBaseline(): Routine? =
                     RoutineExercise(
                         id = item.id,
                         exerciseId = item.exerciseId,
+                        manualMeasurement = item.manualMeasurement,
                         note = item.effectiveNote,
                         restSecondsOverride = item.restSecondsOverride,
                         plannedSets = item.plannedSets.map { it.freshCopy() }.toMutableList(),
@@ -95,6 +97,7 @@ class RoutineWorkoutChanges(
         if (updateSets)
             changed.forEach { (saved, trained) ->
                 saved.note = trained.effectiveNote
+                saved.manualMeasurement = trained.manualMeasurement
                 saved.plannedSets.clear()
                 saved.plannedSets.addAll(trained.plannedSets.map { it.freshCopy() })
             }
@@ -103,6 +106,7 @@ class RoutineWorkoutChanges(
                 val saved =
                     RoutineExercise(
                         exerciseId = item.exerciseId,
+                        manualMeasurement = item.manualMeasurement,
                         note = item.effectiveNote,
                         restSecondsOverride = item.restSecondsOverride,
                         plannedSets = item.plannedSets.map { it.freshCopy() }.toMutableList(),
@@ -125,7 +129,8 @@ fun WorkoutSession.routineChanges(routines: List<Routine>): RoutineWorkoutChange
             } ?: return@mapNotNull null
         if (
             initial.plannedSets.prescription() == item.plannedSets.prescription() &&
-                initial.note == item.effectiveNote
+                initial.note == item.effectiveNote &&
+                initial.manualMeasurement == item.manualMeasurement
         )
             null
         else saved to item

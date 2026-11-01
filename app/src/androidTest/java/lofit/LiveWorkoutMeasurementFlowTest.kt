@@ -1,0 +1,295 @@
+package lofit
+
+import android.Manifest
+import android.os.SystemClock
+import android.util.AtomicFile
+import android.view.ViewGroup
+import androidx.core.view.GravityCompat
+import androidx.drawerlayout.widget.DrawerLayout
+import androidx.test.core.app.ActivityScenario
+import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.action.ViewActions.*
+import androidx.test.espresso.assertion.ViewAssertions.*
+import androidx.test.espresso.matcher.ViewMatchers.*
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import org.hamcrest.Matchers.allOf
+import org.hamcrest.Matchers.not
+import org.junit.After
+import org.junit.Assert.*
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+
+@RunWith(AndroidJUnit4::class)
+class LiveWorkoutMeasurementFlowTest {
+    private val instrumentation = InstrumentationRegistry.getInstrumentation()
+    private val context = instrumentation.targetContext
+    private val selected = CraneScaleDevice("AA:BB:CC:DD:EE:01", "Scale")
+    private var savedState: ByteArray? = null
+    private var savedHistory: ByteArray? = null
+    private val movement =
+        Exercise(
+            "live-test",
+            "Scale Pull",
+            ExerciseType.TIMED,
+            false,
+            "Forearms",
+            "—",
+            weighted = true,
+            liveMeasurement = true,
+            custom = true,
+        )
+
+    @Before
+    fun setup() {
+        listOf(
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_CONNECT,
+                Manifest.permission.BLUETOOTH_ADVERTISE,
+                Manifest.permission.POST_NOTIFICATIONS,
+            )
+            .forEach {
+                instrumentation.uiAutomation.grantRuntimePermission(context.packageName, it)
+            }
+        savedState = runCatching { AtomicFile(context.repositoryStateFile).readFully() }.getOrNull()
+        savedHistory =
+            runCatching { AtomicFile(context.repositoryHistoryFile).readFully() }.getOrNull()
+        LofitRepository(context).apply {
+            data.onboardingComplete = true
+            data.bodyMetricsEnabled = false
+            data.mcpEnabled = false
+            data.craneScale = selected
+            data.exercises.add(movement)
+            data.activeWorkout =
+                WorkoutSession(
+                    name = "Live workout",
+                    exercises =
+                        mutableListOf(
+                            WorkoutExercise(
+                                exerciseId = movement.id,
+                                plannedSets = mutableListOf(PlannedSet(holdSeconds = 1)),
+                            )
+                        ),
+                )
+            save()
+        }
+    }
+
+    @After
+    fun restore() {
+        listOf(
+                context.repositoryStateFile to savedState,
+                context.repositoryHistoryFile to savedHistory,
+            )
+            .forEach { (path, bytes) ->
+                val file = AtomicFile(path)
+                if (bytes == null) file.delete()
+                else file.finishWrite(file.startWrite().apply { write(bytes) })
+            }
+    }
+
+    private class FakeScanner : CraneScaleScanner {
+        var running = false
+        lateinit var reading: (CraneScaleDevice, Double) -> Unit
+        lateinit var error: (String) -> Unit
+
+        override fun start(
+            address: String?,
+            onReading: (CraneScaleDevice, Double) -> Unit,
+            onError: (String) -> Unit,
+        ) {
+            reading = onReading
+            error = onError
+            running = true
+        }
+
+        override fun stop() {
+            running = false
+        }
+    }
+
+    private fun fakeScanner(activity: MainActivity): FakeScanner {
+        val delegate =
+            MainActivity::class
+                .java
+                .getDeclaredField("workoutScaleReader\$delegate")
+                .apply { isAccessible = true }
+                .get(activity) as Lazy<*>
+        val reader = delegate.value as WorkoutScaleReader
+        reader.update(null, false)
+        val scanner = FakeScanner()
+        WorkoutScaleReader::class
+            .java
+            .getDeclaredField("scanner")
+            .apply { isAccessible = true }
+            .set(reader, scanner)
+        reader.update(selected, true)
+        return scanner
+    }
+
+    @Test
+    fun scaleDrivesTimerReleaseCompletesAndMeanAppearsInSet() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            lateinit var scanner: FakeScanner
+            scenario.onActivity { scanner = fakeScanner(it) }
+            onView(withContentDescription("Scale Pull live weight graph"))
+                .perform(scrollTo())
+                .check(matches(isDisplayed()))
+            onView(withContentDescription("Start set 1 hold")).check(doesNotExist())
+            onView(withContentDescription("Set 1 weight")).check(matches(not(isEnabled())))
+            scenario.onActivity { scanner.reading(selected, 1.1) }
+            SystemClock.sleep(150)
+            scenario.onActivity {
+                scanner.reading(selected, 15.113)
+                scanner.reading(selected, 15.133)
+            }
+            SystemClock.sleep(1_100)
+            onView(withContentDescription("Set 1 done")).check(matches(not(isChecked())))
+            scenario.onActivity {
+                scanner.reading(CraneScaleDevice("AA:BB:CC:DD:EE:02", "Other"), 99.0)
+                scanner.reading(selected, 2.0)
+                scanner.reading(selected, 1.0)
+            }
+            onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
+            onView(withContentDescription("Set 1 weight")).check(matches(withText("15.12")))
+            onView(withContentDescription("Rest timer overlay")).check(matches(isDisplayed()))
+            val saved =
+                LofitRepository(context).data.activeWorkout!!.exercises.single().sets.single()
+            assertEquals(15.12, saved.weightKg, 0.0)
+            assertTrue(saved.holdSeconds >= 1)
+            onView(withContentDescription("Scale Pull live weight graph")).check { view, _ ->
+                assertEquals(
+                    listOf(1.1, 15.113, 15.133, 2.0, 1.0),
+                    (view as LiveMeasurementGraphView).series.samples.map { it.kilograms },
+                )
+            }
+            scenario.recreate()
+            onView(withContentDescription("Scale Pull live weight graph")).check { view, _ ->
+                assertTrue((view as LiveMeasurementGraphView).series.samples.isEmpty())
+            }
+            onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
+        }
+    }
+
+    @Test
+    fun shortPullAndScanFailureStayUnfinishedThenManualRestoresNormalTimer() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            lateinit var scanner: FakeScanner
+            scenario.onActivity {
+                scanner = fakeScanner(it)
+                scanner.reading(selected, 1.1)
+            }
+            SystemClock.sleep(150)
+            scenario.onActivity { scanner.reading(selected, 12.0) }
+            SystemClock.sleep(150)
+            scenario.onActivity { scanner.reading(selected, 0.0) }
+            onView(withContentDescription("Set 1 done")).check(matches(not(isChecked())))
+            assertEquals(
+                12.0,
+                LofitRepository(context)
+                    .data
+                    .activeWorkout!!
+                    .exercises
+                    .single()
+                    .plannedSets
+                    .single()
+                    .weightKg,
+                0.0,
+            )
+            scenario.onActivity {
+                scanner.reading(selected, 25.0)
+                scanner.error("Scale unavailable")
+            }
+            assertTrue(
+                LofitRepository(context).data.activeWorkout!!.exercises.single().sets.isEmpty()
+            )
+            onView(withContentDescription("Scale Pull scale status"))
+                .check(matches(withText("Scale unavailable")))
+            onView(withText("Manual")).perform(scrollTo(), click())
+            assertTrue(
+                LofitRepository(context).data.activeWorkout!!.exercises.single().manualMeasurement
+            )
+            assertFalse(scanner.running)
+            onView(withContentDescription("Scale Pull live weight graph")).check(doesNotExist())
+            onView(withContentDescription("Set 1 weight")).check(matches(isEnabled()))
+            onView(withContentDescription("Start set 1 hold")).perform(scrollTo(), click())
+            onView(withContentDescription("Stop set 1 hold")).perform(click())
+            scenario.recreate()
+            onView(withContentDescription("Start set 1 hold")).check(matches(isDisplayed()))
+        }
+    }
+
+    @Test
+    fun routineManualChoiceStartsManualAndWorkoutCanSwitchBackToLive() {
+        LofitRepository(context).apply {
+            data.activeWorkout = null
+            data.routines.clear()
+            data.routines.add(
+                Routine(
+                    name = "Scale routine",
+                    exercises = mutableListOf(RoutineExercise(exerciseId = movement.id)),
+                )
+            )
+            save()
+        }
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            navigate(scenario, R.string.nav_routines)
+            onView(withText("Edit")).perform(scrollTo(), click())
+            onView(withText("use scale")).check(matches(isChecked()))
+            onView(withText("Manual")).perform(scrollTo(), click())
+            onView(withText("Save routine")).perform(scrollTo(), click())
+            onView(withText("Start")).perform(scrollTo(), click())
+            onView(withText("Manual")).check(matches(isChecked()))
+            onView(withContentDescription("Scale Pull live weight graph")).check(doesNotExist())
+            onView(withText("use scale")).perform(scrollTo(), click())
+            onView(withContentDescription("Scale Pull live weight graph"))
+                .check(matches(isDisplayed()))
+            assertFalse(
+                LofitRepository(context).data.activeWorkout!!.exercises.single().manualMeasurement
+            )
+            assertTrue(
+                LofitRepository(context).data.routines.single().exercises.single().manualMeasurement
+            )
+        }
+    }
+
+    @Test
+    fun modifierOnlyEnabledForTimedWeightedExercises() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            navigate(scenario, R.string.nav_exercises)
+            onView(withHint("Search name or muscle"))
+                .perform(replaceText("Scale Pull"), closeSoftKeyboard())
+            onView(withText("Edit")).perform(scrollTo(), click())
+            onView(withText("Live measurement"))
+                .check(matches(isChecked()))
+                .check(matches(isEnabled()))
+            onView(withText("Weighted")).perform(scrollTo(), click())
+            onView(withText("Live measurement"))
+                .check(matches(not(isChecked())))
+                .check(matches(not(isEnabled())))
+            onView(withText("Weighted")).perform(click())
+            onView(withText("Live measurement")).perform(click())
+            onView(withText("Repetitions")).perform(scrollTo(), click())
+            onView(withText("Live measurement"))
+                .check(matches(not(isChecked())))
+                .check(matches(not(isEnabled())))
+            onView(withText("Save exercise")).perform(scrollTo(), click())
+            assertFalse(
+                LofitRepository(context)
+                    .data
+                    .exercises
+                    .first { it.id == movement.id }
+                    .liveMeasurement
+            )
+        }
+    }
+
+    private fun navigate(scenario: ActivityScenario<MainActivity>, label: Int) {
+        scenario.onActivity {
+            val root = it.findViewById<ViewGroup>(android.R.id.content)
+            (root.getChildAt(0) as DrawerLayout).openDrawer(GravityCompat.START, false)
+        }
+        onView(allOf(withText(label), isClickable())).perform(click())
+    }
+}

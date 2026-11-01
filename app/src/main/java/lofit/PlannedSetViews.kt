@@ -40,6 +40,8 @@ internal class PlannedSetViews(
         activeHoldAction: View? = null,
         activeHoldRunning: Boolean = false,
         readOnly: Boolean = false,
+        measured: Boolean = false,
+        onWeightReady: (EditText) -> Unit = {},
         onAmountReady: (EditText) -> Unit = {},
         onActiveAmountReady: (EditText) -> Unit = {},
         onIndexUpdaterReady: ((Int) -> Unit) -> Unit = {},
@@ -104,9 +106,12 @@ internal class PlannedSetViews(
                     else
                         ui.decimalField("Weight in kg").apply {
                             setText(formatWeight(plannedSet.weightKg))
+                            isEnabled = !measured
                             contentDescription = "Set ${currentSetIndex + 1} weight"
                             setPadding(ui.dp(6), 0, ui.dp(6), 0)
+                            onWeightReady(this)
                             doAfterTextChanged { value ->
+                                if (isUpdatingHoldTimer()) return@doAfterTextChanged
                                 parseWeight(value.toString())
                                     ?.takeIf { it >= 0 }
                                     ?.let {
@@ -163,7 +168,7 @@ internal class PlannedSetViews(
                                 contentDescription =
                                     "Set ${currentSetIndex + 1} Active time in seconds"
                                 setPadding(ui.dp(6), 0, ui.dp(6), 0)
-                                isEnabled = !activeHoldRunning
+                                isEnabled = !activeHoldRunning && !measured
                                 doAfterTextChanged { value ->
                                     if (isUpdatingHoldTimer()) return@doAfterTextChanged
                                     value
