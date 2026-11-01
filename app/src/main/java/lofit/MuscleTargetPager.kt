@@ -24,39 +24,28 @@ class MuscleTargetPager(
     private val sage = ContextCompat.getColor(context, R.color.sage)
     private val coral = ContextCompat.getColor(context, R.color.coral)
     private val track = ContextCompat.getColor(context, R.color.charcoal_surface_high)
+    private val maps = MuscleMapPair(context, workload, gender)
+    private val chart: LinearLayout
+    private val percentages = mutableListOf<TextView>()
+    private val bars = mutableListOf<ProgressBar>()
+    private val pager: ViewPager
+
+    var currentPage: Int
+        get() = pager.currentItem
+        set(value) {
+            pager.setCurrentItem(value, false)
+        }
 
     init {
         orientation = VERTICAL
         setPadding(0, dp(10), 0, 0)
-        val maps =
-            LinearLayout(context).apply {
-                gravity = Gravity.CENTER
-                listOf("Front" to MuscleMapSide.FRONT, "Back" to MuscleMapSide.BACK).forEach {
-                    (label, side) ->
-                    addView(
-                        LinearLayout(context).apply {
-                            orientation = VERTICAL
-                            gravity = Gravity.CENTER
-                            addView(label(label, sage).apply { gravity = Gravity.CENTER })
-                            addView(
-                                MuscleMapView(context, side, workload, gender),
-                                LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f),
-                            )
-                        },
-                        LayoutParams(0, LayoutParams.MATCH_PARENT, 1f),
-                    )
-                }
-            }
-        val percentages = workload.targetPercentages()
-        val chart =
+        chart =
             LinearLayout(context).apply {
                 orientation = VERTICAL
                 gravity = Gravity.CENTER_VERTICAL
                 contentDescription = "Muscle targeting graph"
-                stateDescription =
-                    percentages.entries.joinToString(", ") { "${it.key} ${it.value}%" }
                 setPadding(dp(8), 0, dp(8), 0)
-                percentages.forEach { (name, percentage) ->
+                workload.targetPercentages().forEach { (name, _) ->
                     addView(
                         LinearLayout(context).apply {
                             orientation = VERTICAL
@@ -68,7 +57,7 @@ class MuscleTargetPager(
                                         label(name, cream),
                                         LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f),
                                     )
-                                    addView(label("$percentage%", coral))
+                                    addView(label("", coral).also { percentages.add(it) })
                                 }
                             )
                             addView(
@@ -79,10 +68,10 @@ class MuscleTargetPager(
                                     )
                                     .apply {
                                         max = 100
-                                        progress = percentage
                                         progressTintList = ColorStateList.valueOf(coral)
                                         progressBackgroundTintList = ColorStateList.valueOf(track)
                                         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+                                        bars.add(this)
                                     },
                                 LayoutParams(LayoutParams.MATCH_PARENT, dp(8)).apply {
                                     topMargin = dp(6)
@@ -94,7 +83,7 @@ class MuscleTargetPager(
                 }
             }
         val pages = listOf(maps, chart)
-        val pager =
+        pager =
             ViewPager(context).apply {
                 contentDescription = "Muscle visualization pages"
                 adapter =
@@ -121,7 +110,7 @@ class MuscleTargetPager(
             pager,
             LayoutParams(
                 LayoutParams.MATCH_PARENT,
-                dp(264 + (28 * resources.configuration.fontScale).toInt()),
+                pageHeight(context),
             ),
         )
         val dots =
@@ -161,6 +150,34 @@ class MuscleTargetPager(
             }
         )
         selectPage(0)
+        bindChart(workload)
+    }
+
+    fun bind(workload: MuscleWorkload) {
+        maps.bind(workload)
+        bindChart(workload)
+    }
+
+    private fun bindChart(workload: MuscleWorkload) {
+        val values = workload.targetPercentages()
+        chart.stateDescription = values.entries.joinToString(", ") { "${it.key} ${it.value}%" }
+        values.values.forEachIndexed { index, value ->
+            percentages[index].text = "$value%"
+            bars[index].progress = value
+            bars[index].jumpDrawablesToCurrentState()
+        }
+    }
+
+    internal companion object {
+        fun pageHeight(context: Context): Int =
+            ((264 + (28 * context.resources.configuration.fontScale).toInt()) *
+                    context.resources.displayMetrics.density)
+                .toInt()
+
+        fun height(context: Context): Int =
+            pageHeight(context) +
+                (10 * context.resources.displayMetrics.density).toInt() +
+                (48 * context.resources.displayMetrics.density).toInt()
     }
 
     private fun label(value: String, color: Int) =
@@ -171,4 +188,41 @@ class MuscleTargetPager(
         }
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
+}
+
+/** Also supplies the neutral, shared history placeholder without creating a pager or chart. */
+internal class MuscleMapPair(
+    context: Context,
+    workload: MuscleWorkload,
+    gender: BiologicalGender,
+) : LinearLayout(context) {
+    private val maps = mutableListOf<MuscleMapView>()
+
+    init {
+        gravity = Gravity.CENTER
+        listOf("Front" to MuscleMapSide.FRONT, "Back" to MuscleMapSide.BACK).forEach { (label, side)
+            ->
+            addView(
+                LinearLayout(context).apply {
+                    orientation = VERTICAL
+                    gravity = Gravity.CENTER
+                    addView(
+                        TextView(context).apply {
+                            text = label
+                            textSize = 13f
+                            setTextColor(ContextCompat.getColor(context, R.color.sage))
+                            gravity = Gravity.CENTER
+                        }
+                    )
+                    addView(
+                        MuscleMapView(context, side, workload, gender).also { maps.add(it) },
+                        LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f),
+                    )
+                },
+                LayoutParams(0, LayoutParams.MATCH_PARENT, 1f),
+            )
+        }
+    }
+
+    fun bind(workload: MuscleWorkload) = maps.forEach { it.bind(workload) }
 }

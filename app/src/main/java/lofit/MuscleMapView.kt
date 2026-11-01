@@ -49,42 +49,49 @@ class MuscleMapView(
             strokeJoin = Paint.Join.ROUND
             style = Paint.Style.STROKE
         }
-    // Parse geometry once per model and side; prepare shading once per card.
-    private val muscles =
-        anatomy.regions.flatMap { region ->
-            val saturation = workload.saturationFor(groupsFor(region.name, side))
-            val inactive = ColorUtils.blendARGB(surface, sage, 0.48f)
-            val base = ColorUtils.blendARGB(inactive, coral, saturation)
-            val light =
-                ColorUtils.blendARGB(
-                    ColorUtils.blendARGB(inactive, sage, 0.20f),
-                    ColorUtils.blendARGB(coral, cream, 0.20f),
-                    saturation,
-                )
-            val shadow = ColorUtils.blendARGB(base, surface, 0.28f)
-            region.paths.map { path ->
-                val bounds = RectF().also { path.computeBounds(it, true) }
-                ShadedPath(
-                    path,
-                    Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        shader =
-                            LinearGradient(
-                                bounds.left,
-                                bounds.top,
-                                bounds.right,
-                                bounds.bottom,
-                                intArrayOf(shadow, light, base, shadow),
-                                floatArrayOf(0f, 0.35f, 0.7f, 1f),
-                                Shader.TileMode.CLAMP,
-                            )
-                    },
-                )
-            }
-        }
+    // Geometry is shared; shading is rebound when a history map is reused.
+    private var muscles = emptyList<ShadedPath>()
 
     init {
         contentDescription =
             if (side == MuscleMapSide.FRONT) "Front muscle map" else "Back muscle map"
+        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
+        bind(workload)
+    }
+
+    fun bind(workload: MuscleWorkload) {
+        muscles =
+            anatomy.regions.flatMap { region ->
+                val saturation = workload.saturationFor(groupsFor(region.name, side))
+                val inactive = ColorUtils.blendARGB(surface, sage, 0.48f)
+                val base = ColorUtils.blendARGB(inactive, coral, saturation)
+                val light =
+                    ColorUtils.blendARGB(
+                        ColorUtils.blendARGB(inactive, sage, 0.20f),
+                        ColorUtils.blendARGB(coral, cream, 0.20f),
+                        saturation,
+                    )
+                val shadow = ColorUtils.blendARGB(base, surface, 0.28f)
+                region.paths.map { path ->
+                    val bounds = RectF().also { path.computeBounds(it, true) }
+                    ShadedPath(
+                        path,
+                        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                            shader =
+                                LinearGradient(
+                                    bounds.left,
+                                    bounds.top,
+                                    bounds.right,
+                                    bounds.bottom,
+                                    intArrayOf(shadow, light, base, shadow),
+                                    floatArrayOf(0f, 0.35f, 0.7f, 1f),
+                                    Shader.TileMode.CLAMP,
+                                )
+                        },
+                    )
+                }
+            }
+
         val visibleGroups = anatomy.regions.flatMap { groupsFor(it.name, side) }.toSet()
         val highlighted =
             visibleGroups.sorted().mapNotNull { group ->
@@ -95,7 +102,7 @@ class MuscleMapView(
             "${biologicalGender.label}. " +
                 (highlighted.takeIf { it.isNotEmpty() }?.joinToString(", ")
                     ?: "No highlighted muscles")
-        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
+        invalidate()
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {

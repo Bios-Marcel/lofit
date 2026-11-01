@@ -73,6 +73,7 @@ class MainActivity : AppCompatActivity() {
         const val ACTION_ADD_REST = "lofit.action.ADD_REST"
         const val ACTION_SKIP_REST = "lofit.action.SKIP_REST"
         const val ACTION_OPEN_WORKOUT = "lofit.action.OPEN_WORKOUT"
+        const val HISTORY_PAGE_SIZE = 10
     }
 
     private enum class Screen {
@@ -218,6 +219,7 @@ class MainActivity : AppCompatActivity() {
         val route: Route,
         val scrollY: Int,
         val routineDraft: Routine?,
+        val historyPage: Int,
     )
 
     private val previousScreens = mutableListOf<PreviousScreen>()
@@ -230,8 +232,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var root: LinearLayout
     private lateinit var drawerLayout: DrawerLayout
     private lateinit var restBar: LinearLayout
+    private lateinit var historyPager: LinearLayout
     private lateinit var restTimeText: TextView
     private var currentScreen = Screen.HOME
+    private var historyPage = 0
     private var route: Route = Route.Root
     private var routineDraft: Routine? = null
     private var historyEditDraft: WorkoutSession? = null
@@ -483,6 +487,22 @@ class MainActivity : AppCompatActivity() {
         }
         content = FrameLayout(this)
         root.addView(content, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        historyPager =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(ui.dp(14), ui.dp(8), ui.dp(14), ui.dp(8))
+                setBackgroundColor(ui.color(R.color.charcoal_light))
+                contentDescription = "History pages"
+                visibility = View.GONE
+            }
+        root.addView(
+            historyPager,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
+        )
         restBar = createRestBar()
         root.addView(
             restBar,
@@ -562,6 +582,7 @@ class MainActivity : AppCompatActivity() {
             clearActiveHold()
         }
         content.removeAllViews()
+        historyPager.visibility = View.GONE
         timerText = null
         holdTimerText = null
         holdTimerButton = null
@@ -1485,40 +1506,106 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun historyScreen(): View =
-        ui.page("History", "Your training stays on this device.") { body ->
-            val history = repository.data.history.sortedByDescending { it.completedAt }
-            if (history.isEmpty())
-                body.addView(ui.emptyText("Complete a workout and it will appear here."))
-            history.forEachIndexed { index, workout ->
-                body.addView(
-                    ui.card {
-                        addView(ui.titleText(workout.name))
-                        addView(
-                            ui.metaText(
-                                DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
-                                    .format(Date(workout.startedAt))
-                            )
-                        )
-                        addView(
-                            ui.metaText(
-                                "${workout.setCount()} sets · ${formatWeight(workout.totalVolume(repository.data.exercises))} kg volume · ${formatDuration(workout.durationMillis())}"
-                            )
-                        )
-                        workout.bodyWeightKg?.let { addView(bodyWeightText(it)) }
-                        addView(
-                            exerciseMuscleMaps(
-                                workout.exercises.map { it.exerciseId to it.sets.size }
-                            )
-                        )
-                        if (index == 0 && workout.wasCompletedToday()) {
+    private fun historyScreen(): View {
+        val history = repository.data.history.sortedByDescending { it.completedAt }
+        val pageCount =
+            ((history.size + HISTORY_PAGE_SIZE - 1) / HISTORY_PAGE_SIZE).coerceAtLeast(1)
+        historyPage = historyPage.coerceIn(0, pageCount - 1)
+        val pageStart = historyPage * HISTORY_PAGE_SIZE
+        val workouts =
+            history.subList(pageStart, minOf(pageStart + HISTORY_PAGE_SIZE, history.size))
+        updateHistoryPager(pageCount, history.isNotEmpty())
+        val muscleMaps = LazyMuscleMaps(this, repository.data.biologicalGender)
+        return ui.page("History", "Your training stays on this device.") { body ->
+                if (history.isEmpty())
+                    body.addView(ui.emptyText("Complete a workout and it will appear here."))
+                val dateFormat = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
+                workouts.forEachIndexed { index, workout ->
+                    body.addView(
+                        ui.card {
+                            addView(ui.titleText(workout.name))
+                            addView(ui.metaText(dateFormat.format(Date(workout.startedAt))))
                             addView(
-                                ui.actionButton("Continue workout") {
-                                        continueHistoryWorkout(workout)
-                                    }
-                                    .apply {
-                                        contentDescription = "Continue ${workout.name}"
-                                    },
+                                ui.metaText(
+                                    "${workout.setCount()} sets · ${formatWeight(workout.totalVolume(repository.data.exercises))} kg volume · ${formatDuration(workout.durationMillis())}"
+                                )
+                            )
+                            workout.bodyWeightKg?.let { addView(bodyWeightText(it)) }
+                            addView(
+                                muscleMaps.slot {
+                                    exerciseMuscleWorkload(
+                                        workout.exercises.map { it.exerciseId to it.sets.size }
+                                    )
+                                }
+                            )
+                            if (historyPage == 0 && index == 0 && workout.wasCompletedToday()) {
+                                addView(
+                                    ui.actionButton("Continue workout") {
+                                            continueHistoryWorkout(workout)
+                                        }
+                                        .apply {
+                                            contentDescription = "Continue ${workout.name}"
+                                        },
+                                    LinearLayout.LayoutParams(
+                                            ViewGroup.LayoutParams.MATCH_PARENT,
+                                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                                        )
+                                        .apply {
+                                            topMargin = ui.dp(12)
+                                        },
+                                )
+                            }
+                            addView(
+                                LinearLayout(this@MainActivity).apply {
+                                    orientation = LinearLayout.HORIZONTAL
+                                    gravity = Gravity.CENTER_VERTICAL
+                                    addView(
+                                        ui.actionButton("View") {
+                                                openWorkoutHistory(workout)
+                                            }
+                                            .apply {
+                                                contentDescription = "View ${workout.name}"
+                                            },
+                                        LinearLayout.LayoutParams(
+                                                0,
+                                                ViewGroup.LayoutParams.WRAP_CONTENT,
+                                                1f,
+                                            )
+                                            .apply {
+                                                marginEnd = ui.dp(8)
+                                            },
+                                    )
+                                    addView(
+                                        ui.actionButton("Edit", secondary = true) {
+                                                openWorkoutHistory(workout, editing = true)
+                                            }
+                                            .apply {
+                                                contentDescription = "Edit ${workout.name}"
+                                            },
+                                        LinearLayout.LayoutParams(
+                                                0,
+                                                ViewGroup.LayoutParams.WRAP_CONTENT,
+                                                1f,
+                                            )
+                                            .apply { marginEnd = ui.dp(8) },
+                                    )
+                                    addView(
+                                        ui.actionButton("Create Routine", secondary = true) {
+                                                routineDraft = workout.toRoutine()
+                                                route = Route.RoutineEditor(null)
+                                                render()
+                                            }
+                                            .apply {
+                                                contentDescription =
+                                                    "Create routine from ${workout.name}"
+                                            },
+                                        LinearLayout.LayoutParams(
+                                            0,
+                                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                                            1f,
+                                        ),
+                                    )
+                                },
                                 LinearLayout.LayoutParams(
                                         ViewGroup.LayoutParams.MATCH_PARENT,
                                         ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -1527,94 +1614,75 @@ class MainActivity : AppCompatActivity() {
                                         topMargin = ui.dp(12)
                                     },
                             )
-                        }
-                        addView(
-                            LinearLayout(this@MainActivity).apply {
-                                orientation = LinearLayout.HORIZONTAL
-                                gravity = Gravity.CENTER_VERTICAL
+                            val hevyWorkoutId = hevySettings.remoteWorkoutId(workout.id)
+                            if (
+                                workout.setCount() > 0 &&
+                                    (hevyWorkoutId == null || hevySettings.apiKey.isNotBlank())
+                            ) {
+                                val label =
+                                    if (hevyWorkoutId == null) "Export to Hevy"
+                                    else "Update on Hevy"
                                 addView(
-                                    ui.actionButton("View") {
-                                            openWorkoutHistory(workout)
+                                    ui.actionButton(label, secondary = true) {
+                                            exportWorkoutToHevy(
+                                                workout,
+                                                repository.data.exercises.toList(),
+                                            )
                                         }
                                         .apply {
-                                            contentDescription = "View ${workout.name}"
+                                            contentDescription = "$label ${workout.name}"
                                         },
                                     LinearLayout.LayoutParams(
-                                            0,
+                                            ViewGroup.LayoutParams.MATCH_PARENT,
                                             ViewGroup.LayoutParams.WRAP_CONTENT,
-                                            1f,
                                         )
-                                        .apply {
-                                            marginEnd = ui.dp(8)
-                                        },
+                                        .apply { topMargin = ui.dp(12) },
                                 )
-                                addView(
-                                    ui.actionButton("Edit", secondary = true) {
-                                            openWorkoutHistory(workout, editing = true)
-                                        }
-                                        .apply {
-                                            contentDescription = "Edit ${workout.name}"
-                                        },
-                                    LinearLayout.LayoutParams(
-                                            0,
-                                            ViewGroup.LayoutParams.WRAP_CONTENT,
-                                            1f,
-                                        )
-                                        .apply { marginEnd = ui.dp(8) },
-                                )
-                                addView(
-                                    ui.actionButton("Create Routine", secondary = true) {
-                                            routineDraft = workout.toRoutine()
-                                            route = Route.RoutineEditor(null)
-                                            render()
-                                        }
-                                        .apply {
-                                            contentDescription =
-                                                "Create routine from ${workout.name}"
-                                        },
-                                    LinearLayout.LayoutParams(
-                                        0,
-                                        ViewGroup.LayoutParams.WRAP_CONTENT,
-                                        1f,
-                                    ),
-                                )
-                            },
-                            LinearLayout.LayoutParams(
-                                    ViewGroup.LayoutParams.MATCH_PARENT,
-                                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                                )
-                                .apply {
-                                    topMargin = ui.dp(12)
-                                },
-                        )
-                        val hevyWorkoutId = hevySettings.remoteWorkoutId(workout.id)
-                        if (
-                            workout.setCount() > 0 &&
-                                (hevyWorkoutId == null || hevySettings.apiKey.isNotBlank())
-                        ) {
-                            val label =
-                                if (hevyWorkoutId == null) "Export to Hevy" else "Update on Hevy"
-                            addView(
-                                ui.actionButton(label, secondary = true) {
-                                        exportWorkoutToHevy(
-                                            workout,
-                                            repository.data.exercises.toList(),
-                                        )
-                                    }
-                                    .apply {
-                                        contentDescription = "$label ${workout.name}"
-                                    },
-                                LinearLayout.LayoutParams(
-                                        ViewGroup.LayoutParams.MATCH_PARENT,
-                                        ViewGroup.LayoutParams.WRAP_CONTENT,
-                                    )
-                                    .apply { topMargin = ui.dp(12) },
-                            )
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
-        }
+            .also { muscleMaps.attach(it as ScrollView) }
+    }
+
+    private fun updateHistoryPager(pageCount: Int, hasWorkouts: Boolean) {
+        historyPager.removeAllViews()
+        historyPager.visibility = if (hasWorkouts) View.VISIBLE else View.GONE
+        if (!hasWorkouts) return
+        historyPager.addView(
+            ui.actionButton("Newer", secondary = true) {
+                    historyPage--
+                    render()
+                }
+                .apply {
+                    contentDescription = "Newer workouts"
+                    isEnabled = historyPage > 0
+                },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginEnd = ui.dp(12)
+            },
+        )
+        historyPager.addView(
+            ui.metaText("${historyPage + 1} / $pageCount").apply {
+                gravity = Gravity.CENTER
+                contentDescription = "History page ${historyPage + 1} of $pageCount"
+            }
+        )
+        historyPager.addView(
+            ui.actionButton("Older", secondary = true) {
+                    historyPage++
+                    render()
+                }
+                .apply {
+                    contentDescription = "Older workouts"
+                    isEnabled = historyPage < pageCount - 1
+                },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = ui.dp(12)
+            },
+        )
+    }
 
     private fun openWorkoutHistory(workout: WorkoutSession, editing: Boolean = false) {
         historyEditDraft = if (editing) workout.editableCopy() else null
@@ -1854,16 +1922,20 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-    private fun exerciseMuscleMaps(exerciseSets: List<Pair<String, Int>>): View {
-        val workload =
-            MuscleWorkload(
-                exerciseSets.mapNotNull { (exerciseId, sets) ->
-                    exercise(exerciseId)?.let { it to sets }
-                }
-            )
+    private fun exerciseMuscleWorkload(exerciseSets: List<Pair<String, Int>>): MuscleWorkload =
+        MuscleWorkload(
+            exerciseSets.mapNotNull { (exerciseId, sets) ->
+                exercise(exerciseId)?.let { it to sets }
+            }
+        )
 
-        return MuscleTargetPager(this, workload, repository.data.biologicalGender)
-    }
+    // LEGACY: Routine and active-workout screens still construct their single pager eagerly.
+    private fun exerciseMuscleMaps(exerciseSets: List<Pair<String, Int>>): View =
+        MuscleTargetPager(
+            this,
+            exerciseMuscleWorkload(exerciseSets),
+            repository.data.biologicalGender,
+        )
 
     private fun openExerciseTrend(exerciseId: String) {
         route =
@@ -2520,10 +2592,12 @@ class MainActivity : AppCompatActivity() {
                     route,
                     (content.getChildAt(0) as? ScrollView)?.scrollY ?: 0,
                     routineDraft,
+                    historyPage,
                 )
             )
         }
         currentScreen = screen
+        if (screen == Screen.HISTORY) historyPage = 0
         route = Route.Root
         routineDraft = null
         render()
@@ -2546,6 +2620,7 @@ class MainActivity : AppCompatActivity() {
                 currentScreen = previous.screen
                 route = previous.route
                 routineDraft = previous.routineDraft
+                historyPage = previous.historyPage
                 render(previous.scrollY)
             }
             return
