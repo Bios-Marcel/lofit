@@ -108,7 +108,8 @@ class HealthConnectWeightReaderTest {
             onView(withContentDescription("Workout body weight")).check(doesNotExist())
 
             openScreen(activity, R.string.nav_settings)
-            onView(withContentDescription("Android health integration")).perform(click())
+            onView(withContentDescription("Android health integration"))
+                .perform(scrollTo(), click())
             assertEquals(false, LofitRepository(context).data.bodyMetricsEnabled)
             openScreen(activity, R.string.nav_workout)
             onView(withContentDescription("Open active workout")).perform(click())
@@ -120,7 +121,8 @@ class HealthConnectWeightReaderTest {
             assertNull(LofitRepository(context).data.activeWorkout!!.bodyWeightKg)
 
             openScreen(activity, R.string.nav_settings)
-            onView(withContentDescription("Android health integration")).perform(click())
+            onView(withContentDescription("Android health integration"))
+                .perform(scrollTo(), click())
             val enabledDeadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
             while (
                 LofitRepository(context).data.activeWorkout?.bodyWeightKg == null &&

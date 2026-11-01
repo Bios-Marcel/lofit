@@ -346,11 +346,11 @@ class WorkoutFlowTest {
         onView(withText(R.string.nav_settings)).perform(click())
         onView(withContentDescription("Android health integration"))
             .check(matches(not(isChecked())))
-            .perform(click())
+            .perform(scrollTo(), click())
             .check(matches(isChecked()))
         assertEquals(true, LofitRepository(context).data.bodyMetricsEnabled)
         onView(withContentDescription("Android health integration"))
-            .perform(click())
+            .perform(scrollTo(), click())
             .check(matches(not(isChecked())))
         assertEquals(false, LofitRepository(context).data.bodyMetricsEnabled)
         instrumentation.runOnMainSync { activity.finish() }
