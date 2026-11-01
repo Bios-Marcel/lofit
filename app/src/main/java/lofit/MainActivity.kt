@@ -2613,6 +2613,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun navigateBack() {
         if (route == Route.Root) {
+            if (
+                currentScreen == Screen.WORKOUT &&
+                    repository.data.activeWorkout?.exercises?.isEmpty() == true
+            ) {
+                confirmDiscardWorkout()
+                return
+            }
             val previous = previousScreens.removeLastOrNull()
             if (previous == null) {
                 showHome()

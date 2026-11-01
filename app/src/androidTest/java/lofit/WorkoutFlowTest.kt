@@ -559,7 +559,38 @@ class WorkoutFlowTest {
     }
 
     @Test
-    fun home_leavingNewWorkoutShowsTileThenBackLeavesApp() {
+    fun home_leavingEmptyWorkoutDiscardsItWithoutConfirmation() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)).use {
+            scenario ->
+            onView(withText(R.string.start_workout)).perform(scrollTo(), click())
+            val workoutId = LofitRepository(context).data.activeWorkout!!.id
+            onView(withText("Add exercise")).perform(scrollTo(), click())
+            pressBack()
+            onView(withText("Add exercise")).check(matches(isDisplayed()))
+            assertEquals(workoutId, LofitRepository(context).data.activeWorkout!!.id)
+
+            pressBack()
+            onView(withText(R.string.start_workout)).check(matches(isDisplayed()))
+            onView(withText("Resume workout")).check(doesNotExist())
+            onView(withText("Discard workout?")).check(doesNotExist())
+            assertEquals(null, LofitRepository(context).data.activeWorkout)
+            assertTrue(LofitRepository(context).data.history.isEmpty())
+            assertTrue(
+                context
+                    .getSystemService(NotificationManager::class.java)
+                    .activeNotifications
+                    .isEmpty()
+            )
+
+            scenario.recreate()
+            onView(withText(R.string.start_workout)).check(matches(isDisplayed()))
+            onView(withText("Resume workout")).check(doesNotExist())
+        }
+    }
+
+    @Test
+    fun home_leavingWorkoutWithExerciseShowsTileThenBackLeavesApp() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         val intent =
@@ -568,6 +599,10 @@ class WorkoutFlowTest {
         val activity = instrumentation.startActivitySync(intent)
         try {
             onView(withText(R.string.start_workout)).perform(scrollTo(), click())
+            onView(withText("Add exercise")).perform(scrollTo(), click())
+            onView(withHint("Search name or muscle"))
+                .perform(replaceText("Bench press"), closeSoftKeyboard())
+            onView(withContentDescription("Add Bench press")).perform(scrollTo(), click())
             onView(withText("Add exercise")).check(matches(isDisplayed()))
             val workoutId = LofitRepository(context).data.activeWorkout!!.id
             pressBack()
