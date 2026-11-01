@@ -1374,7 +1374,8 @@ class WorkoutFlowTest {
             onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
             scenario.recreate()
             onView(withText("Finish workout")).perform(scrollTo()).check(matches(isEnabled()))
-            onView(withContentDescription("Remove Bench press")).perform(scrollTo(), click())
+            onView(withContentDescription("Options for Bench press")).perform(scrollTo(), click())
+            onView(withText("Remove exercise")).perform(click())
             onView(withText("Finish workout")).perform(scrollTo()).check(matches(not(isEnabled())))
             onView(withText("Discard workout")).perform(scrollTo(), click())
             assertEquals(null, LofitRepository(context).data.activeWorkout)
@@ -1721,7 +1722,8 @@ class WorkoutFlowTest {
             },
         )
         onView(withText("Plank")).check { view, _ -> assertSame(survivingHeading[0], view) }
-        onView(withContentDescription("Remove Bench press")).perform(scrollTo(), click())
+        onView(withContentDescription("Options for Bench press")).perform(scrollTo(), click())
+        onView(withText("Remove exercise")).perform(click())
 
         onView(isAssignableFrom(ScrollView::class.java)).check { view, _ ->
             assertSame(page[0], view)
@@ -1811,7 +1813,8 @@ class WorkoutFlowTest {
         onView(withText("Plank")).check { view, _ -> assertSame(survivingHeading[0], view) }
         onView(withContentDescription("Reorder Plank")).perform(scrollTo(), dragExercise(1))
         onView(withText("Plank")).check { view, _ -> assertSame(survivingHeading[0], view) }
-        onView(withContentDescription("Remove Bench press")).perform(scrollTo(), click())
+        onView(withContentDescription("Options for Bench press")).perform(scrollTo(), click())
+        onView(withText("Remove exercise")).perform(click())
 
         onView(isAssignableFrom(ScrollView::class.java)).check { view, _ ->
             assertSame(page[0], view)
@@ -2611,7 +2614,7 @@ class WorkoutFlowTest {
             onView(withText(it)).check(doesNotExist())
         }
         onView(withContentDescription("Start set 1 hold")).check(doesNotExist())
-        onView(withContentDescription("Remove Bench press")).check(doesNotExist())
+        onView(withContentDescription("Options for Bench press")).check(doesNotExist())
         onView(withContentDescription("Delete set 1")).check(doesNotExist())
         pressBack()
         onView(withContentDescription("View Past workout")).check(matches(isDisplayed()))

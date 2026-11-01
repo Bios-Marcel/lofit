@@ -221,7 +221,8 @@ class RoutineWorkoutFlowTest {
         val original = LofitRepository(context).data.routines.single()
         launch().use { scenario ->
             editRoutine(scenario)
-            onView(withContentDescription("Remove Bench press")).perform(scrollTo(), click())
+            onView(withContentDescription("Options for Bench press")).perform(scrollTo(), click())
+            onView(withText("Remove exercise")).perform(click())
             onView(withText("Cancel")).perform(scrollTo(), click())
             onView(withText("Discard changes?")).inRoot(isDialog()).check(matches(isDisplayed()))
             onView(withText("Discard changes")).inRoot(isDialog()).perform(click())

@@ -14,6 +14,7 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.Rect
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.InsetDrawable
@@ -56,6 +57,7 @@ import androidx.core.view.doOnPreDraw
 import androidx.core.widget.doAfterTextChanged
 import androidx.drawerlayout.widget.DrawerLayout
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.snackbar.Snackbar
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
@@ -108,6 +110,10 @@ class MainActivity : AppCompatActivity() {
             val selectedIds: MutableSet<String> = linkedSetOf(),
             val historyWorkoutId: String? = null,
             val historyReturnScrollY: Int = 0,
+            val anchorId: String? = null,
+            val anchorName: String? = null,
+            val anchorExerciseId: String? = null,
+            val placement: ExercisePlacement? = null,
         ) : Route()
 
         data class RoutineEditor(val originalId: String?) : Route()
@@ -185,8 +191,10 @@ class MainActivity : AppCompatActivity() {
                 render()
             },
             onAddExercise = {
-                route = Route.ExercisePicker(PickerTarget.ROUTINE)
-                render()
+                openExercisePicker(PickerTarget.ROUTINE)
+            },
+            onSelectExercise = { id, placement ->
+                openExercisePicker(PickerTarget.ROUTINE, id, placement)
             },
             onSave = ::saveRoutineDraft,
             onCancel = ::cancelRoutineEditor,
@@ -239,6 +247,7 @@ class MainActivity : AppCompatActivity() {
     private var route: Route = Route.Root
     private var routineDraft: Routine? = null
     private var historyEditDraft: WorkoutSession? = null
+    private var exerciseEditUndo: Snackbar? = null
     private var exerciseDraft: Bundle? = null
     private val exercisePictures by lazy { ExercisePictures(this) }
     private val pictureWorker = Executors.newSingleThreadExecutor()
@@ -563,7 +572,14 @@ class MainActivity : AppCompatActivity() {
                 }
         }
 
-    private fun render(restoreScrollY: Int? = null, scrollToBottom: Boolean = false) {
+    private fun render(
+        restoreScrollY: Int? = null,
+        scrollToBottom: Boolean = false,
+        focusExerciseId: String? = null,
+    ) {
+        exerciseEditUndo?.dismiss()
+        exerciseEditUndo = null
+        content.setPadding(0, 0, 0, 0)
         exerciseScreens.clearPicturePreview()
         if (route !is Route.ExerciseEditor) {
             pictureGeneration++
@@ -628,7 +644,17 @@ class MainActivity : AppCompatActivity() {
                 is Route.Confirm -> confirmationScreen(activeRoute)
             }
         content.addView(view)
-        if (scrollToBottom) {
+        if (focusExerciseId != null && view is ScrollView) {
+            view.doOnPreDraw {
+                val card = view.findViewWithTag<View>(focusExerciseId) ?: return@doOnPreDraw
+                val bounds = Rect()
+                card.getDrawingRect(bounds)
+                view.offsetDescendantRectToMyCoords(card, bounds)
+                view.scrollTo(0, (bounds.top - ui.dp(12)).coerceAtLeast(0))
+                card.alpha = 0.65f
+                card.animate().alpha(1f).setDuration(450).start()
+            }
+        } else if (scrollToBottom) {
             (view as? ScrollView)?.doOnPreDraw { view.scrollTo(0, view.getChildAt(0).height) }
         } else
             restoreScrollY?.let { scrollY ->
@@ -916,6 +942,7 @@ class MainActivity : AppCompatActivity() {
                                 },
                             )
                         cardViews[item.id] = card
+                        card.tag = item.id
                         exerciseCards.addView(card)
                         reorder.bind(handle, card)
                     }
@@ -986,7 +1013,10 @@ class MainActivity : AppCompatActivity() {
         editingHistory: Boolean = false,
     ): View =
         ui.card(horizontalPadding = 0) {
-            val saveChanges: () -> Unit = if (editingHistory) ({}) else repository::save
+            val saveChanges: () -> Unit = {
+                exerciseEditUndo?.dismiss()
+                if (!editingHistory) repository.save()
+            }
             addView(
                 ui.exerciseHeading(
                     exercise,
@@ -997,6 +1027,18 @@ class MainActivity : AppCompatActivity() {
                             exercise = exercise,
                             onRemove = onRemove,
                             onReorderHandleReady = onReorderHandleReady,
+                            onSelectExercise = { placement ->
+                                openExercisePicker(
+                                    if (editingHistory) PickerTarget.HISTORY
+                                    else PickerTarget.WORKOUT,
+                                    item.id,
+                                    placement,
+                                )
+                            },
+                            replaceRemaining = item.sets.isNotEmpty(),
+                            canReplace =
+                                item.sets.isEmpty() ||
+                                    item.plannedSets.any { loggedSetFor(item, it) == null },
                         ),
                 ),
                 ui.insetCardLayoutParams(),
@@ -1233,6 +1275,38 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
+    private fun openExercisePicker(
+        target: PickerTarget,
+        anchorId: String? = null,
+        placement: ExercisePlacement? = null,
+    ) {
+        val history = route as? Route.WorkoutHistory
+        val exerciseId =
+            when (target) {
+                PickerTarget.ROUTINE ->
+                    routineDraft?.exercises?.firstOrNull { it.id == anchorId }?.exerciseId
+                PickerTarget.WORKOUT ->
+                    repository.data.activeWorkout
+                        ?.exercises
+                        ?.firstOrNull { it.id == anchorId }
+                        ?.exerciseId
+                PickerTarget.HISTORY ->
+                    historyEditDraft?.exercises?.firstOrNull { it.id == anchorId }?.exerciseId
+            }
+        route =
+            Route.ExercisePicker(
+                target = target,
+                returnScrollY = (content.getChildAt(0) as? ScrollView)?.scrollY,
+                historyWorkoutId = history?.workoutId,
+                historyReturnScrollY = history?.returnScrollY ?: 0,
+                anchorId = anchorId,
+                anchorName = exerciseId?.let(::exercise)?.name,
+                anchorExerciseId = exerciseId,
+                placement = placement,
+            )
+        render()
+    }
+
     private fun exercisePickerScreen(picker: Route.ExercisePicker): View {
         val footer =
             LinearLayout(this).apply {
@@ -1241,7 +1315,19 @@ class MainActivity : AppCompatActivity() {
                 setBackgroundColor(ui.color(R.color.charcoal))
             }
         val target = picker.target
-        val exercises = repository.data.exercisesByRecency()
+        val replacing = picker.placement == ExercisePlacement.REPLACE
+        val anchorMovement = picker.anchorExerciseId?.let(::exercise)
+        val exercises =
+            repository.data
+                .exercisesByRecency()
+                .filter { !replacing || it.id != anchorMovement?.id }
+                .let { movements ->
+                    if (replacing)
+                        movements.sortedByDescending {
+                            it.primaryMuscle == anchorMovement?.primaryMuscle
+                        }
+                    else movements
+                }
         val search =
             ui.textField("Search name or muscle").apply {
                 inputType = InputType.TYPE_CLASS_TEXT
@@ -1249,35 +1335,136 @@ class MainActivity : AppCompatActivity() {
             }
         fun addExercises(movements: List<Exercise>) {
             if (movements.isEmpty()) return
+            if (replacing && movements.size != 1) return
             WindowCompat.getInsetsController(window, search).hide(WindowInsetsCompat.Type.ime())
             search.clearFocus()
-            movements.forEach { movement ->
-                when (target) {
-                    PickerTarget.WORKOUT,
-                    PickerTarget.HISTORY -> {
-                        val workout =
-                            if (target == PickerTarget.HISTORY)
-                                historyEditDraft?.takeIf { it.id == picker.historyWorkoutId }
-                            else repository.data.activeWorkout
-                        val item =
+            val undo: () -> Unit
+            val focusId: String?
+            when (target) {
+                PickerTarget.WORKOUT,
+                PickerTarget.HISTORY -> {
+                    val workout =
+                        if (target == PickerTarget.HISTORY)
+                            historyEditDraft?.takeIf { it.id == picker.historyWorkoutId }
+                        else repository.data.activeWorkout
+                    if (workout == null) return
+                    val anchorIndex = workout.exercises.indexOfFirst { it.id == picker.anchorId }
+                    if (picker.placement != null && anchorIndex < 0) return
+                    val anchor = workout.exercises.getOrNull(anchorIndex)
+                    val originalPlans = anchor?.plannedSets?.toList().orEmpty()
+                    val added = movements.map { movement ->
+                        val previous =
                             repository.data.lastKnownExercise(
                                 movement.id,
-                                preferredRoutineId = workout?.sourceRoutine?.id,
-                            ) ?: WorkoutExercise(exerciseId = movement.id)
-                        workout?.exercises?.add(item)
-                    }
-                    PickerTarget.ROUTINE ->
-                        routineDraft
-                            ?.exercises
-                            ?.add(
-                                RoutineExercise(
-                                    exerciseId = movement.id,
-                                    plannedSets =
-                                        MutableList(3) {
-                                            PlannedSet(holdSeconds = movement.minimumHoldSeconds)
-                                        },
-                                )
+                                preferredRoutineId = workout.sourceRoutine?.id,
                             )
+                        if (replacing && anchor != null) {
+                            val remaining =
+                                anchor.plannedSets.filter { loggedSetFor(anchor, it) == null }
+                            WorkoutExercise(
+                                exerciseId = movement.id,
+                                restSecondsOverride = anchor.restSecondsOverride,
+                                previousNote = previous?.effectiveNote.orEmpty(),
+                                plannedSets =
+                                    replacementSets(
+                                        remaining,
+                                        exercise(anchor.exerciseId) ?: return,
+                                        movement,
+                                        previous?.plannedSets.orEmpty(),
+                                    ),
+                            )
+                        } else previous ?: WorkoutExercise(exerciseId = movement.id)
+                    }
+                    val insertionIndex =
+                        when (picker.placement) {
+                            ExercisePlacement.ABOVE -> anchorIndex
+                            ExercisePlacement.BELOW -> anchorIndex + 1
+                            ExercisePlacement.REPLACE -> {
+                                if (anchor == null) return
+                                if (
+                                    anchor.sets.isNotEmpty() && added.single().plannedSets.isEmpty()
+                                )
+                                    return
+                                if (activeHoldWorkoutExerciseId == anchor.id) clearActiveHold()
+                                if (anchor.sets.isEmpty()) {
+                                    workout.exercises.removeAt(anchorIndex)
+                                    anchorIndex
+                                } else {
+                                    anchor.plannedSets.removeAll {
+                                        loggedSetFor(anchor, it) == null
+                                    }
+                                    anchorIndex + 1
+                                }
+                            }
+                            null -> workout.exercises.size
+                        }
+                    workout.exercises.addAll(insertionIndex, added)
+                    focusId = added.first().id
+                    undo = {
+                        anchor
+                            ?.plannedSets
+                            ?.takeIf { replacing }
+                            ?.apply {
+                                clear()
+                                addAll(originalPlans)
+                            }
+                        workout.exercises.removeAll { item -> added.any { it.id == item.id } }
+                        if (replacing && anchor != null && anchor !in workout.exercises) {
+                            workout.exercises.add(
+                                anchorIndex.coerceAtMost(workout.exercises.size),
+                                anchor,
+                            )
+                        }
+                    }
+                }
+                PickerTarget.ROUTINE -> {
+                    val draft = routineDraft ?: return
+                    val anchorIndex = draft.exercises.indexOfFirst { it.id == picker.anchorId }
+                    if (picker.placement != null && anchorIndex < 0) return
+                    val anchor = draft.exercises.getOrNull(anchorIndex)
+                    val added = movements.map { movement ->
+                        if (replacing && anchor != null)
+                            anchor.copy(
+                                exerciseId = movement.id,
+                                note = "",
+                                plannedSets =
+                                    replacementSets(
+                                        anchor.plannedSets,
+                                        exercise(anchor.exerciseId) ?: return,
+                                        movement,
+                                        repository.data.lastKnownSets(movement.id).orEmpty(),
+                                    ),
+                            )
+                        else
+                            RoutineExercise(
+                                exerciseId = movement.id,
+                                plannedSets =
+                                    MutableList(3) {
+                                        PlannedSet(holdSeconds = movement.minimumHoldSeconds)
+                                    },
+                            )
+                    }
+                    val insertionIndex =
+                        when (picker.placement) {
+                            ExercisePlacement.ABOVE -> anchorIndex
+                            ExercisePlacement.BELOW -> anchorIndex + 1
+                            ExercisePlacement.REPLACE -> {
+                                draft.exercises.removeAt(anchorIndex)
+                                anchorIndex
+                            }
+                            null -> draft.exercises.size
+                        }
+                    draft.exercises.addAll(insertionIndex, added)
+                    focusId = added.first().id
+                    undo = {
+                        draft.exercises.removeAll { item -> added.any { it.id == item.id } }
+                        if (replacing && anchor != null) {
+                            draft.exercises.add(
+                                anchorIndex.coerceAtMost(draft.exercises.size),
+                                anchor,
+                            )
+                        }
+                    }
                 }
             }
             route =
@@ -1295,7 +1482,45 @@ class MainActivity : AppCompatActivity() {
                         )
                 }
             if (target != PickerTarget.HISTORY) repository.save()
-            render(scrollToBottom = true)
+            render(
+                scrollToBottom = picker.placement == null,
+                focusExerciseId = focusId.takeIf { picker.placement != null },
+            )
+            if (picker.placement != null) {
+                exerciseEditUndo =
+                    Snackbar.make(
+                            content,
+                            if (replacing) "Exercise replaced" else "Exercises added",
+                            Snackbar.LENGTH_LONG,
+                        )
+                        .setAction("Undo") {
+                            undo()
+                            if (target != PickerTarget.HISTORY) repository.save()
+                            render(picker.returnScrollY)
+                        }
+                        .addCallback(
+                            object : Snackbar.Callback() {
+                                override fun onShown(snackbar: Snackbar) {
+                                    if (exerciseEditUndo === snackbar) {
+                                        content.setPadding(
+                                            0,
+                                            0,
+                                            0,
+                                            snackbar.view.height + ui.dp(12),
+                                        )
+                                    }
+                                }
+
+                                override fun onDismissed(snackbar: Snackbar, event: Int) {
+                                    if (exerciseEditUndo === snackbar) {
+                                        content.setPadding(0, 0, 0, 0)
+                                        exerciseEditUndo = null
+                                    }
+                                }
+                            }
+                        )
+                        .also { it.show() }
+            }
         }
         val addSelected =
             ui.actionButton("Add selected") {
@@ -1332,10 +1557,18 @@ class MainActivity : AppCompatActivity() {
                 orientation = LinearLayout.VERTICAL
                 setPadding(ui.dp(14), ui.dp(10), ui.dp(14), ui.dp(8))
                 addView(
-                    ui.titleText("Add exercise").apply {
-                        textSize = 26f
-                        setPadding(0, ui.dp(5), 0, 0)
-                    }
+                    ui.titleText(
+                            when (picker.placement) {
+                                ExercisePlacement.REPLACE -> "Replace ${picker.anchorName}"
+                                ExercisePlacement.ABOVE -> "Add above ${picker.anchorName}"
+                                ExercisePlacement.BELOW -> "Add below ${picker.anchorName}"
+                                null -> "Add exercise"
+                            }
+                        )
+                        .apply {
+                            textSize = 26f
+                            setPadding(0, ui.dp(5), 0, 0)
+                        }
                 )
                 addView(search)
                 addView(resultLabel)
@@ -1389,24 +1622,28 @@ class MainActivity : AppCompatActivity() {
                                 orientation = LinearLayout.HORIZONTAL
                                 gravity = Gravity.CENTER_VERTICAL
                                 setPadding(0, ui.dp(8), 0, 0)
+                                if (!replacing)
+                                    addView(
+                                        ui.largeCheckBox().apply {
+                                            contentDescription = "Select ${movement.name}"
+                                            isChecked = movement.id in picker.selectedIds
+                                            setOnCheckedChangeListener { _, checked ->
+                                                if (checked) picker.selectedIds.add(movement.id)
+                                                else picker.selectedIds.remove(movement.id)
+                                                updateSelection()
+                                            }
+                                        },
+                                        LinearLayout.LayoutParams(ui.dp(56), ui.dp(56)).apply {
+                                            marginEnd = ui.dp(12)
+                                        },
+                                    )
                                 addView(
-                                    ui.largeCheckBox().apply {
-                                        contentDescription = "Select ${movement.name}"
-                                        isChecked = movement.id in picker.selectedIds
-                                        setOnCheckedChangeListener { _, checked ->
-                                            if (checked) picker.selectedIds.add(movement.id)
-                                            else picker.selectedIds.remove(movement.id)
-                                            updateSelection()
+                                    ui.actionButton(if (replacing) "Replace" else "Add") {
+                                            addExercises(listOf(movement))
                                         }
-                                    },
-                                    LinearLayout.LayoutParams(ui.dp(56), ui.dp(56)).apply {
-                                        marginEnd = ui.dp(12)
-                                    },
-                                )
-                                addView(
-                                    ui.actionButton("Add") { addExercises(listOf(movement)) }
                                         .apply {
-                                            contentDescription = "Add ${movement.name}"
+                                            contentDescription =
+                                                "${if (replacing) "Replace with" else "Add"} ${movement.name}"
                                         },
                                     LinearLayout.LayoutParams(
                                         0,
@@ -1450,13 +1687,14 @@ class MainActivity : AppCompatActivity() {
                 resultsScroll,
                 LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f),
             )
-            addView(
-                footer,
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                ),
-            )
+            if (!replacing)
+                addView(
+                    footer,
+                    LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ),
+                )
             ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
                 val keyboard = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
                 val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom
@@ -1779,6 +2017,7 @@ class MainActivity : AppCompatActivity() {
                                 editingHistory = true,
                             )
                         exerciseCards.addView(card)
+                        card.tag = item.id
                         reorder.bind(handle, card)
                     } else {
                         exerciseCards.addView(
@@ -2666,15 +2905,11 @@ class MainActivity : AppCompatActivity() {
         render(
             restoreScrollY =
                 when (previousRoute) {
-                    is Route.ExercisePicker ->
-                        previousRoute.takeIf { it.target != PickerTarget.ROUTINE }?.returnScrollY
+                    is Route.ExercisePicker -> previousRoute.returnScrollY
                     is Route.WorkoutHistory -> previousRoute.returnScrollY
                     is Route.ExerciseTrend -> previousRoute.returnScrollY
                     else -> null
-                },
-            scrollToBottom =
-                previousRoute is Route.ExercisePicker &&
-                    previousRoute.target == PickerTarget.ROUTINE,
+                }
         )
     }
 

@@ -18,6 +18,7 @@ internal class RoutineScreens(
     private val onStart: (Routine) -> Unit,
     private val onDelete: (String) -> Unit,
     private val onAddExercise: () -> Unit,
+    private val onSelectExercise: (String, ExercisePlacement) -> Unit,
     private val onSave: (String?) -> Unit,
     private val onCancel: (String?) -> Unit,
 ) {
@@ -118,6 +119,9 @@ internal class RoutineScreens(
                                         exercise = movement,
                                         onRemove = { removeExercise(item) },
                                         onReorderHandleReady = { handle = it },
+                                        onSelectExercise = { placement ->
+                                            onSelectExercise(item.id, placement)
+                                        },
                                     ),
                             ),
                             ui.insetCardLayoutParams(),
@@ -198,6 +202,7 @@ internal class RoutineScreens(
                         )
                     }
                 cardViews[item.id] = exerciseCard
+                exerciseCard.tag = item.id
                 exerciseCards.addView(exerciseCard)
                 reorder.bind(handle, exerciseCard)
             }

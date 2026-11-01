@@ -21,6 +21,7 @@ import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.appcompat.widget.PopupMenu
 import androidx.core.content.ContextCompat
 import androidx.core.widget.doAfterTextChanged
 import com.google.android.material.button.MaterialButton
@@ -145,6 +146,9 @@ internal class LofitViews(
         exercise: Exercise,
         onRemove: () -> Unit,
         onReorderHandleReady: (View) -> Unit,
+        onSelectExercise: (ExercisePlacement) -> Unit,
+        replaceRemaining: Boolean = false,
+        canReplace: Boolean = true,
     ): View =
         LinearLayout(activityContext).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -160,12 +164,42 @@ internal class LofitViews(
             addView(handle, LinearLayout.LayoutParams(dp(42), dp(48)))
             onReorderHandleReady(handle)
             addView(
-                smallButton("×", onRemove).apply {
-                    contentDescription = "Remove ${exercise.name}"
-                    textSize = 20f
-                    setPadding(dp(2), 0, dp(2), 0)
-                },
-                LinearLayout.LayoutParams(dp(42), dp(42)).apply { marginStart = dp(4) },
+                smallButton("⋮") {}
+                    .apply {
+                        contentDescription = "Options for ${exercise.name}"
+                        textSize = 20f
+                        setPadding(dp(2), 0, dp(2), 0)
+                        setOnClickListener {
+                            PopupMenu(activityContext, this, Gravity.END).apply {
+                                menu.add("Remove exercise").setOnMenuItemClickListener {
+                                    onRemove()
+                                    true
+                                }
+                                menu
+                                    .add(
+                                        if (replaceRemaining) "Replace remaining"
+                                        else "Replace exercise"
+                                    )
+                                    .apply {
+                                        isEnabled = canReplace
+                                        setOnMenuItemClickListener {
+                                            onSelectExercise(ExercisePlacement.REPLACE)
+                                            true
+                                        }
+                                    }
+                                menu.add("Add exercise above").setOnMenuItemClickListener {
+                                    onSelectExercise(ExercisePlacement.ABOVE)
+                                    true
+                                }
+                                menu.add("Add exercise below").setOnMenuItemClickListener {
+                                    onSelectExercise(ExercisePlacement.BELOW)
+                                    true
+                                }
+                                show()
+                            }
+                        }
+                    },
+                LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginStart = dp(8) },
             )
         }
 
