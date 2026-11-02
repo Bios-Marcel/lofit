@@ -1115,6 +1115,11 @@ class MainActivity : AppCompatActivity() {
                             canReplace =
                                 item.sets.isEmpty() ||
                                     item.plannedSets.any { loggedSetFor(item, it) == null },
+                            pauseEverySecondSet = { item.pauseEverySecondSet },
+                            onPauseEverySecondSetChange = {
+                                item.pauseEverySecondSet = it
+                                saveChanges()
+                            },
                             useScale =
                                 if (!editingHistory && exercise.supportsLiveMeasurement)
                                     ({ !item.manualMeasurement })
@@ -1491,6 +1496,8 @@ class MainActivity : AppCompatActivity() {
                             WorkoutExercise(
                                 exerciseId = movement.id,
                                 restSecondsOverride = anchor.restSecondsOverride,
+                                pauseEverySecondSet =
+                                    movement.asymmetric && anchor.pauseEverySecondSet,
                                 previousNote = previous?.effectiveNote.orEmpty(),
                                 plannedSets =
                                     replacementSets(
@@ -1555,6 +1562,8 @@ class MainActivity : AppCompatActivity() {
                                 exerciseId = movement.id,
                                 note = "",
                                 manualMeasurement = false,
+                                pauseEverySecondSet =
+                                    movement.asymmetric && anchor.pauseEverySecondSet,
                                 plannedSets =
                                     replacementSets(
                                         anchor.plannedSets,
@@ -3042,7 +3051,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startRest(item: WorkoutExercise, workout: WorkoutSession) {
-        val seconds = item.restSeconds(workout.defaultRestSeconds)
+        val movement = exercise(item.exerciseId) ?: return
+        val seconds = item.restSecondsAfterSet(workout.defaultRestSeconds, movement)
         restEndsAt = if (seconds > 0) SystemClock.elapsedRealtime() + seconds * 1_000L else 0L
         updateRestBar()
         updateWorkoutNotification(force = true)

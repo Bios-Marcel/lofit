@@ -151,6 +151,8 @@ internal class LofitViews(
         canReplace: Boolean = true,
         useScale: (() -> Boolean)? = null,
         onUseScaleChange: (Boolean) -> Unit = {},
+        pauseEverySecondSet: () -> Boolean = { false },
+        onPauseEverySecondSetChange: (Boolean) -> Unit = {},
     ): View =
         LinearLayout(activityContext).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -203,6 +205,16 @@ internal class LofitViews(
                                         isChecked = checked()
                                         setOnMenuItemClickListener {
                                             onUseScaleChange(!isChecked)
+                                            true
+                                        }
+                                    }
+                                }
+                                if (exercise.asymmetric) {
+                                    menu.add("Pause every second set").apply {
+                                        isCheckable = true
+                                        isChecked = pauseEverySecondSet()
+                                        setOnMenuItemClickListener {
+                                            onPauseEverySecondSetChange(!isChecked)
                                             true
                                         }
                                     }

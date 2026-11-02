@@ -17,6 +17,7 @@ fun AppData.workoutFromRoutine(routine: Routine): WorkoutSession {
                 WorkoutExercise(
                     exerciseId = item.exerciseId,
                     manualMeasurement = item.manualMeasurement,
+                    pauseEverySecondSet = item.pauseEverySecondSet,
                     restSecondsOverride = item.restSecondsOverride,
                     sourceRoutineExerciseId = item.id,
                     note = if (previousExercise == null) item.note else "",
@@ -73,6 +74,7 @@ fun WorkoutSession.captureRoutineBaseline(): Routine? =
                         id = item.id,
                         exerciseId = item.exerciseId,
                         manualMeasurement = item.manualMeasurement,
+                        pauseEverySecondSet = item.pauseEverySecondSet,
                         note = item.effectiveNote,
                         restSecondsOverride = item.restSecondsOverride,
                         plannedSets = item.plannedSets.map { it.freshCopy() }.toMutableList(),
@@ -98,6 +100,7 @@ class RoutineWorkoutChanges(
             changed.forEach { (saved, trained) ->
                 saved.note = trained.effectiveNote
                 saved.manualMeasurement = trained.manualMeasurement
+                saved.pauseEverySecondSet = trained.pauseEverySecondSet
                 saved.plannedSets.clear()
                 saved.plannedSets.addAll(trained.plannedSets.map { it.freshCopy() })
             }
@@ -107,6 +110,7 @@ class RoutineWorkoutChanges(
                     RoutineExercise(
                         exerciseId = item.exerciseId,
                         manualMeasurement = item.manualMeasurement,
+                        pauseEverySecondSet = item.pauseEverySecondSet,
                         note = item.effectiveNote,
                         restSecondsOverride = item.restSecondsOverride,
                         plannedSets = item.plannedSets.map { it.freshCopy() }.toMutableList(),
@@ -130,7 +134,8 @@ fun WorkoutSession.routineChanges(routines: List<Routine>): RoutineWorkoutChange
         if (
             initial.plannedSets.prescription() == item.plannedSets.prescription() &&
                 initial.note == item.effectiveNote &&
-                initial.manualMeasurement == item.manualMeasurement
+                initial.manualMeasurement == item.manualMeasurement &&
+                initial.pauseEverySecondSet == item.pauseEverySecondSet
         )
             null
         else saved to item

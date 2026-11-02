@@ -2909,6 +2909,78 @@ class WorkoutFlowTest {
     }
 
     @Test
+    fun asymmetricRestMenu_persistsAndRestsOnlyAfterEverySecondSet() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val movement = DefaultData.exercises().first { it.asymmetric && !it.type.tracksDuration }
+        LofitRepository(context).apply {
+            data.activeWorkout =
+                WorkoutSession(
+                    name = "Paired rest",
+                    exercises =
+                        mutableListOf(
+                            WorkoutExercise(
+                                exerciseId = movement.id,
+                                plannedSets =
+                                    MutableList(4) {
+                                        PlannedSet(
+                                            side = if (it % 2 == 0) Side.LEFT else Side.RIGHT
+                                        )
+                                    },
+                            )
+                        ),
+                )
+            save()
+        }
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            onView(withContentDescription("Options for ${movement.name}"))
+                .perform(scrollTo(), click())
+            onView(withText("Pause every second set")).perform(click())
+            assertTrue(
+                LofitRepository(context).data.activeWorkout!!.exercises.single().pauseEverySecondSet
+            )
+            scenario.recreate()
+            repeat(4) { index ->
+                onView(withContentDescription("Set ${index + 1} done")).perform(scrollTo(), click())
+                onView(withContentDescription("Rest timer overlay"))
+                    .check(matches(if (index % 2 == 0) not(isDisplayed()) else isDisplayed()))
+            }
+            onView(withText("Skip")).perform(click())
+            onView(withContentDescription("Options for ${movement.name}"))
+                .perform(scrollTo(), click())
+            onView(withText("Pause every second set")).perform(click())
+            onView(withContentDescription("Set 3 done")).perform(scrollTo(), click(), click())
+            onView(withContentDescription("Rest timer overlay")).check(matches(isDisplayed()))
+            assertFalse(
+                LofitRepository(context).data.activeWorkout!!.exercises.single().pauseEverySecondSet
+            )
+        }
+    }
+
+    @Test
+    fun symmetricExerciseMenu_hidesPairedRest() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        LofitRepository(context).apply {
+            data.activeWorkout =
+                WorkoutSession(
+                    name = "Rest",
+                    exercises =
+                        mutableListOf(
+                            WorkoutExercise(
+                                exerciseId = "plank",
+                                plannedSets = mutableListOf(PlannedSet()),
+                            )
+                        ),
+                )
+            save()
+        }
+        ActivityScenario.launch(MainActivity::class.java).use {
+            onView(withContentDescription("Options for Plank")).perform(scrollTo(), click())
+            onView(withText("Pause every second set")).check(doesNotExist())
+            pressBack()
+        }
+    }
+
+    @Test
     fun restTimer_reachingEndHidesOverlay() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext

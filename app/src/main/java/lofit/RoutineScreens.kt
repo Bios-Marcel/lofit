@@ -126,6 +126,10 @@ internal class RoutineScreens(
                                                 ({ !item.manualMeasurement })
                                             else null,
                                         onUseScaleChange = { item.manualMeasurement = !it },
+                                        pauseEverySecondSet = { item.pauseEverySecondSet },
+                                        onPauseEverySecondSetChange = {
+                                            item.pauseEverySecondSet = it
+                                        },
                                     ),
                             ),
                             ui.insetCardLayoutParams(),

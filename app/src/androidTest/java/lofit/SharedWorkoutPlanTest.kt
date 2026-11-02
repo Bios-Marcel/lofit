@@ -52,6 +52,7 @@ class SharedWorkoutPlanTest {
                     WorkoutExercise(
                         exerciseId = movement.id,
                         restSecondsOverride = 45,
+                        pauseEverySecondSet = true,
                         note = "Brace core\nKeep breathing",
                         plannedSets = sets,
                         sets =
@@ -85,6 +86,8 @@ class SharedWorkoutPlanTest {
         val exercise = plan.routine.exercises.single()
         assertEquals("Brace core\nKeep breathing", exercise.note)
         assertEquals(45, exercise.restSecondsOverride)
+        assertTrue(exercise.pauseEverySecondSet)
+        assertTrue(plan.startIn(AppData()).exercises.single().pauseEverySecondSet)
         assertEquals(2, exercise.plannedSets.size)
         assertNull(exercise.plannedSets.first().actualHoldSeconds)
         assertEquals(Side.LEFT, exercise.plannedSets.first().side)

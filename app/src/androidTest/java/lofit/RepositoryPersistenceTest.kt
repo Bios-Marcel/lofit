@@ -19,6 +19,35 @@ class RepositoryPersistenceTest {
     }
 
     @Test
+    fun pairedRestPersistsAndDefaultsOffForOldPlans() {
+        val repository = LofitRepository(context)
+        val item = WorkoutExercise(exerciseId = "pistol-squat", pauseEverySecondSet = true)
+        val workout = WorkoutSession(name = "Legs", exercises = mutableListOf(item))
+        repository.data.activeWorkout = workout
+        repository.data.routines.add(workout.toRoutine())
+        repository.save()
+        val loaded = LofitRepository(context)
+        assertTrue(loaded.data.activeWorkout!!.exercises.single().pauseEverySecondSet)
+        assertTrue(loaded.data.routines.single().exercises.single().pauseEverySecondSet)
+        val root = JSONObject(stored())
+        root
+            .getJSONObject("activeWorkout")
+            .getJSONArray("exercises")
+            .getJSONObject(0)
+            .remove("pauseEverySecondSet")
+        root
+            .getJSONArray("routines")
+            .getJSONObject(0)
+            .getJSONArray("exercises")
+            .getJSONObject(0)
+            .remove("pauseEverySecondSet")
+        store(root.toString())
+        val old = LofitRepository(context)
+        assertFalse(old.data.activeWorkout!!.exercises.single().pauseEverySecondSet)
+        assertFalse(old.data.routines.single().exercises.single().pauseEverySecondSet)
+    }
+
+    @Test
     fun craneScaleSelectionIsOptionalPersistsAndResets() {
         val repository = LofitRepository(context)
         assertNull(repository.data.craneScale)

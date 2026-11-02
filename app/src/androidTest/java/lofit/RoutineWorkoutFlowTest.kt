@@ -243,7 +243,12 @@ class RoutineWorkoutFlowTest {
                 .perform(scrollTo(), click())
             onView(allOf(withContentDescription("Set 1 side: Right"), inCard("Single leg")))
                 .check(matches(withText("R")))
+            onView(withContentDescription("Options for Single leg")).perform(scrollTo(), click())
+            onView(withText("Pause every second set")).perform(click())
             onView(withText("Save routine")).perform(scrollTo(), click())
+            assertTrue(
+                LofitRepository(context).data.routines.single().exercises.last().pauseEverySecondSet
+            )
             assertEquals(
                 Side.RIGHT,
                 LofitRepository(context)

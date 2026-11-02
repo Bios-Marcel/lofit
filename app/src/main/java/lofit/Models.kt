@@ -101,8 +101,15 @@ data class WorkoutExercise(
     var note: String = "",
     var previousNote: String = "",
     var manualMeasurement: Boolean = false,
+    var pauseEverySecondSet: Boolean = false,
 ) {
     fun restSeconds(defaultRestSeconds: Int): Int = restSecondsOverride ?: defaultRestSeconds
+
+    fun restSecondsAfterSet(defaultRestSeconds: Int, exercise: Exercise): Int {
+        if (exercise.asymmetric && pauseEverySecondSet && sets.size % 2 != 0) return 0
+        // LEGACY: Exercises without paired rest keep resting after each completed set.
+        return restSeconds(defaultRestSeconds)
+    }
 
     val effectiveNote: String
         get() = note.ifBlank { previousNote }
@@ -232,6 +239,7 @@ data class WorkoutSession(
                             plannedSets = plannedSets,
                             note = item.effectiveNote,
                             manualMeasurement = item.manualMeasurement,
+                            pauseEverySecondSet = item.pauseEverySecondSet,
                         )
                     }
                     .toMutableList(),
@@ -252,6 +260,7 @@ data class RoutineExercise(
     val plannedSets: MutableList<PlannedSet> = MutableList(3) { PlannedSet() },
     var note: String = "",
     var manualMeasurement: Boolean = false,
+    var pauseEverySecondSet: Boolean = false,
 )
 
 data class ExerciseRecord(
@@ -333,6 +342,7 @@ data class AppData(
                 WorkoutExercise(
                     exerciseId = item.exerciseId,
                     previousNote = item.effectiveNote,
+                    pauseEverySecondSet = item.pauseEverySecondSet,
                     restSecondsOverride = item.restSecondsOverride ?: workout.defaultRestSeconds,
                     plannedSets =
                         item.sets

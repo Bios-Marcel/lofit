@@ -30,6 +30,7 @@ data class SharedWorkoutPlan(val routine: Routine, val exercises: List<Exercise>
                             exerciseId = mapped.getValue(item.exerciseId),
                             note = item.note,
                             manualMeasurement = item.manualMeasurement,
+                            pauseEverySecondSet = item.pauseEverySecondSet,
                             restSecondsOverride = item.restSecondsOverride,
                             plannedSets =
                                 item.plannedSets
@@ -116,6 +117,7 @@ data class SharedWorkoutPlan(val routine: Routine, val exercises: List<Exercise>
                                         .put("movement", item.exerciseId)
                                         .put("note", item.effectiveNote)
                                         .put("manualMeasurement", item.manualMeasurement)
+                                        .put("pauseEverySecondSet", item.pauseEverySecondSet)
                                         .put("rest", item.restSecondsOverride ?: JSONObject.NULL)
                                         .put(
                                             "sets",
@@ -178,6 +180,8 @@ data class SharedWorkoutPlan(val routine: Routine, val exercises: List<Exercise>
                                     exerciseId = movement,
                                     note = e.optString("note", ""),
                                     manualMeasurement = e.optBoolean("manualMeasurement", false),
+                                    pauseEverySecondSet =
+                                        e.optBoolean("pauseEverySecondSet", false),
                                     restSecondsOverride =
                                         if (e.isNull("rest")) null else e.number("rest", 0, 3_600),
                                     plannedSets =

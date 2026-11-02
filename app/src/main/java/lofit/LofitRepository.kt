@@ -281,6 +281,7 @@ class LofitRepository(context: Context) {
                                 )
                                 put("note", item.note)
                                 put("manualMeasurement", item.manualMeasurement)
+                                put("pauseEverySecondSet", item.pauseEverySecondSet)
                                 put("plannedSets", encodePlannedSets(item.plannedSets))
                             }
                         )
@@ -327,6 +328,7 @@ class LofitRepository(context: Context) {
                                 )
                                 put("note", item.note)
                                 put("manualMeasurement", item.manualMeasurement)
+                                put("pauseEverySecondSet", item.pauseEverySecondSet)
                                 put("previousNote", item.previousNote)
                                 put("plannedSets", encodePlannedSets(item.plannedSets))
                                 put(
@@ -464,6 +466,7 @@ class LofitRepository(context: Context) {
                             note = item.optString("note", ""),
                             exerciseId = item.getString("exerciseId"),
                             manualMeasurement = item.optBoolean("manualMeasurement", false),
+                            pauseEverySecondSet = item.optBoolean("pauseEverySecondSet", false),
                             restSecondsOverride =
                                 if (item.isNull("restSecondsOverride")) null
                                 else item.getInt("restSecondsOverride"),
@@ -506,6 +509,7 @@ class LofitRepository(context: Context) {
                             previousNote = item.optString("previousNote", ""),
                             exerciseId = item.getString("exerciseId"),
                             manualMeasurement = item.optBoolean("manualMeasurement", false),
+                            pauseEverySecondSet = item.optBoolean("pauseEverySecondSet", false),
                             sourceRoutineExerciseId =
                                 if (item.isNull("sourceRoutineExerciseId")) null
                                 else item.getString("sourceRoutineExerciseId"),
