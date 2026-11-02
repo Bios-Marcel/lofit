@@ -149,6 +149,8 @@ internal class LofitViews(
         onSelectExercise: (ExercisePlacement) -> Unit,
         replaceRemaining: Boolean = false,
         canReplace: Boolean = true,
+        useScale: (() -> Boolean)? = null,
+        onUseScaleChange: (Boolean) -> Unit = {},
     ): View =
         LinearLayout(activityContext).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -194,6 +196,16 @@ internal class LofitViews(
                                 menu.add("Add exercise below").setOnMenuItemClickListener {
                                     onSelectExercise(ExercisePlacement.BELOW)
                                     true
+                                }
+                                useScale?.let { checked ->
+                                    menu.add("Use scale").apply {
+                                        isCheckable = true
+                                        isChecked = checked()
+                                        setOnMenuItemClickListener {
+                                            onUseScaleChange(!isChecked)
+                                            true
+                                        }
+                                    }
                                 }
                                 show()
                             }

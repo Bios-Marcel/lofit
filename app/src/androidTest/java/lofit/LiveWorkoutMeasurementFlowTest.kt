@@ -4,6 +4,7 @@ import android.Manifest
 import android.os.SystemClock
 import android.util.AtomicFile
 import android.view.ViewGroup
+import android.widget.CheckBox
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.test.core.app.ActivityScenario
@@ -206,7 +207,8 @@ class LiveWorkoutMeasurementFlowTest {
             )
             onView(withContentDescription("Scale Pull scale status"))
                 .check(matches(withText("Scale unavailable")))
-            onView(withText("Manual")).perform(scrollTo(), click())
+            openScaleOption(checked = true)
+            onView(withText("Use scale")).perform(click())
             assertTrue(
                 LofitRepository(context).data.activeWorkout!!.exercises.single().manualMeasurement
             )
@@ -236,13 +238,16 @@ class LiveWorkoutMeasurementFlowTest {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             navigate(scenario, R.string.nav_routines)
             onView(withText("Edit")).perform(scrollTo(), click())
-            onView(withText("use scale")).check(matches(isChecked()))
-            onView(withText("Manual")).perform(scrollTo(), click())
+            onView(withContentDescription("Scale Pull measurement mode")).check(doesNotExist())
+            openScaleOption(checked = true)
+            onView(withText("Use scale")).perform(click())
+            openScaleOption(checked = false)
+            androidx.test.espresso.Espresso.pressBack()
             onView(withText("Save routine")).perform(scrollTo(), click())
             onView(withText("Start")).perform(scrollTo(), click())
-            onView(withText("Manual")).check(matches(isChecked()))
             onView(withContentDescription("Scale Pull live weight graph")).check(doesNotExist())
-            onView(withText("use scale")).perform(scrollTo(), click())
+            openScaleOption(checked = false)
+            onView(withText("Use scale")).perform(click())
             onView(withContentDescription("Scale Pull live weight graph"))
                 .check(matches(isDisplayed()))
             assertFalse(
@@ -251,6 +256,9 @@ class LiveWorkoutMeasurementFlowTest {
             assertTrue(
                 LofitRepository(context).data.routines.single().exercises.single().manualMeasurement
             )
+            scenario.recreate()
+            openScaleOption(checked = true)
+            androidx.test.espresso.Espresso.pressBack()
         }
     }
 
@@ -283,6 +291,23 @@ class LiveWorkoutMeasurementFlowTest {
                     .liveMeasurement
             )
         }
+    }
+
+    private fun openScaleOption(checked: Boolean) {
+        onView(withContentDescription("Options for Scale Pull")).perform(scrollTo(), click())
+        onView(withText("Use scale"))
+            .check(
+                matches(
+                    isDescendantOfA(
+                        hasDescendant(
+                            allOf(
+                                isAssignableFrom(CheckBox::class.java),
+                                if (checked) isChecked() else not(isChecked()),
+                            )
+                        )
+                    )
+                )
+            )
     }
 
     private fun navigate(scenario: ActivityScenario<MainActivity>, label: Int) {

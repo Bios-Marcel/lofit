@@ -1115,6 +1115,23 @@ class MainActivity : AppCompatActivity() {
                             canReplace =
                                 item.sets.isEmpty() ||
                                     item.plannedSets.any { loggedSetFor(item, it) == null },
+                            useScale =
+                                if (!editingHistory && exercise.supportsLiveMeasurement)
+                                    ({ !item.manualMeasurement })
+                                else null,
+                            onUseScaleChange = { useScale ->
+                                if (activeHoldWorkoutExerciseId == item.id) stopActiveHold()
+                                if (liveWorkoutMeasurement.active?.item?.id == item.id) {
+                                    liveWorkoutMeasurement.interrupt()?.let {
+                                        refreshLiveSetValues(it.pull.set)
+                                    }
+                                }
+                                item.manualMeasurement = !useScale
+                                repository.save()
+                                render(
+                                    restoreScrollY = (content.getChildAt(0) as? ScrollView)?.scrollY
+                                )
+                            },
                         ),
                 ),
                 ui.insetCardLayoutParams(),
@@ -1133,31 +1150,6 @@ class MainActivity : AppCompatActivity() {
                 },
             )
             val liveMeasurement = !editingHistory && liveWorkoutMeasurement.isLive(item)
-            if (!editingHistory && exercise.supportsLiveMeasurement) {
-                addView(
-                    ui.choiceGroup(
-                            listOf("use scale", "Manual"),
-                            if (item.manualMeasurement) 1 else 0,
-                        )
-                        .apply {
-                            contentDescription = "${exercise.name} measurement mode"
-                            setOnCheckedChangeListener { _, _ ->
-                                if (activeHoldWorkoutExerciseId == item.id) stopActiveHold()
-                                if (liveWorkoutMeasurement.active?.item?.id == item.id) {
-                                    liveWorkoutMeasurement.interrupt()?.let {
-                                        refreshLiveSetValues(it.pull.set)
-                                    }
-                                }
-                                item.manualMeasurement = ui.selectedChoice(this) == 1
-                                repository.save()
-                                render(
-                                    restoreScrollY = (content.getChildAt(0) as? ScrollView)?.scrollY
-                                )
-                            }
-                        },
-                    ui.insetCardLayoutParams().apply { bottomMargin = ui.dp(8) },
-                )
-            }
             if (liveMeasurement) {
                 addView(
                     LiveMeasurementGraphView(
