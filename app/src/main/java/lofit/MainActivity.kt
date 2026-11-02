@@ -2175,17 +2175,18 @@ class MainActivity : AppCompatActivity() {
                                         },
                                     ui.insetCardLayoutParams(),
                                 )
-                                addView(
-                                    ui.exerciseNote(item.note, movement, readOnly = true),
-                                    ui.insetCardLayoutParams().apply {
-                                        topMargin = ui.dp(8)
-                                        bottomMargin = ui.dp(8)
-                                    },
-                                )
+                                if (item.note.isNotBlank()) {
+                                    addView(
+                                        ui.exerciseNote(item.note, movement, readOnly = true),
+                                        ui.insetCardLayoutParams().apply {
+                                            topMargin = ui.dp(8)
+                                            bottomMargin = ui.dp(8)
+                                        },
+                                    )
+                                }
                                 addView(
                                     setViews.plannedSetHeader(
                                         movement,
-                                        showDone = true,
                                         showActiveHold = movement.type.tracksDuration,
                                     )
                                 )
@@ -2209,26 +2210,6 @@ class MainActivity : AppCompatActivity() {
                                             exercise = movement,
                                             plannedSet = displaySet,
                                             setIndex = index,
-                                            endAction =
-                                                LinearLayout(this@MainActivity).apply {
-                                                    addView(
-                                                        ui.largeCheckBox().apply {
-                                                            isChecked = loggedSet != null
-                                                            isEnabled = false
-                                                            isClickable = false
-                                                            isFocusable = false
-                                                            contentDescription =
-                                                                "Set ${index + 1} done"
-                                                        },
-                                                        LinearLayout.LayoutParams(
-                                                            ui.dp(
-                                                                PlannedSetViews.CHECKBOX_WIDTH_DP
-                                                            ),
-                                                            ui.dp(56),
-                                                        ),
-                                                    )
-                                                },
-                                            endActionHeight = 56,
                                             completed = loggedSet != null,
                                             showActiveHold = movement.type.tracksDuration,
                                             readOnly = true,

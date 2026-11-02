@@ -2556,6 +2556,7 @@ class WorkoutFlowTest {
                         ),
                         WorkoutExercise(
                             exerciseId = "plank",
+                            note = " \n ",
                             plannedSets = mutableListOf(holdSet),
                             sets =
                                 mutableListOf(
@@ -2617,11 +2618,9 @@ class WorkoutFlowTest {
             .check(matches(withText("67.5")))
         onView(benchField("Set 1 Repetitions")).check(matches(withText("6")))
         onView(benchField("Set 1 type: Warm-up")).perform(click()).check(matches(withText("W")))
-        onView(benchField("Set 1 done"))
-            .check(matches(isChecked()))
-            .check(matches(not(isEnabled())))
+        onView(benchField("Set 1 done")).check(doesNotExist())
         onView(benchField("Set 2 type: Failure")).check(matches(withText("F")))
-        onView(benchField("Set 2 done")).check(matches(not(isChecked())))
+        onView(benchField("Set 2 done")).check(doesNotExist())
         onView(benchField("Set 2 weight")).check(matches(withText("50")))
         onView(withText("Set Rest: 75s")).perform(scrollTo()).check(matches(isDisplayed()))
         onView(holdField("Set 1 Goal time in seconds"))
@@ -2644,6 +2643,10 @@ class WorkoutFlowTest {
             )
             .check(matches(withText("12")))
         onView(isAssignableFrom(android.widget.EditText::class.java)).check(doesNotExist())
+        onView(isAssignableFrom(CheckBox::class.java)).check(doesNotExist())
+        onView(withContentDescription("Bench press note")).check(doesNotExist())
+        onView(withContentDescription("Plank note")).check(doesNotExist())
+        onView(withText("Type note here ...")).check(doesNotExist())
         listOf("Add exercise", "Add set", "Finish workout", "Discard workout").forEach {
             onView(withText(it)).check(doesNotExist())
         }
