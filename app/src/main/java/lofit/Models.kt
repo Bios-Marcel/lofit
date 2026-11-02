@@ -343,7 +343,10 @@ data class AppData(
                     exerciseId = item.exerciseId,
                     previousNote = item.effectiveNote,
                     pauseEverySecondSet = item.pauseEverySecondSet,
-                    restSecondsOverride = item.restSecondsOverride ?: workout.defaultRestSeconds,
+                    restSecondsOverride =
+                        if (preferredRoutineId == null) null
+                        // LEGACY: Routine workouts retain the previous exercise's effective rest.
+                        else item.restSecondsOverride ?: workout.defaultRestSeconds,
                     plannedSets =
                         item.sets
                             .map { set ->

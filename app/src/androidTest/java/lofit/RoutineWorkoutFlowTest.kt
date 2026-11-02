@@ -441,7 +441,7 @@ class RoutineWorkoutFlowTest {
     }
 
     @Test
-    fun emptyWorkoutReusesFullLoggedExercise() {
+    fun emptyWorkoutReusesLoggedSetsWithoutRestOverride() {
         launch().use {
             onView(withText(R.string.start_workout)).perform(scrollTo(), click())
             onView(withText("Add exercise")).perform(scrollTo(), click())
@@ -454,7 +454,7 @@ class RoutineWorkoutFlowTest {
             onView(withContentDescription("Set 3 row")).check(doesNotExist())
             val item = LofitRepository(context).data.activeWorkout!!.exercises.single()
             assertEquals(listOf(SetType.WARMUP, SetType.NORMAL), item.plannedSets.map { it.type })
-            assertEquals(45, item.restSecondsOverride)
+            assertNull(item.restSecondsOverride)
             assertEquals(2, item.plannedSets.size)
             assertTrue(item.sets.isEmpty())
         }

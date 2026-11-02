@@ -256,10 +256,10 @@ class RoutineWorkoutsTest {
     }
 
     @Test
-    fun emptyWorkoutCopiesExactLoggedExerciseIncludingRestAndSetCount() {
+    fun emptyWorkoutCopiesLoggedSetsWithoutRestOverride() {
         val data = data(routine())
         val item = data.lastKnownExercise("bench")!!
-        assertEquals(45, item.restSecondsOverride)
+        assertNull(item.restSecondsOverride)
         assertEquals(2, item.plannedSets.size)
         assertEquals(listOf(SetType.WARMUP, SetType.FAILURE), item.plannedSets.map { it.type })
         assertEquals(listOf(20.0, 80.0), item.plannedSets.map { it.weightKg })
@@ -272,11 +272,31 @@ class RoutineWorkoutsTest {
     }
 
     @Test
-    fun emptyWorkoutKeepsPreviousEffectiveRestWhenExerciseInheritedIt() {
+    fun emptyWorkoutDoesNotCopyPreviousInheritedRest() {
         val data = data(routine())
         data.history.single().defaultRestSeconds = 75
         data.history.single().exercises.single().restSecondsOverride = null
-        assertEquals(75, data.lastKnownExercise("bench")!!.restSecondsOverride)
+        assertNull(data.lastKnownExercise("bench")!!.restSecondsOverride)
+    }
+
+    @Test
+    fun emptyWorkoutDoesNotCopyRestFromOpenWorkoutHistory() {
+        val data = data(routine())
+        data.history[0] = data.history[0].copy(sourceRoutine = null)
+        for (rest in listOf(45, 0, null)) {
+            data.history.single().exercises.single().restSecondsOverride = rest
+            assertNull(data.lastKnownExercise("bench")!!.restSecondsOverride)
+        }
+    }
+
+    @Test
+    fun routineExerciseCopiesPreviousEffectiveRest() {
+        val saved = routine()
+        val data = data(saved)
+        assertEquals(45, data.lastKnownExercise("bench", saved.id)!!.restSecondsOverride)
+        data.history.single().defaultRestSeconds = 75
+        data.history.single().exercises.single().restSecondsOverride = null
+        assertEquals(75, data.lastKnownExercise("bench", saved.id)!!.restSecondsOverride)
     }
 
     @Test
