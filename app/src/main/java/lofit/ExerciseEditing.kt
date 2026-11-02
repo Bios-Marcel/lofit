@@ -1,9 +1,28 @@
 package lofit
 
+import java.util.UUID
+
 internal enum class ExercisePlacement {
     REPLACE,
     ABOVE,
     BELOW,
+}
+
+internal fun nextPlannedSets(sets: List<PlannedSet>, exercise: Exercise): List<PlannedSet> {
+    val paired =
+        sets.size >= 2 &&
+            sets.size % 2 == 0 &&
+            sets.all { it.side != Side.BOTH } &&
+            sets.zipWithNext().all { (first, second) -> first.side != second.side }
+    val previous =
+        if (paired) sets.takeLast(2)
+        else {
+            // LEGACY: Unpaired sets keep adding a single copy of the last set.
+            sets.takeLast(1)
+        }
+    return previous
+        .map { it.copy(id = UUID.randomUUID().toString(), actualHoldSeconds = null) }
+        .ifEmpty { listOf(PlannedSet(holdSeconds = exercise.minimumHoldSeconds)) }
 }
 
 internal fun replacementSets(

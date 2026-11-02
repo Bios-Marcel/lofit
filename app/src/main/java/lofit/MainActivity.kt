@@ -61,7 +61,6 @@ import com.google.android.material.snackbar.Snackbar
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
@@ -1392,14 +1391,13 @@ class MainActivity : AppCompatActivity() {
             addView(setRows)
             addView(
                 ui.actionButton("Add set", secondary = true) {
-                    val next =
-                        item.plannedSets
-                            .lastOrNull()
-                            ?.copy(id = UUID.randomUUID().toString(), actualHoldSeconds = null)
-                            ?: PlannedSet(holdSeconds = exercise.minimumHoldSeconds)
-                    item.plannedSets.add(next)
+                    val nextSets = nextPlannedSets(item.plannedSets, exercise)
+                    val firstIndex = item.plannedSets.size
+                    item.plannedSets.addAll(nextSets)
                     saveChanges()
-                    addWorkoutSetRow(next, item.plannedSets.lastIndex)
+                    nextSets.forEachIndexed { index, next ->
+                        addWorkoutSetRow(next, firstIndex + index)
+                    }
                     if (!editingHistory) updateWorkoutNotification(force = true)
                 }
             )

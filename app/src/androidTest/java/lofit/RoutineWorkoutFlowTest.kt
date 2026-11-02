@@ -110,6 +110,106 @@ class RoutineWorkoutFlowTest {
         onView(withText("Edit")).perform(scrollTo(), click())
     }
 
+    private fun preparePairedRoutine(type: ExerciseType) {
+        LofitRepository(context).apply {
+            data.exercises.add(
+                Exercise(
+                    id = "single-side",
+                    name = "Single side",
+                    type = type,
+                    asymmetric = true,
+                    primaryMuscle = "Core",
+                    secondaryMuscles = "",
+                    custom = true,
+                    weighted = true,
+                )
+            )
+            data.routines.single().exercises.apply {
+                clear()
+                add(
+                    RoutineExercise(
+                        exerciseId = "single-side",
+                        plannedSets =
+                            mutableListOf(
+                                PlannedSet(
+                                    side = Side.LEFT,
+                                    weightKg = 10.0,
+                                    reps = 8,
+                                    holdSeconds = 40,
+                                    actualHoldSeconds = 42,
+                                ),
+                                PlannedSet(
+                                    side = Side.RIGHT,
+                                    weightKg = 15.0,
+                                    reps = 6,
+                                    holdSeconds = 50,
+                                    actualHoldSeconds = 55,
+                                ),
+                            ),
+                    )
+                )
+            }
+            save()
+        }
+    }
+
+    @Test
+    fun routineAddSetCopiesLeftAndRightRepsAndLatestWeights() {
+        preparePairedRoutine(ExerciseType.REPETITIONS)
+        launch().use { scenario ->
+            editRoutine(scenario)
+            onView(withText("Add set")).perform(scrollTo(), click())
+            onView(withContentDescription("Set 3 side: Left")).check(matches(withText("L")))
+            onView(withContentDescription("Set 4 side: Right")).check(matches(withText("R")))
+            onView(withContentDescription("Set 3 weight"))
+                .check(matches(withText("10")))
+                .perform(scrollTo(), replaceText("12"), closeSoftKeyboard())
+            onView(withContentDescription("Set 4 weight")).check(matches(withText("15")))
+            onView(withContentDescription("Set 3 Repetitions")).check(matches(withText("8")))
+            onView(withContentDescription("Set 4 Repetitions")).check(matches(withText("6")))
+            onView(withText("Add set")).perform(scrollTo(), click())
+            onView(withContentDescription("Set 5 weight")).check(matches(withText("12")))
+            onView(withContentDescription("Set 6 weight")).check(matches(withText("15")))
+            onView(withText("Save routine")).perform(scrollTo(), click())
+            val sets =
+                LofitRepository(context).data.routines.single().exercises.single().plannedSets
+            assertEquals(
+                listOf(Side.LEFT, Side.RIGHT, Side.LEFT, Side.RIGHT, Side.LEFT, Side.RIGHT),
+                sets.map { it.side },
+            )
+            assertEquals(listOf(10.0, 15.0, 12.0, 15.0, 12.0, 15.0), sets.map { it.weightKg })
+            assertEquals(listOf(8, 6, 8, 6, 8, 6), sets.map { it.reps })
+            assertEquals(6, sets.map { it.id }.toSet().size)
+        }
+    }
+
+    @Test
+    fun workoutAddSetCopiesLeftAndRightHoldGoalsAndPersists() {
+        preparePairedRoutine(ExerciseType.TIMED)
+        launch().use { scenario ->
+            onView(withText("Start routine")).perform(scrollTo(), click())
+            onView(withText("Add set")).perform(scrollTo(), click())
+            scenario.recreate()
+            onView(withContentDescription("Set 3 side: Left")).check(matches(withText("L")))
+            onView(withContentDescription("Set 4 side: Right")).check(matches(withText("R")))
+            onView(withContentDescription("Set 3 weight")).check(matches(withText("10")))
+            onView(withContentDescription("Set 4 weight")).check(matches(withText("15")))
+            onView(withContentDescription("Set 3 Goal time in seconds"))
+                .check(matches(withText("40")))
+            onView(withContentDescription("Set 4 Goal time in seconds"))
+                .check(matches(withText("50")))
+            val item = LofitRepository(context).data.activeWorkout!!.exercises.single()
+            assertEquals(
+                listOf(Side.LEFT, Side.RIGHT, Side.LEFT, Side.RIGHT),
+                item.plannedSets.map { it.side },
+            )
+            assertEquals(listOf(40, 50, 40, 50), item.plannedSets.map { it.holdSeconds })
+            assertTrue(item.plannedSets.takeLast(2).all { it.actualHoldSeconds == null })
+            assertEquals(4, item.plannedSets.map { it.id }.toSet().size)
+            assertTrue(item.sets.isEmpty())
+        }
+    }
+
     @Test
     fun asymmetricRoutineSet_sideColumnSavesSelection() {
         LofitRepository(context).apply {

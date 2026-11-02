@@ -6,7 +6,6 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.core.widget.doAfterTextChanged
-import java.util.UUID
 
 internal class RoutineScreens(
     private val activityContext: Context,
@@ -198,15 +197,10 @@ internal class RoutineScreens(
                         addView(setRows)
                         addView(
                             ui.actionButton("Add set", secondary = true) {
-                                val next =
-                                    item.plannedSets
-                                        .lastOrNull()
-                                        ?.copy(
-                                            id = UUID.randomUUID().toString(),
-                                            actualHoldSeconds = null,
-                                        ) ?: PlannedSet(holdSeconds = movement.minimumHoldSeconds)
-                                item.plannedSets.add(next)
-                                addRoutineSetRow(next, item.plannedSets.lastIndex)
+                                nextPlannedSets(item.plannedSets, movement).forEach { next ->
+                                    item.plannedSets.add(next)
+                                    addRoutineSetRow(next, item.plannedSets.lastIndex)
+                                }
                             }
                         )
                         addView(
