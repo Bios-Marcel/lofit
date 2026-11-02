@@ -15,6 +15,9 @@ import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.*
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.runner.lifecycle.ActivityLifecycleCallback
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import org.hamcrest.Matchers.allOf
@@ -32,6 +35,29 @@ class CraneScaleScreensTest {
     private val selected = CraneScaleDevice("AA:BB:CC:DD:EE:01", "IF_B7")
     private val other = CraneScaleDevice("AA:BB:CC:DD:EE:02", "WH-C06")
     private var savedState: ByteArray? = null
+    private val fakeActivityScanner = ActivityLifecycleCallback { activity, stage ->
+        if (activity is MainActivity && stage == Stage.CREATED) {
+            // Replace the radio before onStart, including after activity recreation.
+            val delegate =
+                MainActivity::class
+                    .java
+                    .getDeclaredField("craneScaleScreens\$delegate")
+                    .apply { isAccessible = true }
+                    .get(activity) as Lazy<*>
+            val screens = delegate.value as CraneScaleScreens
+            CraneScaleScreens::class
+                .java
+                .getDeclaredField("scanner")
+                .apply { isAccessible = true }
+                .set(screens, FakeScanner())
+            val withBluetooth: (() -> Unit) -> Unit = { it() }
+            CraneScaleScreens::class
+                .java
+                .getDeclaredField("withBluetooth")
+                .apply { isAccessible = true }
+                .set(screens, withBluetooth)
+        }
+    }
 
     @Before
     fun setup() {
@@ -51,10 +77,17 @@ class CraneScaleScreensTest {
             data.craneScale = null
             save()
         }
+        instrumentation.runOnMainSync {
+            ActivityLifecycleMonitorRegistry.getInstance().addLifecycleCallback(fakeActivityScanner)
+        }
     }
 
     @After
     fun restore() {
+        instrumentation.runOnMainSync {
+            ActivityLifecycleMonitorRegistry.getInstance()
+                .removeLifecycleCallback(fakeActivityScanner)
+        }
         val file = AtomicFile(context.repositoryStateFile)
         val bytes = savedState
         if (bytes == null) file.delete()
