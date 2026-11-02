@@ -15,12 +15,14 @@ internal class LiveMeasurementGraphView(
     context: Context,
     private val now: () -> Long = SystemClock::elapsedRealtime,
     val series: LiveMeasurementSeries = LiveMeasurementSeries(),
+    private val targetWeightKg: () -> Double? = { null },
 ) : View(context) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val path = Path()
     private val number = NumberFormat.getNumberInstance().apply { maximumFractionDigits = 1 }
     private val sage = ContextCompat.getColor(context, R.color.sage)
     private val coral = ContextCompat.getColor(context, R.color.coral)
+    private val targetGreen = ContextCompat.getColor(context, R.color.target_green)
     private val redraw =
         object : Runnable {
             override fun run() {
@@ -80,7 +82,9 @@ internal class LiveMeasurementGraphView(
         val time = now()
         series.trim(time)
         val samples = series.samples
-        val maximum = max(5.0, ceil((samples.maxOfOrNull { it.kilograms } ?: 0.0) * 1.1 / 5) * 5)
+        val target = targetWeightKg()?.takeIf { it.isFinite() && it >= 0 }
+        val peak = max(samples.maxOfOrNull { it.kilograms } ?: 0.0, target ?: 0.0)
+        val maximum = max(5.0, ceil(peak * 1.1 / 5) * 5)
         paint.style = Paint.Style.FILL
         paint.color = sage
         paint.alpha = 255
@@ -117,6 +121,12 @@ internal class LiveMeasurementGraphView(
                 }
             val label = if (index == 2) "0 s" else "−${60 - index * 30} s"
             canvas.drawText(label, left + (right - left) * index / 2, bottom + dp(24), paint)
+        }
+
+        target?.let { kilograms ->
+            paint.color = targetGreen
+            paint.strokeWidth = dp(2)
+            canvas.drawLine(left, y(kilograms), right, y(kilograms), paint)
         }
 
         path.reset()

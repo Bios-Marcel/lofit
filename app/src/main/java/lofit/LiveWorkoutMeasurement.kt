@@ -28,6 +28,7 @@ internal class LiveWorkoutMeasurement(private val data: () -> AppData) {
         private set
 
     private var workoutId: String? = null
+    private var waitingForRelease = false
     private val traces = mutableMapOf<String, LiveMeasurementSeries>()
 
     fun seriesFor(itemId: String): LiveMeasurementSeries =
@@ -37,6 +38,7 @@ internal class LiveWorkoutMeasurement(private val data: () -> AppData) {
         val workout = data().activeWorkout
         if (workoutId != workout?.id) {
             active = null
+            waitingForRelease = false
             traces.clear()
             workoutId = workout?.id
         }
@@ -62,6 +64,10 @@ internal class LiveWorkoutMeasurement(private val data: () -> AppData) {
         reconcile()
         val workout = data().activeWorkout ?: return null
         workout.exercises.filter(::isLive).forEach { seriesFor(it.id).add(atMillis, kilograms) }
+        if (waitingForRelease) {
+            if (kilograms <= PULL_THRESHOLD_KG) waitingForRelease = false
+            return null
+        }
         active?.let { pull ->
             if (atMillis < pull.lastReadingAt) return null
             if (kilograms <= PULL_THRESHOLD_KG) {
@@ -103,6 +109,12 @@ internal class LiveWorkoutMeasurement(private val data: () -> AppData) {
         return active?.let { stop(it.lastReadingAt) }
     }
 
+    fun stopForManualCompletion(set: PlannedSet, atMillis: Long): Change? {
+        if (active?.set?.id != set.id) return null
+        waitingForRelease = true
+        return stop(atMillis)
+    }
+
     private fun stop(atMillis: Long, release: PullWeightReading? = null): Change {
         val pull = requireNotNull(active)
         active = null
@@ -110,6 +122,7 @@ internal class LiveWorkoutMeasurement(private val data: () -> AppData) {
         pull.set.actualHoldSeconds = seconds
         val averageKg = pull.average(release)
         if (averageKg != null) pull.set.weightKg = averageKg
+        // LEGACY: Automatic completion still requires release after reaching the goal.
         val completed = release != null && seconds >= pull.set.holdSeconds && averageKg != null
         if (completed) {
             pull.item.sets.add(

@@ -1160,6 +1160,11 @@ class MainActivity : AppCompatActivity() {
                     LiveMeasurementGraphView(
                             this@MainActivity,
                             series = liveWorkoutMeasurement.seriesFor(item.id),
+                            targetWeightKg = {
+                                item.plannedSets
+                                    .firstOrNull { loggedSetFor(item, it) == null }
+                                    ?.weightKg
+                            },
                         )
                         .also {
                             it.contentDescription = "${exercise.name} live weight graph"
@@ -1188,6 +1193,7 @@ class MainActivity : AppCompatActivity() {
                     exercise,
                     showDone = true,
                     showActiveHold = exercise.type.tracksDuration,
+                    showActiveHoldAction = !editingHistory && !liveMeasurement,
                 )
             )
             val setRows =
@@ -1232,7 +1238,6 @@ class MainActivity : AppCompatActivity() {
                 val done =
                     ui.largeCheckBox().apply {
                         isChecked = loggedSet != null
-                        isEnabled = !liveMeasurement
                         contentDescription = "Set ${setIndex + 1} done"
                         stateDescription = if (isChecked) "Done" else "Not done"
                     }
@@ -1356,6 +1361,11 @@ class MainActivity : AppCompatActivity() {
                     val currentIndex = item.plannedSets.indexOf(plannedSet)
                     if (currentIndex < 0) return@setOnCheckedChangeListener
                     if (checked) {
+                        if (liveMeasurement) {
+                            liveWorkoutMeasurement
+                                .stopForManualCompletion(plannedSet, SystemClock.elapsedRealtime())
+                                ?.let { refreshLiveSetValues(it.pull.set) }
+                        }
                         if (isActiveHold(item, plannedSet) && !completingHoldAutomatically)
                             stopActiveHold()
                         val loggedSet = loggedSetFor(item, plannedSet)

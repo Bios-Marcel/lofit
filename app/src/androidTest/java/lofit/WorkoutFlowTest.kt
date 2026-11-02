@@ -46,6 +46,7 @@ import androidx.test.espresso.matcher.ViewMatchers.withHint
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import java.text.DateFormat
 import java.time.Instant
@@ -2452,16 +2453,46 @@ class WorkoutFlowTest {
         val intent =
             Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         ActivityScenario.launch<MainActivity>(intent).use { scenario ->
-            onView(withText("Side")).check(matches(isDisplayed()))
+            onView(withText("Side")).check(doesNotExist())
+            onView(withText("Set")).check(matches(isDisplayed()))
+            lateinit var setButton: MaterialButton
+            onView(withContentDescription("Set 1 type: Normal"))
+                .check { view, _ -> setButton = view as MaterialButton }
+                .perform(click())
             onView(withContentDescription("Set 1 side: Both"))
                 .check(matches(withText("B")))
-                .check { view, _ -> assertTrue(view.parent.parent is android.widget.GridLayout) }
+                .check { view, _ ->
+                    val sideButton = view as MaterialButton
+                    assertSame(setButton.parent, sideButton.parent)
+                    val setLocation = IntArray(2)
+                    val sideLocation = IntArray(2)
+                    setButton.getLocationOnScreen(setLocation)
+                    sideButton.getLocationOnScreen(sideLocation)
+                    assertEquals(setLocation[0] + setButton.width, sideLocation[0])
+                    assertEquals(setLocation[1], sideLocation[1])
+                    assertEquals(setButton.height, sideButton.height)
+                    val setShape = setButton.shapeAppearanceModel
+                    val sideShape = sideButton.shapeAppearanceModel
+                    val bounds =
+                        android.graphics.RectF(0f, 0f, view.width.toFloat(), view.height.toFloat())
+                    assertEquals(0f, setShape.topRightCornerSize.getCornerSize(bounds), 0f)
+                    assertEquals(0f, setShape.bottomRightCornerSize.getCornerSize(bounds), 0f)
+                    assertEquals(0f, sideShape.topLeftCornerSize.getCornerSize(bounds), 0f)
+                    assertEquals(0f, sideShape.bottomLeftCornerSize.getCornerSize(bounds), 0f)
+                    assertTrue(setShape.topLeftCornerSize.getCornerSize(bounds) > 0f)
+                    assertTrue(sideShape.topRightCornerSize.getCornerSize(bounds) > 0f)
+                }
                 .perform(scrollTo(), click())
+            onView(withContentDescription("Set 1 type: Warm-up")).check(matches(withText("W")))
             onView(withContentDescription("Set 1 side: Left"))
                 .check(matches(withText("L")))
                 .perform(click())
             onView(withContentDescription("Set 1 side: Right")).check(matches(withText("R")))
             onView(withContentDescription("Set 1 done")).perform(click())
+            assertEquals(
+                SetType.WARMUP,
+                LofitRepository(context).data.activeWorkout!!.exercises.single().sets.single().type,
+            )
             assertEquals(
                 Side.RIGHT,
                 LofitRepository(context).data.activeWorkout!!.exercises.single().sets.single().side,

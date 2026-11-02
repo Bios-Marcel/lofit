@@ -1,6 +1,8 @@
 package lofit
 
 import android.Manifest
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.os.SystemClock
 import android.util.AtomicFile
 import android.view.ViewGroup
@@ -130,6 +132,54 @@ class LiveWorkoutMeasurementFlowTest {
     }
 
     @Test
+    fun greenTargetLineFollowsCurrentSetAndStaysVisibleAboveReadings() {
+        LofitRepository(context).apply {
+            data.activeWorkout!!.exercises.single().plannedSets.apply {
+                clear()
+                add(PlannedSet(weightKg = 20.0, holdSeconds = 1))
+                add(PlannedSet(weightKg = 40.0, holdSeconds = 1))
+            }
+            save()
+        }
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            lateinit var scanner: FakeScanner
+            scenario.onActivity { scanner = fakeScanner(it) }
+            fun targetLinePosition(): Float? {
+                var position: Float? = null
+                onView(withContentDescription("Scale Pull live weight graph")).check { view, _ ->
+                    val bitmap =
+                        Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+                    view.draw(Canvas(bitmap))
+                    val green = context.getColor(R.color.target_green)
+                    val row =
+                        (0 until bitmap.height).firstOrNull { y ->
+                            (1..3).all { index ->
+                                bitmap.getPixel(bitmap.width * index / 4, y) == green
+                            }
+                        }
+                    position = row?.toFloat()?.div(bitmap.height)
+                    bitmap.recycle()
+                }
+                return position
+            }
+            // An empty graph must already fit the first target.
+            assertTrue(requireNotNull(targetLinePosition()) < 0.5f)
+            scenario.onActivity { scanner.reading(selected, 50.0) }
+            assertTrue(requireNotNull(targetLinePosition()) > 0.5f)
+            SystemClock.sleep(1_100)
+            scenario.onActivity { scanner.reading(selected, 0.0) }
+            onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
+            // The next target is higher, while the same readings remain in the graph.
+            assertTrue(requireNotNull(targetLinePosition()) < 0.5f)
+            scenario.onActivity { scanner.reading(selected, 50.0) }
+            SystemClock.sleep(1_100)
+            scenario.onActivity { scanner.reading(selected, 0.0) }
+            onView(withContentDescription("Set 2 done")).check(matches(isChecked()))
+            assertNull(targetLinePosition())
+        }
+    }
+
+    @Test
     fun scaleDrivesTimerReleaseCompletesAndMeanAppearsInSet() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             lateinit var scanner: FakeScanner
@@ -138,7 +188,21 @@ class LiveWorkoutMeasurementFlowTest {
                 .perform(scrollTo())
                 .check(matches(isDisplayed()))
             onView(withContentDescription("Start set 1 hold")).check(doesNotExist())
-            onView(withContentDescription("Set 1 weight")).check(matches(not(isEnabled())))
+            onView(withContentDescription("Set 1 weight"))
+                .check(matches(isEnabled()))
+                .perform(replaceText("20.5"), closeSoftKeyboard())
+            assertEquals(
+                20.5,
+                LofitRepository(context)
+                    .data
+                    .activeWorkout!!
+                    .exercises
+                    .single()
+                    .plannedSets
+                    .single()
+                    .weightKg,
+                0.0,
+            )
             scenario.onActivity { scanner.reading(selected, 1.1) }
             SystemClock.sleep(150)
             scenario.onActivity {
@@ -165,11 +229,105 @@ class LiveWorkoutMeasurementFlowTest {
                     (view as LiveMeasurementGraphView).series.samples.map { it.kilograms },
                 )
             }
+            onView(withContentDescription("Set 1 weight"))
+                .perform(replaceText("16.5"), closeSoftKeyboard())
+            assertEquals(
+                16.5,
+                LofitRepository(context)
+                    .data
+                    .activeWorkout!!
+                    .exercises
+                    .single()
+                    .sets
+                    .single()
+                    .weightKg,
+                0.0,
+            )
             scenario.recreate()
             onView(withContentDescription("Scale Pull live weight graph")).check { view, _ ->
                 assertTrue((view as LiveMeasurementGraphView).series.samples.isEmpty())
             }
             onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
+            onView(withContentDescription("Set 1 weight")).check(matches(withText("16.5")))
+        }
+    }
+
+    @Test
+    fun shortPullCanBeMarkedDoneAndUndoneManually() {
+        LofitRepository(context).apply {
+            data.activeWorkout!!.exercises.single().plannedSets.single().holdSeconds = 30
+            save()
+        }
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            lateinit var scanner: FakeScanner
+            scenario.onActivity {
+                scanner = fakeScanner(it)
+                scanner.reading(selected, 12.0)
+            }
+            SystemClock.sleep(150)
+            scenario.onActivity { scanner.reading(selected, 0.0) }
+            onView(withContentDescription("Set 1 done"))
+                .check(matches(not(isChecked())))
+                .check(matches(isEnabled()))
+                .perform(scrollTo(), click())
+            onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
+            onView(withContentDescription("Rest timer overlay")).check(matches(isDisplayed()))
+            val logged =
+                LofitRepository(context).data.activeWorkout!!.exercises.single().sets.single()
+            assertEquals(12.0, logged.weightKg, 0.0)
+            assertTrue(logged.holdSeconds < 30)
+            scenario.recreate()
+            onView(withContentDescription("Set 1 done"))
+                .check(matches(isChecked()))
+                .perform(scrollTo(), click())
+            assertTrue(
+                LofitRepository(context).data.activeWorkout!!.exercises.single().sets.isEmpty()
+            )
+        }
+    }
+
+    @Test
+    fun manualCompletionDuringPullStopsTimerAndWaitsForReleaseBeforeNextSet() {
+        LofitRepository(context).apply {
+            data.activeWorkout!!.exercises.single().plannedSets.apply {
+                clear()
+                add(PlannedSet(weightKg = 50.0, holdSeconds = 30))
+                add(PlannedSet(holdSeconds = 1))
+            }
+            save()
+        }
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            lateinit var scanner: FakeScanner
+            scenario.onActivity {
+                scanner = fakeScanner(it)
+                scanner.reading(selected, 20.0)
+            }
+            SystemClock.sleep(1_100)
+            scenario.onActivity { scanner.reading(selected, 20.0) }
+            onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
+            val first =
+                LofitRepository(context).data.activeWorkout!!.exercises.single().sets.single()
+            assertEquals(20.0, first.weightKg, 0.0)
+            assertTrue(first.holdSeconds in 1 until 30)
+            scenario.onActivity { scanner.reading(selected, 40.0) }
+            SystemClock.sleep(1_100)
+            scenario.onActivity { scanner.reading(selected, 0.0) }
+            onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
+            onView(withContentDescription("Set 2 done")).check(matches(not(isChecked())))
+            onView(withContentDescription("Set 2 Active time in seconds"))
+                .check(matches(withText("0")))
+            assertEquals(
+                listOf(first),
+                LofitRepository(context).data.activeWorkout!!.exercises.single().sets,
+            )
+            scenario.onActivity { scanner.reading(selected, 30.0) }
+            SystemClock.sleep(1_100)
+            scenario.onActivity { scanner.reading(selected, 0.0) }
+            onView(withContentDescription("Set 2 done")).check(matches(isChecked()))
+            val sets = LofitRepository(context).data.activeWorkout!!.exercises.single().sets
+            assertEquals(2, sets.size)
+            assertEquals(first, sets.first())
+            assertEquals(30.0, sets.last().weightKg, 0.0)
         }
     }
 

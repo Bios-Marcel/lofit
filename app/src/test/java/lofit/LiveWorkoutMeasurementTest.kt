@@ -111,6 +111,45 @@ class LiveWorkoutMeasurementTest {
     }
 
     @Test
+    fun manualCompletionKeepsMeasuredValuesAndWaitsForReleaseBeforeNextSet() {
+        measurement.read(1_000, 20.0)
+        measurement.read(1_100, 20.0)
+        measurement.read(2_100, 20.0)
+        assertNotNull(measurement.stopForManualCompletion(first, 2_500))
+        assertNull(measurement.active)
+        assertEquals(1, first.actualHoldSeconds)
+        assertEquals(20.0, first.weightKg, 0.0)
+        assertTrue(item.sets.isEmpty())
+        item.sets.add(
+            LoggedSet(
+                type = first.type,
+                weightKg = first.weightKg,
+                holdSeconds = requireNotNull(first.actualHoldSeconds),
+                plannedSetId = first.id,
+            )
+        )
+        assertNull(measurement.read(2_600, 30.0))
+        assertFalse(measurement.tick(5_000))
+        assertNull(measurement.active)
+        assertEquals(1, first.actualHoldSeconds)
+        assertNull(measurement.read(5_000, 0.0))
+        assertEquals(1, item.sets.size)
+        assertEquals(second.id, measurement.read(6_000, 30.0)!!.pull.set.id)
+        assertTrue(measurement.read(9_000, 0.0)!!.completed)
+        assertEquals(2, item.sets.size)
+        assertEquals(1, item.sets.first().holdSeconds)
+        assertEquals(20.0, item.sets.first().weightKg, 0.0)
+    }
+
+    @Test
+    fun manuallyCompletingAnotherSetLeavesCurrentPullRunning() {
+        measurement.read(1_000, 20.0)
+        assertNull(measurement.stopForManualCompletion(second, 1_500))
+        assertEquals(first.id, measurement.active!!.set.id)
+        assertTrue(measurement.read(3_000, 0.0)!!.completed)
+    }
+
+    @Test
     fun eachPullAdvancesExactlyOneSetThenNextExercise() {
         val next =
             item.copy(
