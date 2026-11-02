@@ -242,7 +242,7 @@ class LofitRepository(context: Context) {
 
     private fun encodeHistory(history: List<WorkoutSession>) =
         JSONArray().apply {
-            history.forEach { put(encodeWorkout(it)) }
+            history.forEach { put(encodeWorkout(it, includeExerciseOptions = false)) }
         }
 
     internal fun encodeExercise(exercise: Exercise) =
@@ -263,6 +263,9 @@ class LofitRepository(context: Context) {
         }
 
     internal fun encodeRoutine(routine: Routine) =
+        encodeRoutine(routine, includeExerciseOptions = true)
+
+    private fun encodeRoutine(routine: Routine, includeExerciseOptions: Boolean): JSONObject =
         JSONObject().apply {
             put("id", routine.id)
             put("name", routine.name)
@@ -280,8 +283,10 @@ class LofitRepository(context: Context) {
                                     item.restSecondsOverride ?: JSONObject.NULL,
                                 )
                                 put("note", item.note)
-                                put("manualMeasurement", item.manualMeasurement)
-                                put("pauseEverySecondSet", item.pauseEverySecondSet)
+                                if (includeExerciseOptions) {
+                                    put("manualMeasurement", item.manualMeasurement)
+                                    put("pauseEverySecondSet", item.pauseEverySecondSet)
+                                }
                                 put("plannedSets", encodePlannedSets(item.plannedSets))
                             }
                         )
@@ -291,11 +296,21 @@ class LofitRepository(context: Context) {
         }
 
     internal fun encodeWorkout(workout: WorkoutSession) =
+        encodeWorkout(workout, includeExerciseOptions = true)
+
+    private fun encodeWorkout(
+        workout: WorkoutSession,
+        includeExerciseOptions: Boolean,
+    ): JSONObject =
         JSONObject().apply {
             put("id", workout.id)
             put("name", workout.name)
             put("bodyWeightKg", workout.bodyWeightKg?.let(::roundBodyWeight) ?: JSONObject.NULL)
-            put("sourceRoutine", workout.sourceRoutine?.let(::encodeRoutine) ?: JSONObject.NULL)
+            put(
+                "sourceRoutine",
+                workout.sourceRoutine?.let { encodeRoutine(it, includeExerciseOptions) }
+                    ?: JSONObject.NULL,
+            )
             put(
                 "intervals",
                 JSONArray().apply {
@@ -327,8 +342,10 @@ class LofitRepository(context: Context) {
                                     item.sourceRoutineExerciseId ?: JSONObject.NULL,
                                 )
                                 put("note", item.note)
-                                put("manualMeasurement", item.manualMeasurement)
-                                put("pauseEverySecondSet", item.pauseEverySecondSet)
+                                if (includeExerciseOptions) {
+                                    put("manualMeasurement", item.manualMeasurement)
+                                    put("pauseEverySecondSet", item.pauseEverySecondSet)
+                                }
                                 put("previousNote", item.previousNote)
                                 put("plannedSets", encodePlannedSets(item.plannedSets))
                                 put(

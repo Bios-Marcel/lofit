@@ -48,6 +48,50 @@ class RepositoryPersistenceTest {
     }
 
     @Test
+    fun exerciseOptionsPersistInPlansButAreOmittedFromHistory() {
+        val repository = LofitRepository(context)
+        val item =
+            WorkoutExercise(
+                exerciseId = "pistol-squat",
+                manualMeasurement = true,
+                pauseEverySecondSet = true,
+            )
+        val routine = WorkoutSession(name = "Legs", exercises = mutableListOf(item)).toRoutine()
+        val workout =
+            WorkoutSession(
+                name = "Legs",
+                exercises = mutableListOf(item),
+                sourceRoutine = routine,
+            )
+        repository.data.routines.add(routine)
+        repository.data.activeWorkout = workout
+        repository.data.history.add(
+            workout.copy(intervals = mutableListOf(WorkoutInterval(startedAt = 100, endedAt = 200)))
+        )
+        repository.save()
+        repository.saveHistory()
+
+        val history = org.json.JSONArray(context.repositoryHistoryFile.readText()).getJSONObject(0)
+        listOf(history, history.getJSONObject("sourceRoutine")).forEach { saved ->
+            val exercise = saved.getJSONArray("exercises").getJSONObject(0)
+            assertFalse(exercise.has("manualMeasurement"))
+            assertFalse(exercise.has("pauseEverySecondSet"))
+        }
+
+        val loaded = LofitRepository(context).data
+        assertTrue(loaded.activeWorkout!!.exercises.single().manualMeasurement)
+        assertTrue(loaded.activeWorkout!!.exercises.single().pauseEverySecondSet)
+        assertTrue(loaded.activeWorkout!!.sourceRoutine!!.exercises.single().manualMeasurement)
+        assertTrue(loaded.activeWorkout!!.sourceRoutine!!.exercises.single().pauseEverySecondSet)
+        assertTrue(loaded.routines.single().exercises.single().manualMeasurement)
+        assertTrue(loaded.routines.single().exercises.single().pauseEverySecondSet)
+        assertFalse(loaded.history.single().exercises.single().manualMeasurement)
+        assertFalse(loaded.history.single().exercises.single().pauseEverySecondSet)
+        assertFalse(loaded.history.single().sourceRoutine!!.exercises.single().manualMeasurement)
+        assertFalse(loaded.history.single().sourceRoutine!!.exercises.single().pauseEverySecondSet)
+    }
+
+    @Test
     fun craneScaleSelectionIsOptionalPersistsAndResets() {
         val repository = LofitRepository(context)
         assertNull(repository.data.craneScale)
