@@ -896,9 +896,7 @@ class WorkoutFlowTest {
         onView(withContentDescription("Set 1 weight"))
             .perform(scrollTo(), click())
             .check(matches(withText("67.5")))
-        onView(withContentDescription("Set 1 done"))
-            .check(matches(isChecked()))
-            .check(matches(not(isEnabled())))
+        onView(withContentDescription("Set 1 done")).check(doesNotExist())
         onView(isAssignableFrom(android.widget.EditText::class.java)).check(doesNotExist())
         onView(withText("Finish workout")).check(doesNotExist())
 
