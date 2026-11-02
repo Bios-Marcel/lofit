@@ -16,6 +16,8 @@ import android.view.WindowManager
 import android.widget.CheckBox
 import android.widget.ScrollView
 import androidx.core.view.GravityCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
@@ -37,6 +39,7 @@ import androidx.test.espresso.matcher.ViewMatchers.hasDescendant
 import androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom
 import androidx.test.espresso.matcher.ViewMatchers.isChecked
 import androidx.test.espresso.matcher.ViewMatchers.isClickable
+import androidx.test.espresso.matcher.ViewMatchers.isCompletelyDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.isDescendantOfA
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.isEnabled
@@ -3008,6 +3011,77 @@ class WorkoutFlowTest {
             onView(withContentDescription("Options for Plank")).perform(scrollTo(), click())
             onView(withText("Pause every second set")).check(doesNotExist())
             pressBack()
+        }
+    }
+
+    @Test
+    fun completingSet_closesKeyboardAndRestStaysAboveReopenedKeyboard() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        LofitRepository(context).apply {
+            data.activeWorkout =
+                WorkoutSession(
+                    name = "Keyboard rest",
+                    defaultRestSeconds = 120,
+                    exercises =
+                        mutableListOf(
+                            WorkoutExercise(
+                                exerciseId = "bench-press",
+                                plannedSets = mutableListOf(PlannedSet(weightKg = 20.0, reps = 8)),
+                            )
+                        ),
+                )
+            save()
+        }
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            fun assertKeyboardVisible(expected: Boolean) {
+                var visible: Boolean? = null
+                val deadline = SystemClock.uptimeMillis() + 5_000
+                do {
+                    scenario.onActivity { activity ->
+                        visible =
+                            ViewCompat.getRootWindowInsets(activity.window.decorView)
+                                ?.isVisible(WindowInsetsCompat.Type.ime())
+                    }
+                    if (visible == expected) {
+                        onView(withContentDescription("Set 1 weight")).perform(waitFor(500))
+                        return
+                    }
+                    SystemClock.sleep(50)
+                } while (SystemClock.uptimeMillis() < deadline)
+                assertEquals("Keyboard visibility", expected, visible)
+            }
+
+            onView(withContentDescription("Set 1 weight"))
+                .perform(scrollTo(), click(), typeText("5"))
+            assertKeyboardVisible(true)
+            onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
+            onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
+            assertKeyboardVisible(false)
+            onView(withContentDescription("Rest timer overlay"))
+                .check(matches(isCompletelyDisplayed()))
+
+            onView(withContentDescription("Set 1 weight")).perform(scrollTo(), click())
+            assertKeyboardVisible(true)
+            onView(withContentDescription("Rest timer overlay"))
+                .check(matches(isCompletelyDisplayed()))
+                .check { view, _ ->
+                    val decor = view.rootView
+                    val keyboard =
+                        ViewCompat.getRootWindowInsets(decor)!!.getInsets(
+                                WindowInsetsCompat.Type.ime()
+                            )
+                            .bottom
+                    assertTrue("Keyboard covers bottom of screen", keyboard > 0)
+                    val location = IntArray(2).also { view.getLocationOnScreen(it) }
+                    assertTrue(
+                        "Rest timer stays above keyboard",
+                        location[1] + view.height <= decor.height - keyboard,
+                    )
+                }
+            onView(withText("+15")).perform(click())
+            assertKeyboardVisible(true)
+            onView(withText("Skip")).perform(click())
+            onView(withContentDescription("Rest timer overlay")).check(matches(not(isDisplayed())))
         }
     }
 

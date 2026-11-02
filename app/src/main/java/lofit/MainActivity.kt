@@ -547,7 +547,8 @@ class MainActivity : AppCompatActivity() {
             }
         ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            view.setPadding(0, bars.top, 0, bars.bottom)
+            val keyboard = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+            view.setPadding(0, bars.top, 0, max(bars.bottom, keyboard))
             insets
         }
         content = FrameLayout(this)
@@ -1361,6 +1362,9 @@ class MainActivity : AppCompatActivity() {
                     val currentIndex = item.plannedSets.indexOf(plannedSet)
                     if (currentIndex < 0) return@setOnCheckedChangeListener
                     if (checked) {
+                        WindowCompat.getInsetsController(window, done)
+                            .hide(WindowInsetsCompat.Type.ime())
+                        currentFocus?.clearFocus()
                         if (liveMeasurement) {
                             liveWorkoutMeasurement
                                 .stopForManualCompletion(plannedSet, SystemClock.elapsedRealtime())
@@ -1842,12 +1846,6 @@ class MainActivity : AppCompatActivity() {
                         ViewGroup.LayoutParams.WRAP_CONTENT,
                     ),
                 )
-            ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
-                val keyboard = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
-                val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom
-                view.setPadding(0, 0, 0, (keyboard - bars).coerceAtLeast(0))
-                insets
-            }
         }
     }
 
