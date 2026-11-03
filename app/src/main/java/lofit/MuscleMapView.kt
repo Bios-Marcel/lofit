@@ -137,13 +137,13 @@ class MuscleMapView(
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
-    private data class Region(val name: String, val paths: List<Path>)
+    internal data class Region(val name: String, val paths: List<Path>)
 
-    private data class Anatomy(val viewport: RectF, val outline: Path, val regions: List<Region>)
+    internal data class Anatomy(val viewport: RectF, val outline: Path, val regions: List<Region>)
 
     private data class ShadedPath(val path: Path, val paint: Paint)
 
-    private companion object {
+    internal companion object {
         private val cache = mutableMapOf<Pair<BiologicalGender, MuscleMapSide>, Anatomy>()
 
         @Synchronized

@@ -1,4 +1,5 @@
 <resources>
+    <string name="nav_body_measurements">Body measurements</string>
     <string name="app_name">Lofit</string>
     <string name="start_workout">Start empty workout</string>
     <string name="nav_workout">Home</string>

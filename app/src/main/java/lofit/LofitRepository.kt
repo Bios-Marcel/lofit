@@ -19,7 +19,8 @@ class LofitRepository(context: Context) {
     var data: AppData = load()
         private set
 
-    // Save exercises, routines, the active workout, and settings only. Call saveHistory()
+    // Save exercises, routines, body measurements, the active workout, and settings. Call
+    // saveHistory()
     // separately whenever history changes so frequent saves do not encode or write it.
     fun save() {
         write(encode(data).toString())
@@ -238,6 +239,22 @@ class LofitRepository(context: Context) {
             put("biologicalGender", data.biologicalGender.name)
             put("onboardingComplete", data.onboardingComplete)
             put("exerciseLastSelectedAt", JSONObject(data.exerciseLastSelectedAt))
+            put(
+                "bodyMeasurements",
+                JSONArray().apply {
+                    data.bodyMeasurements.forEach { measurement ->
+                        put(
+                            JSONObject().apply {
+                                put("id", measurement.id)
+                                put("bodyPart", measurement.bodyPart.name)
+                                put("side", measurement.side.name)
+                                put("centimeters", measurement.centimeters)
+                                put("measuredAt", measurement.measuredAt)
+                            }
+                        )
+                    }
+                },
+            )
         }
 
     private fun encodeHistory(history: List<WorkoutSession>) =
@@ -385,6 +402,19 @@ class LofitRepository(context: Context) {
         val defaultIds = defaults.mapTo(mutableSetOf()) { it.id }
         val exercises = (defaults + savedExercises.filter { it.id !in defaultIds }).toMutableList()
         return AppData(
+            bodyMeasurements =
+                root
+                    .optJSONArray("bodyMeasurements")
+                    ?.mapObjects { value ->
+                        BodyMeasurement(
+                            id = value.getString("id"),
+                            bodyPart = BodyPart.valueOf(value.getString("bodyPart")),
+                            side = Side.valueOf(value.getString("side")),
+                            centimeters = value.getDouble("centimeters"),
+                            measuredAt = value.getLong("measuredAt"),
+                        )
+                    }
+                    ?.toMutableList() ?: mutableListOf(),
             exercises = exercises,
             routines = root.getJSONArray("routines").mapObjects(::decodeRoutine).toMutableList(),
             history = history,

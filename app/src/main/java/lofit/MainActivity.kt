@@ -83,6 +83,7 @@ class MainActivity : AppCompatActivity() {
         ROUTINES,
         EXERCISES,
         RECORDS,
+        BODY_MEASUREMENTS,
         HISTORY,
         LIVE_MEASUREMENT,
         SETTINGS,
@@ -133,6 +134,8 @@ class MainActivity : AppCompatActivity() {
             val span: TrendSpan = TrendSpan.YEAR,
         ) : Route()
 
+        data class BodyMeasurementDetail(val bodyPart: BodyPart) : Route()
+
         data class Confirm(val action: ConfirmAction, val targetId: String? = null) : Route()
     }
 
@@ -176,6 +179,13 @@ class MainActivity : AppCompatActivity() {
     }
     private val records by lazy {
         RecordScreens(this, ui, { repository.data }, ::openExerciseTrend)
+    }
+    private val bodyMeasurements by lazy {
+        BodyMeasurementScreens(this, ui, { repository.data }, repository::save, { render() }) { part
+            ->
+            route = Route.BodyMeasurementDetail(part)
+            render()
+        }
     }
     private val routines by lazy {
         RoutineScreens(
@@ -428,6 +438,18 @@ class MainActivity : AppCompatActivity() {
             currentScreen = Screen.LIVE_MEASUREMENT
             route = Route.Root
         }
+        if (savedInstanceState?.getBoolean("showBodyMeasurements") == true) {
+            currentScreen = Screen.BODY_MEASUREMENTS
+            bodyMeasurements.restoreDraft(savedInstanceState.getBundle("bodyMeasurementDraft"))
+            route =
+                savedInstanceState
+                    .getString("measurementBodyPart")
+                    ?.let(BodyPart::valueOf)
+                    ?.takeIf { it.selectable }
+                    ?.let {
+                        Route.BodyMeasurementDetail(it)
+                    } ?: Route.Root
+        }
         WindowCompat.setDecorFitsSystemWindows(window, false)
         onBackPressedDispatcher.addCallback(
             this,
@@ -493,6 +515,13 @@ class MainActivity : AppCompatActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putBoolean("showActiveWorkout", currentScreen == Screen.WORKOUT)
         outState.putBoolean("showLiveMeasurement", currentScreen == Screen.LIVE_MEASUREMENT)
+        outState.putBoolean("showBodyMeasurements", currentScreen == Screen.BODY_MEASUREMENTS)
+        if (currentScreen == Screen.BODY_MEASUREMENTS) {
+            outState.putBundle("bodyMeasurementDraft", bodyMeasurements.saveDraft())
+        }
+        (route as? Route.BodyMeasurementDetail)?.let {
+            outState.putString("measurementBodyPart", it.bodyPart.name)
+        }
         outState.putBoolean("healthPermissionPending", healthPermissionPending)
         outState.putString("onboardingGender", onboardingGender.name)
         outState.putBoolean("onboardingHealthEnabled", onboardingHealthEnabled)
@@ -614,6 +643,7 @@ class MainActivity : AppCompatActivity() {
                     Screen.ROUTINES to getString(R.string.nav_routines),
                     Screen.EXERCISES to getString(R.string.nav_exercises),
                     Screen.RECORDS to getString(R.string.nav_records),
+                    Screen.BODY_MEASUREMENTS to getString(R.string.nav_body_measurements),
                     Screen.HISTORY to getString(R.string.nav_history),
                     Screen.LIVE_MEASUREMENT to getString(R.string.nav_live_measurement),
                     Screen.SETTINGS to getString(R.string.nav_settings),
@@ -715,6 +745,7 @@ class MainActivity : AppCompatActivity() {
                         route = activeRoute.copy(span = span)
                         render()
                     }
+                is Route.BodyMeasurementDetail -> bodyMeasurements.detail(activeRoute.bodyPart)
                 is Route.Confirm -> confirmationScreen(activeRoute)
             }
         content.addView(view)
@@ -747,6 +778,7 @@ class MainActivity : AppCompatActivity() {
             Screen.ROUTINES -> routines.routinesScreen()
             Screen.EXERCISES -> exerciseScreens.exercisesScreen()
             Screen.RECORDS -> records.recordsScreen()
+            Screen.BODY_MEASUREMENTS -> bodyMeasurements.overview()
             Screen.HISTORY -> historyScreen()
             Screen.LIVE_MEASUREMENT -> craneScaleScreens.liveScreen()
             Screen.SETTINGS -> settings.settingsScreen()

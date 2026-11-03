@@ -288,6 +288,7 @@ data class AppData(
     var mcpEnabled: Boolean = false,
     var mcpPort: Int = BuildConfig.MCP_PORT,
     var craneScale: CraneScaleDevice? = null,
+    val bodyMeasurements: MutableList<BodyMeasurement> = mutableListOf(),
 ) {
     fun resumeWorkout(
         workoutId: String,
