@@ -30,6 +30,7 @@ class LofitRepository(context: Context) {
         write(encodeHistory(data.history).toString(), historyFile)
     }
 
+    // LEGACY: Keep the internal reset API after removing the reset action from settings.
     fun reset() {
         val fresh = AppData()
         val history = encodeHistory(fresh.history).toString()

@@ -124,23 +124,6 @@ class McpSettingsTest {
     }
 
     @Test
-    fun resetClosesEnabledServer() {
-        val intent =
-            Intent(context, MainActivity::class.java)
-                .setAction(Intent.ACTION_MAIN)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        ActivityScenario.launch<MainActivity>(intent).use { scenario ->
-            navigate(scenario, R.string.nav_settings)
-            onView(withContentDescription("MCP server")).perform(scrollTo(), click())
-            post("ping")
-            onView(withText("Reset all app data")).perform(scrollTo(), click())
-            onView(withText("Reset everything")).perform(scrollTo(), click())
-            assertFalse(LofitRepository(context).data.mcpEnabled)
-            assertClosed()
-        }
-    }
-
-    @Test
     fun portOverrideRestartsServerAndPersists() {
         val port = ServerSocket(0).use { it.localPort }
         val intent =

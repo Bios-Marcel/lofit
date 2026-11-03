@@ -23,7 +23,6 @@ internal class SettingsScreen(
     private val onMcpChanged: () -> Unit,
     private val onMcpPortChange: (Int) -> Boolean,
     private val craneScaleSettings: () -> View,
-    private val onReset: () -> Unit,
     private val onRefresh: () -> Unit,
 ) {
     fun genderChoice(
@@ -183,17 +182,6 @@ internal class SettingsScreen(
                     activityContext.startActivity(
                         Intent(activityContext, HealthPrivacyActivity::class.java)
                     )
-                }
-            )
-            body.addView(ui.sectionTitle("App data"))
-            body.addView(
-                ui.metaText(
-                    "Remove workout history, routines, custom exercises, and any active workout. Default exercises will be restored."
-                )
-            )
-            body.addView(
-                ui.actionButton("Reset all app data", secondary = true) {
-                    onReset()
                 }
             )
         }

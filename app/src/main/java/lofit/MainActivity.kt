@@ -99,7 +99,6 @@ class MainActivity : AppCompatActivity() {
         FINISH_WORKOUT,
         DELETE_EXERCISE,
         DELETE_ROUTINE,
-        RESET_DATA,
     }
 
     private sealed class Route {
@@ -221,10 +220,6 @@ class MainActivity : AppCompatActivity() {
             onMcpChanged = ::updateMcpServer,
             onMcpPortChange = ::changeMcpPort,
             craneScaleSettings = { craneScaleScreens.settingsCard() },
-            onReset = {
-                route = Route.Confirm(ConfirmAction.RESET_DATA)
-                render()
-            },
             onRefresh = { render() },
         )
     }
@@ -2398,12 +2393,6 @@ class MainActivity : AppCompatActivity() {
                         "The routine will be removed. Workout history is unaffected.",
                         "Delete routine",
                     )
-                ConfirmAction.RESET_DATA ->
-                    Triple(
-                        "Reset all app data?",
-                        "This permanently removes workout history, routines, custom exercises, and the active workout.",
-                        "Reset everything",
-                    )
             }
         return ui.page(title, message) { body ->
             val routineChanges =
@@ -2482,23 +2471,8 @@ class MainActivity : AppCompatActivity() {
                             }
                         ConfirmAction.DELETE_ROUTINE ->
                             repository.data.routines.removeAll { it.id == confirm.targetId }
-                        ConfirmAction.RESET_DATA -> {
-                            val pictures = repository.data.exercises.mapNotNull { it.imageFile }
-                            repository.reset()
-                            hevySettings.clear()
-                            updateMcpServer()
-                            pictures.forEach(::deleteUnsavedPicture)
-                            onboardingGender = repository.data.biologicalGender
-                            onboardingHealthEnabled = false
-                            bodyMetricsReadGeneration++
-                            routineDraft = null
-                            restEndsAt = 0L
-                            clearActiveHold()
-                            currentScreen = Screen.HOME
-                            previousScreens.clear()
-                        }
                     }
-                    if (confirm.action != ConfirmAction.RESET_DATA) repository.save()
+                    repository.save()
                     route = Route.Root
                     render()
                 },
