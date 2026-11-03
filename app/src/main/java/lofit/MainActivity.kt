@@ -724,6 +724,8 @@ class MainActivity : AppCompatActivity() {
             if (::restBar.isInitialized) restBar.visibility = View.GONE
             clearActiveHold()
         }
+        WindowCompat.getInsetsController(window, root).hide(WindowInsetsCompat.Type.ime())
+        currentFocus?.clearFocus()
         content.removeAllViews()
         historyPager.visibility = View.GONE
         timerText = null

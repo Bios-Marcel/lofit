@@ -20,6 +20,7 @@ import androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom
 import androidx.test.espresso.matcher.ViewMatchers.isDescendantOfA
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.isEnabled
+import androidx.test.espresso.matcher.ViewMatchers.isRoot
 import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
 import androidx.test.espresso.matcher.ViewMatchers.withHint
 import androidx.test.espresso.matcher.ViewMatchers.withText
@@ -94,6 +95,34 @@ class ExerciseEditingFlowTest {
             (root.getChildAt(0) as DrawerLayout).openDrawer(GravityCompat.START, false)
         }
         onView(allOf(withText(label), isAssignableFrom(Button::class.java))).perform(click())
+    }
+
+    @Test
+    fun switchingDrawerScreensClosesKeyboard() {
+        launch().use { scenario ->
+            navigate(scenario, R.string.nav_exercises)
+            KeyboardMonitor(scenario).use { keyboard ->
+                onView(withHint("Search name or muscle")).perform(click(), replaceText("bench"))
+                onView(withHint("Search name or muscle")).perform(keyboard.awaitVisible(true))
+                navigate(scenario, R.string.nav_records)
+                onView(isRoot()).perform(keyboard.awaitVisible(false))
+            }
+        }
+    }
+
+    @Test
+    fun openingEditorClosesKeyboardAndAllowsTypingAgain() {
+        launch().use { scenario ->
+            navigate(scenario, R.string.nav_exercises)
+            KeyboardMonitor(scenario).use { keyboard ->
+                onView(withHint("Search name or muscle")).perform(click(), replaceText("bench"))
+                onView(withHint("Search name or muscle")).perform(keyboard.awaitVisible(true))
+                onView(withText("Create custom exercise")).perform(scrollTo(), click())
+                onView(withHint("Exercise name")).perform(keyboard.awaitVisible(false))
+                onView(withHint("Exercise name")).perform(click(), replaceText("Custom press"))
+                onView(withHint("Exercise name")).perform(keyboard.awaitVisible(true))
+            }
+        }
     }
 
     @Test
