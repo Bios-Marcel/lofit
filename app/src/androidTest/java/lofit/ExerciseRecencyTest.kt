@@ -103,7 +103,7 @@ class ExerciseRecencyTest {
     }
 
     @Test
-    fun bothSelectorsPrioritizeHistoryUntilWorkoutFinishes() {
+    fun selectorsKeepHistoryOrderUntilLoggedWorkoutFinishes() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             onView(withText(R.string.start_workout)).perform(scrollTo(), click())
             onView(withText("Add exercise")).perform(scrollTo(), click())
@@ -145,6 +145,23 @@ class ExerciseRecencyTest {
                 listOf("bench-press", "recent-custom"),
                 LofitRepository(context).data.exercisesByRecency().take(2).map { it.id },
             )
+
+            scenario.onActivity { activity ->
+                val root = activity.findViewById<ViewGroup>(android.R.id.content)
+                (root.getChildAt(0) as DrawerLayout).openDrawer(GravityCompat.START, false)
+            }
+            onView(allOf(withText(R.string.nav_workout), isClickable())).perform(click())
+            onView(withText("Resume workout")).perform(scrollTo(), click())
+            onView(withText("Add set")).perform(scrollTo(), click())
+            onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
+            scenario.recreate()
+            assertTrue(LofitRepository(context).data.exerciseLastSelectedAt.isEmpty())
+            onView(withText("Finish workout")).perform(scrollTo(), click())
+            onView(withText("Finish and save")).perform(click())
+            val data = LofitRepository(context).data
+            val completedAt = data.history.single { it.name == "Open workout" }.completedAt!!
+            assertEquals(completedAt, data.exerciseLastSelectedAt["recent-custom"])
+            assertEquals("recent-custom", data.exercisesByRecency().first().id)
         }
     }
 
@@ -193,25 +210,6 @@ class ExerciseRecencyTest {
             onView(withContentDescription("Add selected exercises"))
                 .check(matches(org.hamcrest.Matchers.not(isEnabled())))
             pressBack()
-        }
-    }
-
-    @Test
-    fun finishingWorkoutUpdatesRecencyAfterAddingAndLoggingExercise() {
-        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-            onView(withText(R.string.start_workout)).perform(scrollTo(), click())
-            onView(withText("Add exercise")).perform(scrollTo(), click())
-            onView(withContentDescription("Add Recent curl")).perform(scrollTo(), click())
-            onView(withText("Add set")).perform(scrollTo(), click())
-            onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
-            scenario.recreate()
-            assertTrue(LofitRepository(context).data.exerciseLastSelectedAt.isEmpty())
-            onView(withText("Finish workout")).perform(scrollTo(), click())
-            onView(withText("Finish and save")).perform(click())
-            val data = LofitRepository(context).data
-            val completedAt = data.history.single { it.name == "Open workout" }.completedAt!!
-            assertEquals(completedAt, data.exerciseLastSelectedAt["recent-custom"])
-            assertEquals("recent-custom", data.exercisesByRecency().first().id)
         }
     }
 

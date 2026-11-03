@@ -60,8 +60,13 @@ find_device() {
 SERIAL="$(find_device || true)"
 if [[ -z "$SERIAL" ]]; then
     LOG_FILE="${TMPDIR:-/tmp}/lofit-emulator-${AVD_NAME}.log"
+    EMULATOR_ARGS=()
+    if [[ "${LOFIT_EMULATOR_HEADLESS:-0}" == 1 ]]; then
+        # Automated test AVDs must not wait for an interactive ADB authorization dialog.
+        EMULATOR_ARGS+=(-no-window -no-audio -no-boot-anim -no-snapshot -skip-adb-auth -gpu "${LOFIT_EMULATOR_GPU:-host}")
+    fi
     # A separate session keeps the emulator alive after this script exits.
-    nohup setsid -f "$EMULATOR" -avd "$AVD_NAME" > "$LOG_FILE" 2>&1 < /dev/null
+    nohup setsid -f "$EMULATOR" -avd "$AVD_NAME" "${EMULATOR_ARGS[@]}" > "$LOG_FILE" 2>&1 < /dev/null
 fi
 
 for ((i = 0; i < 60; i++)); do

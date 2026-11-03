@@ -248,7 +248,7 @@ class WorkoutFlowTest {
     }
 
     @Test
-    fun settings_genderChangesBothMuscleMapsAndPersistsAcrossRestart() {
+    fun settings_genderHealthAndSoundPersistAcrossRestart() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         LofitRepository(context).apply {
@@ -284,6 +284,20 @@ class WorkoutFlowTest {
         onView(withText(R.string.nav_settings)).perform(click())
         onView(withText("Female")).perform(click()).check(matches(isChecked()))
         assertEquals(BiologicalGender.FEMALE, LofitRepository(context).data.biologicalGender)
+        onView(withContentDescription("Android health integration"))
+            .check(matches(not(isChecked())))
+            .perform(scrollTo(), click())
+            .check(matches(isChecked()))
+        assertEquals(true, LofitRepository(context).data.bodyMetricsEnabled)
+        onView(withContentDescription("Android health integration"))
+            .perform(scrollTo(), click())
+            .check(matches(not(isChecked())))
+        assertEquals(false, LofitRepository(context).data.bodyMetricsEnabled)
+        onView(withContentDescription("Sound cues"))
+            .check(matches(isChecked()))
+            .perform(scrollTo(), click())
+            .check(matches(not(isChecked())))
+        assertFalse(LofitRepository(context).data.soundCuesEnabled)
         checkMaps(BiologicalGender.FEMALE)
         instrumentation.runOnMainSync { activity.finish() }
 
@@ -292,8 +306,14 @@ class WorkoutFlowTest {
         checkMaps(BiologicalGender.FEMALE)
         onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
         onView(withText(R.string.nav_settings)).perform(click())
-        onView(withText("Female")).check(matches(isChecked()))
-        onView(withText("Male")).perform(click())
+        onView(withContentDescription("Android health integration"))
+            .perform(scrollTo())
+            .check(matches(not(isChecked())))
+        onView(withContentDescription("Sound cues"))
+            .perform(scrollTo())
+            .check(matches(not(isChecked())))
+        onView(withText("Female")).perform(scrollTo()).check(matches(isChecked()))
+        onView(withText("Male")).perform(scrollTo(), click())
         checkMaps(BiologicalGender.MALE)
         instrumentation.runOnMainSync { restarted.finish() }
     }
@@ -337,35 +357,6 @@ class WorkoutFlowTest {
         } finally {
             instrumentation.runOnMainSync { activity.finish() }
         }
-    }
-
-    @Test
-    fun settings_bodyMetricsCanBeEnabledAndDisabledAfterDeclining() {
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val context = instrumentation.targetContext
-        val intent =
-            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        val activity = instrumentation.startActivitySync(intent)
-        onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
-        onView(withText(R.string.nav_settings)).perform(click())
-        onView(withContentDescription("Android health integration"))
-            .check(matches(not(isChecked())))
-            .perform(scrollTo(), click())
-            .check(matches(isChecked()))
-        assertEquals(true, LofitRepository(context).data.bodyMetricsEnabled)
-        onView(withContentDescription("Android health integration"))
-            .perform(scrollTo(), click())
-            .check(matches(not(isChecked())))
-        assertEquals(false, LofitRepository(context).data.bodyMetricsEnabled)
-        instrumentation.runOnMainSync { activity.finish() }
-
-        val restarted = instrumentation.startActivitySync(intent)
-        onView(withText("Welcome to Lofit")).check(doesNotExist())
-        onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
-        onView(withText(R.string.nav_settings)).perform(click())
-        onView(withContentDescription("Android health integration"))
-            .check(matches(not(isChecked())))
-        instrumentation.runOnMainSync { restarted.finish() }
     }
 
     @Test
@@ -563,10 +554,23 @@ class WorkoutFlowTest {
     }
 
     @Test
-    fun home_leavingEmptyWorkoutDiscardsItWithoutConfirmation() {
+    fun home_placesStartButtonAndDiscardsEmptyWorkoutWithoutConfirmation() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)).use {
             scenario ->
+            val routinesTitle = arrayOfNulls<View>(1)
+            val startButton = arrayOfNulls<View>(1)
+            onView(allOf(withText("Routines"), isDisplayed())).check { view, _ ->
+                routinesTitle[0] = view
+            }
+            onView(withText(R.string.start_workout)).check { view, _ -> startButton[0] = view }
+            val parent = routinesTitle[0]?.parent as ViewGroup
+            assertSame(parent, startButton[0]?.parent)
+            assertEquals(
+                parent.indexOfChild(routinesTitle[0]) + 1,
+                parent.indexOfChild(startButton[0]),
+            )
+
             onView(withText(R.string.start_workout)).perform(scrollTo(), click())
             val workoutId = LofitRepository(context).data.activeWorkout!!.id
             onView(withText("Add exercise")).perform(scrollTo(), click())
@@ -620,7 +624,7 @@ class WorkoutFlowTest {
             onView(withText("Add exercise")).check(matches(isDisplayed()))
             pressBack()
             onView(withText("Ready to move?")).check(matches(isDisplayed()))
-            onView(withText("Resume workout")).perform(waitFor(500), click())
+            onView(withText("Resume workout")).perform(waitForStableLayout(), click())
             onView(withText("Add exercise")).check(matches(isDisplayed()))
             assertEquals(workoutId, LofitRepository(context).data.activeWorkout!!.id)
             onView(withText("Discard workout")).perform(scrollTo(), click())
@@ -629,26 +633,6 @@ class WorkoutFlowTest {
         } finally {
             instrumentation.runOnMainSync { activity.finish() }
         }
-    }
-
-    @Test
-    fun home_placesStartWorkoutInRoutinesSection() {
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val intent =
-            Intent(instrumentation.targetContext, MainActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        instrumentation.startActivitySync(intent)
-
-        val routinesTitle = arrayOfNulls<View>(1)
-        val startButton = arrayOfNulls<View>(1)
-        onView(allOf(withText("Routines"), isDisplayed())).check { view, _ ->
-            routinesTitle[0] = view
-        }
-        onView(withText(R.string.start_workout)).check { view, _ -> startButton[0] = view }
-
-        val parent = routinesTitle[0]?.parent as ViewGroup
-        assertSame(parent, startButton[0]?.parent)
-        assertEquals(parent.indexOfChild(routinesTitle[0]) + 1, parent.indexOfChild(startButton[0]))
     }
 
     @Test
@@ -944,25 +928,6 @@ class WorkoutFlowTest {
         }
         assertEquals(storedState, context.repositoryStateFile.readText())
         instrumentation.runOnMainSync { activity.finish() }
-    }
-
-    @Test
-    fun settings_soundCuesAreOnByDefaultAndPersistOff() {
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val intent =
-            Intent(instrumentation.targetContext, MainActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        val activity = instrumentation.startActivitySync(intent)
-
-        onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
-        onView(withText(R.string.nav_settings)).perform(click())
-        onView(withContentDescription("Sound cues"))
-            .check(matches(isChecked()))
-            .perform(click())
-            .check(matches(not(isChecked())))
-
-        assertFalse(LofitRepository(instrumentation.targetContext).data.soundCuesEnabled)
-        activity.finish()
     }
 
     @Test
@@ -1690,7 +1655,7 @@ class WorkoutFlowTest {
         onView(isAssignableFrom(ScrollView::class.java)).check { view, _ -> page[0] = view }
         onView(withText("Plank")).check { view, _ -> survivingHeading[0] = view }
         onView(withContentDescription("Reorder Plank"))
-            .perform(scrollTo(), dragExercise(-1, holdMillis = 0))
+            .perform(scrollTo(), dragExercise(-1, longPress = false))
         assertEquals(
             listOf("bench-press", "plank", "back-squat"),
             LofitRepository(instrumentation.targetContext).data.activeWorkout!!.exercises.map {
@@ -3034,55 +2999,46 @@ class WorkoutFlowTest {
             save()
         }
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-            fun assertKeyboardVisible(expected: Boolean) {
-                var visible: Boolean? = null
-                val deadline = SystemClock.uptimeMillis() + 5_000
-                do {
-                    scenario.onActivity { activity ->
-                        visible =
-                            ViewCompat.getRootWindowInsets(activity.window.decorView)
-                                ?.isVisible(WindowInsetsCompat.Type.ime())
-                    }
-                    if (visible == expected) {
-                        onView(withContentDescription("Set 1 weight")).perform(waitFor(500))
-                        return
-                    }
-                    SystemClock.sleep(50)
-                } while (SystemClock.uptimeMillis() < deadline)
-                assertEquals("Keyboard visibility", expected, visible)
-            }
-
-            onView(withContentDescription("Set 1 weight"))
-                .perform(scrollTo(), click(), typeText("5"))
-            assertKeyboardVisible(true)
-            onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
-            onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
-            assertKeyboardVisible(false)
-            onView(withContentDescription("Rest timer overlay"))
-                .check(matches(isCompletelyDisplayed()))
-
-            onView(withContentDescription("Set 1 weight")).perform(scrollTo(), click())
-            assertKeyboardVisible(true)
-            onView(withContentDescription("Rest timer overlay"))
-                .check(matches(isCompletelyDisplayed()))
-                .check { view, _ ->
-                    val decor = view.rootView
-                    val keyboard =
-                        ViewCompat.getRootWindowInsets(decor)!!.getInsets(
-                                WindowInsetsCompat.Type.ime()
-                            )
-                            .bottom
-                    assertTrue("Keyboard covers bottom of screen", keyboard > 0)
-                    val location = IntArray(2).also { view.getLocationOnScreen(it) }
-                    assertTrue(
-                        "Rest timer stays above keyboard",
-                        location[1] + view.height <= decor.height - keyboard,
-                    )
+            KeyboardMonitor(scenario).use { keyboard ->
+                fun assertKeyboardVisible(expected: Boolean) {
+                    onView(withContentDescription("Set 1 weight"))
+                        .perform(keyboard.awaitVisible(expected), waitForStableLayout())
                 }
-            onView(withText("+15")).perform(click())
-            assertKeyboardVisible(true)
-            onView(withText("Skip")).perform(click())
-            onView(withContentDescription("Rest timer overlay")).check(matches(not(isDisplayed())))
+
+                onView(withContentDescription("Set 1 weight"))
+                    .perform(scrollTo(), click(), typeText("5"))
+                assertKeyboardVisible(true)
+                onView(withContentDescription("Set 1 done"))
+                    .perform(scrollTo(), waitForStableLayout(), click())
+                onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
+                assertKeyboardVisible(false)
+                onView(withContentDescription("Rest timer overlay"))
+                    .check(matches(isCompletelyDisplayed()))
+
+                onView(withContentDescription("Set 1 weight")).perform(scrollTo(), click())
+                assertKeyboardVisible(true)
+                onView(withContentDescription("Rest timer overlay"))
+                    .check(matches(isCompletelyDisplayed()))
+                    .check { view, _ ->
+                        val decor = view.rootView
+                        val keyboard =
+                            ViewCompat.getRootWindowInsets(decor)!!.getInsets(
+                                    WindowInsetsCompat.Type.ime()
+                                )
+                                .bottom
+                        assertTrue("Keyboard covers bottom of screen", keyboard > 0)
+                        val location = IntArray(2).also { view.getLocationOnScreen(it) }
+                        assertTrue(
+                            "Rest timer stays above keyboard",
+                            location[1] + view.height <= decor.height - keyboard,
+                        )
+                    }
+                onView(withText("+15")).perform(click())
+                assertKeyboardVisible(true)
+                onView(withText("Skip")).perform(click())
+                onView(withContentDescription("Rest timer overlay"))
+                    .check(matches(not(isDisplayed())))
+            }
         }
     }
 
@@ -3112,7 +3068,8 @@ class WorkoutFlowTest {
 
         onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
         onView(withContentDescription("Rest timer overlay")).check(matches(isDisplayed()))
-        onView(withContentDescription("Set 1 done")).perform(waitFor(1_500))
+        onView(withContentDescription("Rest timer overlay"))
+            .perform(waitUntilMatches(not(isDisplayed())))
         onView(withContentDescription("Rest timer overlay")).check(matches(not(isDisplayed())))
         onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
         instrumentation.runOnMainSync { activity.finish() }
@@ -3205,7 +3162,7 @@ class WorkoutFlowTest {
             .perform(click())
         onView(withText("Start")).perform(scrollTo(), click())
         onView(withContentDescription("Start set 1 hold")).perform(scrollTo(), click())
-        onView(withContentDescription("Stop set 1 hold")).perform(waitFor(1_300))
+        onView(withContentDescription("Set 1 done")).perform(waitUntilMatches(isChecked()))
         onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
         onView(withContentDescription("Stop set 1 hold"))
             .check(matches(isDisplayed()))
@@ -3235,7 +3192,7 @@ class WorkoutFlowTest {
         }
     }
 
-    private fun dragExercise(direction: Int, cancel: Boolean = false, holdMillis: Long = 300L) =
+    private fun dragExercise(direction: Int, cancel: Boolean = false, longPress: Boolean = true) =
         object : ViewAction {
             override fun getDescription() =
                 "drag exercise one place ${if (direction < 0) "up" else "down"}"
@@ -3243,6 +3200,8 @@ class WorkoutFlowTest {
             override fun getConstraints(): Matcher<View> = isDisplayed()
 
             override fun perform(uiController: UiController, view: View) {
+                // A preceding short swipe can leave the ScrollView flinging after scrollTo().
+                waitForStableLayout().perform(uiController, view)
                 val card =
                     generateSequence(view.parent) { it.parent }
                         .filterIsInstance<MaterialCardView>()
@@ -3276,26 +3235,31 @@ class WorkoutFlowTest {
                         event.recycle()
                     }
                 }
-                send(MotionEvent.ACTION_DOWN, startY)
-                if (holdMillis > 0) uiController.loopMainThreadForAtLeast(holdMillis)
-                for (step in 1..20) {
-                    send(MotionEvent.ACTION_MOVE, startY + (endY - startY) * step / 20)
-                    uiController.loopMainThreadForAtLeast(16)
+                var released = false
+                try {
+                    send(MotionEvent.ACTION_DOWN, startY)
+                    if (longPress)
+                        awaitCondition(
+                            uiController,
+                            "${view.contentDescription} starts dragging (direction=$direction, cancel=$cancel)",
+                        ) {
+                            card.alpha < 1f
+                        }
+                    for (step in 1..20) {
+                        send(MotionEvent.ACTION_MOVE, startY + (endY - startY) * step / 20)
+                        uiController.loopMainThreadForAtLeast(16)
+                    }
+                    if (longPress && endY != startY + distance)
+                        awaitCondition(uiController, "drag scrolls past the neighboring card") {
+                            neighbor.translationY != 0f
+                        }
+                    send(if (cancel) MotionEvent.ACTION_CANCEL else MotionEvent.ACTION_UP, endY)
+                    released = true
+                } finally {
+                    // A failed wait must not leave a pointer down across subsequent tests.
+                    if (!released) runCatching { send(MotionEvent.ACTION_CANCEL, endY) }
                 }
-                if (endY != startY + distance) uiController.loopMainThreadForAtLeast(600)
-                send(if (cancel) MotionEvent.ACTION_CANCEL else MotionEvent.ACTION_UP, endY)
                 uiController.loopMainThreadUntilIdle()
-            }
-        }
-
-    private fun waitFor(milliseconds: Long) =
-        object : ViewAction {
-            override fun getDescription() = "wait for $milliseconds milliseconds"
-
-            override fun getConstraints(): Matcher<View> = isDisplayed()
-
-            override fun perform(uiController: UiController, view: View) {
-                uiController.loopMainThreadForAtLeast(milliseconds)
             }
         }
 

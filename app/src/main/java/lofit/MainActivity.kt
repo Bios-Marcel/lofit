@@ -315,6 +315,8 @@ class MainActivity : AppCompatActivity() {
         )
     }
     private val liveWorkoutMeasurement by lazy { LiveWorkoutMeasurement { repository.data } }
+    // Readings, completion, timer updates and graph rendering share one monotonic clock.
+    internal var liveMeasurementNow: () -> Long = SystemClock::elapsedRealtime
     private val liveGraphs = mutableListOf<LiveMeasurementGraphView>()
     private val liveStatusViews = mutableListOf<TextView>()
     private val liveWeightViews = mutableMapOf<String, EditText>()
@@ -325,7 +327,7 @@ class MainActivity : AppCompatActivity() {
         WorkoutScaleReader(
             scanner = BluetoothCraneScaleScanner(this),
             withBluetooth = ::withBluetooth,
-            onReading = { onWorkoutScaleReading(SystemClock.elapsedRealtime(), it) },
+            onReading = { onWorkoutScaleReading(liveMeasurementNow(), it) },
             onInterrupted = {
                 liveWorkoutMeasurement.interrupt()?.let {
                     refreshLiveSetValues(it.pull.set)
@@ -1192,6 +1194,7 @@ class MainActivity : AppCompatActivity() {
                 addView(
                     LiveMeasurementGraphView(
                             this@MainActivity,
+                            now = { liveMeasurementNow() },
                             series = liveWorkoutMeasurement.seriesFor(item.id),
                             targetWeightKg = {
                                 item.plannedSets
@@ -1399,7 +1402,7 @@ class MainActivity : AppCompatActivity() {
                         currentFocus?.clearFocus()
                         if (liveMeasurement) {
                             liveWorkoutMeasurement
-                                .stopForManualCompletion(plannedSet, SystemClock.elapsedRealtime())
+                                .stopForManualCompletion(plannedSet, liveMeasurementNow())
                                 ?.let { refreshLiveSetValues(it.pull.set) }
                         }
                         if (isActiveHold(item, plannedSet) && !completingHoldAutomatically)
@@ -3300,7 +3303,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateHoldTimer() {
         liveWorkoutMeasurement.reconcile()
-        if (liveWorkoutMeasurement.tick(SystemClock.elapsedRealtime())) playCue()
+        if (liveWorkoutMeasurement.tick(liveMeasurementNow())) playCue()
         liveWorkoutMeasurement.active?.let { pull ->
             refreshLiveSetValues(pull.set)
             updateWorkoutNotification()

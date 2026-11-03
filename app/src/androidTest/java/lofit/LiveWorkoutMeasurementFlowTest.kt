@@ -31,6 +31,7 @@ class LiveWorkoutMeasurementFlowTest {
     private val selected = CraneScaleDevice("AA:BB:CC:DD:EE:01", "Scale")
     private var savedState: ByteArray? = null
     private var savedHistory: ByteArray? = null
+    private var scaleTimeMillis = 0L
     private val movement =
         Exercise(
             "live-test",
@@ -113,6 +114,8 @@ class LiveWorkoutMeasurementFlowTest {
     }
 
     private fun fakeScanner(activity: MainActivity): FakeScanner {
+        scaleTimeMillis = SystemClock.elapsedRealtime()
+        activity.liveMeasurementNow = { scaleTimeMillis }
         val delegate =
             MainActivity::class
                 .java
@@ -166,13 +169,13 @@ class LiveWorkoutMeasurementFlowTest {
             assertTrue(requireNotNull(targetLinePosition()) < 0.5f)
             scenario.onActivity { scanner.reading(selected, 50.0) }
             assertTrue(requireNotNull(targetLinePosition()) > 0.5f)
-            SystemClock.sleep(1_100)
+            scenario.onActivity { scaleTimeMillis += 1_100 }
             scenario.onActivity { scanner.reading(selected, 0.0) }
             onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
             // The next target is higher, while the same readings remain in the graph.
             assertTrue(requireNotNull(targetLinePosition()) < 0.5f)
             scenario.onActivity { scanner.reading(selected, 50.0) }
-            SystemClock.sleep(1_100)
+            scenario.onActivity { scaleTimeMillis += 1_100 }
             scenario.onActivity { scanner.reading(selected, 0.0) }
             onView(withContentDescription("Set 2 done")).check(matches(isChecked()))
             assertNull(targetLinePosition())
@@ -204,12 +207,14 @@ class LiveWorkoutMeasurementFlowTest {
                 0.0,
             )
             scenario.onActivity { scanner.reading(selected, 1.1) }
-            SystemClock.sleep(150)
+            scenario.onActivity { scaleTimeMillis += 150 }
             scenario.onActivity {
                 scanner.reading(selected, 15.113)
                 scanner.reading(selected, 15.133)
             }
-            SystemClock.sleep(1_100)
+            scenario.onActivity { scaleTimeMillis += 1_100 }
+            onView(withContentDescription("Set 1 Active time in seconds"))
+                .perform(waitUntilMatches(withText("1")))
             onView(withContentDescription("Set 1 done")).check(matches(not(isChecked())))
             scenario.onActivity {
                 scanner.reading(CraneScaleDevice("AA:BB:CC:DD:EE:02", "Other"), 99.0)
@@ -264,7 +269,7 @@ class LiveWorkoutMeasurementFlowTest {
                 scanner = fakeScanner(it)
                 scanner.reading(selected, 12.0)
             }
-            SystemClock.sleep(150)
+            scenario.onActivity { scaleTimeMillis += 150 }
             scenario.onActivity { scanner.reading(selected, 0.0) }
             onView(withContentDescription("Set 1 done"))
                 .check(matches(not(isChecked())))
@@ -302,7 +307,7 @@ class LiveWorkoutMeasurementFlowTest {
                 scanner = fakeScanner(it)
                 scanner.reading(selected, 20.0)
             }
-            SystemClock.sleep(1_100)
+            scenario.onActivity { scaleTimeMillis += 1_100 }
             scenario.onActivity { scanner.reading(selected, 20.0) }
             onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
             val first =
@@ -310,7 +315,7 @@ class LiveWorkoutMeasurementFlowTest {
             assertEquals(20.0, first.weightKg, 0.0)
             assertTrue(first.holdSeconds in 1 until 30)
             scenario.onActivity { scanner.reading(selected, 40.0) }
-            SystemClock.sleep(1_100)
+            scenario.onActivity { scaleTimeMillis += 1_100 }
             scenario.onActivity { scanner.reading(selected, 0.0) }
             onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
             onView(withContentDescription("Set 2 done")).check(matches(not(isChecked())))
@@ -321,7 +326,7 @@ class LiveWorkoutMeasurementFlowTest {
                 LofitRepository(context).data.activeWorkout!!.exercises.single().sets,
             )
             scenario.onActivity { scanner.reading(selected, 30.0) }
-            SystemClock.sleep(1_100)
+            scenario.onActivity { scaleTimeMillis += 1_100 }
             scenario.onActivity { scanner.reading(selected, 0.0) }
             onView(withContentDescription("Set 2 done")).check(matches(isChecked()))
             val sets = LofitRepository(context).data.activeWorkout!!.exercises.single().sets
@@ -339,9 +344,9 @@ class LiveWorkoutMeasurementFlowTest {
                 scanner = fakeScanner(it)
                 scanner.reading(selected, 1.1)
             }
-            SystemClock.sleep(150)
+            scenario.onActivity { scaleTimeMillis += 150 }
             scenario.onActivity { scanner.reading(selected, 12.0) }
-            SystemClock.sleep(150)
+            scenario.onActivity { scaleTimeMillis += 150 }
             scenario.onActivity { scanner.reading(selected, 0.0) }
             onView(withContentDescription("Set 1 done")).check(matches(not(isChecked())))
             assertEquals(

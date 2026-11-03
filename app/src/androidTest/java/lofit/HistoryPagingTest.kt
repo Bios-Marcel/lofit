@@ -125,7 +125,7 @@ class HistoryPagingTest {
     }
 
     @Test
-    fun newestTenOnlyAndStickyPagerReachesOlderPagesWithoutExtraCards() {
+    fun pagingAndNavigationPreserveWorkoutOrderAndScrollPosition() {
         seedHistory(23)
         ActivityScenario.launch(MainActivity::class.java).use {
             openHistory()
@@ -161,14 +161,7 @@ class HistoryPagingTest {
             checkWorkouts(13 downTo 4)
             onView(withContentDescription("Newer workouts")).perform(click())
             checkWorkouts(23 downTo 14, continuable = 1)
-        }
-    }
 
-    @Test
-    fun detailsEditingAndScreenNavigationRestorePageAndScrollWhileFreshEntryShowsLatest() {
-        seedHistory(23)
-        ActivityScenario.launch(MainActivity::class.java).use {
-            openHistory()
             onView(withContentDescription("Older workouts")).perform(click())
             onView(withContentDescription("View Paged workout 8")).perform(scrollTo())
             var scrollY = 0

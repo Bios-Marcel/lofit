@@ -7,8 +7,7 @@ import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
-import androidx.test.espresso.UiController
-import androidx.test.espresso.ViewAction
+import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.scrollTo
 import androidx.test.espresso.assertion.ViewAssertions.matches
@@ -18,8 +17,6 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleCallback
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import org.hamcrest.Matchers.allOf
 import org.hamcrest.Matchers.not
 import org.junit.After
@@ -119,10 +116,13 @@ class CraneScaleScreensTest {
     }
 
     @Test
-    fun pickerRemembersChosenScaleAcrossRestartAndCanForgetIt() {
+    fun selectedScaleControlsLiveMenuAcrossRecreationAndForgetting() {
         val scanner = FakeScanner()
         val repository = LofitRepository(context)
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            openDrawer(scenario)
+            onView(withText(R.string.nav_live_measurement)).check(matches(not(isDisplayed())))
+            pressBack()
             lateinit var screens: CraneScaleScreens
             scenario.onActivity { activity ->
                 val ui = LofitViews(activity, ExercisePictures(activity)) { BiologicalGender.MALE }
@@ -151,26 +151,22 @@ class CraneScaleScreensTest {
                 scanner.reading(other, 7.0)
             }
             onView(withText("${other.name}\n${other.address}"))
-                .perform(
-                    object : ViewAction {
-                        override fun getConstraints() = isDisplayed()
-
-                        override fun getDescription() = "wait for scale picker resize"
-
-                        override fun perform(controller: UiController, view: android.view.View) {
-                            // New device rows move the dialog while its resize animation runs.
-                            controller.loopMainThreadForAtLeast(350)
-                        }
-                    },
-                    click(),
-                )
+                .perform(waitForStableLayout(), click())
             assertFalse(scanner.running)
             assertEquals(other, LofitRepository(context).data.craneScale)
             scenario.recreate()
             navigate(scenario, R.string.nav_settings)
             onView(withText(other.address)).perform(scrollTo()).check(matches(isDisplayed()))
+            navigate(scenario, R.string.nav_live_measurement)
+            onView(withContentDescription("Live weight graph")).check(matches(isDisplayed()))
+            scenario.recreate()
+            onView(withContentDescription("Live weight graph")).check(matches(isDisplayed()))
+            navigate(scenario, R.string.nav_settings)
             onView(withText("Forget scale")).perform(scrollTo(), click())
             assertNull(LofitRepository(context).data.craneScale)
+            openDrawer(scenario)
+            onView(withText(R.string.nav_live_measurement)).check(matches(not(isDisplayed())))
+            scenario.recreate()
             openDrawer(scenario)
             onView(withText(R.string.nav_live_measurement)).check(matches(not(isDisplayed())))
         }
@@ -285,7 +281,6 @@ class CraneScaleScreensTest {
         val repository = LofitRepository(context).apply { data.craneScale = selected }
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             lateinit var screens: CraneScaleScreens
-            val expired = CountDownLatch(1)
             scenario.onActivity { activity ->
                 val ui = LofitViews(activity, ExercisePictures(activity)) { BiologicalGender.MALE }
                 screens =
@@ -302,11 +297,9 @@ class CraneScaleScreensTest {
                 activity.setContentView(screens.liveScreen())
                 screens.onStart()
                 scanner.reading(selected, 25.0)
-                android.os
-                    .Handler(android.os.Looper.getMainLooper())
-                    .postDelayed({ expired.countDown() }, 100)
             }
-            assertTrue(expired.await(3, TimeUnit.SECONDS))
+            onView(withContentDescription("Scale status"))
+                .perform(waitUntilMatches(withText("No signal · waiting for scale…")))
             onView(withContentDescription("Live scale weight")).check(matches(withText("—")))
             onView(withContentDescription("Scale status"))
                 .check(matches(withText("No signal · waiting for scale…")))
@@ -317,30 +310,6 @@ class CraneScaleScreensTest {
                 assertEquals(formatBodyWeight(26.0), activityText(it, "Live scale weight"))
                 screens.onStop()
             }
-        }
-    }
-
-    @Test
-    fun liveMenuNeedsSavedScaleAndUpdatesAfterForgettingIt() {
-        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-            openDrawer(scenario)
-            onView(withText(R.string.nav_live_measurement)).check(matches(not(isDisplayed())))
-            LofitRepository(context).apply {
-                data.craneScale = selected
-                save()
-            }
-            scenario.recreate()
-            navigate(scenario, R.string.nav_live_measurement)
-            onView(withContentDescription("Live weight graph")).check(matches(isDisplayed()))
-            scenario.recreate()
-            onView(withContentDescription("Live weight graph")).check(matches(isDisplayed()))
-            navigate(scenario, R.string.nav_settings)
-            onView(withText("Forget scale")).perform(scrollTo(), click())
-            openDrawer(scenario)
-            onView(withText(R.string.nav_live_measurement)).check(matches(not(isDisplayed())))
-            scenario.recreate()
-            openDrawer(scenario)
-            onView(withText(R.string.nav_live_measurement)).check(matches(not(isDisplayed())))
         }
     }
 

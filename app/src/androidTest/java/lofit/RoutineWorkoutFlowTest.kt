@@ -299,7 +299,7 @@ class RoutineWorkoutFlowTest {
     }
 
     @Test
-    fun cancelChangedRoutineAsksAboutChangesAndKeepsSavedRoutine() {
+    fun cancelChangedOrEmptiedRoutineKeepsSavedRoutine() {
         val original = LofitRepository(context).data.routines.single()
         launch().use { scenario ->
             editRoutine(scenario)
@@ -318,14 +318,7 @@ class RoutineWorkoutFlowTest {
             assertEquals(original, LofitRepository(context).data.routines.single())
             onView(withText("Edit")).perform(scrollTo(), click())
             onView(withContentDescription("Set 1 weight")).check(matches(withText("60")))
-        }
-    }
 
-    @Test
-    fun cancelRoutineAfterRemovingLastExerciseStillAsksAboutChanges() {
-        val original = LofitRepository(context).data.routines.single()
-        launch().use { scenario ->
-            editRoutine(scenario)
             onView(withContentDescription("Options for Bench press")).perform(scrollTo(), click())
             onView(withText("Remove exercise")).perform(click())
             onView(withText("Cancel")).perform(scrollTo(), click())
