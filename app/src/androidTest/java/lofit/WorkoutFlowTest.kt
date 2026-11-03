@@ -2000,31 +2000,36 @@ class WorkoutFlowTest {
         val name = repository.data.exercises.first { it.id == "bench-press" }.name
         onView(withContentDescription("View $name trend")).perform(scrollTo(), click())
 
-        onView(withContentDescription("1 year")).check(matches(isSelected()))
+        onView(withContentDescription("3 months")).check(matches(isSelected()))
         onView(withContentDescription("Highest weight trend")).check { view, _ ->
             val graph = view as TrendGraphView
             assertEquals(
-                now.toLocalDate().minusYears(1),
-                Instant.ofEpochMilli(graph.startedAt).atZone(zone).toLocalDate(),
+                now.toLocalDate().minusMonths(3),
+                Instant.ofEpochMilli(graph.series.points.first().completedAt)
+                    .atZone(zone)
+                    .toLocalDate(),
             )
-            assertEquals(listOf(40.0, 60.0, 80.0), graph.series.points.map { it.value })
+            assertEquals(listOf(60.0, 80.0), graph.series.points.map { it.value })
+            assertTrue(graph.startedAt < graph.series.points.first().completedAt)
+            assertTrue(graph.endedAt > graph.series.points.last().completedAt)
         }
         onView(withContentDescription("Highest set volume trend")).perform(scrollTo()).check {
             view,
             _ ->
             assertEquals(
-                listOf(200.0, 300.0, 400.0),
+                listOf(300.0, 400.0),
                 (view as TrendGraphView).series.points.map { it.value },
             )
         }
-        listOf("1 month" to 1L, "3 months" to 3L, "6 months" to 6L).forEach { (label, months) ->
+        listOf("1 month" to 1L, "3 months" to 3L, "6 months" to 6L, "1 year" to 12L).forEach {
+            (label, months) ->
             onView(withContentDescription(label))
                 .perform(scrollTo(), click())
                 .check(matches(isSelected()))
             onView(withContentDescription("Highest weight trend")).check { view, _ ->
                 assertEquals(
                     now.toLocalDate().minusMonths(months),
-                    Instant.ofEpochMilli((view as TrendGraphView).startedAt)
+                    Instant.ofEpochMilli((view as TrendGraphView).series.points.first().completedAt)
                         .atZone(zone)
                         .toLocalDate(),
                 )
@@ -2032,7 +2037,9 @@ class WorkoutFlowTest {
         }
         onView(withContentDescription("All time")).perform(click()).check(matches(isSelected()))
         onView(withContentDescription("Highest weight trend")).check { view, _ ->
-            assertEquals(first.completedAt, (view as TrendGraphView).startedAt)
+            val graph = view as TrendGraphView
+            assertEquals(first.completedAt, graph.series.points.first().completedAt)
+            assertTrue(graph.startedAt < first.completedAt)
         }
         pressBack()
         onView(withText("Your best logged set for each exercise.")).check(matches(isDisplayed()))
@@ -2040,7 +2047,7 @@ class WorkoutFlowTest {
         onView(withText(R.string.nav_history)).perform(click())
         onView(withContentDescription("View Trend workout")).perform(scrollTo(), click())
         onView(withContentDescription("View $name trend")).perform(scrollTo(), click())
-        onView(withContentDescription("1 year")).check(matches(isSelected()))
+        onView(withContentDescription("3 months")).check(matches(isSelected()))
         pressBack()
         onView(withContentDescription("Workout duration")).check(matches(isDisplayed()))
         onView(withContentDescription("View $name trend")).perform(scrollTo(), click())

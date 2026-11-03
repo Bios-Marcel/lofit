@@ -2,6 +2,7 @@ package lofit
 
 import java.time.Instant
 import java.time.ZoneId
+import kotlin.math.max
 
 enum class TrendSpan(val label: String, val months: Long?) {
     MONTH("1M", 1),
@@ -42,7 +43,7 @@ fun LoggedSet.isRecordEligible(exercise: Exercise): Boolean =
 
 fun AppData.exerciseTrend(
     exerciseId: String,
-    span: TrendSpan = TrendSpan.YEAR,
+    span: TrendSpan = TrendSpan.THREE_MONTHS,
     now: Long = System.currentTimeMillis(),
     zone: ZoneId = ZoneId.systemDefault(),
 ): ExerciseTrendData {
@@ -71,27 +72,34 @@ fun AppData.exerciseTrend(
     val startedAt =
         span.startedAt(now, zone)
             ?: series.flatMap { it.points }.minOfOrNull { it.completedAt }
-            ?: TrendSpan.YEAR.startedAt(now, zone)!!
+            ?: TrendSpan.THREE_MONTHS.startedAt(now, zone)!!
+    val visibleSeries = series.map { seriesItem ->
+        // A record set before the span remains the baseline until it is beaten.
+        val baseline = seriesItem.points.lastOrNull { it.completedAt < startedAt }
+        val points =
+            listOfNotNull(baseline?.copy(completedAt = startedAt)) +
+                seriesItem.points.filter { it.completedAt >= startedAt }
+        seriesItem.copy(
+            points =
+                points
+                    .groupBy { Instant.ofEpochMilli(it.completedAt).atZone(zone).toLocalDate() }
+                    .values
+                    .map { dailyPoints ->
+                        dailyPoints.maxWith(
+                            compareBy<TrendPoint> { it.value }.thenBy { it.completedAt }
+                        )
+                    }
+        )
+    }
+    val points = visibleSeries.flatMap { it.points }
+    val first =
+        points.minOfOrNull { it.completedAt }
+            ?: return ExerciseTrendData(startedAt, now, visibleSeries)
+    val last = points.maxOf { it.completedAt }
+    val padding = max((last - first) / 20, 12 * 60 * 60 * 1000L)
     return ExerciseTrendData(
-        startedAt,
-        now,
-        series.map { seriesItem ->
-            // A record set before the span remains the baseline until it is beaten.
-            val baseline = seriesItem.points.lastOrNull { it.completedAt < startedAt }
-            val points =
-                listOfNotNull(baseline?.copy(completedAt = startedAt)) +
-                    seriesItem.points.filter { it.completedAt >= startedAt }
-            seriesItem.copy(
-                points =
-                    points
-                        .groupBy { Instant.ofEpochMilli(it.completedAt).atZone(zone).toLocalDate() }
-                        .values
-                        .map { dailyPoints ->
-                            dailyPoints.maxWith(
-                                compareBy<TrendPoint> { it.value }.thenBy { it.completedAt }
-                            )
-                        }
-            )
-        },
+        first - padding,
+        last + padding,
+        visibleSeries,
     )
 }

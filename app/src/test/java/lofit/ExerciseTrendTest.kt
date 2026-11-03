@@ -41,15 +41,19 @@ class ExerciseTrendTest {
             .also { it.recordWorkout(it.history.single()) }
 
     @Test
-    fun defaultSpan_isCalendarYearWithEarlierBaseline() {
+    fun defaultSpan_isThreeCalendarMonthsWithEarlierBaseline() {
         val data = data(set(18, 40.0), set(6, 60.0), set(0, 80.0))
 
         val trend = data.exerciseTrend(bench.id, now = now.toInstant().toEpochMilli(), zone = zone)
 
-        assertEquals(now.minusYears(1).toInstant().toEpochMilli(), trend.startedAt)
-        assertEquals(listOf(40.0, 60.0, 80.0), trend.series.first().points.map { it.value })
-        assertEquals(trend.startedAt, trend.series.first().points.first().completedAt)
-        assertEquals(listOf(200.0, 300.0, 400.0), trend.series.last().points.map { it.value })
+        assertEquals(listOf(60.0, 80.0), trend.series.first().points.map { it.value })
+        assertEquals(
+            now.minusMonths(3).toInstant().toEpochMilli(),
+            trend.series.first().points.first().completedAt,
+        )
+        assertTrue(trend.startedAt < trend.series.first().points.first().completedAt)
+        assertTrue(trend.endedAt > now.toInstant().toEpochMilli())
+        assertEquals(listOf(300.0, 400.0), trend.series.last().points.map { it.value })
     }
 
     @Test
@@ -60,9 +64,13 @@ class ExerciseTrendTest {
             data.exerciseTrend(bench.id, TrendSpan.MONTH, now.toInstant().toEpochMilli(), zone)
         val all = data.exerciseTrend(bench.id, TrendSpan.ALL, now.toInstant().toEpochMilli(), zone)
 
-        assertEquals(now.minusMonths(1).toInstant().toEpochMilli(), month.startedAt)
+        assertEquals(
+            now.minusMonths(1).toInstant().toEpochMilli(),
+            month.series.first().points.first().completedAt,
+        )
         assertEquals(listOf(60.0, 80.0), month.series.first().points.map { it.value })
-        assertEquals(first.completedAt, all.startedAt)
+        assertEquals(first.completedAt, all.series.first().points.first().completedAt)
+        assertTrue(all.startedAt < first.completedAt)
         assertEquals(3, all.series.first().points.size)
         assertEquals(listOf(1L, 3L, 6L, 12L), TrendSpan.entries.mapNotNull { it.months })
         val leapDay = ZonedDateTime.of(2024, 2, 29, 12, 0, 0, 0, zone)
@@ -70,6 +78,43 @@ class ExerciseTrendTest {
             leapDay.minusYears(1).toInstant().toEpochMilli(),
             TrendSpan.YEAR.startedAt(leapDay.toInstant().toEpochMilli(), zone),
         )
+    }
+
+    @Test
+    fun everySpan_fitsShortHistoryWithEmptySpaceOnBothSides() {
+        val first = set(0, 60.0).copy(completedAt = now.minusDays(14).toInstant().toEpochMilli())
+        val last = set(0, 80.0).copy(completedAt = now.minusDays(7).toInstant().toEpochMilli())
+        val data = data(first, last)
+        val day = 24 * 60 * 60 * 1000L
+
+        TrendSpan.entries.forEach { span ->
+            val trend = data.exerciseTrend(bench.id, span, now.toInstant().toEpochMilli(), zone)
+
+            assertEquals(listOf(60.0, 80.0), trend.series.first().points.map { it.value })
+            assertTrue(trend.startedAt < first.completedAt)
+            assertTrue(trend.startedAt >= first.completedAt - day)
+            assertTrue(trend.endedAt > last.completedAt)
+            assertTrue(trend.endedAt <= last.completedAt + day)
+        }
+    }
+
+    @Test
+    fun singleRecord_isCenteredInShortNonzeroSpanForEverySelection() {
+        val record = set(0, 60.0).copy(completedAt = now.minusDays(7).toInstant().toEpochMilli())
+        val data = data(record)
+
+        TrendSpan.entries.forEach { span ->
+            val trend = data.exerciseTrend(bench.id, span, now.toInstant().toEpochMilli(), zone)
+
+            assertEquals(
+                listOf(record.completedAt),
+                trend.series.first().points.map { it.completedAt },
+            )
+            assertTrue(trend.startedAt < record.completedAt)
+            assertTrue(trend.endedAt > record.completedAt)
+            assertEquals(record.completedAt - trend.startedAt, trend.endedAt - record.completedAt)
+            assertTrue(trend.endedAt - trend.startedAt <= 24 * 60 * 60 * 1000L)
+        }
     }
 
     @Test

@@ -99,7 +99,6 @@ class TrendGraphView(
                 path.lineTo(x(point.completedAt), y(point.value))
             }
         }
-        path.lineTo(right, y(series.points.last().value))
         paint.color = coral
         paint.strokeWidth = dp(2.5f)
         paint.style = Paint.Style.STROKE

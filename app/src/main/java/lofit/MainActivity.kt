@@ -130,7 +130,7 @@ class MainActivity : AppCompatActivity() {
             val exerciseId: String,
             val returnRoute: Route,
             val returnScrollY: Int,
-            val span: TrendSpan = TrendSpan.YEAR,
+            val span: TrendSpan = TrendSpan.THREE_MONTHS,
         ) : Route()
 
         data class BodyMeasurementDetail(val bodyPart: BodyPart) : Route()
