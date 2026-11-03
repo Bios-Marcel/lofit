@@ -2312,7 +2312,7 @@ class WorkoutFlowTest {
     }
 
     @Test
-    fun historyEntry_canCreatePrefilledRoutineWithEveryExercise() {
+    fun historyEntry_canDerivePrefilledRoutineWithEveryExercise() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val repository = LofitRepository(instrumentation.targetContext)
         repository.data.history.add(
@@ -2352,7 +2352,9 @@ class WorkoutFlowTest {
             .check(matches(isDisplayed()))
         onView(withContentDescription("Back muscle map")).check(matches(isDisplayed()))
         onView(withText("Bench press")).check(doesNotExist())
-        onView(withContentDescription("Create routine from Push day")).perform(scrollTo(), click())
+        onView(withContentDescription("Options for Push day")).perform(scrollTo(), click())
+        onView(withText("Export to Hevy")).check(matches(isDisplayed()))
+        onView(withText("Derive Routine")).perform(click())
 
         onView(withText("New routine")).check(matches(isDisplayed()))
         onView(withHint("Routine name")).check(matches(withText("Push day")))
@@ -2721,11 +2723,12 @@ class WorkoutFlowTest {
         onView(withContentDescription("View Older workout"))
             .perform(scrollTo())
             .check(matches(isDisplayed()))
-        onView(withContentDescription("Create routine from Older workout"))
+        onView(withContentDescription("Options for Older workout"))
+            .perform(scrollTo())
             .check(matches(isDisplayed()))
         onView(withContentDescription("Continue Push day")).perform(scrollTo(), click())
 
-        onView(withText("Workout in progress")).check(matches(isDisplayed()))
+        onView(withContentDescription("Workout timer")).check(matches(isDisplayed()))
         onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
         onView(withContentDescription("Set 1 weight")).check(matches(withText("67.5")))
         val savedData = LofitRepository(instrumentation.targetContext).data
@@ -2902,7 +2905,8 @@ class WorkoutFlowTest {
         onView(withContentDescription("View Yesterday"))
             .perform(scrollTo())
             .check(matches(isDisplayed()))
-        onView(withContentDescription("Create routine from Yesterday"))
+        onView(withContentDescription("Options for Yesterday"))
+            .perform(scrollTo())
             .check(matches(isDisplayed()))
         assertEquals(storedState, context.repositoryStateFile.readText())
         instrumentation.runOnMainSync { activity.finish() }

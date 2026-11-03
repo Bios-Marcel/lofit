@@ -49,7 +49,7 @@ internal class LofitViews(
         body.addView(
             LinearLayout(activityContext).apply {
                 orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
+                gravity = if (headerEnd is TextView) Gravity.TOP else Gravity.CENTER_VERTICAL
                 addView(
                     LinearLayout(activityContext).apply {
                         orientation = LinearLayout.VERTICAL
@@ -59,6 +59,7 @@ internal class LofitViews(
                                 setPadding(0, dp(5), 0, 0)
                             }
                         )
+                        baselineAlignedChildIndex = 0
                         subtitle?.let {
                             addView(metaText(it).apply { setPadding(0, 0, 0, dp(10)) })
                         }
@@ -301,7 +302,6 @@ internal class LofitViews(
                 },
                 LinearLayout.LayoutParams(dp(82), dp(42)),
             )
-            addView(metaText("seconds").apply { setPadding(dp(8), 0, 0, 0) })
         }
 
     fun restOverrideInput(value: Int?, onChange: (Int?) -> Unit): View =

@@ -62,10 +62,7 @@ internal class RoutineScreens(
 
     fun routineEditorScreen(draft: Routine?, originalId: String?): View {
         if (draft == null) return routinesScreen()
-        return ui.page(
-            if (originalId == null) "New routine" else "Edit routine",
-            if (originalId == null) null else "Set the exact work you intend to do.",
-        ) { body ->
+        return ui.page(if (originalId == null) "New routine" else "Edit routine") { body ->
             val name =
                 ui.textField("Routine name").apply {
                     setText(draft.name)

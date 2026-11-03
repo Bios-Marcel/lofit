@@ -11,6 +11,7 @@
 ## Testing
 
 - Test on emulator if started.
+- Default to two emulators for parallel tests, including releases: `./scripts/test-sharded.py --shards 2`. Use another count only when requested.
 
 ## Formatting
 

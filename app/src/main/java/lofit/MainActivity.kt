@@ -250,7 +250,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var content: FrameLayout
     private lateinit var root: LinearLayout
     private lateinit var drawerLayout: DrawerLayout
-    private var liveMeasurementMenuItem: View? = null
+    private val drawerMenuItems = mutableMapOf<Screen, MaterialButton>()
     private lateinit var restBar: LinearLayout
     private lateinit var historyPager: LinearLayout
     private lateinit var restTimeText: TextView
@@ -637,9 +637,10 @@ class MainActivity : AppCompatActivity() {
             addView(
                 ui.titleText("Lofit").apply {
                     textSize = 30f
-                    setPadding(ui.dp(8), 0, 0, ui.dp(20))
+                    setPadding(ui.dp(12), 0, 0, ui.dp(20))
                 }
             )
+            val itemStates = arrayOf(intArrayOf(android.R.attr.state_selected), intArrayOf())
             listOf(
                     Screen.HOME to getString(R.string.nav_workout),
                     Screen.ROUTINES to getString(R.string.nav_routines),
@@ -656,11 +657,31 @@ class MainActivity : AppCompatActivity() {
                                 drawerLayout.closeDrawer(GravityCompat.START, false)
                                 openScreen(screen)
                             }
-                            .also {
-                                if (screen == Screen.LIVE_MEASUREMENT) liveMeasurementMenuItem = it
+                            .apply {
+                                gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                                textAlignment = View.TEXT_ALIGNMENT_GRAVITY
+                                setPadding(ui.dp(12), 0, ui.dp(12), 0)
+                                backgroundTintList =
+                                    ColorStateList(
+                                        itemStates,
+                                        intArrayOf(
+                                            ui.color(R.color.charcoal_surface_high),
+                                            Color.TRANSPARENT,
+                                        ),
+                                    )
+                                setTextColor(
+                                    ColorStateList(
+                                        itemStates,
+                                        intArrayOf(
+                                            ui.color(R.color.coral),
+                                            ui.color(R.color.cream),
+                                        ),
+                                    )
+                                )
+                                drawerMenuItems[screen] = this
                             },
-                        LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ui.dp(58))
-                            .apply { bottomMargin = ui.dp(8) },
+                        LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ui.dp(52))
+                            .apply { bottomMargin = ui.dp(6) },
                     )
                 }
         }
@@ -676,7 +697,12 @@ class MainActivity : AppCompatActivity() {
         liveStatusViews.clear()
         liveWeightViews.clear()
         liveTimeViews.clear()
-        liveMeasurementMenuItem?.visibility =
+        val selectedScreen = if (currentScreen == Screen.WORKOUT) Screen.HOME else currentScreen
+        drawerMenuItems.forEach { (screen, item) ->
+            item.isSelected = screen == selectedScreen
+            item.setTypeface(null, if (item.isSelected) Typeface.BOLD else Typeface.NORMAL)
+        }
+        drawerMenuItems[Screen.LIVE_MEASUREMENT]?.visibility =
             if (repository.data.craneScale != null) View.VISIBLE else View.GONE
         exerciseEditUndo?.dismiss()
         exerciseEditUndo = null
@@ -976,7 +1002,7 @@ class MainActivity : AppCompatActivity() {
             }
         timerText = workoutTimer
         val view =
-            ui.page(workout.name, "Workout in progress", headerEnd = workoutTimer) { body ->
+            ui.page(workout.name, headerEnd = workoutTimer) { body ->
                 updateWorkoutTimer()
                 body.addView(
                     togetherMenuButton(
@@ -991,6 +1017,7 @@ class MainActivity : AppCompatActivity() {
                             ViewGroup.LayoutParams.WRAP_CONTENT,
                         )
                         .apply {
+                            topMargin = ui.dp(12)
                             bottomMargin = ui.dp(16)
                         },
                 )
@@ -1941,7 +1968,26 @@ class MainActivity : AppCompatActivity() {
                 workouts.forEachIndexed { index, workout ->
                     body.addView(
                         ui.card {
-                            addView(ui.titleText(workout.name))
+                            addView(
+                                LinearLayout(this@MainActivity).apply {
+                                    orientation = LinearLayout.HORIZONTAL
+                                    gravity = Gravity.CENTER_VERTICAL
+                                    addView(
+                                        ui.titleText(workout.name),
+                                        LinearLayout.LayoutParams(
+                                            0,
+                                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                                            1f,
+                                        ),
+                                    )
+                                    addView(
+                                        historyWorkoutMenuButton(workout),
+                                        LinearLayout.LayoutParams(ui.dp(48), ui.dp(48)).apply {
+                                            marginStart = ui.dp(12)
+                                        },
+                                    )
+                                }
+                            )
                             addView(ui.metaText(dateFormat.format(Date(workout.startedAt))))
                             addView(
                                 ui.metaText(
@@ -2001,23 +2047,6 @@ class MainActivity : AppCompatActivity() {
                                                 contentDescription = "Edit ${workout.name}"
                                             },
                                         LinearLayout.LayoutParams(
-                                                0,
-                                                ViewGroup.LayoutParams.WRAP_CONTENT,
-                                                1f,
-                                            )
-                                            .apply { marginEnd = ui.dp(8) },
-                                    )
-                                    addView(
-                                        ui.actionButton("Create Routine", secondary = true) {
-                                                routineDraft = workout.toRoutine()
-                                                route = Route.RoutineEditor(null)
-                                                render()
-                                            }
-                                            .apply {
-                                                contentDescription =
-                                                    "Create routine from ${workout.name}"
-                                            },
-                                        LinearLayout.LayoutParams(
                                             0,
                                             ViewGroup.LayoutParams.WRAP_CONTENT,
                                             1f,
@@ -2032,37 +2061,45 @@ class MainActivity : AppCompatActivity() {
                                         topMargin = ui.dp(12)
                                     },
                             )
-                            val hevyWorkoutId = hevySettings.remoteWorkoutId(workout.id)
-                            if (
-                                workout.setCount() > 0 &&
-                                    (hevyWorkoutId == null || hevySettings.apiKey.isNotBlank())
-                            ) {
-                                val label =
-                                    if (hevyWorkoutId == null) "Export to Hevy"
-                                    else "Update on Hevy"
-                                addView(
-                                    ui.actionButton(label, secondary = true) {
-                                            exportWorkoutToHevy(
-                                                workout,
-                                                repository.data.exercises.toList(),
-                                            )
-                                        }
-                                        .apply {
-                                            contentDescription = "$label ${workout.name}"
-                                        },
-                                    LinearLayout.LayoutParams(
-                                            ViewGroup.LayoutParams.MATCH_PARENT,
-                                            ViewGroup.LayoutParams.WRAP_CONTENT,
-                                        )
-                                        .apply { topMargin = ui.dp(12) },
-                                )
-                            }
                         }
                     )
                 }
             }
             .also { muscleMaps.attach(it as ScrollView) }
     }
+
+    private fun historyWorkoutMenuButton(workout: WorkoutSession): MaterialButton =
+        ui.smallButton("⋮") {}
+            .apply {
+                textSize = 20f
+                contentDescription = "Options for ${workout.name}"
+                setOnClickListener {
+                    PopupMenu(this@MainActivity, this, Gravity.END).apply {
+                        menu.add("Derive Routine").setOnMenuItemClickListener {
+                            routineDraft = workout.toRoutine()
+                            route = Route.RoutineEditor(null)
+                            render()
+                            true
+                        }
+                        val hevyWorkoutId = hevySettings.remoteWorkoutId(workout.id)
+                        if (
+                            workout.setCount() > 0 &&
+                                (hevyWorkoutId == null || hevySettings.apiKey.isNotBlank())
+                        ) {
+                            menu
+                                .add(
+                                    if (hevyWorkoutId == null) "Export to Hevy"
+                                    else "Update on Hevy"
+                                )
+                                .setOnMenuItemClickListener {
+                                    exportWorkoutToHevy(workout, repository.data.exercises.toList())
+                                    true
+                                }
+                        }
+                        show()
+                    }
+                }
+            }
 
     private fun updateHistoryPager(pageCount: Int, hasWorkouts: Boolean) {
         historyPager.removeAllViews()
@@ -2149,8 +2186,22 @@ class MainActivity : AppCompatActivity() {
             DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
                 .format(Date(workout.startedAt)),
             headerEnd =
-                ui.titleText(formatDuration(workout.durationMillis())).apply {
-                    contentDescription = "Workout duration"
+                LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    addView(
+                        ui.titleText(formatDuration(workout.durationMillis())).apply {
+                            contentDescription = "Workout duration"
+                        }
+                    )
+                    if (!editing) {
+                        addView(
+                            historyWorkoutMenuButton(workout),
+                            LinearLayout.LayoutParams(ui.dp(48), ui.dp(48)).apply {
+                                marginStart = ui.dp(12)
+                            },
+                        )
+                    }
                 },
         ) { body ->
             body.addView(
@@ -2283,27 +2334,6 @@ class MainActivity : AppCompatActivity() {
                 )
                 body.addView(ui.divider())
             } else body.addView(exerciseCards)
-            if (
-                !editing &&
-                    workout.setCount() > 0 &&
-                    (hevySettings.apiKey.isNotBlank() ||
-                        hevySettings.remoteWorkoutId(workout.id) == null)
-            ) {
-                body.addView(
-                    ui.actionButton(
-                        if (hevySettings.remoteWorkoutId(workout.id) == null) "Export to Hevy"
-                        else "Update on Hevy",
-                        secondary = true,
-                    ) {
-                        exportWorkoutToHevy(workout, repository.data.exercises.toList())
-                    },
-                    LinearLayout.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.WRAP_CONTENT,
-                        )
-                        .apply { topMargin = ui.dp(12) },
-                )
-            }
             if (editing) {
                 val activeRoute = route as? Route.WorkoutHistory ?: return@page
                 body.addView(
