@@ -641,8 +641,8 @@ class MainActivity : AppCompatActivity() {
                     Screen.ROUTINES to getString(R.string.nav_routines),
                     Screen.EXERCISES to getString(R.string.nav_exercises),
                     Screen.RECORDS to getString(R.string.nav_records),
-                    Screen.BODY_MEASUREMENTS to getString(R.string.nav_body_measurements),
                     Screen.HISTORY to getString(R.string.nav_history),
+                    Screen.BODY_MEASUREMENTS to getString(R.string.nav_body_measurements),
                     Screen.LIVE_MEASUREMENT to getString(R.string.nav_live_measurement),
                     Screen.SETTINGS to getString(R.string.nav_settings),
                 )
