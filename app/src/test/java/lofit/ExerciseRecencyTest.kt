@@ -44,6 +44,7 @@ class ExerciseRecencyTest {
             )
 
         assertEquals(listOf("b", "a", "c"), data.exercisesByRecency().map { it.id })
+        assertEquals(listOf("b", "a"), data.exercisesByRecency(includeUnused = false).map { it.id })
         assertEquals(listOf("a", "b", "c"), data.exercises.map { it.id })
     }
 
@@ -66,6 +67,10 @@ class ExerciseRecencyTest {
             )
 
         assertEquals(listOf("c", "b", "a"), data.exercisesByRecency().map { it.id })
+        assertEquals(
+            listOf("c", "b", "a"),
+            data.exercisesByRecency(includeUnused = false).map { it.id },
+        )
         assertEquals(mapOf("c" to 300L, "b" to 50L, "deleted" to 900L), data.exerciseLastSelectedAt)
         val workout = data.activeWorkout!!
         workout.finish(400)
@@ -114,6 +119,10 @@ class ExerciseRecencyTest {
             )
 
         assertEquals(listOf("a", "b", "c", "d"), data.exercisesByRecency().map { it.id })
+        assertEquals(
+            emptyList<String>(),
+            data.exercisesByRecency(includeUnused = false).map { it.id },
+        )
         data.exerciseLastSelectedAt.putAll(mapOf("d" to 200, "c" to 200))
         assertEquals(listOf("c", "d", "a", "b"), data.exercisesByRecency().map { it.id })
     }

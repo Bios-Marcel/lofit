@@ -1,6 +1,6 @@
 package lofit
 
-fun AppData.exercisesByRecency(): List<Exercise> {
+fun AppData.exercisesByRecency(includeUnused: Boolean = true): List<Exercise> {
     val lastUsedAt = exerciseLastSelectedAt.toMutableMap()
     history.forEach { workout ->
         workout.exercises.forEach { item ->
@@ -13,7 +13,9 @@ fun AppData.exercisesByRecency(): List<Exercise> {
         }
     }
     // Stable sort keeps the catalog order for unused exercises and equal timestamps.
-    return exercises.sortedByDescending { lastUsedAt[it.id] ?: Long.MIN_VALUE }
+    return exercises
+        .filter { includeUnused || it.id in lastUsedAt }
+        .sortedByDescending { lastUsedAt[it.id] ?: Long.MIN_VALUE }
 }
 
 fun AppData.recordExerciseRecency(workout: WorkoutSession) {

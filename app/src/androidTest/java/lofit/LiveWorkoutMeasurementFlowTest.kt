@@ -429,6 +429,7 @@ class LiveWorkoutMeasurementFlowTest {
     fun liveMeasurementRestoresRequiredOptionsWhenEditingExercise() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             navigate(scenario, R.string.nav_exercises)
+            onView(withText("Custom")).perform(scrollTo(), click())
             onView(withHint("Search name or muscle"))
                 .perform(replaceText("Scale Pull"), closeSoftKeyboard())
             onView(withText("Edit")).perform(scrollTo(), click())

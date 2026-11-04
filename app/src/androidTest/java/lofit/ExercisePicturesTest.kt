@@ -122,6 +122,7 @@ class ExercisePicturesTest {
     }
 
     private fun searchCustomExercise() {
+        onView(withText("Custom")).perform(scrollTo(), click())
         onView(withHint("Search name or muscle"))
             .perform(scrollTo(), replaceText("My movement"), closeSoftKeyboard())
     }
@@ -197,6 +198,7 @@ class ExercisePicturesTest {
         }
         fun checkPicture(scenario: ActivityScenario<MainActivity>, gender: BiologicalGender) {
             openScreen(scenario, R.string.nav_exercises)
+            onView(withText("All")).perform(scrollTo(), click())
             val examples =
                 ExerciseCatalog.exercises().filter {
                     it.id == "bench-press" || it.imageName == "exercise_db_001"

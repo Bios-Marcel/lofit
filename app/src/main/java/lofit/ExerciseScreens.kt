@@ -66,21 +66,28 @@ internal class ExerciseScreens(
                     },
             )
             val search = ui.textField("Search name or muscle")
+            val filters = ui.choiceGroup(listOf("Recent", "Custom", "All"), 0)
             val results =
                 LinearLayout(activityContext).apply { orientation = LinearLayout.VERTICAL }
             fun updateResults(query: String) {
                 results.removeAllViews()
-                val allMatches =
-                    data().exercises.filter { movement ->
-                        matchesSearchQuery(
-                            query,
-                            movement.name,
-                            movement.primaryMuscle,
-                            movement.secondaryMuscles,
-                            exerciseSearchTerms(movement),
-                        )
+                val exercises =
+                    when (ui.selectedChoice(filters)) {
+                        0 -> data().exercisesByRecency(includeUnused = false)
+                        1 -> data().exercises.filter { it.custom }
+                        else -> data().exercises
                     }
+                val allMatches = exercises.filter { movement ->
+                    matchesSearchQuery(
+                        query,
+                        movement.name,
+                        movement.primaryMuscle,
+                        movement.secondaryMuscles,
+                        exerciseSearchTerms(movement),
+                    )
+                }
                 val matches = allMatches.take(40)
+                if (matches.isEmpty()) results.addView(ui.emptyText("No matching exercises."))
                 if (allMatches.size > matches.size)
                     results.addView(
                         ui.metaText("Showing 40 of ${allMatches.size}. Search to narrow the list.")
@@ -121,7 +128,16 @@ internal class ExerciseScreens(
                 }
             }
             search.doAfterTextChanged { updateResults(it.toString()) }
+            filters.setOnCheckedChangeListener { _, _ -> updateResults(search.text.toString()) }
             body.addView(search)
+            body.addView(
+                filters,
+                LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    )
+                    .apply { bottomMargin = ui.dp(12) },
+            )
             body.addView(results)
             updateResults("")
         }
