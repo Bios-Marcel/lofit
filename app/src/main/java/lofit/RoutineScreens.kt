@@ -187,7 +187,11 @@ internal class RoutineScreens(
                         }
                         addView(setRows)
                         addView(
-                            ui.actionButton("Add set", secondary = true) {
+                            ui.actionButton(
+                                "Add set",
+                                secondary = true,
+                                keepVisibleAfterClick = true,
+                            ) {
                                 nextPlannedSets(item.plannedSets, movement).forEach { next ->
                                     item.plannedSets.add(next)
                                     addRoutineSetRow(next, item.plannedSets.lastIndex)

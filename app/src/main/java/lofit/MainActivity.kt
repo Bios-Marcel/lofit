@@ -1460,7 +1460,7 @@ class MainActivity : AppCompatActivity() {
             }
             addView(setRows)
             addView(
-                ui.actionButton("Add set", secondary = true) {
+                ui.actionButton("Add set", secondary = true, keepVisibleAfterClick = true) {
                     val nextSets = nextPlannedSets(item.plannedSets, exercise)
                     val firstIndex = item.plannedSets.size
                     item.plannedSets.addAll(nextSets)

@@ -1270,7 +1270,10 @@ class WorkoutFlowTest {
         onView(withText("Add exercise")).perform(scrollTo(), click())
         onView(withHint("Search name or muscle")).perform(typeText("squat"), closeSoftKeyboard())
         onView(withContentDescription("Add Back squat")).perform(scrollTo(), click())
-        repeat(2) { onView(withText("Add set")).perform(scrollTo(), click()) }
+        onView(withText("Add set")).perform(scrollTo())
+        repeat(8) {
+            onView(withText("Add set")).perform(click()).check(matches(isCompletelyDisplayed()))
+        }
 
         onView(withText("Add exercise")).perform(scrollTo(), click())
         onView(withHint("Search name or muscle")).perform(typeText("plank"), closeSoftKeyboard())
@@ -1285,7 +1288,8 @@ class WorkoutFlowTest {
                     )
                 ),
             )
-        repeat(2) { onView(plankAddSet).perform(scrollTo(), click()) }
+        onView(plankAddSet).perform(scrollTo())
+        repeat(8) { onView(plankAddSet).perform(click()).check(matches(isCompletelyDisplayed())) }
 
         onView(withText("Add exercise")).perform(scrollTo(), click())
         onView(withHint("Search name or muscle"))

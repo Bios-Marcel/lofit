@@ -2,6 +2,7 @@ package lofit
 
 import android.content.Context
 import android.content.res.ColorStateList
+import android.graphics.Rect
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.LayerDrawable
@@ -23,6 +24,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.widget.PopupMenu
 import androidx.core.content.ContextCompat
+import androidx.core.view.doOnPreDraw
 import androidx.core.widget.doAfterTextChanged
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
@@ -379,6 +381,7 @@ internal class LofitViews(
     fun actionButton(
         label: String,
         secondary: Boolean = false,
+        keepVisibleAfterClick: Boolean = false,
         action: () -> Unit,
     ): MaterialButton =
         MaterialButton(activityContext).apply {
@@ -401,7 +404,12 @@ internal class LofitViews(
                 backgroundTintList = ColorStateList.valueOf(color(R.color.coral))
                 setTextColor(color(R.color.white))
             }
-            setOnClickListener { action() }
+            setOnClickListener {
+                action()
+                if (keepVisibleAfterClick) {
+                    doOnPreDraw { requestRectangleOnScreen(Rect(0, 0, width, height), true) }
+                }
+            }
         }
 
     fun smallButton(label: String, action: () -> Unit): MaterialButton =

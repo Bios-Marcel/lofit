@@ -159,6 +159,7 @@ class RoutineWorkoutFlowTest {
         launch().use { scenario ->
             editRoutine(scenario)
             onView(withText("Add set")).perform(scrollTo(), click())
+            onView(withText("Add set")).check(matches(isCompletelyDisplayed()))
             onView(withContentDescription("Set 3 side: Left")).check(matches(withText("L")))
             onView(withContentDescription("Set 4 side: Right")).check(matches(withText("R")))
             onView(withContentDescription("Set 3 weight"))
@@ -168,6 +169,7 @@ class RoutineWorkoutFlowTest {
             onView(withContentDescription("Set 3 Repetitions")).check(matches(withText("8")))
             onView(withContentDescription("Set 4 Repetitions")).check(matches(withText("6")))
             onView(withText("Add set")).perform(scrollTo(), click())
+            onView(withText("Add set")).check(matches(isCompletelyDisplayed()))
             onView(withContentDescription("Set 5 weight")).check(matches(withText("12")))
             onView(withContentDescription("Set 6 weight")).check(matches(withText("15")))
             onView(withText("Save routine")).perform(scrollTo(), click())
@@ -189,6 +191,7 @@ class RoutineWorkoutFlowTest {
         launch().use { scenario ->
             onView(withText("Start routine")).perform(scrollTo(), click())
             onView(withText("Add set")).perform(scrollTo(), click())
+            onView(withText("Add set")).check(matches(isCompletelyDisplayed()))
             scenario.recreate()
             onView(withContentDescription("Set 3 side: Left")).check(matches(withText("L")))
             onView(withContentDescription("Set 4 side: Right")).check(matches(withText("R")))
