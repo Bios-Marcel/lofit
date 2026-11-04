@@ -420,8 +420,7 @@ class WorkoutFlowTest {
             onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
             onView(allOf(withText(R.string.nav_routines), isClickable())).perform(click())
             onView(withText("Create routine")).perform(click())
-            onView(withHint("Routine name"))
-                .perform(replaceText("Unsaved draft"), closeSoftKeyboard())
+            onView(withHint("Routine name")).perform(replaceText("Unsaved draft"))
             onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
             onView(allOf(withText(R.string.nav_exercises), isClickable())).perform(click())
             pressBack()
@@ -515,8 +514,7 @@ class WorkoutFlowTest {
             onView(withText(R.string.start_workout)).check(doesNotExist())
             onView(withText("Finish workout")).check(doesNotExist())
             onView(withContentDescription("Open active workout")).perform(click())
-            onView(withContentDescription("Set 1 Repetitions"))
-                .perform(replaceText("12"), closeSoftKeyboard())
+            onView(withContentDescription("Set 1 Repetitions")).perform(replaceText("12"))
             onView(withContentDescription("Set 1 done")).perform(click())
             val storedState = context.repositoryStateFile.readText()
 
@@ -951,7 +949,7 @@ class WorkoutFlowTest {
         onView(withText("This workout is empty. Add any exercise when you’re ready."))
             .check(matches(isDisplayed()))
         onView(withText("Add exercise")).perform(scrollTo(), click())
-        onView(withHint("Search name or muscle")).perform(replaceText("squat"), closeSoftKeyboard())
+        onView(withHint("Search name or muscle")).perform(replaceText("squat"))
         onView(withContentDescription("Back squat illustration")).check(matches(isDisplayed()))
         onView(withContentDescription("Add Back squat")).perform(scrollTo(), click())
         onView(withText("Back squat")).check(matches(isDisplayed()))
@@ -1013,10 +1011,8 @@ class WorkoutFlowTest {
         )
         onView(withContentDescription("Set 1 type: Normal")).perform(click())
         onView(withContentDescription("Set 1 type: Warm-up")).check(matches(isDisplayed()))
-        onView(withContentDescription("Set 1 weight"))
-            .perform(replaceText("20"), closeSoftKeyboard())
-        onView(withContentDescription("Set 1 Repetitions"))
-            .perform(replaceText("10"), closeSoftKeyboard())
+        onView(withContentDescription("Set 1 weight")).perform(replaceText("20"))
+        onView(withContentDescription("Set 1 Repetitions")).perform(replaceText("10"))
         onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
         onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
         val restNotification = notificationManager.activeNotifications.single().notification
@@ -1096,9 +1092,8 @@ class WorkoutFlowTest {
                 onView(withText("Add set")).perform(scrollTo(), click())
                 onView(withContentDescription("Set 2 weight"))
                     .check(matches(withText(weightText)))
-                    .perform(replaceText(weightText), closeSoftKeyboard())
-                onView(withContentDescription("Set 2 Repetitions"))
-                    .perform(replaceText("2"), closeSoftKeyboard())
+                    .perform(replaceText(weightText))
+                onView(withContentDescription("Set 2 Repetitions")).perform(replaceText("2"))
                 scenario.recreate()
                 onView(withContentDescription("Set 1 weight")).check(matches(withText(weightText)))
                 onView(withContentDescription("Set 2 weight")).check(matches(withText(weightText)))
@@ -1197,8 +1192,7 @@ class WorkoutFlowTest {
         onView(allOf(withText("Bodyweight workout"), isDisplayed())).check(matches(isDisplayed()))
 
         onView(withContentDescription("Set 1 weight")).check(doesNotExist())
-        onView(withContentDescription("Set 1 Repetitions"))
-            .perform(replaceText("12"), closeSoftKeyboard())
+        onView(withContentDescription("Set 1 Repetitions")).perform(replaceText("12"))
         onView(withContentDescription("Set 1 done")).perform(click())
 
         val loggedSet =
@@ -1251,11 +1245,9 @@ class WorkoutFlowTest {
 
         onView(withText(R.string.start_workout)).perform(click())
         onView(withText("Add exercise")).perform(scrollTo(), click())
-        onView(withHint("Search name or muscle"))
-            .perform(replaceText("SqUa BACK"), closeSoftKeyboard())
+        onView(withHint("Search name or muscle")).perform(replaceText("SqUa BACK"))
         onView(withContentDescription("Add Back squat")).check(matches(isDisplayed()))
-        onView(withHint("Search name or muscle"))
-            .perform(replaceText("weighted push"), closeSoftKeyboard())
+        onView(withHint("Search name or muscle")).perform(replaceText("weighted push"))
         onView(withContentDescription("Add Weighted Push-up"))
             .perform(scrollTo())
             .check(matches(isDisplayed()))
@@ -1295,8 +1287,7 @@ class WorkoutFlowTest {
         }
 
         onView(withText("Add exercise")).perform(scrollTo(), click())
-        onView(withHint("Search name or muscle"))
-            .perform(replaceText("dumbbell curl"), closeSoftKeyboard())
+        onView(withHint("Search name or muscle")).perform(replaceText("dumbbell curl"))
 
         val root = activity.window.decorView
         val drawn = CountDownLatch(1)
@@ -1336,8 +1327,7 @@ class WorkoutFlowTest {
             onView(withText(R.string.start_workout)).perform(click())
             onView(withText("Finish workout")).perform(scrollTo()).check(matches(not(isEnabled())))
             onView(withText("Add exercise")).perform(scrollTo(), click())
-            onView(withHint("Search name or muscle"))
-                .perform(replaceText("Bench press"), closeSoftKeyboard())
+            onView(withHint("Search name or muscle")).perform(replaceText("Bench press"))
             onView(withContentDescription("Add Bench press")).perform(scrollTo(), click())
             onView(withText("Add set")).perform(scrollTo(), click())
             onView(withText("Finish workout")).perform(scrollTo()).check(matches(not(isEnabled())))
@@ -1405,15 +1395,13 @@ class WorkoutFlowTest {
             onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
             onView(allOf(withText(R.string.nav_routines), isClickable())).perform(click())
             onView(withText("Create routine")).perform(click())
-            onView(withHint("Routine name")).perform(replaceText("Strength"), closeSoftKeyboard())
+            onView(withHint("Routine name")).perform(replaceText("Strength"))
             listOf("Bench press", "Plank").forEach { name ->
                 onView(withText("Add Exercise")).perform(scrollTo(), click())
-                onView(withHint("Search name or muscle"))
-                    .perform(replaceText(name), closeSoftKeyboard())
+                onView(withHint("Search name or muscle")).perform(replaceText(name))
                 onView(withContentDescription("Add $name")).perform(scrollTo(), click())
             }
-            onView(withContentDescription("Set 1 weight"))
-                .perform(scrollTo(), replaceText("60"), closeSoftKeyboard())
+            onView(withContentDescription("Set 1 weight")).perform(scrollTo(), replaceText("60"))
             onView(withText("Cancel")).perform(scrollTo(), click())
             onView(withText("Discard routine?")).inRoot(isDialog()).check(matches(isDisplayed()))
             onView(withText("Cancel")).inRoot(isDialog()).perform(click())
@@ -1447,8 +1435,7 @@ class WorkoutFlowTest {
                 onView(withText("Create routine")).perform(click())
                 if (exerciseCount == 1) {
                     onView(withText("Add Exercise")).perform(scrollTo(), click())
-                    onView(withHint("Search name or muscle"))
-                        .perform(replaceText("Bench press"), closeSoftKeyboard())
+                    onView(withHint("Search name or muscle")).perform(replaceText("Bench press"))
                     onView(withContentDescription("Add Bench press")).perform(scrollTo(), click())
                 }
                 onView(withText("Cancel")).perform(scrollTo(), click())
@@ -2202,8 +2189,7 @@ class WorkoutFlowTest {
         onView(withContentDescription("Set 2 done")).perform(scrollTo(), click())
         assertSetDoneState(1, "Done, record")
         assertSetDoneState(2, "Done")
-        onView(withContentDescription("Set 2 weight"))
-            .perform(replaceText("62"), closeSoftKeyboard())
+        onView(withContentDescription("Set 2 weight")).perform(replaceText("62"))
         assertSetDoneState(1, "Done")
         assertSetDoneState(2, "Done, record")
         onView(withContentDescription("Set 2 done")).perform(click())
@@ -2305,10 +2291,10 @@ class WorkoutFlowTest {
                 assertEquals(view.minimumWidth, actions.width)
             }
             onView(withContentDescription("Set 1 Active time in seconds"))
-                .perform(replaceText("20"), closeSoftKeyboard())
+                .perform(replaceText("20"))
             assertSetDoneState(1, "Done")
             onView(withContentDescription("Set 1 Active time in seconds"))
-                .perform(replaceText("46"), closeSoftKeyboard())
+                .perform(replaceText("46"))
             assertSetDoneState(1, "Done, record")
             scenario.recreate()
             assertSetDoneState(1, "Done, record")
@@ -2819,7 +2805,7 @@ class WorkoutFlowTest {
                     isDescendantOfA(plankCard),
                 )
             )
-            .perform(scrollTo(), replaceText("45"), closeSoftKeyboard())
+            .perform(scrollTo(), replaceText("45"))
         onView(allOf(withContentDescription("Set 1 done"), isDescendantOfA(plankCard)))
             .perform(scrollTo(), click())
 
@@ -2872,8 +2858,7 @@ class WorkoutFlowTest {
         onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
         onView(withText(R.string.nav_history)).perform(click())
         onView(withContentDescription("Edit Past workout")).perform(scrollTo(), click())
-        onView(withContentDescription("Set 1 weight"))
-            .perform(scrollTo(), replaceText("70"), closeSoftKeyboard())
+        onView(withContentDescription("Set 1 weight")).perform(scrollTo(), replaceText("70"))
         onView(withText("Discard changes")).perform(scrollTo(), click())
 
         assertEquals(originalHistory, context.repositoryHistoryFile.readText())
@@ -3129,7 +3114,7 @@ class WorkoutFlowTest {
         onView(withContentDescription("Set 1 Goal time in seconds")).check(matches(withText("45")))
         onView(withContentDescription("Set 1 Active time in seconds"))
             .check(matches(isEnabled()))
-            .perform(replaceText("12"), closeSoftKeyboard())
+            .perform(replaceText("12"))
             .check(matches(withText("12")))
         assertEquals(
             12,

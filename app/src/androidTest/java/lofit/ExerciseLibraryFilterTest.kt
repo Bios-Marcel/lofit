@@ -83,8 +83,7 @@ class ExerciseLibraryFilterTest {
     }
 
     private fun search(query: String) {
-        onView(withHint("Search name or muscle"))
-            .perform(scrollTo(), replaceText(query), closeSoftKeyboard())
+        onView(withHint("Search name or muscle")).perform(scrollTo(), replaceText(query))
     }
 
     private fun exerciseName(name: String) =

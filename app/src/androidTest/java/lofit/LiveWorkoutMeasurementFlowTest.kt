@@ -193,7 +193,7 @@ class LiveWorkoutMeasurementFlowTest {
             onView(withContentDescription("Start set 1 hold")).check(doesNotExist())
             onView(withContentDescription("Set 1 weight"))
                 .check(matches(isEnabled()))
-                .perform(replaceText("20.5"), closeSoftKeyboard())
+                .perform(replaceText("20.5"))
             assertEquals(
                 20.5,
                 LofitRepository(context)
@@ -234,8 +234,7 @@ class LiveWorkoutMeasurementFlowTest {
                     (view as LiveMeasurementGraphView).series.samples.map { it.kilograms },
                 )
             }
-            onView(withContentDescription("Set 1 weight"))
-                .perform(replaceText("16.5"), closeSoftKeyboard())
+            onView(withContentDescription("Set 1 weight")).perform(replaceText("16.5"))
             assertEquals(
                 16.5,
                 LofitRepository(context)
@@ -430,8 +429,7 @@ class LiveWorkoutMeasurementFlowTest {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             navigate(scenario, R.string.nav_exercises)
             onView(withText("Custom")).perform(scrollTo(), click())
-            onView(withHint("Search name or muscle"))
-                .perform(replaceText("Scale Pull"), closeSoftKeyboard())
+            onView(withHint("Search name or muscle")).perform(replaceText("Scale Pull"))
             onView(withText("Edit")).perform(scrollTo(), click())
             onView(withText("Live measurement"))
                 .check(matches(isChecked()))
@@ -472,10 +470,8 @@ class LiveWorkoutMeasurementFlowTest {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             navigate(scenario, R.string.nav_exercises)
             onView(withText("Create custom exercise")).perform(scrollTo(), click())
-            onView(withHint("Exercise name"))
-                .perform(replaceText("Custom live pull"), closeSoftKeyboard())
-            onView(withHint("Search primary muscle"))
-                .perform(scrollTo(), replaceText("Forearms"), closeSoftKeyboard())
+            onView(withHint("Exercise name")).perform(replaceText("Custom live pull"))
+            onView(withHint("Search primary muscle")).perform(scrollTo(), replaceText("Forearms"))
             onView(withText("Repetitions")).check(matches(isChecked()))
             onView(withText("Weighted")).check(matches(not(isChecked())))
             onView(withText("Live measurement")).perform(scrollTo(), click())

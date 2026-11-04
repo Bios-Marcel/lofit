@@ -62,8 +62,8 @@ class ExercisePicturesTest {
         }
         onView(allOf(withText(R.string.nav_exercises), isClickable())).perform(click())
         onView(withText("Create custom exercise")).perform(scrollTo(), click())
-        onView(withHint("Exercise name")).perform(replaceText("My movement"), closeSoftKeyboard())
-        onView(withHint("Search primary muscle")).perform(replaceText("Chest"), closeSoftKeyboard())
+        onView(withHint("Exercise name")).perform(replaceText("My movement"))
+        onView(withHint("Search primary muscle")).perform(replaceText("Chest"))
         return scenario
     }
 
@@ -123,8 +123,7 @@ class ExercisePicturesTest {
 
     private fun searchCustomExercise() {
         onView(withText("Custom")).perform(scrollTo(), click())
-        onView(withHint("Search name or muscle"))
-            .perform(scrollTo(), replaceText("My movement"), closeSoftKeyboard())
+        onView(withHint("Search name or muscle")).perform(scrollTo(), replaceText("My movement"))
     }
 
     private fun assertColor(expected: Int, file: String) {
@@ -205,7 +204,7 @@ class ExercisePicturesTest {
                 }
             examples.forEach { exercise ->
                 onView(withHint("Search name or muscle"))
-                    .perform(scrollTo(), replaceText(exercise.name), closeSoftKeyboard())
+                    .perform(scrollTo(), replaceText(exercise.name))
                 onView(withContentDescription("${exercise.name} illustration")).check { view, _ ->
                     val expectedId = pictures.bundledResource(exercise, gender)!!
                     val expected = BitmapFactory.decodeResource(context.resources, expectedId)

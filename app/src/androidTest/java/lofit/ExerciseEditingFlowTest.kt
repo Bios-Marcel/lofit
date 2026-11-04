@@ -11,7 +11,6 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.action.ViewActions.click
-import androidx.test.espresso.action.ViewActions.closeSoftKeyboard
 import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.action.ViewActions.scrollTo
 import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
@@ -86,7 +85,7 @@ class ExerciseEditingFlowTest {
     }
 
     private fun search(query: String) {
-        onView(withHint("Search name or muscle")).perform(replaceText(query), closeSoftKeyboard())
+        onView(withHint("Search name or muscle")).perform(replaceText(query))
     }
 
     private fun navigate(scenario: ActivityScenario<MainActivity>, label: Int) {

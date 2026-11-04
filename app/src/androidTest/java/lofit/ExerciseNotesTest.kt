@@ -79,7 +79,6 @@ class ExerciseNotesTest {
                 .perform(
                     scrollTo(),
                     replaceText("Keep elbows tucked\nSlow descent"),
-                    closeSoftKeyboard(),
                 )
             onView(withText("Save routine")).perform(scrollTo(), click())
             assertEquals(
@@ -95,7 +94,6 @@ class ExerciseNotesTest {
                 .perform(
                     scrollTo(),
                     replaceText("Pause at bottom\nBreathe out"),
-                    closeSoftKeyboard(),
                 )
             scenario.recreate()
             onView(withContentDescription("Bench press note"))
@@ -171,8 +169,7 @@ class ExerciseNotesTest {
         launch().use { scenario ->
             onView(withText(R.string.start_workout)).perform(scrollTo(), click())
             onView(withText("Add exercise")).perform(scrollTo(), click())
-            onView(withHint("Search name or muscle"))
-                .perform(replaceText("Bench press"), closeSoftKeyboard())
+            onView(withHint("Search name or muscle")).perform(replaceText("Bench press"))
             onView(withContentDescription("Add Bench press")).perform(scrollTo(), click())
             onView(withContentDescription("Bench press note"))
                 .check(matches(withText("")))
@@ -211,16 +208,16 @@ class ExerciseNotesTest {
             onView(withContentDescription("Bench press note"))
                 .check(matches(withText("")))
                 .check(matches(withHint("Old cue")))
-                .perform(scrollTo(), replaceText("New cue"), closeSoftKeyboard())
+                .perform(scrollTo(), replaceText("New cue"))
             scenario.recreate()
             onView(withContentDescription("Bench press note"))
                 .check(matches(withText("New cue")))
-                .perform(scrollTo(), replaceText(""), closeSoftKeyboard())
+                .perform(scrollTo(), replaceText(""))
             scenario.recreate()
             onView(withContentDescription("Bench press note"))
                 .check(matches(withText("")))
                 .check(matches(withHint("Old cue")))
-                .perform(scrollTo(), replaceText("Final cue"), closeSoftKeyboard())
+                .perform(scrollTo(), replaceText("Final cue"))
             onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
             onView(withText("Finish workout")).perform(scrollTo(), click())
             onView(withText("Finish and save")).perform(scrollTo(), click())

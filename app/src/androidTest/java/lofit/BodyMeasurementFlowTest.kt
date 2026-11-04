@@ -89,7 +89,6 @@ class BodyMeasurementFlowTest {
                 .perform(scrollTo(), replaceText("32,5"))
             onView(withContentDescription("Right Upper arm in centimeters"))
                 .perform(scrollTo(), replaceText("33.5"))
-            closeSoftKeyboard()
             scenario.recreate()
             onView(withContentDescription("Left Upper arm in centimeters"))
                 .check(matches(withText("32,5")))
