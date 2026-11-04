@@ -426,7 +426,7 @@ class LiveWorkoutMeasurementFlowTest {
     }
 
     @Test
-    fun modifierOnlyEnabledForTimedWeightedExercises() {
+    fun liveMeasurementRestoresRequiredOptionsWhenEditingExercise() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             navigate(scenario, R.string.nav_exercises)
             onView(withHint("Search name or muscle"))
@@ -438,20 +438,64 @@ class LiveWorkoutMeasurementFlowTest {
             onView(withText("Weighted")).perform(scrollTo(), click())
             onView(withText("Live measurement"))
                 .check(matches(not(isChecked())))
-                .check(matches(not(isEnabled())))
-            onView(withText("Weighted")).perform(click())
+                .check(matches(isEnabled()))
             onView(withText("Live measurement")).perform(click())
+            onView(withText("Weighted")).check(matches(isChecked()))
+            onView(withText("Live measurement")).check(matches(isChecked()))
             onView(withText("Repetitions")).perform(scrollTo(), click())
             onView(withText("Live measurement"))
                 .check(matches(not(isChecked())))
-                .check(matches(not(isEnabled())))
+                .check(matches(isEnabled()))
+            onView(withText("Weighted")).perform(click())
+            onView(withText("Live measurement")).perform(click())
+            onView(withText("Weighted")).check(matches(isChecked()))
+            onView(withText("Timed")).check(matches(isChecked()))
+            onView(withText("Live measurement")).check(matches(isChecked()))
+            scenario.recreate()
+            onView(withText("Weighted")).check(matches(isChecked()))
+            onView(withText("Timed")).check(matches(isChecked()))
+            onView(withText("Live measurement")).check(matches(isChecked()))
             onView(withText("Save exercise")).perform(scrollTo(), click())
-            assertFalse(
+            assertTrue(
                 LofitRepository(context)
                     .data
                     .exercises
                     .first { it.id == movement.id }
-                    .liveMeasurement
+                    .supportsLiveMeasurement
+            )
+        }
+    }
+
+    @Test
+    fun newExerciseLiveMeasurementSelectsTimedAndWeightedAndPersists() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            navigate(scenario, R.string.nav_exercises)
+            onView(withText("Create custom exercise")).perform(scrollTo(), click())
+            onView(withHint("Exercise name"))
+                .perform(replaceText("Custom live pull"), closeSoftKeyboard())
+            onView(withHint("Search primary muscle"))
+                .perform(scrollTo(), replaceText("Forearms"), closeSoftKeyboard())
+            onView(withText("Repetitions")).check(matches(isChecked()))
+            onView(withText("Weighted")).check(matches(not(isChecked())))
+            onView(withText("Live measurement")).perform(scrollTo(), click())
+            onView(withText("Weighted")).check(matches(isChecked()))
+            onView(withText("Timed")).check(matches(isChecked()))
+            onView(withText("Live measurement")).check(matches(isChecked()))
+            onView(withText("Live measurement")).perform(click())
+            onView(withText("Weighted")).check(matches(isChecked()))
+            onView(withText("Timed")).check(matches(isChecked()))
+            onView(withText("Live measurement")).perform(click())
+            scenario.recreate()
+            onView(withText("Live measurement")).check(matches(isChecked()))
+            onView(withText("Weighted")).check(matches(isChecked()))
+            onView(withText("Timed")).check(matches(isChecked()))
+            onView(withText("Save exercise")).perform(scrollTo(), click())
+            assertTrue(
+                LofitRepository(context)
+                    .data
+                    .exercises
+                    .single { it.name == "Custom live pull" }
+                    .supportsLiveMeasurement
             )
         }
     }

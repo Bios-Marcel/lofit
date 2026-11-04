@@ -157,15 +157,14 @@ internal class ExerciseScreens(
             val weighted = exerciseOption("Weighted", draft.getInt("weight") == 1)
             val liveMeasurement =
                 exerciseOption("Live measurement", draft.getBoolean("liveMeasurement"))
-            fun updateLiveOption() {
-                liveMeasurement.isEnabled =
-                    ExerciseType.entries[ui.selectedChoice(typeGroup)].tracksDuration &&
-                        weighted.isChecked
-                if (!liveMeasurement.isEnabled) liveMeasurement.isChecked = false
-                draft.putBoolean("liveMeasurement", liveMeasurement.isChecked)
-            }
-            updateLiveOption()
+            var enablingLiveMeasurement = false
             liveMeasurement.setOnCheckedChangeListener { _, checked ->
+                if (checked) {
+                    enablingLiveMeasurement = true
+                    weighted.isChecked = true
+                    typeGroup.check(ExerciseType.TIMED.ordinal + 1)
+                    enablingLiveMeasurement = false
+                }
                 draft.putBoolean("liveMeasurement", checked)
             }
             val asymmetric = exerciseOption("Asymmetrical", draft.getInt("tracking") == 1)
@@ -174,11 +173,15 @@ internal class ExerciseScreens(
             secondary.doAfterTextChanged { draft.putString("secondary", it.toString()) }
             typeGroup.setOnCheckedChangeListener { _, _ ->
                 draft.putInt("type", ui.selectedChoice(typeGroup))
-                updateLiveOption()
+                if (
+                    !enablingLiveMeasurement &&
+                        !ExerciseType.entries[ui.selectedChoice(typeGroup)].tracksDuration
+                )
+                    liveMeasurement.isChecked = false
             }
             weighted.setOnCheckedChangeListener { _, checked ->
                 draft.putInt("weight", if (checked) 1 else 0)
-                updateLiveOption()
+                if (!checked) liveMeasurement.isChecked = false
             }
             asymmetric.setOnCheckedChangeListener { _, checked ->
                 draft.putInt("tracking", if (checked) 1 else 0)
@@ -356,8 +359,7 @@ internal class ExerciseScreens(
                     movement.name = name.text.toString().trim()
                     movement.type = ExerciseType.entries[ui.selectedChoice(typeGroup)]
                     movement.weighted = weighted.isChecked
-                    movement.liveMeasurement =
-                        liveMeasurement.isChecked && liveMeasurement.isEnabled
+                    movement.liveMeasurement = liveMeasurement.isChecked
                     movement.asymmetric = asymmetric.isChecked
                     movement.primaryMuscle = primaryMuscle
                     movement.secondaryMuscles = secondaryMuscles
