@@ -13,6 +13,17 @@
 - Test on emulator if started.
 - Default to two emulators for parallel tests, including releases: `./scripts/test-sharded.py --shards 2`. Use another count only when requested.
 
+### Test speed
+
+- Use `replaceText()` for text input, not `typeText()`. For keyboard tests, explicitly tap the field and await keyboard visibility.
+- Do not append `closeSoftKeyboard()` to `replaceText()` by habit. Keep it only when the flow can open the keyboard and needs it closed, such as after field taps or in input dialogs.
+- Seed prerequisite exercises, sets, and workouts through the repository before activity launch. Avoid repeated UI taps just to build fixture data.
+- Keep UI actions and assertions for the behavior under test: adding/removing items, history-derived defaults, unsaved drafts, gestures, keyboard handling, and lifecycle changes. Do not bypass these with seeded results.
+- Keep test-speed changes in test code. Do not add production hooks or use reflection into private UI state to skip setup.
+- Await observable conditions with bounded timeouts instead of fixed sleeps. Do not shorten timeouts or remove synchronization merely to make tests faster.
+- Prefer JVM tests for pure logic; use emulator tests where Android or UI behavior matters.
+- Measure speed changes with the same suite, two shards, and profiling mode. Report single-run differences as observed, not guaranteed. Espresso wait samples include intentional synchronization, not just wasted time.
+
 ## Formatting
 
 - After file changes, run `./gradlew spotlessApply` as the final work step before replying.
