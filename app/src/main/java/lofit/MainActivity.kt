@@ -861,8 +861,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun createMcpServer(port: Int): McpHttpServer {
         val protocol =
-            McpProtocol(repository) {
-                if (route == Route.Root && currentScreen in listOf(Screen.HOME, Screen.ROUTINES))
+            McpProtocol(repository, exercisePictures) {
+                if (
+                    route == Route.Root &&
+                        currentScreen in listOf(Screen.HOME, Screen.ROUTINES, Screen.EXERCISES)
+                )
                     render()
             }
         lateinit var server: McpHttpServer

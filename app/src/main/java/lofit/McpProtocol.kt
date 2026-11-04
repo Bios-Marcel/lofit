@@ -1,5 +1,8 @@
 package lofit
 
+import android.graphics.ImageDecoder
+import java.util.Base64
+import java.util.UUID
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
@@ -8,8 +11,14 @@ import org.json.JSONTokener
 /** Invoked on the UI thread, so reads and writes share the UI's repository and ordering. */
 internal class McpProtocol(
     private val repository: LofitRepository,
-    private val onRoutineCreated: () -> Unit = {},
+    private val pictures: ExercisePictures,
+    private val onDataChanged: () -> Unit = {},
 ) {
+    private companion object {
+        const val MAX_IMAGE_BYTES = 5 * 1024 * 1024
+        const val MAX_IMAGE_BASE64_LENGTH = 4 * ((MAX_IMAGE_BYTES + 2) / 3)
+    }
+
     fun handle(body: String): JSONObject? {
         val request =
             try {
@@ -80,7 +89,17 @@ internal class McpProtocol(
 
     private fun callTool(params: JSONObject): JSONObject {
         val name = params.opt("name") as? String ?: throw RpcFailure(-32602, "Tool name required")
-        if (name !in listOf("get_routines", "get_exercises", "get_history", "create_routine")) {
+        if (
+            name !in
+                listOf(
+                    "get_routines",
+                    "get_exercises",
+                    "get_history",
+                    "create_routine",
+                    "create_exercise",
+                    "edit_exercise",
+                )
+        ) {
             throw RpcFailure(-32602, "Unknown tool: $name")
         }
         val arguments =
@@ -118,7 +137,9 @@ internal class McpProtocol(
                                 .put("startedAt", it.startedAt)
                                 .put("completedAt", it.completedAt ?: JSONObject.NULL)
                         }
-                    else -> createRoutine(arguments)
+                    "create_routine" -> createRoutine(arguments)
+                    "create_exercise" -> createExercise(arguments)
+                    else -> editExercise(arguments)
                 }
             JSONObject()
                 .put("content", textContent(result.toString()))
@@ -216,8 +237,171 @@ internal class McpProtocol(
             repository.data.routines.remove(routine)
             throw failure
         }
-        onRoutineCreated()
+        onDataChanged()
         return JSONObject().put("routine", repository.encodeRoutine(routine))
+    }
+
+    private fun exerciseFields(args: JSONObject, existing: Exercise? = null): Exercise {
+        val name = if (args.has("name")) args.string("name", 200).trim() else existing?.name
+        require(!name.isNullOrBlank()) { "name must not be blank" }
+        val primary =
+            if (args.has("primaryMuscle")) MuscleGroups.canonical(args.string("primaryMuscle", 200))
+            else existing?.primaryMuscle
+        require(primary != null) {
+            "primaryMuscle must be one of: ${MuscleGroups.all.joinToString()}"
+        }
+        val secondary =
+            if (args.has("secondaryMuscles"))
+                MuscleGroups.canonicalList(args.string("secondaryMuscles", 2000))
+            else existing?.secondaryMuscles ?: ""
+        require(secondary != null) {
+            "secondaryMuscles must be a comma-separated list of muscle groups: ${MuscleGroups.all.joinToString()}"
+        }
+        val type = args.enum("type", existing?.type ?: ExerciseType.REPETITIONS)
+        return Exercise(
+            id = existing?.id ?: UUID.randomUUID().toString(),
+            name = name,
+            type = type,
+            asymmetric = args.boolean("asymmetric", existing?.asymmetric ?: false),
+            primaryMuscle = primary,
+            secondaryMuscles = secondary,
+            minimumHoldSeconds =
+                args.integer("minimumHoldSeconds", existing?.minimumHoldSeconds ?: 30),
+            custom = true,
+            imageResource = existing?.imageResource,
+            imageName = existing?.imageName,
+            imageFile = existing?.imageFile,
+            weighted =
+                args.boolean("weighted", existing?.weighted ?: (type == ExerciseType.REPETITIONS)),
+            liveMeasurement = args.boolean("liveMeasurement", existing?.liveMeasurement ?: false),
+        )
+    }
+
+    private fun createExercise(args: JSONObject): JSONObject {
+        args.only(
+            "name",
+            "type",
+            "asymmetric",
+            "primaryMuscle",
+            "secondaryMuscles",
+            "minimumHoldSeconds",
+            "weighted",
+            "liveMeasurement",
+        )
+        val exercise = exerciseFields(args)
+        repository.data.exercises.add(exercise)
+        try {
+            repository.save()
+        } catch (failure: Exception) {
+            repository.data.exercises.remove(exercise)
+            throw failure
+        }
+        onDataChanged()
+        return JSONObject().put("exercise", repository.encodeExercise(exercise))
+    }
+
+    private fun editExercise(args: JSONObject): JSONObject {
+        args.only(
+            "exerciseId",
+            "name",
+            "type",
+            "asymmetric",
+            "primaryMuscle",
+            "secondaryMuscles",
+            "minimumHoldSeconds",
+            "weighted",
+            "liveMeasurement",
+            "imageBase64",
+        )
+        val id = args.string("exerciseId", 200)
+        val index = repository.data.exercises.indexOfFirst { it.id == id }
+        require(index >= 0) { "Unknown exerciseId: $id. Read get_exercises first." }
+        val existing = repository.data.exercises[index]
+        require(existing.custom) {
+            "Only custom exercises can be edited. Create a custom exercise instead."
+        }
+        val exercise = exerciseFields(args, existing)
+        if (args.has("imageBase64")) {
+            exercise.imageFile =
+                if (args.isNull("imageBase64")) null
+                else {
+                    val bytes =
+                        Base64.getDecoder()
+                            .decode(args.string("imageBase64", MAX_IMAGE_BASE64_LENGTH))
+                    require(bytes.isNotEmpty() && bytes.size <= MAX_IMAGE_BYTES) {
+                        "imageBase64 must encode an image of 1 byte to 5 MiB"
+                    }
+                    try {
+                        pictures.importPicture(bytes)
+                    } catch (_: ImageDecoder.DecodeException) {
+                        throw IllegalArgumentException(
+                            "imageBase64 must encode a valid image, such as PNG, JPEG or WebP"
+                        )
+                    }
+                }
+        }
+        repository.data.exercises[index] = exercise
+        try {
+            repository.save()
+        } catch (failure: Exception) {
+            repository.data.exercises[index] = existing
+            exercise.imageFile?.takeIf { it != existing.imageFile }?.let(pictures::delete)
+            throw failure
+        }
+        existing.imageFile
+            ?.takeIf { old ->
+                old != exercise.imageFile && repository.data.exercises.none { it.imageFile == old }
+            }
+            ?.let(pictures::delete)
+        onDataChanged()
+        return JSONObject().put("exercise", repository.encodeExercise(exercise))
+    }
+
+    private fun exerciseSchema(edit: Boolean): JSONObject {
+        val properties =
+            JSONObject(
+                """{
+                "name":{"type":"string","minLength":1,"maxLength":200},
+                "type":{"type":"string","enum":["REPETITIONS","TIMED"]},
+                "asymmetric":{"type":"boolean"},
+                "primaryMuscle":{"type":"string","minLength":1,"maxLength":200},
+                "secondaryMuscles":{"type":"string","maxLength":2000,"description":"Comma-separated muscle groups; empty string clears the list."},
+                "minimumHoldSeconds":{"type":"integer","minimum":0,"maximum":2147483647},
+                "weighted":{"type":"boolean"},
+                "liveMeasurement":{"type":"boolean","description":"Requires type TIMED and weighted true."}
+            }"""
+            )
+        properties
+            .getJSONObject("primaryMuscle")
+            .put(
+                "description",
+                "Muscle group: ${MuscleGroups.all.joinToString()}. Case-insensitive; front delts and rear delts are accepted aliases.",
+            )
+        if (edit) {
+            properties.put(
+                "exerciseId",
+                JSONObject().put("type", "string").put("minLength", 1).put("maxLength", 200),
+            )
+            properties.put(
+                "imageBase64",
+                JSONObject()
+                    .put("type", JSONArray(listOf("string", "null")))
+                    .put("minLength", 1)
+                    .put("maxLength", MAX_IMAGE_BASE64_LENGTH)
+                    .put(
+                        "description",
+                        "Attach or replace a picture using standard base64 image bytes (PNG, JPEG, WebP or another Android-supported format), at most 5 MiB decoded. No data URL prefix or whitespace. Omit to keep the current picture; null removes it. Stored as WebP, at most 1024 pixels on the longest edge. Returns imageFile, not the image bytes.",
+                    ),
+            )
+        }
+        return JSONObject()
+            .put("type", "object")
+            .put("additionalProperties", false)
+            .put(
+                "required",
+                JSONArray(if (edit) listOf("exerciseId") else listOf("name", "primaryMuscle")),
+            )
+            .put("properties", properties)
     }
 
     private fun toolDefinitions(): JSONArray {
@@ -231,7 +415,14 @@ internal class McpProtocol(
             }
         }"""
             )
-        fun tool(name: String, description: String, schema: JSONObject, readOnly: Boolean) =
+        fun tool(
+            name: String,
+            description: String,
+            schema: JSONObject,
+            readOnly: Boolean,
+            destructive: Boolean = false,
+            idempotent: Boolean = readOnly,
+        ) =
             JSONObject()
                 .put("name", name)
                 .put("description", description)
@@ -240,8 +431,8 @@ internal class McpProtocol(
                     "annotations",
                     JSONObject()
                         .put("readOnlyHint", readOnly)
-                        .put("destructiveHint", false)
-                        .put("idempotentHint", readOnly)
+                        .put("destructiveHint", destructive)
+                        .put("idempotentHint", idempotent)
                         .put("openWorldHint", false),
                 )
         return JSONArray().apply {
@@ -302,6 +493,24 @@ internal class McpProtocol(
                     false,
                 )
             )
+            put(
+                tool(
+                    "create_exercise",
+                    "Save a new custom exercise with a generated ID usable in create_routine. Defaults: REPETITIONS, weighted true for repetitions and false for timed, asymmetric false, liveMeasurement false, minimumHoldSeconds 30, no secondary muscles. Returns the saved exercise.",
+                    exerciseSchema(false),
+                    false,
+                )
+            )
+            put(
+                tool(
+                    "edit_exercise",
+                    "Edit a custom exercise by exerciseId from get_exercises. Omitted fields keep their current values, including weighted and liveMeasurement when type changes. Use imageBase64 to attach, replace or remove a picture. Built-in exercises cannot be edited. Keeps the ID; existing routines and workouts reference the updated exercise. Returns the saved exercise.",
+                    exerciseSchema(true),
+                    false,
+                    destructive = true,
+                    idempotent = false,
+                )
+            )
         }
     }
 
@@ -313,6 +522,11 @@ internal class McpProtocol(
         val value = opt(key) as? String ?: throw IllegalArgumentException("$key must be a string")
         require(value.length <= maxLength) { "$key is too long" }
         return value
+    }
+
+    private fun JSONObject.boolean(key: String, default: Boolean): Boolean {
+        if (!has(key)) return default
+        return opt(key) as? Boolean ?: throw IllegalArgumentException("$key must be a boolean")
     }
 
     private fun JSONObject.integer(

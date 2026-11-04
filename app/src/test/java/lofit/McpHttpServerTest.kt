@@ -133,7 +133,18 @@ class McpHttpServerTest {
                         .startsWith("HTTP/1.1 200")
                 )
                 assertTrue(
-                    raw(server, headers + "Content-Length: 1048577\r\n\r\n")
+                    raw(
+                            server,
+                            headers + "Content-Length: ${McpHttpServer.MAX_BODY_BYTES + 1}\r\n\r\n",
+                        )
+                        .startsWith("HTTP/1.1 413")
+                )
+                assertTrue(
+                    raw(
+                            server,
+                            headers +
+                                "Transfer-Encoding: chunked\r\n\r\n${(McpHttpServer.MAX_BODY_BYTES + 1).toString(16)}\r\n",
+                        )
                         .startsWith("HTTP/1.1 413")
                 )
                 assertTrue(

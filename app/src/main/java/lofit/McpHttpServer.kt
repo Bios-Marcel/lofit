@@ -26,7 +26,7 @@ internal class McpHttpServer(
         const val PORT = BuildConfig.MCP_PORT
         const val URL = "http://127.0.0.1:$PORT/mcp"
         val PROTOCOL_VERSIONS = listOf("2025-03-26", "2025-06-18", "2025-11-25")
-        private const val MAX_BODY_BYTES = 1024 * 1024
+        internal const val MAX_BODY_BYTES = 8 * 1024 * 1024
         private const val MAX_HEADER_BYTES = 16 * 1024
 
         fun isTailscaleAddress(address: InetAddress): Boolean {

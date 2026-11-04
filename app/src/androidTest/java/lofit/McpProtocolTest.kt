@@ -1,6 +1,7 @@
 package lofit
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import java.io.File
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.*
@@ -20,7 +21,7 @@ class McpProtocolTest {
         context.clearRepositoryTestData()
         repository = LofitRepository(context)
         changes = 0
-        protocol = McpProtocol(repository) { changes++ }
+        protocol = McpProtocol(repository, ExercisePictures(context)) { changes++ }
     }
 
     private fun request(method: String, params: JSONObject = JSONObject()): JSONObject =
@@ -78,11 +79,25 @@ class McpProtocolTest {
         assertTrue(initialized.getJSONObject("capabilities").has("tools"))
         val tools = request("tools/list").getJSONObject("result").getJSONArray("tools")
         assertEquals(
-            listOf("get_routines", "get_exercises", "get_history", "create_routine"),
+            listOf(
+                "get_routines",
+                "get_exercises",
+                "get_history",
+                "create_routine",
+                "create_exercise",
+                "edit_exercise",
+            ),
             (0 until tools.length()).map { tools.getJSONObject(it).getString("name") },
         )
         assertTrue(tools.getJSONObject(0).getJSONObject("annotations").getBoolean("readOnlyHint"))
         assertFalse(tools.getJSONObject(3).getJSONObject("annotations").getBoolean("readOnlyHint"))
+        assertFalse(tools.getJSONObject(4).getJSONObject("annotations").getBoolean("readOnlyHint"))
+        assertTrue(
+            tools.getJSONObject(5).getJSONObject("annotations").getBoolean("destructiveHint")
+        )
+        assertFalse(
+            tools.getJSONObject(5).getJSONObject("annotations").getBoolean("idempotentHint")
+        )
         assertNull(protocol.handle("""{"jsonrpc":"2.0","method":"notifications/initialized"}"""))
         // Even a tools/call notification must never perform a write.
         assertNull(
@@ -202,6 +217,325 @@ class McpProtocolTest {
         }
         assertEquals(0, changes)
         assertTrue(call("get_history", JSONObject().put("limit", 0)).getBoolean("isError"))
+    }
+
+    @Test
+    fun createsCustomExercisesWithDefaultsAndUsesThemInRoutines() {
+        val result =
+            call(
+                "create_exercise",
+                JSONObject().put("name", "  Custom press  ").put("primaryMuscle", " chest "),
+            )
+        assertFalse(result.getBoolean("isError"))
+        val saved = result.getJSONObject("structuredContent").getJSONObject("exercise")
+        val exercise =
+            LofitRepository(context).data.exercises.single { it.id == saved.getString("id") }
+        assertEquals("Custom press", exercise.name)
+        assertEquals("Chest", exercise.primaryMuscle)
+        assertEquals("", exercise.secondaryMuscles)
+        assertEquals(ExerciseType.REPETITIONS, exercise.type)
+        assertTrue(exercise.custom)
+        assertTrue(exercise.weighted)
+        assertFalse(exercise.asymmetric)
+        assertFalse(exercise.liveMeasurement)
+        assertEquals(30, exercise.minimumHoldSeconds)
+        assertEquals(1, changes)
+        assertEquals(
+            result.getJSONObject("structuredContent").toString(),
+            result.getJSONArray("content").getJSONObject(0).getString("text"),
+        )
+        val routine =
+            call(
+                "create_routine",
+                JSONObject()
+                    .put("name", "Custom routine")
+                    .put("exercises", JSONArray().put(JSONObject().put("exerciseId", exercise.id))),
+            )
+        assertFalse(routine.getBoolean("isError"))
+        assertEquals(
+            exercise.id,
+            LofitRepository(context).data.routines.single().exercises.single().exerciseId,
+        )
+        val timed =
+            call(
+                "create_exercise",
+                JSONObject()
+                    .put("name", "Custom hold")
+                    .put("primaryMuscle", "Core")
+                    .put("type", "TIMED"),
+            )
+        assertFalse(
+            timed
+                .getJSONObject("structuredContent")
+                .getJSONObject("exercise")
+                .getBoolean("weighted")
+        )
+        assertNotEquals(
+            exercise.id,
+            timed.getJSONObject("structuredContent").getJSONObject("exercise").getString("id"),
+        )
+    }
+
+    @Test
+    fun editsCustomExerciseAndPreservesOmittedFieldsPictureAndReferences() {
+        val existing =
+            Exercise(
+                "custom-hold",
+                "Hold",
+                ExerciseType.TIMED,
+                true,
+                "Grip",
+                "Forearms",
+                minimumHoldSeconds = 45,
+                custom = true,
+                weighted = true,
+                imageFile = "custom.webp",
+                liveMeasurement = true,
+            )
+        repository.data.exercises.add(existing)
+        repository.data.routines.add(
+            Routine(
+                name = "Holds",
+                exercises = mutableListOf(RoutineExercise(exerciseId = existing.id)),
+            )
+        )
+        repository.save()
+        val args =
+            JSONObject()
+                .put("exerciseId", existing.id)
+                .put("name", "New hold")
+                .put("secondaryMuscles", "")
+        val edited = call("edit_exercise", args)
+        assertFalse(edited.getBoolean("isError"))
+        val reloaded = LofitRepository(context).data
+        val exercise = reloaded.exercises.single { it.id == existing.id }
+        assertEquals(existing.copy(name = "New hold", secondaryMuscles = ""), exercise)
+        assertEquals(existing.id, reloaded.routines.single().exercises.single().exerciseId)
+        assertEquals(1, changes)
+        val repeated = call("edit_exercise", args)
+        assertEquals(
+            edited.getJSONObject("structuredContent").toString(),
+            repeated.getJSONObject("structuredContent").toString(),
+        )
+        val changed =
+            call(
+                "edit_exercise",
+                JSONObject()
+                    .put("exerciseId", existing.id)
+                    .put("type", "REPETITIONS")
+                    .put("liveMeasurement", false)
+                    .put("weighted", false)
+                    .put("asymmetric", false)
+                    .put("primaryMuscle", "front delts")
+                    .put("secondaryMuscles", "Triceps, chest, Triceps")
+                    .put("minimumHoldSeconds", 0),
+            )
+        assertFalse(changed.getBoolean("isError"))
+        val updated = LofitRepository(context).data.exercises.single { it.id == existing.id }
+        assertEquals(ExerciseType.REPETITIONS, updated.type)
+        assertFalse(updated.weighted)
+        assertFalse(updated.asymmetric)
+        assertFalse(updated.liveMeasurement)
+        assertEquals("Front deltoids", updated.primaryMuscle)
+        assertEquals("Triceps, Chest", updated.secondaryMuscles)
+        assertEquals(0, updated.minimumHoldSeconds)
+        val page =
+            call(
+                    "get_exercises",
+                    JSONObject()
+                        .put(
+                            "offset",
+                            repository.data.exercises.indexOfFirst { it.id == existing.id },
+                        ),
+                )
+                .getJSONObject("structuredContent")
+        assertEquals(
+            changed.getJSONObject("structuredContent").getJSONObject("exercise").toString(),
+            page.getJSONArray("exercises").getJSONObject(0).toString(),
+        )
+    }
+
+    @Test
+    fun invalidExerciseWritesNeverChangeStoredData() {
+        val existing =
+            Exercise(
+                "custom",
+                "Hold",
+                ExerciseType.TIMED,
+                false,
+                "Grip",
+                "",
+                custom = true,
+                weighted = true,
+                liveMeasurement = true,
+            )
+        repository.data.exercises.add(existing)
+        repository.save()
+        val stored = context.repositoryStateFile.readText()
+        val before = repository.data.exercises.toList()
+        val invalid =
+            listOf(
+                JSONObject().put("name", "  "),
+                JSONObject().put("name", JSONObject.NULL),
+                JSONObject().put("name", "a".repeat(201)),
+                JSONObject().put("primaryMuscle", "Unknown"),
+                JSONObject().put("secondaryMuscles", "Chest, Unknown"),
+                JSONObject().put("type", "INVALID"),
+                JSONObject().put("weighted", "true"),
+                JSONObject().put("asymmetric", 1),
+                JSONObject().put("liveMeasurement", JSONObject.NULL),
+                JSONObject().put("minimumHoldSeconds", -1),
+                JSONObject().put("minimumHoldSeconds", 1.5),
+                JSONObject().put("minimumHoldSeconds", 2147483648L),
+                JSONObject().put("id", "overwrite"),
+                JSONObject().put("custom", false),
+                JSONObject().put("imageFile", "/tmp/picture"),
+                JSONObject().put("type", "REPETITIONS").put("liveMeasurement", true),
+                JSONObject().put("weighted", false).put("liveMeasurement", true),
+            )
+        invalid.forEach { fields ->
+            val create = JSONObject().put("name", "New exercise").put("primaryMuscle", "Chest")
+            val edit = JSONObject().put("exerciseId", existing.id)
+            fields.keys().forEach { key ->
+                create.put(key, fields.get(key))
+                edit.put(key, fields.get(key))
+            }
+            assertTrue(create.toString(), call("create_exercise", create).getBoolean("isError"))
+            assertTrue(edit.toString(), call("edit_exercise", edit).getBoolean("isError"))
+            assertEquals(before, repository.data.exercises)
+            assertEquals(stored, context.repositoryStateFile.readText())
+        }
+        assertTrue(
+            call("create_exercise", JSONObject().put("name", "Missing muscle"))
+                .getBoolean("isError")
+        )
+        assertTrue(
+            call("create_exercise", JSONObject().put("primaryMuscle", "Chest"))
+                .getBoolean("isError")
+        )
+        assertTrue(
+            call("edit_exercise", JSONObject().put("exerciseId", "missing")).getBoolean("isError")
+        )
+        assertTrue(
+            call(
+                    "edit_exercise",
+                    JSONObject().put("exerciseId", "bench-press").put("name", "Changed"),
+                )
+                .getBoolean("isError")
+        )
+        assertTrue(
+            call("edit_exercise", JSONObject().put("name", "Missing ID")).getBoolean("isError")
+        )
+        assertTrue(
+            call(
+                    "edit_exercise",
+                    JSONObject().put("exerciseId", existing.id).put("type", "REPETITIONS"),
+                )
+                .getBoolean("isError")
+        )
+        assertEquals(before, repository.data.exercises)
+        assertEquals(stored, context.repositoryStateFile.readText())
+        assertEquals(0, changes)
+    }
+
+    @Test
+    fun createsTimedExerciseWithAllOptions() {
+        val result =
+            call(
+                "create_exercise",
+                JSONObject()
+                    .put("name", "Measured hold")
+                    .put("primaryMuscle", "grip")
+                    .put("secondaryMuscles", "Forearms, rear delts")
+                    .put("type", "TIMED")
+                    .put("weighted", true)
+                    .put("liveMeasurement", true)
+                    .put("asymmetric", true)
+                    .put("minimumHoldSeconds", 15),
+            )
+        assertFalse(result.getBoolean("isError"))
+        val id = result.getJSONObject("structuredContent").getJSONObject("exercise").getString("id")
+        assertEquals(
+            Exercise(
+                id,
+                "Measured hold",
+                ExerciseType.TIMED,
+                true,
+                "Grip",
+                "Forearms, Rear deltoids",
+                minimumHoldSeconds = 15,
+                custom = true,
+                weighted = true,
+                liveMeasurement = true,
+            ),
+            LofitRepository(context).data.exercises.single { it.id == id },
+        )
+    }
+
+    @Test
+    fun failedExerciseStorageWritesRollBackWithoutNotifying() {
+        val existing =
+            Exercise(
+                "custom",
+                "Original",
+                ExerciseType.REPETITIONS,
+                false,
+                "Chest",
+                "",
+                custom = true,
+            )
+        repository.data.exercises.add(existing)
+        repository.save()
+        val stored = context.repositoryStateFile.readText()
+        val before = repository.data.exercises.toList()
+        val blockedWrite = File(context.repositoryStateFile.path + ".new")
+        assertTrue(blockedWrite.mkdir())
+        try {
+            listOf(
+                    "create_exercise" to
+                        JSONObject().put("name", "New").put("primaryMuscle", "Chest"),
+                    "edit_exercise" to
+                        JSONObject().put("exerciseId", existing.id).put("name", "Changed"),
+                )
+                .forEach { (name, args) ->
+                    val result =
+                        request("tools/call", JSONObject().put("name", name).put("arguments", args))
+                    assertEquals(-32603, result.getJSONObject("error").getInt("code"))
+                    assertEquals(before, repository.data.exercises)
+                    assertEquals(stored, context.repositoryStateFile.readText())
+                    assertEquals(0, changes)
+                }
+        } finally {
+            assertTrue(blockedWrite.delete())
+        }
+    }
+
+    @Test
+    fun exerciseWriteNotificationsNeverMutateData() {
+        val before = repository.data.exercises.toList()
+        listOf("create_exercise", "edit_exercise").forEach { name ->
+            assertNull(
+                protocol.handle(
+                    JSONObject()
+                        .put("jsonrpc", "2.0")
+                        .put("method", "tools/call")
+                        .put(
+                            "params",
+                            JSONObject()
+                                .put("name", name)
+                                .put(
+                                    "arguments",
+                                    JSONObject()
+                                        .put("name", "Ignored")
+                                        .put("primaryMuscle", "Chest"),
+                                ),
+                        )
+                        .toString()
+                )
+            )
+        }
+        assertEquals(before, repository.data.exercises)
+        assertEquals(0, changes)
     }
 
     @Test

@@ -3,7 +3,8 @@
 Enable **MCP server** in Settings in each app. Debug uses port **8765**; release
 uses **8766**, so both apps can run MCP at the same time. The server listens at
 `http://127.0.0.1:PORT/mcp` while the app's activity exists, including in the
-background. Reopen the app after Android stops it. Turning the switch off closes the server.
+background. Reopen the app after Android stops it. Turning the switch off or
+resetting app data closes the server. The setting persists across app restarts.
 To use another port, enter it in Settings and tap **Apply**. The change restarts
 the listener and persists across app restarts. Use the new port in your MCP URL,
 ADB forward command, and Tailscale rules.
@@ -30,7 +31,8 @@ unlock the phone and reopen Lofit if the endpoint times out.
 Only loopback and Tailscale source/destination addresses are accepted; ordinary
 LAN and public network requests receive HTTP 403. Tailscale authenticates remote
 devices and encrypts traffic; there is no separate MCP login. Devices permitted
-by your tailnet rules can read workout data and create routines while MCP is on.
+by your tailnet rules can read workout data, create routines, and create or edit
+custom exercises while MCP is on.
 Host and Origin checks accept only localhost, loopback IPs and the phone's current
 Tailscale IPs. The Android internet permission permits the listening socket.
 
@@ -45,12 +47,30 @@ and `2025-11-25`. It has no sessions or SSE stream. Send `initialize`, then
 | `get_exercises` | Read the built-in and custom exercise catalog, including IDs. |
 | `get_history` | Read saved workouts and logged sets, newest first. |
 | `create_routine` | Save a new routine with generated IDs. |
+| `create_exercise` | Save a custom exercise with a generated ID. Requires `name` and `primaryMuscle`. |
+| `edit_exercise` | Update a custom exercise by `exerciseId`; omitted fields stay unchanged. |
+
+Exercise writes support `name`, `type` (`REPETITIONS` or `TIMED`), `primaryMuscle`,
+`secondaryMuscles` (comma-separated), `weighted`, `asymmetric`,
+`minimumHoldSeconds`, and `liveMeasurement`. Muscle groups use the app's list
+shown in the tool schema. Live measurement requires a timed, weighted exercise.
+New exercises default to repetitions, weighted, symmetric, a 30-second minimum
+hold, no secondary muscles, and no live measurement. Timed exercises default to
+unweighted. Edits preserve the exercise ID; built-in exercises cannot
+be edited. Use the returned ID to add the exercise to a routine.
+
+`edit_exercise` also accepts `imageBase64`: standard base64-encoded image bytes
+(PNG, JPEG, WebP, or another Android-supported format), up to 5 MiB decoded.
+Send the base64 string without a data URL prefix or whitespace. Omit this field
+to keep the picture; send `null` to remove it. Pictures are stored in the app as
+WebP at a maximum of 1024 pixels on the longest edge. The response includes the
+saved `imageFile` name. Invalid uploads leave the exercise and its picture intact.
 
 Read tools accept `offset` (default 0) and `limit` (default 100, max 200).
 Results include `total` and `nextOffset`; keep reading until `nextOffset` is null.
 Weights use kilograms; timestamps use Unix milliseconds. Requests are limited
-to 1 MiB. Routine names, exercise IDs, numbers, set types and sides are validated
-before the routine is saved.
+to 8 MiB, including base64 picture data. Routine names, exercise IDs, numbers,
+set types and sides are validated before the routine is saved.
 
 Example `tools/call` parameters, using an ID from `get_exercises`:
 

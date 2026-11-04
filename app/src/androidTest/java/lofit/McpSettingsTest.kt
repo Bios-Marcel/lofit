@@ -90,7 +90,7 @@ class McpSettingsTest {
             navigate(scenario, R.string.nav_settings)
             onView(withContentDescription("MCP server")).check(matches(isChecked()))
             assertEquals(
-                4,
+                6,
                 post("tools/list").getJSONObject("result").getJSONArray("tools").length(),
             )
 

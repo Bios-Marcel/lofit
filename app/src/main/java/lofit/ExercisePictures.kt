@@ -6,6 +6,7 @@ import android.graphics.ImageDecoder
 import android.net.Uri
 import android.util.LruCache
 import java.io.File
+import java.nio.ByteBuffer
 import java.util.UUID
 import kotlin.math.max
 
@@ -33,12 +34,15 @@ class ExercisePictures(private val context: Context) {
         else resource(name)
     }
 
-    fun importPicture(uri: Uri): String {
+    fun importPicture(uri: Uri): String =
+        importPicture(ImageDecoder.createSource(context.contentResolver, uri))
+
+    fun importPicture(bytes: ByteArray): String =
+        importPicture(ImageDecoder.createSource(ByteBuffer.wrap(bytes)))
+
+    private fun importPicture(source: ImageDecoder.Source): String {
         val bitmap =
-            ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri)) {
-                decoder,
-                info,
-                _ ->
+            ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
                 val longest = max(info.size.width, info.size.height)
                 if (longest > 1024)
                     decoder.setTargetSize(
