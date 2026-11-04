@@ -103,6 +103,16 @@ class WorkoutFlowTest {
         }
     }
 
+    /** Persist fixtures before launch so the activity reads them through normal storage. */
+    private fun seedWorkout(vararg exercises: WorkoutExercise) {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        LofitRepository(context).apply {
+            data.activeWorkout =
+                WorkoutSession(name = "Open workout", exercises = exercises.toMutableList())
+            save()
+        }
+    }
+
     @Test
     fun onboarding_femaleAndHealthDeclinedPersistAcrossRestart() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -599,17 +609,13 @@ class WorkoutFlowTest {
     @Test
     fun home_leavingWorkoutWithExerciseShowsTileThenBackLeavesApp() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
+        seedWorkout(WorkoutExercise(exerciseId = "bench-press"))
         val context = instrumentation.targetContext
         val intent =
             Intent(context, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         val activity = instrumentation.startActivitySync(intent)
         try {
-            onView(withText(R.string.start_workout)).perform(scrollTo(), click())
-            onView(withText("Add exercise")).perform(scrollTo(), click())
-            onView(withHint("Search name or muscle"))
-                .perform(replaceText("Bench press"), closeSoftKeyboard())
-            onView(withContentDescription("Add Bench press")).perform(scrollTo(), click())
             onView(withText("Add exercise")).check(matches(isDisplayed()))
             val workoutId = LofitRepository(context).data.activeWorkout!!.id
             pressBack()
@@ -1260,36 +1266,33 @@ class WorkoutFlowTest {
 
     @Test
     fun addingExercise_showsWorkoutBottomOnFirstDraw() {
+        // The tall workout is setup; keep one add-set check per card and the final picker action.
+        seedWorkout(
+            WorkoutExercise(
+                exerciseId = "back-squat",
+                plannedSets = MutableList(7) { PlannedSet() },
+            ),
+            WorkoutExercise(exerciseId = "plank", plannedSets = MutableList(7) { PlannedSet() }),
+        )
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val intent =
             Intent(instrumentation.targetContext, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         val activity = instrumentation.startActivitySync(intent)
 
-        onView(withText(R.string.start_workout)).perform(click())
-        onView(withText("Add exercise")).perform(scrollTo(), click())
-        onView(withHint("Search name or muscle")).perform(replaceText("squat"), closeSoftKeyboard())
-        onView(withContentDescription("Add Back squat")).perform(scrollTo(), click())
-        onView(withText("Add set")).perform(scrollTo())
-        repeat(8) {
-            onView(withText("Add set")).perform(click()).check(matches(isCompletelyDisplayed()))
+        listOf("Back squat", "Plank").forEach { name ->
+            val addSet =
+                allOf(
+                    withText("Add set"),
+                    isDescendantOfA(
+                        allOf(
+                            isAssignableFrom(MaterialCardView::class.java),
+                            hasDescendant(withText(name)),
+                        )
+                    ),
+                )
+            onView(addSet).perform(scrollTo(), click()).check(matches(isCompletelyDisplayed()))
         }
-
-        onView(withText("Add exercise")).perform(scrollTo(), click())
-        onView(withHint("Search name or muscle")).perform(replaceText("plank"), closeSoftKeyboard())
-        onView(withContentDescription("Add Plank")).perform(scrollTo(), click())
-        val plankAddSet =
-            allOf(
-                withText("Add set"),
-                isDescendantOfA(
-                    allOf(
-                        isAssignableFrom(MaterialCardView::class.java),
-                        hasDescendant(withText("Plank")),
-                    )
-                ),
-            )
-        onView(plankAddSet).perform(scrollTo())
-        repeat(8) { onView(plankAddSet).perform(click()).check(matches(isCompletelyDisplayed())) }
 
         onView(withText("Add exercise")).perform(scrollTo(), click())
         onView(withHint("Search name or muscle"))
@@ -1457,13 +1460,9 @@ class WorkoutFlowTest {
 
     @Test
     fun discardWorkout_singleExerciseWithNoDoneSetsNeedsNoConfirmation() {
+        seedWorkout(WorkoutExercise(exerciseId = "bench-press"))
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)).use {
-            onView(withText(R.string.start_workout)).perform(click())
-            onView(withText("Add exercise")).perform(scrollTo(), click())
-            onView(withHint("Search name or muscle"))
-                .perform(replaceText("Bench press"), closeSoftKeyboard())
-            onView(withContentDescription("Add Bench press")).perform(scrollTo(), click())
             onView(withText("Discard workout")).perform(scrollTo(), click())
             onView(withText(R.string.start_workout)).check(matches(isDisplayed()))
             assertEquals(null, LofitRepository(context).data.activeWorkout)
