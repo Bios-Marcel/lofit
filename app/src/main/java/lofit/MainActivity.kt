@@ -3341,13 +3341,20 @@ class MainActivity : AppCompatActivity() {
             holdCuePlayed = true
             plannedSet.actualHoldSeconds = elapsed
             loggedSetFor(item, plannedSet)?.let { syncLoggedSet(it, plannedSet, movement) }
-                // LEGACY: Manual timers still mark done at the goal while continuing to run.
+                // LEGACY: Failure sets still mark done at the goal while continuing to run.
                 ?: item.sets.add(loggedSetFrom(plannedSet, movement))
             repository.save()
             completingHoldAutomatically = true
             holdDoneCheckBox?.isChecked = true
             completingHoldAutomatically = false
             playCue()
+        }
+        if (
+            plannedSet != null &&
+                elapsed >= plannedSet.holdSeconds &&
+                plannedSet.type != SetType.FAILURE
+        ) {
+            stopActiveHold()
         }
     }
 

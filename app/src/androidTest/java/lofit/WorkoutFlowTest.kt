@@ -3146,7 +3146,21 @@ class WorkoutFlowTest {
     }
 
     @Test
-    fun holdTimer_reachingTargetCompletesSetButKeepsRunning() {
+    fun holdTimer_normalSetStopsAtTarget() {
+        checkHoldTimerAtTarget(SetType.NORMAL)
+    }
+
+    @Test
+    fun holdTimer_warmupSetStopsAtTarget() {
+        checkHoldTimerAtTarget(SetType.WARMUP)
+    }
+
+    @Test
+    fun holdTimer_failureSetKeepsRunningAtTarget() {
+        checkHoldTimerAtTarget(SetType.FAILURE)
+    }
+
+    private fun checkHoldTimerAtTarget(type: SetType) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val repository = LofitRepository(instrumentation.targetContext)
         repository.data.routines.add(
@@ -3156,7 +3170,7 @@ class WorkoutFlowTest {
                     mutableListOf(
                         RoutineExercise(
                             exerciseId = "plank",
-                            plannedSets = mutableListOf(PlannedSet(holdSeconds = 1)),
+                            plannedSets = mutableListOf(PlannedSet(type = type, holdSeconds = 1)),
                         )
                     ),
             )
@@ -3179,9 +3193,15 @@ class WorkoutFlowTest {
         onView(withContentDescription("Start set 1 hold")).perform(scrollTo(), click())
         onView(withContentDescription("Set 1 done")).perform(waitUntilMatches(isChecked()))
         onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
-        onView(withContentDescription("Stop set 1 hold"))
-            .check(matches(isDisplayed()))
-            .perform(click())
+        if (type != SetType.FAILURE) {
+            onView(withContentDescription("Start set 1 hold")).check(matches(isDisplayed()))
+            onView(withContentDescription("Set 1 Active time in seconds"))
+                .check(matches(withText("1")))
+        } else {
+            onView(withContentDescription("Stop set 1 hold"))
+                .check(matches(isDisplayed()))
+                .perform(click())
+        }
         onView(withContentDescription("Set 1 Active time in seconds")).check(matches(isEnabled()))
         val savedSet =
             LofitRepository(instrumentation.targetContext)
