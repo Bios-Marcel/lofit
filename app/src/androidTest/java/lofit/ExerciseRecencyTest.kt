@@ -264,7 +264,8 @@ class ExerciseRecencyTest {
             assertEquals(top, buttonTop())
             assertEquals(headerTop, headerPositions())
 
-            onView(withContentDescription("Search exercises")).perform(typeText("Recent curl"))
+            onView(withContentDescription("Search exercises"))
+                .perform(click(), replaceText("Recent curl"))
             val deadline = android.os.SystemClock.uptimeMillis() + 5_000
             var keyboardVisible = false
             while (!keyboardVisible && android.os.SystemClock.uptimeMillis() < deadline) {

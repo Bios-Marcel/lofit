@@ -352,7 +352,7 @@ class RoutineWorkoutFlowTest {
         launch().use { scenario ->
             onView(withText(R.string.start_workout)).perform(scrollTo(), click())
             onView(withText("Add exercise")).perform(scrollTo(), click())
-            onView(withHint("Search name or muscle")).perform(typeText("Bench press"))
+            onView(withHint("Search name or muscle")).perform(click(), replaceText("Bench press"))
             assertKeyboardVisible(scenario, true)
 
             onView(withContentDescription("Add Bench press")).perform(scrollTo(), click())
@@ -373,7 +373,7 @@ class RoutineWorkoutFlowTest {
             onView(allOf(withText(R.string.nav_routines), isClickable())).perform(click())
             onView(withText("Create routine")).perform(click())
             onView(withText("Add Exercise")).perform(scrollTo(), click())
-            onView(withHint("Search name or muscle")).perform(typeText("Bench press"))
+            onView(withHint("Search name or muscle")).perform(click(), replaceText("Bench press"))
             assertKeyboardVisible(scenario, true)
 
             onView(withContentDescription("Add Bench press")).perform(scrollTo(), click())

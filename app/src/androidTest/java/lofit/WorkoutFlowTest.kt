@@ -31,7 +31,6 @@ import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.action.ViewActions.scrollTo
 import androidx.test.espresso.action.ViewActions.swipeLeft
 import androidx.test.espresso.action.ViewActions.swipeRight
-import androidx.test.espresso.action.ViewActions.typeText
 import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.RootMatchers.isDialog
@@ -946,7 +945,7 @@ class WorkoutFlowTest {
         onView(withText("This workout is empty. Add any exercise when you’re ready."))
             .check(matches(isDisplayed()))
         onView(withText("Add exercise")).perform(scrollTo(), click())
-        onView(withHint("Search name or muscle")).perform(typeText("squat"), closeSoftKeyboard())
+        onView(withHint("Search name or muscle")).perform(replaceText("squat"), closeSoftKeyboard())
         onView(withContentDescription("Back squat illustration")).check(matches(isDisplayed()))
         onView(withContentDescription("Add Back squat")).perform(scrollTo(), click())
         onView(withText("Back squat")).check(matches(isDisplayed()))
@@ -972,10 +971,10 @@ class WorkoutFlowTest {
             assertEquals(cardLocation[0] + ancestor.width, rowLocation[0] + view.width)
         }
         onView(withContentDescription("Set 1 weight"))
-            .perform(click(), typeText("7"), closeSoftKeyboard())
+            .perform(click(), replaceText("7"), closeSoftKeyboard())
             .check(matches(withText("7")))
         onView(withContentDescription("Set 1 Repetitions"))
-            .perform(click(), typeText("8"), closeSoftKeyboard())
+            .perform(click(), replaceText("8"), closeSoftKeyboard())
             .check(matches(withText("8")))
         var setTypeRight = 0
         onView(withContentDescription("Set 1 type: Normal")).check { view, _ ->
@@ -1269,7 +1268,7 @@ class WorkoutFlowTest {
 
         onView(withText(R.string.start_workout)).perform(click())
         onView(withText("Add exercise")).perform(scrollTo(), click())
-        onView(withHint("Search name or muscle")).perform(typeText("squat"), closeSoftKeyboard())
+        onView(withHint("Search name or muscle")).perform(replaceText("squat"), closeSoftKeyboard())
         onView(withContentDescription("Add Back squat")).perform(scrollTo(), click())
         onView(withText("Add set")).perform(scrollTo())
         repeat(8) {
@@ -1277,7 +1276,7 @@ class WorkoutFlowTest {
         }
 
         onView(withText("Add exercise")).perform(scrollTo(), click())
-        onView(withHint("Search name or muscle")).perform(typeText("plank"), closeSoftKeyboard())
+        onView(withHint("Search name or muscle")).perform(replaceText("plank"), closeSoftKeyboard())
         onView(withContentDescription("Add Plank")).perform(scrollTo(), click())
         val plankAddSet =
             allOf(
@@ -1294,7 +1293,7 @@ class WorkoutFlowTest {
 
         onView(withText("Add exercise")).perform(scrollTo(), click())
         onView(withHint("Search name or muscle"))
-            .perform(typeText("dumbbell curl"), closeSoftKeyboard())
+            .perform(replaceText("dumbbell curl"), closeSoftKeyboard())
 
         val root = activity.window.decorView
         val drawn = CountDownLatch(1)
@@ -3022,7 +3021,7 @@ class WorkoutFlowTest {
                 }
 
                 onView(withContentDescription("Set 1 weight"))
-                    .perform(scrollTo(), click(), typeText("5"))
+                    .perform(scrollTo(), click(), replaceText("5"))
                 assertKeyboardVisible(true)
                 onView(withContentDescription("Set 1 done"))
                     .perform(scrollTo(), waitForStableLayout(), click())
