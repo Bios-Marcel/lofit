@@ -1189,7 +1189,7 @@ class WorkoutFlowTest {
             Intent(instrumentation.targetContext, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         instrumentation.startActivitySync(intent)
-        onView(withText("Bodyweight workout")).check(matches(isDisplayed()))
+        onView(allOf(withText("Bodyweight workout"), isDisplayed())).check(matches(isDisplayed()))
 
         onView(withContentDescription("Set 1 weight")).check(doesNotExist())
         onView(withContentDescription("Set 1 Repetitions"))
@@ -1228,7 +1228,8 @@ class WorkoutFlowTest {
             Intent(instrumentation.targetContext, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         instrumentation.startActivitySync(intent)
-        onView(withText("Weighted bodyweight workout")).check(matches(isDisplayed()))
+        onView(allOf(withText("Weighted bodyweight workout"), isDisplayed()))
+            .check(matches(isDisplayed()))
 
         onView(withText("Weighted Push-up")).check(matches(isDisplayed()))
         onView(withContentDescription("Set 1 weight")).check(matches(withText("10")))
@@ -2633,7 +2634,7 @@ class WorkoutFlowTest {
         onView(withContentDescription("View Past workout")).check(matches(isDisplayed()))
         assertEquals(storedState, context.repositoryStateFile.readText())
         pressBack()
-        onView(withText("Live workout")).check(matches(isDisplayed()))
+        onView(allOf(withText("Live workout"), isDisplayed())).check(matches(isDisplayed()))
         instrumentation.runOnMainSync { activity.finish() }
     }
 
