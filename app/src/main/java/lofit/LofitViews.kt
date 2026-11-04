@@ -10,11 +10,14 @@ import android.text.InputType
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
 import android.widget.AutoCompleteTextView
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.Filter
+import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.MultiAutoCompleteTextView
@@ -40,6 +43,7 @@ internal class LofitViews(
         title: String,
         subtitle: String? = null,
         headerEnd: View? = null,
+        onTitleChange: ((String) -> Unit)? = null,
         build: (LinearLayout) -> Unit,
     ): View {
         val scroll = ScrollView(activityContext).apply { isFillViewport = true }
@@ -56,10 +60,12 @@ internal class LofitViews(
                     LinearLayout(activityContext).apply {
                         orientation = LinearLayout.VERTICAL
                         addView(
-                            titleText(title).apply {
-                                textSize = 26f
-                                setPadding(0, dp(5), 0, 0)
-                            }
+                            if (onTitleChange != null) editableTitle(title, onTitleChange)
+                            else
+                                titleText(title).apply {
+                                    textSize = 26f
+                                    setPadding(0, dp(5), 0, 0)
+                                }
                         )
                         baselineAlignedChildIndex = 0
                         subtitle?.let {
@@ -87,6 +93,76 @@ internal class LofitViews(
         scroll.addView(body)
         return scroll
     }
+
+    private fun editableTitle(value: String, onChange: (String) -> Unit): View =
+        LinearLayout(activityContext).apply {
+            layoutParams =
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                )
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            var savedTitle = value
+            val title = titleText(value).apply { textSize = 26f }
+            val field =
+                textField("Workout title").apply {
+                    visibility = View.GONE
+                    textSize = 26f
+                    contentDescription = "Workout title"
+                    inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+                    imeOptions = EditorInfo.IME_ACTION_DONE
+                    setText(value)
+                    doAfterTextChanged {
+                        val name = it.toString().trim()
+                        if (name.isNotBlank() && name != savedTitle) {
+                            savedTitle = name
+                            onChange(name)
+                        }
+                    }
+                }
+            val pen =
+                ImageButton(activityContext).apply {
+                    setImageResource(R.drawable.ic_edit)
+                    imageTintList = ColorStateList.valueOf(color(R.color.white))
+                    background = null
+                    contentDescription = "Edit workout title"
+                    setOnClickListener {
+                        title.visibility = View.GONE
+                        visibility = View.GONE
+                        field.setText(savedTitle)
+                        field.visibility = View.VISIBLE
+                        field.requestFocus()
+                        field.selectAll()
+                        field.post {
+                            activityContext
+                                .getSystemService(InputMethodManager::class.java)
+                                .showSoftInput(field, 0)
+                        }
+                    }
+                }
+            field.setOnFocusChangeListener { _, focused ->
+                field.background = fieldBackground(focused)
+                if (!focused) {
+                    title.text = savedTitle
+                    field.visibility = View.GONE
+                    title.visibility = View.VISIBLE
+                    pen.visibility = View.VISIBLE
+                }
+            }
+            field.setOnEditorActionListener { _, action, _ ->
+                if (action == EditorInfo.IME_ACTION_DONE) {
+                    activityContext
+                        .getSystemService(InputMethodManager::class.java)
+                        .hideSoftInputFromWindow(field.windowToken, 0)
+                    field.clearFocus()
+                    true
+                } else false
+            }
+            addView(title, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            addView(pen, LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginStart = dp(4) })
+            addView(field, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        }
 
     fun card(horizontalPadding: Int = 10, build: LinearLayout.() -> Unit): View =
         MaterialCardView(activityContext).apply {

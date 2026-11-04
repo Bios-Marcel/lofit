@@ -124,7 +124,7 @@ data class WorkoutInterval(
 
 data class WorkoutSession(
     val id: String = UUID.randomUUID().toString(),
-    val name: String,
+    var name: String,
     val intervals: MutableList<WorkoutInterval>,
     var defaultRestSeconds: Int = 120,
     val exercises: MutableList<WorkoutExercise> = mutableListOf(),

@@ -999,7 +999,15 @@ class MainActivity : AppCompatActivity() {
             }
         timerText = workoutTimer
         val view =
-            ui.page(workout.name, headerEnd = workoutTimer) { body ->
+            ui.page(
+                workout.name,
+                headerEnd = workoutTimer,
+                onTitleChange = { name ->
+                    workout.name = name
+                    repository.save()
+                    updateWorkoutNotification(force = true)
+                },
+            ) { body ->
                 updateWorkoutTimer()
                 body.addView(
                     togetherMenuButton(
