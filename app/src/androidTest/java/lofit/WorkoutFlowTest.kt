@@ -1000,13 +1000,16 @@ class WorkoutFlowTest {
         }
         val notificationManager =
             instrumentation.targetContext.getSystemService(NotificationManager::class.java)
-        val activeNotification = notificationManager.activeNotifications.single().notification
+        val activeNotification = awaitWorkoutNotification {
+            it.extras.getCharSequence(Notification.EXTRA_TEXT).toString() ==
+                "Set 1 of 1 · 7 kg × 8 reps"
+        }
         assertEquals(
             "Back squat",
             activeNotification.extras.getCharSequence(Notification.EXTRA_TITLE).toString(),
         )
         assertEquals(
-            "Set 1 of 1",
+            "Set 1 of 1 · 7 kg × 8 reps",
             activeNotification.extras.getCharSequence(Notification.EXTRA_TEXT).toString(),
         )
         onView(withContentDescription("Set 1 type: Normal")).perform(click())
@@ -1015,7 +1018,9 @@ class WorkoutFlowTest {
         onView(withContentDescription("Set 1 Repetitions")).perform(replaceText("10"))
         onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
         onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
-        val restNotification = notificationManager.activeNotifications.single().notification
+        val restNotification = awaitWorkoutNotification {
+            it.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains("Rest")
+        }
         assert(
             restNotification.extras
                 .getCharSequence(Notification.EXTRA_TEXT)
@@ -1063,6 +1068,137 @@ class WorkoutFlowTest {
         onView(withContentDescription("${LocalDate.now()}, workout completed"))
             .perform(scrollTo())
             .check(matches(isDisplayed()))
+    }
+
+    private fun launchNotificationWorkout(): ActivityScenario<MainActivity> {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        // Older flow tests leave activities open; only the new workout may receive actions.
+        return ActivityScenario.launch(
+            Intent(context, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        )
+    }
+
+    private fun awaitWorkoutNotification(predicate: (Notification) -> Boolean): Notification {
+        val manager =
+            InstrumentationRegistry.getInstrumentation()
+                .targetContext
+                .getSystemService(NotificationManager::class.java)
+        val deadline = SystemClock.uptimeMillis() + 5_000
+        do {
+            manager.activeNotifications.singleOrNull()?.notification?.let {
+                if (predicate(it)) return it
+            }
+            SystemClock.sleep(50)
+        } while (SystemClock.uptimeMillis() < deadline)
+        val last = manager.activeNotifications.singleOrNull()?.notification
+        throw AssertionError(
+            "Workout notification did not reach expected state: ${last?.extras?.getCharSequence(Notification.EXTRA_TEXT)}, actions=${last?.actions?.map { it.title }}"
+        )
+    }
+
+    @Test
+    fun notification_completesDisplayedSetInBackgroundAndIgnoresRepeatedAction() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val first = PlannedSet(weightKg = 62.5, reps = 6, type = SetType.WARMUP)
+        val second = PlannedSet(weightKg = 65.0, reps = 8)
+        seedWorkout(
+            WorkoutExercise(exerciseId = "bench-press", plannedSets = mutableListOf(first, second))
+        )
+        launchNotificationWorkout().use { scenario ->
+            val notification = awaitWorkoutNotification {
+                it.extras.getCharSequence(Notification.EXTRA_TEXT).toString() ==
+                    "Set 1 of 2 · 62.5 kg × 6 reps"
+            }
+            val complete =
+                notification.actions.single { it.title.toString() == "Complete Set" }.actionIntent
+            scenario.moveToState(androidx.lifecycle.Lifecycle.State.CREATED)
+            complete.send()
+            val resting = awaitWorkoutNotification {
+                it.extras
+                    .getCharSequence(Notification.EXTRA_TEXT)
+                    .toString()
+                    .startsWith("Set 2 of 2 · 65 kg × 8 reps · Rest")
+            }
+            assertEquals(
+                listOf("−15s", "+15s", "Skip"),
+                resting.actions.map { it.title.toString() },
+            )
+            resting.actions.single { it.title.toString() == "Skip" }.actionIntent.send()
+            awaitWorkoutNotification {
+                it.actions?.singleOrNull()?.title.toString() == "Complete Set"
+            }
+            complete.send()
+            scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
+            onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
+            onView(withContentDescription("Set 2 done")).check(matches(not(isChecked())))
+            val logged =
+                LofitRepository(context).data.activeWorkout!!.exercises.single().sets.single()
+            assertEquals(first.id, logged.plannedSetId)
+            assertEquals(62.5, logged.weightKg, 0.0)
+            assertEquals(6, logged.reps)
+            assertEquals(SetType.WARMUP, logged.type)
+            awaitWorkoutNotification {
+                it.actions?.singleOrNull()?.title.toString() == "Complete Set"
+            }
+                .actions
+                .single()
+                .actionIntent
+                .send()
+            val lastRest = awaitWorkoutNotification {
+                it.extras
+                    .getCharSequence(Notification.EXTRA_TEXT)
+                    .toString()
+                    .startsWith("All 2 sets done · Rest")
+            }
+            lastRest.actions.single { it.title.toString() == "Skip" }.actionIntent.send()
+            awaitWorkoutNotification {
+                it.extras.getCharSequence(Notification.EXTRA_TEXT).toString() ==
+                    "All 2 sets done" && it.actions.isNullOrEmpty()
+            }
+            onView(withContentDescription("Set 2 done")).check(matches(isChecked()))
+        }
+    }
+
+    @Test
+    fun notification_timedSetShowsTargetAndCompletesRunningHold() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        seedWorkout(
+            WorkoutExercise(
+                exerciseId = "plank",
+                plannedSets = mutableListOf(PlannedSet(holdSeconds = 60)),
+            )
+        )
+        launchNotificationWorkout().use {
+            awaitWorkoutNotification {
+                it.extras.getCharSequence(Notification.EXTRA_TEXT).toString() == "Set 1 of 1 · 60s"
+            }
+            onView(withContentDescription("Start set 1 hold")).perform(scrollTo(), click())
+            val holding = awaitWorkoutNotification {
+                it.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains("Hold")
+            }
+            holding.actions.single { it.title.toString() == "Complete Set" }.actionIntent.send()
+            awaitWorkoutNotification {
+                it.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains("Rest")
+            }
+            onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
+            onView(withContentDescription("Start set 1 hold")).check(matches(isDisplayed()))
+            val logged =
+                LofitRepository(context).data.activeWorkout!!.exercises.single().sets.single()
+            assertTrue(logged.holdSeconds >= 1)
+            assertEquals(0, logged.reps)
+        }
+    }
+
+    @Test
+    fun notification_noCompleteActionWithoutPlannedSet() {
+        seedWorkout(WorkoutExercise(exerciseId = "bench-press"))
+        launchNotificationWorkout().use {
+            awaitWorkoutNotification {
+                it.extras.getCharSequence(Notification.EXTRA_TEXT).toString() ==
+                    "Add a set to continue" && it.actions.isNullOrEmpty()
+            }
+        }
     }
 
     @Test

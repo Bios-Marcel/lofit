@@ -73,6 +73,7 @@ class MainActivity : AppCompatActivity() {
         const val ACTION_SUBTRACT_REST = "lofit.action.SUBTRACT_REST"
         const val ACTION_ADD_REST = "lofit.action.ADD_REST"
         const val ACTION_SKIP_REST = "lofit.action.SKIP_REST"
+        const val ACTION_COMPLETE_SET = "lofit.action.COMPLETE_SET"
         const val ACTION_OPEN_WORKOUT = "lofit.action.OPEN_WORKOUT"
         const val HISTORY_PAGE_SIZE = 10
     }
@@ -290,6 +291,8 @@ class MainActivity : AppCompatActivity() {
     private var completingHoldAutomatically = false
     private var restEndsAt = 0L
     private var lastWorkoutNotification = ""
+    private var lastWorkoutNotificationAt = 0L
+    private val refreshWorkoutNotification = Runnable { updateWorkoutNotification(force = true) }
     private val handler = Handler(Looper.getMainLooper())
     private val workoutFileWorker = Executors.newSingleThreadExecutor()
     private var workoutFileGeneration = 0
@@ -381,6 +384,7 @@ class MainActivity : AppCompatActivity() {
                     ACTION_SUBTRACT_REST -> subtractRest()
                     ACTION_ADD_REST -> addRest()
                     ACTION_SKIP_REST -> skipRest()
+                    ACTION_COMPLETE_SET -> completeNotificationSet(intent)
                 }
             }
         }
@@ -476,6 +480,12 @@ class MainActivity : AppCompatActivity() {
             },
             ContextCompat.RECEIVER_NOT_EXPORTED,
         )
+        ContextCompat.registerReceiver(
+            this,
+            notificationActionReceiver,
+            IntentFilter(ACTION_COMPLETE_SET).apply { addDataScheme("lofit") },
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
         buildShell()
         render()
         updateMcpServer()
@@ -553,6 +563,7 @@ class MainActivity : AppCompatActivity() {
         workoutTogetherDialog?.dismiss()
         workoutBluetooth.stop()
         handler.removeCallbacks(tick)
+        handler.removeCallbacks(refreshWorkoutNotification)
         handler.removeCallbacks(releaseCueAudioFocus)
         cueAudioManager.abandonAudioFocusRequest(cueAudioFocusRequest)
         cueSounds.release()
@@ -1427,6 +1438,7 @@ class MainActivity : AppCompatActivity() {
                             }
                             saveChanges()
                             onSetsChanged()
+                            if (!editingHistory) updateWorkoutNotification(force = true)
                         },
                     )
                 done.setOnCheckedChangeListener { _, checked ->
@@ -1436,22 +1448,7 @@ class MainActivity : AppCompatActivity() {
                         WindowCompat.getInsetsController(window, done)
                             .hide(WindowInsetsCompat.Type.ime())
                         currentFocus?.clearFocus()
-                        if (liveMeasurement) {
-                            liveWorkoutMeasurement
-                                .stopForManualCompletion(plannedSet, liveMeasurementNow())
-                                ?.let { refreshLiveSetValues(it.pull.set) }
-                        }
-                        if (isActiveHold(item, plannedSet) && !completingHoldAutomatically)
-                            stopActiveHold()
-                        val loggedSet = loggedSetFor(item, plannedSet)
-                        if (loggedSet == null) {
-                            val newSet = loggedSetFrom(plannedSet, exercise, workout.completedAt)
-                            item.sets.add(newSet)
-                        } else {
-                            syncLoggedSet(loggedSet, plannedSet, exercise)
-                        }
-                        if (!editingHistory && !completingHoldAutomatically)
-                            startRest(item, workout)
+                        completeWorkoutSet(item, plannedSet, exercise, workout, editingHistory)
                     } else {
                         loggedSetFor(item, plannedSet)?.let { removedSet ->
                             item.sets.remove(removedSet)
@@ -3379,6 +3376,42 @@ class MainActivity : AppCompatActivity() {
         handler.postDelayed(releaseCueAudioFocus, 1_200L)
     }
 
+    private fun completeWorkoutSet(
+        item: WorkoutExercise,
+        plannedSet: PlannedSet,
+        movement: Exercise,
+        workout: WorkoutSession,
+        editingHistory: Boolean = false,
+    ) {
+        if (!editingHistory && liveWorkoutMeasurement.isLive(item)) {
+            liveWorkoutMeasurement.stopForManualCompletion(plannedSet, liveMeasurementNow())?.let {
+                refreshLiveSetValues(it.pull.set)
+            }
+        }
+        if (isActiveHold(item, plannedSet) && !completingHoldAutomatically) stopActiveHold()
+        val loggedSet = loggedSetFor(item, plannedSet)
+        if (loggedSet == null) {
+            item.sets.add(loggedSetFrom(plannedSet, movement, workout.completedAt))
+        } else {
+            syncLoggedSet(loggedSet, plannedSet, movement)
+        }
+        if (!editingHistory && !completingHoldAutomatically) startRest(item, workout)
+    }
+
+    private fun completeNotificationSet(intent: Intent) {
+        val ids = intent.data?.pathSegments ?: return
+        if (ids.size != 3) return
+        val workout = repository.data.activeWorkout?.takeIf { it.id == ids[0] } ?: return
+        val item = workout.exercises.firstOrNull { it.id == ids[1] } ?: return
+        val plannedSet = item.plannedSets.firstOrNull { it.id == ids[2] } ?: return
+        if (loggedSetFor(item, plannedSet) != null) return
+        val movement = exercise(item.exerciseId) ?: return
+        completeWorkoutSet(item, plannedSet, movement, workout)
+        repository.save()
+        render(restoreScrollY = (content.getChildAt(0) as? ScrollView)?.scrollY)
+        updateWorkoutNotification(force = true)
+    }
+
     private fun createWorkoutNotificationChannel() {
         val manager = getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
@@ -3412,6 +3445,7 @@ class MainActivity : AppCompatActivity() {
         val workout = repository.data.activeWorkout
         if (workout == null) {
             lastWorkoutNotification = ""
+            handler.removeCallbacks(refreshWorkoutNotification)
             manager.cancel(WORKOUT_NOTIFICATION_ID)
             return
         }
@@ -3421,6 +3455,15 @@ class MainActivity : AppCompatActivity() {
         )
             return
 
+        val livePull = liveWorkoutMeasurement.active
+        val active =
+            workout.exercises.firstNotNullOfOrNull { item ->
+                val index =
+                    item.plannedSets.indexOfFirst {
+                        isActiveHold(item, it) || livePull?.set?.id == it.id
+                    }
+                if (index >= 0) Triple(item, item.plannedSets[index], index) else null
+            }
         val current =
             workout.exercises.firstNotNullOfOrNull { item ->
                 val nextSet =
@@ -3434,19 +3477,29 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         val fallback = workout.exercises.lastOrNull()?.let { Triple(it, null, it.plannedSets.size) }
-        val (item, plannedSet, setIndex) = current ?: fallback ?: Triple(null, null, 0)
+        val (item, plannedSet, setIndex) = active ?: current ?: fallback ?: Triple(null, null, 0)
         val movement = item?.let { exercise(it.exerciseId) }
         val title = movement?.name ?: workout.name
+        val target =
+            if (plannedSet != null && movement != null) {
+                buildList {
+                        if (movement.weighted) add("${formatWeight(plannedSet.weightKg)} kg")
+                        add(
+                            if (movement.type.tracksDuration) "${plannedSet.holdSeconds}s"
+                            else "${plannedSet.reps} reps"
+                        )
+                    }
+                    .joinToString(" × ")
+            } else null
         val setText =
             when {
                 item == null -> "Add an exercise to continue"
                 item.plannedSets.isEmpty() -> "Add a set to continue"
-                plannedSet != null -> "Set ${setIndex + 1} of ${item.plannedSets.size}"
+                plannedSet != null -> "Set ${setIndex + 1} of ${item.plannedSets.size} · $target"
                 else -> "All ${workout.setCount()} sets done"
             }
         val restSeconds =
             ((restEndsAt - SystemClock.elapsedRealtime() + 999L) / 1_000L).toInt().coerceAtLeast(0)
-        val livePull = liveWorkoutMeasurement.active
         val holdSeconds =
             if (livePull != null) {
                 livePull.set.actualHoldSeconds ?: 0
@@ -3460,9 +3513,23 @@ class MainActivity : AppCompatActivity() {
                     "$setText · Hold ${formatSeconds(holdSeconds)}"
                 else -> setText
             }
-        val state = "$title|$detail"
+        val canComplete =
+            item != null &&
+                plannedSet != null &&
+                movement != null &&
+                loggedSetFor(item, plannedSet) == null
+        val state = "${workout.id}|${item?.id}|${plannedSet?.id}|$canComplete|$title|$detail"
         if (!force && state == lastWorkoutNotification) return
+        // Android drops rapid notification updates; coalesce edits and completion refreshes.
+        val now = SystemClock.elapsedRealtime()
+        val delay = 300L - (now - lastWorkoutNotificationAt)
+        handler.removeCallbacks(refreshWorkoutNotification)
+        if (delay > 0) {
+            handler.postDelayed(refreshWorkoutNotification, delay)
+            return
+        }
         lastWorkoutNotification = state
+        lastWorkoutNotificationAt = now
 
         val openApp =
             PendingIntent.getActivity(
@@ -3478,6 +3545,7 @@ class MainActivity : AppCompatActivity() {
                 .setSmallIcon(R.drawable.ic_workout_notification)
                 .setContentTitle(title)
                 .setContentText(detail)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(detail))
                 .setContentIntent(openApp)
                 .setCategory(NotificationCompat.CATEGORY_PROGRESS)
                 .setOngoing(true)
@@ -3490,6 +3558,21 @@ class MainActivity : AppCompatActivity() {
                 .addAction(0, "−15s", restAction(ACTION_SUBTRACT_REST, 1))
                 .addAction(0, "+15s", restAction(ACTION_ADD_REST, 2))
                 .addAction(0, "Skip", restAction(ACTION_SKIP_REST, 3))
+        } else if (canComplete) {
+            val completeSet =
+                PendingIntent.getBroadcast(
+                    this,
+                    4,
+                    Intent(ACTION_COMPLETE_SET)
+                        .setPackage(packageName)
+                        .setData(
+                            Uri.parse(
+                                "lofit://complete-set/${workout.id}/${item?.id}/${plannedSet?.id}"
+                            )
+                        ),
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                )
+            notification.addAction(0, "Complete Set", completeSet)
         }
         manager.notify(WORKOUT_NOTIFICATION_ID, notification.build())
     }
