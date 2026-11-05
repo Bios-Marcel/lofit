@@ -8,6 +8,9 @@ internal enum class ExercisePlacement {
     BELOW,
 }
 
+internal fun Exercise.canKeepLoggedSetsFrom(original: Exercise): Boolean =
+    type == original.type && asymmetric == original.asymmetric && weighted == original.weighted
+
 internal fun nextPlannedSets(sets: List<PlannedSet>, exercise: Exercise): List<PlannedSet> {
     val paired =
         sets.size >= 2 &&

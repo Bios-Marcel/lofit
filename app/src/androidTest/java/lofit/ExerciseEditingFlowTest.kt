@@ -16,9 +16,7 @@ import androidx.test.espresso.action.ViewActions.scrollTo
 import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom
-import androidx.test.espresso.matcher.ViewMatchers.isDescendantOfA
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
-import androidx.test.espresso.matcher.ViewMatchers.isEnabled
 import androidx.test.espresso.matcher.ViewMatchers.isRoot
 import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
 import androidx.test.espresso.matcher.ViewMatchers.withHint
@@ -26,7 +24,6 @@ import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.hamcrest.Matchers.allOf
-import org.hamcrest.Matchers.not
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
@@ -230,30 +227,63 @@ class ExerciseEditingFlowTest {
         }
     }
 
-    @Test
-    fun replaceRemainingKeepsLoggedSetsOnOriginalAndUndoRestoresPendingSets() {
+    private fun seedLoggedBench(count: Int = 2) {
         LofitRepository(context).apply {
             val bench = data.activeWorkout!!.exercises.first()
-            val planned = bench.plannedSets.first()
-            bench.sets.add(
-                LoggedSet(
-                    type = planned.type,
-                    weightKg = planned.weightKg,
-                    reps = planned.reps,
-                    plannedSetId = planned.id,
+            bench.plannedSets.take(count).forEachIndexed { index, planned ->
+                bench.sets.add(
+                    LoggedSet(
+                        type = planned.type,
+                        weightKg = planned.weightKg,
+                        reps = planned.reps,
+                        completedAt = 1000L + index,
+                        plannedSetId = planned.id,
+                    )
+                )
+            }
+            val original = data.exercises.first { it.id == "bench-press" }
+            data.exercises.addAll(
+                listOf(
+                    original.copy(
+                        id = "compatible-press",
+                        name = "Compatible press",
+                        custom = true,
+                    ),
+                    original.copy(
+                        id = "timed-press",
+                        name = "Timed press",
+                        type = ExerciseType.TIMED,
+                        custom = true,
+                    ),
+                    original.copy(
+                        id = "asymmetric-press",
+                        name = "Asymmetric press",
+                        asymmetric = true,
+                        custom = true,
+                    ),
+                    original.copy(
+                        id = "unweighted-press",
+                        name = "Unweighted press",
+                        weighted = false,
+                        custom = true,
+                    ),
                 )
             )
             save()
         }
+    }
+
+    @Test
+    fun replaceRemainingKeepsLoggedSetsOnOriginalAndUndoRestoresPendingSets() {
+        seedLoggedBench(count = 1)
         val before = active()
         launch().use {
-            chooseAction("Bench press", "Replace remaining")
-            search("Dumbbell curl")
-            onView(withContentDescription("Replace with Dumbbell curl"))
-                .perform(scrollTo(), click())
+            chooseAction("Bench press", "Replace exercise")
+            search("Unweighted press")
+            onView(withText("Replace remaining")).perform(scrollTo(), click())
             val updated = active()
             assertEquals(
-                listOf("bench-press", "dumbbell-curl", "plank"),
+                listOf("bench-press", "unweighted-press", "plank"),
                 updated.exercises.map { it.exerciseId },
             )
             assertEquals(before.exercises.first().sets, updated.exercises.first().sets)
@@ -266,25 +296,143 @@ class ExerciseEditingFlowTest {
     }
 
     @Test
-    fun fullyLoggedExerciseDisablesReplaceRemaining() {
+    fun fullyLoggedExerciseReplacesOnlyWithMatchingFlagsAndSupportsUndoAndRecreation() {
+        seedLoggedBench()
+        val before = active()
+        val expected = before.exercises.first().copy(exerciseId = "compatible-press")
+        launch().use { scenario ->
+            chooseAction("Bench press", "Replace exercise")
+            listOf("Timed press", "Asymmetric press", "Unweighted press").forEach { name ->
+                search(name)
+                onView(withContentDescription("Replace with $name")).check(doesNotExist())
+            }
+            search("Compatible press")
+            onView(withContentDescription("Replace with Compatible press"))
+                .perform(scrollTo(), click())
+            assertEquals(listOf(expected, before.exercises.last()), active().exercises)
+            onView(withText("Undo")).perform(click())
+            assertEquals(before, active())
+            chooseAction("Bench press", "Replace exercise")
+            search("Compatible press")
+            onView(withContentDescription("Replace with Compatible press"))
+                .perform(scrollTo(), click())
+            scenario.recreate()
+            assertEquals(listOf(expected, before.exercises.last()), active().exercises)
+        }
+    }
+
+    @Test
+    fun compatibleReplacementKeepsBothLoggedAndPendingSets() {
+        seedLoggedBench(count = 1)
+        val before = active()
+        launch().use {
+            chooseAction("Bench press", "Replace exercise")
+            search("Compatible press")
+            onView(withContentDescription("Replace with Compatible press"))
+                .perform(scrollTo(), click())
+            assertEquals(
+                listOf(
+                    before.exercises.first().copy(exerciseId = "compatible-press"),
+                    before.exercises.last(),
+                ),
+                active().exercises,
+            )
+        }
+    }
+
+    @Test
+    fun compatibleReplacementKeepsLoggedSetsWithoutPlans() {
+        seedLoggedBench()
         LofitRepository(context).apply {
-            val bench = data.activeWorkout!!.exercises.first()
-            bench.plannedSets.forEach { planned ->
-                bench.sets.add(
-                    LoggedSet(
-                        type = planned.type,
-                        weightKg = planned.weightKg,
-                        reps = planned.reps,
-                        plannedSetId = planned.id,
-                    )
-                )
+            data.activeWorkout!!.exercises.first().apply {
+                plannedSets.clear()
+                sets.forEach { it.plannedSetId = null }
             }
             save()
         }
+        val before = active()
         launch().use {
-            onView(withContentDescription("Options for Bench press")).perform(scrollTo(), click())
-            onView(withText("Replace remaining")).check(matches(isDescendantOfA(not(isEnabled()))))
-            pressBack()
+            chooseAction("Bench press", "Replace exercise")
+            search("Compatible press")
+            onView(withContentDescription("Replace with Compatible press"))
+                .perform(scrollTo(), click())
+            assertEquals(
+                before.exercises.first().copy(exerciseId = "compatible-press"),
+                active().exercises.first(),
+            )
+            onView(withText("Undo")).perform(click())
+            assertEquals(before, active())
+        }
+    }
+
+    @Test
+    fun loggedTimedAsymmetricWeightedHistoryReplacementStaysInDraftUntilSave() {
+        val original =
+            Exercise(
+                id = "timed-original",
+                name = "Original hold",
+                type = ExerciseType.TIMED,
+                asymmetric = true,
+                weighted = true,
+                primaryMuscle = "Core",
+                secondaryMuscles = "",
+                custom = true,
+            )
+        val replacement =
+            original.copy(
+                id = "timed-replacement",
+                name = "Replacement hold",
+                minimumHoldSeconds = 60,
+                liveMeasurement = true,
+            )
+        val planned =
+            PlannedSet(weightKg = 12.5, holdSeconds = 40, actualHoldSeconds = 42, side = Side.LEFT)
+        val item =
+            WorkoutExercise(
+                exerciseId = original.id,
+                plannedSets = mutableListOf(planned),
+                sets =
+                    mutableListOf(
+                        LoggedSet(
+                            type = SetType.NORMAL,
+                            weightKg = 12.5,
+                            holdSeconds = 42,
+                            side = Side.LEFT,
+                            completedAt = 100000,
+                            plannedSetId = planned.id,
+                        )
+                    ),
+                note = "Keep setup",
+            )
+        val finished =
+            WorkoutSession(
+                name = "Past holds",
+                startedAt = 1000,
+                completedAt = 121000,
+                exercises = mutableListOf(item),
+            )
+        LofitRepository(context).apply {
+            data.exercises.addAll(listOf(original, replacement))
+            data.history.add(finished)
+            save()
+            saveHistory()
+        }
+        val activeBefore = active()
+        launch().use { scenario ->
+            navigate(scenario, R.string.nav_history)
+            onView(withContentDescription("Edit Past holds")).perform(scrollTo(), click())
+            chooseAction("Original hold", "Replace exercise")
+            search("Replacement hold")
+            onView(withContentDescription("Replace with Replacement hold"))
+                .perform(scrollTo(), click())
+            assertEquals(finished, LofitRepository(context).data.history.single())
+            onView(withText("Save changes")).perform(scrollTo(), click())
+            val saved = LofitRepository(context).data.history.single()
+            assertEquals(listOf(item.copy(exerciseId = replacement.id)), saved.exercises)
+            assertEquals(finished.intervals, saved.intervals)
+            assertEquals(activeBefore, active())
+            scenario.recreate()
+            assertEquals(saved, LofitRepository(context).data.history.single())
         }
     }
 

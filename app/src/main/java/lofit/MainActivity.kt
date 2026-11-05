@@ -1192,10 +1192,6 @@ class MainActivity : AppCompatActivity() {
                                     placement,
                                 )
                             },
-                            replaceRemaining = item.sets.isNotEmpty(),
-                            canReplace =
-                                item.sets.isEmpty() ||
-                                    item.plannedSets.any { loggedSetFor(item, it) == null },
                             pauseEverySecondSet = { item.pauseEverySecondSet },
                             onPauseEverySecondSetChange = {
                                 item.pauseEverySecondSet = it
@@ -1531,10 +1527,24 @@ class MainActivity : AppCompatActivity() {
         val target = picker.target
         val replacing = picker.placement == ExercisePlacement.REPLACE
         val anchorMovement = picker.anchorExerciseId?.let(::exercise)
+        val anchorItem =
+            when (target) {
+                    PickerTarget.WORKOUT -> repository.data.activeWorkout
+                    PickerTarget.HISTORY -> historyEditDraft
+                    PickerTarget.ROUTINE -> null
+                }
+                ?.exercises
+                ?.firstOrNull { it.id == picker.anchorId }
+        val hasLoggedSets = replacing && anchorItem?.sets?.isNotEmpty() == true
+        val hasPendingSets =
+            anchorItem?.plannedSets?.any { loggedSetFor(anchorItem, it) == null } == true
+        fun keepsLoggedSets(movement: Exercise) =
+            hasLoggedSets && anchorMovement?.let(movement::canKeepLoggedSetsFrom) == true
         val exercises =
             repository.data
                 .exercisesByRecency()
                 .filter { !replacing || it.id != anchorMovement?.id }
+                .filter { !hasLoggedSets || hasPendingSets || keepsLoggedSets(it) }
                 .let { movements ->
                     if (replacing)
                         movements.sortedByDescending {
@@ -1566,13 +1576,23 @@ class MainActivity : AppCompatActivity() {
                     if (picker.placement != null && anchorIndex < 0) return
                     val anchor = workout.exercises.getOrNull(anchorIndex)
                     val originalPlans = anchor?.plannedSets?.toList().orEmpty()
+                    val keepLoggedSets =
+                        replacing &&
+                            anchor != null &&
+                            anchor.sets.isNotEmpty() &&
+                            exercise(anchor.exerciseId)
+                                ?.let(movements.single()::canKeepLoggedSetsFrom) == true
                     val added = movements.map { movement ->
                         val previous =
                             repository.data.lastKnownExercise(
                                 movement.id,
                                 preferredRoutineId = workout.sourceRoutine?.id,
                             )
-                        if (replacing && anchor != null) {
+                        if (keepLoggedSets) {
+                            anchor.copy(exerciseId = movement.id)
+                        } else if (replacing && anchor != null) {
+                            // LEGACY: Incompatible replacements move only pending sets; logged sets
+                            // stay on the original.
                             val remaining =
                                 anchor.plannedSets.filter { loggedSetFor(anchor, it) == null }
                             WorkoutExercise(
@@ -1598,11 +1618,13 @@ class MainActivity : AppCompatActivity() {
                             ExercisePlacement.REPLACE -> {
                                 if (anchor == null) return
                                 if (
-                                    anchor.sets.isNotEmpty() && added.single().plannedSets.isEmpty()
+                                    !keepLoggedSets &&
+                                        anchor.sets.isNotEmpty() &&
+                                        added.single().plannedSets.isEmpty()
                                 )
                                     return
                                 if (activeHoldWorkoutExerciseId == anchor.id) clearActiveHold()
-                                if (anchor.sets.isEmpty()) {
+                                if (anchor.sets.isEmpty() || keepLoggedSets) {
                                     workout.exercises.removeAt(anchorIndex)
                                     anchorIndex
                                 } else {
@@ -1854,7 +1876,11 @@ class MainActivity : AppCompatActivity() {
                                         },
                                     )
                                 addView(
-                                    ui.actionButton(if (replacing) "Replace" else "Add") {
+                                    ui.actionButton(
+                                            if (hasLoggedSets && !keepsLoggedSets(movement))
+                                                "Replace remaining"
+                                            else if (replacing) "Replace" else "Add"
+                                        ) {
                                             addExercises(listOf(movement))
                                         }
                                         .apply {

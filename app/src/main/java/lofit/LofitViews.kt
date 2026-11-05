@@ -247,8 +247,6 @@ internal class LofitViews(
         onRemove: () -> Unit,
         onReorderHandleReady: (View) -> Unit,
         onSelectExercise: (ExercisePlacement) -> Unit,
-        replaceRemaining: Boolean = false,
-        canReplace: Boolean = true,
         useScale: (() -> Boolean)? = null,
         onUseScaleChange: (Boolean) -> Unit = {},
         pauseEverySecondSet: () -> Boolean = { false },
@@ -279,18 +277,10 @@ internal class LofitViews(
                                     onRemove()
                                     true
                                 }
-                                menu
-                                    .add(
-                                        if (replaceRemaining) "Replace remaining"
-                                        else "Replace exercise"
-                                    )
-                                    .apply {
-                                        isEnabled = canReplace
-                                        setOnMenuItemClickListener {
-                                            onSelectExercise(ExercisePlacement.REPLACE)
-                                            true
-                                        }
-                                    }
+                                menu.add("Replace exercise").setOnMenuItemClickListener {
+                                    onSelectExercise(ExercisePlacement.REPLACE)
+                                    true
+                                }
                                 menu.add("Add exercise above").setOnMenuItemClickListener {
                                     onSelectExercise(ExercisePlacement.ABOVE)
                                     true
