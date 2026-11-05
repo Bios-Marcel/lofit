@@ -37,6 +37,7 @@ internal class PlannedSetViews(
         completed: Boolean = false,
         onRemove: (() -> Unit)? = null,
         onRemoveAndBelow: (() -> Unit)? = null,
+        onOverrideBelow: (() -> Unit)? = null,
         showActiveHold: Boolean = false,
         activeHoldAction: View? = null,
         activeHoldRunning: Boolean = false,
@@ -46,9 +47,11 @@ internal class PlannedSetViews(
         onAmountReady: (EditText) -> Unit = {},
         onActiveAmountReady: (EditText) -> Unit = {},
         onIndexUpdaterReady: ((Int) -> Unit) -> Unit = {},
+        onValuesUpdaterReady: (() -> Unit) -> Unit = {},
         onChanged: () -> Unit = {},
     ): View {
         var currentSetIndex = setIndex
+        var updatingValues = false
         return LinearLayout(activityContext).apply {
             orientation = LinearLayout.VERTICAL
             if (completed) setBackgroundColor(ui.color(R.color.done_green))
@@ -111,7 +114,8 @@ internal class PlannedSetViews(
                             setPadding(ui.dp(6), 0, ui.dp(6), 0)
                             onWeightReady(this)
                             doAfterTextChanged { value ->
-                                if (isUpdatingHoldTimer()) return@doAfterTextChanged
+                                if (updatingValues || isUpdatingHoldTimer())
+                                    return@doAfterTextChanged
                                 parseWeight(value.toString())
                                     ?.takeIf { it >= 0 }
                                     ?.let {
@@ -141,7 +145,7 @@ internal class PlannedSetViews(
                         contentDescription = "Set ${currentSetIndex + 1} $amountLabel"
                         setPadding(ui.dp(6), 0, ui.dp(6), 0)
                         doAfterTextChanged { value ->
-                            if (isUpdatingHoldTimer()) return@doAfterTextChanged
+                            if (updatingValues || isUpdatingHoldTimer()) return@doAfterTextChanged
                             value
                                 .toString()
                                 .toIntOrNull()
@@ -172,7 +176,8 @@ internal class PlannedSetViews(
                                 // controls it.
                                 isEnabled = !activeHoldRunning && !measured
                                 doAfterTextChanged { value ->
-                                    if (isUpdatingHoldTimer()) return@doAfterTextChanged
+                                    if (updatingValues || isUpdatingHoldTimer())
+                                        return@doAfterTextChanged
                                     value
                                         .toString()
                                         .toIntOrNull()
@@ -335,10 +340,12 @@ internal class PlannedSetViews(
             var swipeRow: HorizontalScrollView? = null
             var deleteButton: MaterialButton? = null
             var deleteBelowButton: MaterialButton? = null
-            if (onRemove != null || onRemoveAndBelow != null) {
+            var overrideBelowButton: MaterialButton? = null
+            if (onRemove != null || onRemoveAndBelow != null || onOverrideBelow != null) {
                 val revealWidth =
-                    (if (onRemove != null) ui.dp(92) else 0) +
-                        (if (onRemoveAndBelow != null) ui.dp(128) else 0)
+                    (if (onRemove != null) ui.dp(84) else 0) +
+                        (if (onOverrideBelow != null) ui.dp(116) else 0) +
+                        (if (onRemoveAndBelow != null) ui.dp(108) else 0)
                 val row =
                     SwipeRevealRow(revealWidth).apply {
                         contentDescription = "Set ${currentSetIndex + 1} row"
@@ -347,6 +354,22 @@ internal class PlannedSetViews(
                                 orientation = LinearLayout.HORIZONTAL
                                 gravity = Gravity.CENTER_VERTICAL
                                 addView(fields)
+                                onOverrideBelow?.let { override ->
+                                    val button =
+                                        ui.smallButton("Override down") {
+                                                override()
+                                                swipeRow?.smoothScrollTo(0, 0)
+                                            }
+                                            .apply {
+                                                contentDescription =
+                                                    "Override down set ${currentSetIndex + 1}"
+                                            }
+                                    overrideBelowButton = button
+                                    addView(
+                                        button,
+                                        LinearLayout.LayoutParams(ui.dp(116), ui.dp(48)),
+                                    )
+                                }
                                 onRemove?.let { remove ->
                                     val button =
                                         swipeDeleteButton(
@@ -355,19 +378,24 @@ internal class PlannedSetViews(
                                             remove,
                                         )
                                     deleteButton = button
-                                    addView(button, LinearLayout.LayoutParams(ui.dp(92), ui.dp(64)))
+                                    addView(
+                                        button,
+                                        LinearLayout.LayoutParams(ui.dp(80), ui.dp(48)).apply {
+                                            marginStart = ui.dp(4)
+                                        },
+                                    )
                                 }
                                 onRemoveAndBelow?.let { remove ->
                                     val button =
                                         swipeDeleteButton(
-                                            "Delete below",
+                                            "Delete down",
                                             "Delete set ${currentSetIndex + 1} and all below",
                                             remove,
                                         )
                                     deleteBelowButton = button
                                     addView(
                                         button,
-                                        LinearLayout.LayoutParams(ui.dp(124), ui.dp(64)).apply {
+                                        LinearLayout.LayoutParams(ui.dp(104), ui.dp(48)).apply {
                                             marginStart = ui.dp(4)
                                         },
                                     )
@@ -393,8 +421,22 @@ internal class PlannedSetViews(
                 swipeRow?.contentDescription = "Set ${newIndex + 1} row"
                 deleteButton?.contentDescription = "Delete set ${newIndex + 1}"
                 deleteBelowButton?.contentDescription = "Delete set ${newIndex + 1} and all below"
+                overrideBelowButton?.contentDescription = "Override down set ${newIndex + 1}"
                 sideControl?.contentDescription =
                     "Set ${newIndex + 1} side: ${plannedSet.side.label}"
+            }
+            onValuesUpdaterReady {
+                updatingValues = true
+                try {
+                    weight?.text = formatWeight(plannedSet.weightKg)
+                    amount.text =
+                        ui.formatInteger(
+                            if (exercise.type.tracksDuration) plannedSet.holdSeconds
+                            else plannedSet.reps
+                        )
+                } finally {
+                    updatingValues = false
+                }
             }
         }
     }

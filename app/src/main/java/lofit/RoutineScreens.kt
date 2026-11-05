@@ -144,6 +144,7 @@ internal class RoutineScreens(
                             }
                         val rowViews = mutableMapOf<String, View>()
                         val updateRowIndices = mutableMapOf<String, (Int) -> Unit>()
+                        val updateRowValues = mutableMapOf<String, () -> Unit>()
                         fun removeRoutineSets(fromIndex: Int, allBelow: Boolean) {
                             val endIndex = if (allBelow) item.plannedSets.size else fromIndex + 1
                             val removedSets = item.plannedSets.subList(fromIndex, endIndex).toList()
@@ -151,6 +152,7 @@ internal class RoutineScreens(
                             removedSets.forEach { removedSet ->
                                 rowViews.remove(removedSet.id)?.let(setRows::removeView)
                                 updateRowIndices.remove(removedSet.id)
+                                updateRowValues.remove(removedSet.id)
                             }
                             item.plannedSets.forEachIndexed { setIndex, set ->
                                 updateRowIndices[set.id]?.invoke(setIndex)
@@ -174,6 +176,12 @@ internal class RoutineScreens(
                                             .takeIf { it >= 0 }
                                             ?.let { removeRoutineSets(it, true) }
                                     },
+                                    onOverrideBelow = {
+                                        overrideSetsBelow(item.plannedSets, plannedSet).forEach {
+                                            updateRowValues[it.id]?.invoke()
+                                        }
+                                    },
+                                    onValuesUpdaterReady = { updateRowValues[plannedSet.id] = it },
                                     onIndexUpdaterReady = { updater ->
                                         updateRowIndices[plannedSet.id] = updater
                                     },

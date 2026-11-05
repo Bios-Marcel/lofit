@@ -1281,6 +1281,7 @@ class MainActivity : AppCompatActivity() {
                 }
             val rowViews = mutableMapOf<String, View>()
             val updateRowIndices = mutableMapOf<String, (Int) -> Unit>()
+            val updateRowValues = mutableMapOf<String, () -> Unit>()
             fun removeWorkoutSets(fromIndex: Int, allBelow: Boolean) {
                 val endIndex = if (allBelow) item.plannedSets.size else fromIndex + 1
                 val indices = fromIndex until endIndex
@@ -1304,6 +1305,7 @@ class MainActivity : AppCompatActivity() {
                 removedSets.forEach { removedSet ->
                     rowViews.remove(removedSet.id)?.let(setRows::removeView)
                     updateRowIndices.remove(removedSet.id)
+                    updateRowValues.remove(removedSet.id)
                 }
                 item.plannedSets.forEachIndexed { setIndex, set ->
                     updateRowIndices[set.id]?.invoke(setIndex)
@@ -1400,6 +1402,19 @@ class MainActivity : AppCompatActivity() {
                                 .takeIf { it >= 0 }
                                 ?.let { removeWorkoutSets(it, true) }
                         },
+                        onOverrideBelow = {
+                            overrideSetsBelow(item.plannedSets, plannedSet).forEach { set ->
+                                loggedSetFor(item, set)?.let {
+                                    it.weightKg = set.weightKg.takeIf { exercise.weighted } ?: 0.0
+                                    it.reps = if (exercise.type.tracksDuration) 0 else set.reps
+                                }
+                                updateRowValues[set.id]?.invoke()
+                            }
+                            saveChanges()
+                            onSetsChanged()
+                            if (!editingHistory) updateWorkoutNotification(force = true)
+                        },
+                        onValuesUpdaterReady = { updateRowValues[plannedSet.id] = it },
                         showActiveHold = exercise.type.tracksDuration,
                         activeHoldAction = holdButton,
                         activeHoldRunning = isActiveHold(item, plannedSet),

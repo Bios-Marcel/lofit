@@ -6,6 +6,30 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ExerciseEditingTest {
+    @Test
+    fun overrideBelowCopiesOnlyTargetsAndPreservesOtherFields() {
+        val sets =
+            listOf(
+                PlannedSet(weightKg = 5.0, reps = 12, holdSeconds = 15),
+                PlannedSet(weightKg = 20.5, reps = 6, holdSeconds = 45, actualHoldSeconds = 50),
+                PlannedSet(type = SetType.WARMUP, side = Side.LEFT, actualHoldSeconds = 27),
+                PlannedSet(type = SetType.FAILURE, side = Side.RIGHT),
+            )
+        val before = sets.map { it.copy() }
+
+        assertEquals(sets.drop(2), overrideSetsBelow(sets, sets[1]))
+
+        assertEquals(before.take(2), sets.take(2))
+        assertEquals(
+            before.drop(2).map { it.copy(weightKg = 20.5, reps = 6, holdSeconds = 45) },
+            sets.drop(2),
+        )
+        val after = sets.map { it.copy() }
+        assertTrue(overrideSetsBelow(sets, sets.last()).isEmpty())
+        assertTrue(overrideSetsBelow(sets, PlannedSet()).isEmpty())
+        assertEquals(after, sets)
+    }
+
     private val exercise =
         Exercise(
             id = "single-side",

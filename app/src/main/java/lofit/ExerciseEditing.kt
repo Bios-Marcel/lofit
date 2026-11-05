@@ -11,6 +11,16 @@ internal enum class ExercisePlacement {
 internal fun Exercise.canKeepLoggedSetsFrom(original: Exercise): Boolean =
     type == original.type && asymmetric == original.asymmetric && weighted == original.weighted
 
+internal fun overrideSetsBelow(sets: List<PlannedSet>, source: PlannedSet): List<PlannedSet> {
+    val index = sets.indexOfFirst { it.id == source.id }
+    if (index < 0) return emptyList()
+    return sets.drop(index + 1).onEach {
+        it.reps = source.reps
+        it.holdSeconds = source.holdSeconds
+        it.weightKg = source.weightKg
+    }
+}
+
 internal fun nextPlannedSets(sets: List<PlannedSet>, exercise: Exercise): List<PlannedSet> {
     val paired =
         sets.size >= 2 &&

@@ -1641,6 +1641,173 @@ class WorkoutFlowTest {
     }
 
     @Test
+    fun workoutOverrideBelow_updatesRowsAndLogsWithoutChangingCompletion() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val sets =
+            mutableListOf(
+                PlannedSet(weightKg = 10.0, reps = 12),
+                PlannedSet(weightKg = 20.0, reps = 8, side = Side.LEFT),
+                PlannedSet(weightKg = 30.0, reps = 5, side = Side.RIGHT, type = SetType.FAILURE),
+                PlannedSet(weightKg = 40.0, reps = 4, type = SetType.WARMUP),
+            )
+        val completed =
+            LoggedSet(
+                plannedSetId = sets[2].id,
+                weightKg = 30.0,
+                reps = 5,
+                side = Side.RIGHT,
+                type = SetType.FAILURE,
+                completedAt = 1234L,
+            )
+        seedWorkout(
+            WorkoutExercise(
+                exerciseId = "bench-press",
+                plannedSets = sets,
+                sets = mutableListOf(completed),
+            )
+        )
+        ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)).use {
+            scenario ->
+            onView(withContentDescription("Set 2 weight")).perform(replaceText("22.5"))
+            onView(withContentDescription("Set 2 Repetitions")).perform(replaceText("9"))
+            var belowRow: View? = null
+            onView(withContentDescription("Set 3 row")).check { view, _ -> belowRow = view }
+            onView(withContentDescription("Set 2 row")).perform(swipeLeft())
+            onView(withContentDescription("Override down set 2"))
+                .check(matches(isCompletelyDisplayed()))
+                .perform(click())
+            onView(withContentDescription("Set 3 row")).check { view, _ ->
+                assertSame(belowRow, view)
+            }
+            onView(withContentDescription("Set 3 weight")).check(matches(withText("22.5")))
+            onView(withContentDescription("Set 4 Repetitions")).check(matches(withText("9")))
+            onView(withContentDescription("Set 3 done")).check(matches(isChecked()))
+            onView(withContentDescription("Set 4 done")).check(matches(not(isChecked())))
+            val saved = LofitRepository(context).data.activeWorkout!!.exercises.single()
+            assertEquals(sets[0], saved.plannedSets[0])
+            assertEquals(sets[2].copy(weightKg = 22.5, reps = 9), saved.plannedSets[2])
+            assertEquals(sets[3].copy(weightKg = 22.5, reps = 9), saved.plannedSets[3])
+            assertEquals(completed.copy(weightKg = 22.5, reps = 9), saved.sets.single())
+            scenario.recreate()
+            onView(withContentDescription("Set 3 weight")).check(matches(withText("22.5")))
+            onView(withContentDescription("Set 3 done")).check(matches(isChecked()))
+            onView(withContentDescription("Set 4 row")).perform(scrollTo(), swipeLeft())
+            onView(withContentDescription("Override down set 4")).perform(click())
+            assertEquals(saved, LofitRepository(context).data.activeWorkout!!.exercises.single())
+        }
+    }
+
+    @Test
+    fun routineOverrideBelow_usesCurrentIndexAfterDeleteAndSavesTime() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val sets =
+            mutableListOf(
+                PlannedSet(holdSeconds = 10),
+                PlannedSet(holdSeconds = 45, side = Side.LEFT),
+                PlannedSet(holdSeconds = 20, side = Side.RIGHT, type = SetType.WARMUP),
+            )
+        LofitRepository(context).apply {
+            data.routines.add(
+                Routine(
+                    name = "Override time",
+                    exercises =
+                        mutableListOf(RoutineExercise(exerciseId = "plank", plannedSets = sets)),
+                )
+            )
+            save()
+        }
+        ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)).use {
+            scenario ->
+            onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+            onView(
+                    allOf(
+                        withText(R.string.nav_routines),
+                        isAssignableFrom(android.widget.Button::class.java),
+                    )
+                )
+                .perform(click())
+            onView(withText("Edit")).perform(click())
+            onView(withContentDescription("Set 1 row")).perform(swipeLeft())
+            onView(withContentDescription("Delete set 1")).perform(click())
+            onView(withContentDescription("Set 1 Hold duration in seconds"))
+                .perform(replaceText("55"))
+            onView(withContentDescription("Set 1 row")).perform(swipeLeft())
+            onView(withContentDescription("Override down set 1")).perform(click())
+            onView(withContentDescription("Set 2 Hold duration in seconds"))
+                .check(matches(withText("55")))
+            onView(withText("Save routine")).perform(scrollTo(), click())
+            val saved =
+                LofitRepository(context).data.routines.single().exercises.single().plannedSets
+            assertEquals(sets.drop(1).map { it.copy(holdSeconds = 55) }, saved)
+            onView(withText("Edit")).perform(click())
+            onView(withContentDescription("Set 2 Hold duration in seconds"))
+                .check(matches(withText("55")))
+        }
+    }
+
+    @Test
+    fun historyOverrideBelow_preservesRecordedTimeAndCompletion() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val sets =
+            mutableListOf(
+                PlannedSet(holdSeconds = 45, actualHoldSeconds = 47),
+                PlannedSet(
+                    holdSeconds = 20,
+                    actualHoldSeconds = 23,
+                    type = SetType.FAILURE,
+                    side = Side.RIGHT,
+                ),
+                PlannedSet(holdSeconds = 30),
+            )
+        val completed =
+            LoggedSet(
+                plannedSetId = sets[1].id,
+                weightKg = 0.0,
+                holdSeconds = 23,
+                reps = 0,
+                type = SetType.FAILURE,
+                side = Side.RIGHT,
+                completedAt = 1234L,
+            )
+        LofitRepository(context).apply {
+            data.history.add(
+                WorkoutSession(
+                    name = "Past holds",
+                    startedAt = 1000L,
+                    completedAt = 2000L,
+                    exercises =
+                        mutableListOf(
+                            WorkoutExercise(
+                                exerciseId = "plank",
+                                plannedSets = sets,
+                                sets = mutableListOf(completed),
+                            )
+                        ),
+                )
+            )
+            saveHistory()
+            save()
+        }
+        ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)).use {
+            onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+            onView(withText(R.string.nav_history)).perform(click())
+            onView(withContentDescription("Edit Past holds")).perform(scrollTo(), click())
+            onView(withContentDescription("Set 1 row")).perform(scrollTo(), swipeLeft())
+            onView(withContentDescription("Override down set 1")).perform(click())
+            onView(withContentDescription("Set 2 Goal time in seconds"))
+                .check(matches(withText("45")))
+            onView(withContentDescription("Set 2 Active time in seconds"))
+                .check(matches(withText("23")))
+            onView(withContentDescription("Set 2 done")).check(matches(isChecked()))
+            onView(withContentDescription("Set 3 done")).check(matches(not(isChecked())))
+            onView(withText("Save changes")).perform(scrollTo(), click())
+            val saved = LofitRepository(context).data.history.single().exercises.single()
+            assertEquals(sets.map { it.copy(holdSeconds = 45) }, saved.plannedSets)
+            assertEquals(completed, saved.sets.single())
+        }
+    }
+
+    @Test
     fun workoutSetDelete_keepsSurvivingRowsMounted() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val repository = LofitRepository(instrumentation.targetContext)
