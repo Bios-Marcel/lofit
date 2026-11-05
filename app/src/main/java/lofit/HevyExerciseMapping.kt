@@ -54,7 +54,6 @@ internal object HevyExerciseMapping {
             "barbell-bench-press-medium-grip" to "79D0BB3A", // Bench Press (Barbell)
             "barbell-curl" to "A5AC6449", // Bicep Curl (Barbell)
             "barbell-deadlift" to "C6272009", // Deadlift (Barbell)
-            "barbell-full-squat" to "D04AC939", // Squat (Barbell)
             "barbell-glute-bridge" to "49C922A1", // Glute Bridge (Barbell)
             "barbell-guillotine-bench-press" to "79D0BB3A", // Bench Press (Barbell)
             "barbell-hack-squat" to "AC5A4C58", // Hack Squat

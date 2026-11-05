@@ -2816,16 +2816,6 @@ object ExerciseCatalog {
                         imageName = "exercise_db_227",
                     ),
                     Exercise(
-                        "barbell-full-squat",
-                        "Barbell Full Squat",
-                        ExerciseType.REPETITIONS,
-                        false,
-                        "Quadriceps",
-                        "Calves, Glutes, Hamstrings, Lower Back",
-                        30,
-                        imageName = "exercise_db_228",
-                    ),
-                    Exercise(
                         "barbell-glute-bridge",
                         "Barbell Glute Bridge",
                         ExerciseType.REPETITIONS,
