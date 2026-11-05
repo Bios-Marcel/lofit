@@ -5,8 +5,10 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.os.SystemClock
 import android.util.AtomicFile
+import android.view.View
 import android.view.ViewGroup
 import android.widget.CheckBox
+import android.widget.ScrollView
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.test.core.app.ActivityScenario
@@ -16,8 +18,10 @@ import androidx.test.espresso.assertion.ViewAssertions.*
 import androidx.test.espresso.matcher.ViewMatchers.*
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import org.hamcrest.Description
 import org.hamcrest.Matchers.allOf
 import org.hamcrest.Matchers.not
+import org.hamcrest.TypeSafeMatcher
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -133,6 +137,126 @@ class LiveWorkoutMeasurementFlowTest {
         reader.update(selected, true)
         return scanner
     }
+
+    @Test
+    fun graphStaysVisibleThroughManySetsAndReturnsToItsOriginalPosition() {
+        seedLongExercises()
+        ActivityScenario.launch(MainActivity::class.java).use {
+            val graph = onView(withContentDescription("Scale Pull live weight graph"))
+            graph.check { view, _ ->
+                val scroll = graphScroll(view)
+                scroll.scrollTo(0, naturalTop(view, scroll) + view.height * 2)
+            }
+            graph.perform(waitUntilMatches(graphAtViewportTop()))
+            graph.check(matches(isCompletelyDisplayed()))
+            var beforeSwipe = 0
+            graph.check { view, _ -> beforeSwipe = graphScroll(view).scrollY }
+            graph.perform(swipeUp())
+            graph.perform(waitUntilMatches(graphAtViewportTop()))
+            graph.check { view, _ -> assertTrue(graphScroll(view).scrollY > beforeSwipe) }
+            graph.check { view, _ ->
+                val scroll = graphScroll(view)
+                scroll.scrollTo(0, naturalTop(view, scroll) + view.height * 3)
+            }
+            graph.perform(waitUntilMatches(graphAtViewportTop()))
+            graph.check(matches(isCompletelyDisplayed()))
+            graph.check { view, _ -> graphScroll(view).scrollTo(0, 0) }
+            graph.perform(
+                waitUntilMatches(
+                    object : TypeSafeMatcher<View>() {
+                        override fun describeTo(description: Description) {
+                            description.appendText("graph back at its original position")
+                        }
+
+                        override fun matchesSafely(view: View) = view.translationY == 0f
+                    }
+                )
+            )
+        }
+    }
+
+    @Test
+    fun graphLeavesWithItsExerciseAndNextGraphBecomesSticky() {
+        seedLongExercises()
+        ActivityScenario.launch(MainActivity::class.java).use {
+            val first = onView(withContentDescription("Scale Pull live weight graph"))
+            val next = onView(withContentDescription("Next Pull live weight graph"))
+            first.check { view, _ ->
+                val scroll = graphScroll(view)
+                val card = view.parent as ViewGroup
+                val cardBottom =
+                    naturalTop(view, scroll) - view.top + card.height - card.paddingBottom
+                scroll.scrollTo(0, cardBottom - view.height / 2)
+            }
+            first.perform(
+                waitUntilMatches(
+                    object : TypeSafeMatcher<View>() {
+                        override fun describeTo(description: Description) {
+                            description.appendText("graph pushed above viewport by exercise bottom")
+                        }
+
+                        override fun matchesSafely(view: View): Boolean {
+                            val card = view.parent as ViewGroup
+                            return view.translationY ==
+                                (card.height - card.paddingBottom - view.bottom).toFloat() &&
+                                windowTop(view) < windowTop(graphScroll(view))
+                        }
+                    }
+                )
+            )
+            next.check { view, _ ->
+                val scroll = graphScroll(view)
+                scroll.scrollTo(0, naturalTop(view, scroll) + view.height * 2)
+            }
+            next.perform(waitUntilMatches(graphAtViewportTop()))
+            next.check(matches(isCompletelyDisplayed()))
+            first.check(matches(not(isDisplayed())))
+            first.check { view, _ ->
+                val scroll = graphScroll(view)
+                scroll.scrollTo(0, naturalTop(view, scroll) + view.height)
+            }
+            first.perform(waitUntilMatches(graphAtViewportTop()))
+            first.check(matches(isCompletelyDisplayed()))
+        }
+    }
+
+    private fun seedLongExercises() {
+        LofitRepository(context).apply {
+            val next = movement.copy(id = "next-live-test", name = "Next Pull")
+            data.exercises.add(next)
+            data.activeWorkout!!.exercises.apply {
+                single().plannedSets.apply {
+                    clear()
+                    repeat(40) { add(PlannedSet(holdSeconds = 1)) }
+                }
+                add(
+                    WorkoutExercise(
+                        exerciseId = next.id,
+                        plannedSets = MutableList(40) { PlannedSet(holdSeconds = 1) },
+                    )
+                )
+            }
+            save()
+        }
+    }
+
+    private fun graphScroll(view: View): ScrollView =
+        generateSequence(view.parent) { it.parent }.filterIsInstance<ScrollView>().first()
+
+    private fun windowTop(view: View): Int = IntArray(2).also(view::getLocationInWindow)[1]
+
+    private fun naturalTop(view: View, scroll: ScrollView): Int =
+        windowTop(view.parent as View) + view.top - windowTop(scroll) + scroll.scrollY
+
+    private fun graphAtViewportTop() =
+        object : TypeSafeMatcher<View>() {
+            override fun describeTo(description: Description) {
+                description.appendText("graph pinned at viewport top")
+            }
+
+            override fun matchesSafely(view: View): Boolean =
+                view.translationY > 0 && windowTop(view) == windowTop(graphScroll(view))
+        }
 
     @Test
     fun greenTargetLineFollowsCurrentSetAndStaysVisibleAboveReadings() {

@@ -1240,6 +1240,7 @@ class MainActivity : AppCompatActivity() {
                         .also {
                             it.contentDescription = "${exercise.name} live weight graph"
                             liveGraphs.add(it)
+                            StickyExerciseGraph(it, this)
                         },
                     ui.insetCardLayoutParams(),
                 )
