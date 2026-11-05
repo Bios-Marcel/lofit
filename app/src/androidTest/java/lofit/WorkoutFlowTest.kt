@@ -2576,9 +2576,21 @@ class WorkoutFlowTest {
                 .check(matches(isDisplayed()))
             onView(withContentDescription("Set 1 Active time in seconds")).check { field, _ ->
                 val control = field.parent as ViewGroup
-                assertEquals(2, control.childCount)
-                val play = control.getChildAt(1)
+                assertEquals(1, control.childCount)
+                val row = control.parent as ViewGroup
+                val playControl = row.getChildAt(row.indexOfChild(control) + 1) as ViewGroup
+                val play = playControl.getChildAt(0)
                 assertEquals("Start set 1 hold", play.contentDescription)
+                val density = field.resources.displayMetrics.density
+                assertTrue(play.width >= (36 * density).toInt())
+                assertTrue(play.height >= (56 * density).toInt())
+                assertTrue(playControl.left >= control.right)
+                val doneControl = row.getChildAt(row.childCount - 1)
+                assertEquals(
+                    doneControl.top + doneControl.height / 2,
+                    playControl.top + playControl.height / 2,
+                )
+                assertTrue(play is android.widget.ImageButton)
                 assertEquals(null, play.background)
                 assertEquals(
                     0,

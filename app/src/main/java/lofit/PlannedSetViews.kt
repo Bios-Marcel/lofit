@@ -23,7 +23,7 @@ internal class PlannedSetViews(
     companion object {
         const val CHECKBOX_WIDTH_DP = 40
         private const val SET_ROW_PADDING_DP = 4
-        private const val SET_HOLD_BUTTON_WIDTH_DP = 30
+        private const val SET_HOLD_BUTTON_WIDTH_DP = 36
         private const val SET_ACTIVE_FIELD_EXTRA_WIDTH_DP = 24
         private const val JOINED_SET_BUTTON_WIDTH_DP = 44
     }
@@ -217,33 +217,6 @@ internal class PlannedSetViews(
                         if (sideControl == null) setNumber
                         else joinedSetControl(setNumber, sideControl)
                     addView(setGridControl(setControl), setGridCell(columns[0], heightDp = 48))
-                    val activeControl = activeAmount?.let { active ->
-                        FrameLayout(activityContext).apply {
-                            addView(
-                                active,
-                                FrameLayout.LayoutParams(
-                                    ViewGroup.LayoutParams.MATCH_PARENT,
-                                    ViewGroup.LayoutParams.MATCH_PARENT,
-                                ),
-                            )
-                            activeHoldAction?.let { action ->
-                                (active as? EditText)?.setPadding(
-                                    ui.dp(6),
-                                    0,
-                                    ui.dp(SET_HOLD_BUTTON_WIDTH_DP + 2),
-                                    0,
-                                )
-                                addView(
-                                    action,
-                                    FrameLayout.LayoutParams(
-                                        ui.dp(SET_HOLD_BUTTON_WIDTH_DP),
-                                        ViewGroup.LayoutParams.MATCH_PARENT,
-                                        Gravity.END,
-                                    ),
-                                )
-                            }
-                        }
-                    }
                     when {
                         activeGrid && exercise.weighted -> {
                             addView(
@@ -255,14 +228,20 @@ internal class PlannedSetViews(
                                 setGridCell(columns[2], heightDp = 48),
                             )
                             addView(
-                                setGridControl(activeControl!!),
+                                setGridControl(activeAmount!!),
                                 setGridCell(columns[3], heightDp = 48),
                             )
+                            activeHoldAction?.let {
+                                addView(
+                                    setGridControl(it, horizontalMarginDp = 0),
+                                    setGridCell(columns[columns.lastIndex - 1], heightDp = 56),
+                                )
+                            }
                             endAction?.let {
                                 addView(
                                     it,
                                     setGridCell(
-                                        columns[4],
+                                        columns.last(),
                                         heightDp = endActionHeight,
                                     ),
                                 )
@@ -274,14 +253,20 @@ internal class PlannedSetViews(
                                 setGridCell(columns[1], heightDp = 48),
                             )
                             addView(
-                                setGridControl(activeControl!!),
+                                setGridControl(activeAmount!!),
                                 setGridCell(columns[2], heightDp = 48),
                             )
+                            activeHoldAction?.let {
+                                addView(
+                                    setGridControl(it, horizontalMarginDp = 0),
+                                    setGridCell(columns[columns.lastIndex - 1], heightDp = 56),
+                                )
+                            }
                             endAction?.let {
                                 addView(
                                     it,
                                     setGridCell(
-                                        columns[3],
+                                        columns.last(),
                                         heightDp = endActionHeight,
                                     ),
                                 )
@@ -520,6 +505,9 @@ internal class PlannedSetViews(
                     addView(View(activityContext), setGridCell(columns[2]))
                 }
             }
+            if (activeGrid && showActiveHoldAction) {
+                addView(View(activityContext), setGridCell(columns[columns.lastIndex - 1]))
+            }
             if (showDone) addView(View(activityContext), setGridCell(columns.last()))
         }
 
@@ -539,18 +527,22 @@ internal class PlannedSetViews(
         // LEGACY: Standalone set buttons retain their original width.
         val setWidth = if (asymmetric) JOINED_SET_BUTTON_WIDTH_DP else 48
         val sideWidth = if (asymmetric) JOINED_SET_BUTTON_WIDTH_DP else 0
+        val holdButtonWidth = if (activeHold && activeHoldAction) SET_HOLD_BUTTON_WIDTH_DP else 0
         val totalWidth =
             (activityContext.resources.configuration.screenWidthDp - 28 - SET_ROW_PADDING_DP * 2)
-                .coerceAtLeast(280) - sideWidth
+                .coerceAtLeast(280) - sideWidth - holdButtonWidth
         val widths =
             when {
                 weighted && activeHold -> {
-                    // LEGACY: Manual timer icons keep their existing column widths.
+                    // Give the space saved by compact timer controls to the weight input.
+                    // LEGACY: Rows without manual timers keep their existing weight allowance.
+                    val extraWeightWidth =
+                        if (activeHoldAction) 12 else SET_ACTIVE_FIELD_EXTRA_WIDTH_DP
                     val fieldWidth =
-                        ((totalWidth - setWidth - endWidth - SET_ACTIVE_FIELD_EXTRA_WIDTH_DP) / 3)
-                            .coerceAtLeast(40)
-                    val weightWidth =
-                        fieldWidth + if (activeHoldAction) 0 else SET_ACTIVE_FIELD_EXTRA_WIDTH_DP
+                        ((totalWidth - setWidth - endWidth - extraWeightWidth) / 3).coerceAtLeast(
+                            40
+                        )
+                    val weightWidth = fieldWidth + extraWeightWidth
                     intArrayOf(
                         setWidth,
                         weightWidth,
@@ -582,9 +574,12 @@ internal class PlannedSetViews(
                 }
                 else -> intArrayOf(setWidth, totalWidth - setWidth - 40 - endWidth, 40, endWidth)
             }
-        return if (asymmetric)
-            intArrayOf(widths[0] + sideWidth) + widths.copyOfRange(1, widths.size)
-        else widths
+        val columns =
+            if (holdButtonWidth > 0)
+                widths.copyOfRange(0, widths.lastIndex) + intArrayOf(holdButtonWidth, endWidth)
+            else widths
+        if (asymmetric) columns[0] += sideWidth
+        return columns
     }
 
     private fun joinedSetControl(setNumber: TextView, side: TextView): View =
@@ -628,7 +623,7 @@ internal class PlannedSetViews(
             setMargins(0, 0, 0, 0)
         }
 
-    private fun setGridControl(control: View): View =
+    private fun setGridControl(control: View, horizontalMarginDp: Int = 3): View =
         FrameLayout(activityContext).apply {
             addView(
                 control,
@@ -637,8 +632,8 @@ internal class PlannedSetViews(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                     )
                     .apply {
-                        marginStart = ui.dp(3)
-                        marginEnd = ui.dp(3)
+                        marginStart = ui.dp(horizontalMarginDp)
+                        marginEnd = ui.dp(horizontalMarginDp)
                     },
             )
         }

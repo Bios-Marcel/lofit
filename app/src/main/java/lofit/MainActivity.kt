@@ -38,6 +38,8 @@ import android.view.WindowManager
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -274,7 +276,7 @@ class MainActivity : AppCompatActivity() {
         }
     private var timerText: TextView? = null
     private var holdTimerText: TextView? = null
-    private var holdTimerButton: TextView? = null
+    private var holdTimerButton: ImageButton? = null
     private var holdDoneCheckBox: CheckBox? = null
     private var activeHoldWorkoutExerciseId: String? = null
     private var activeHoldPlannedSetId: String? = null
@@ -1345,13 +1347,15 @@ class MainActivity : AppCompatActivity() {
                 lateinit var activeHoldAmount: EditText
                 val holdButton =
                     if (exercise.type.tracksDuration && !editingHistory && !liveMeasurement)
-                        TextView(this@MainActivity).apply {
-                            text = if (isActiveHold(item, plannedSet)) "■" else "▶"
-                            textSize = 18f
-                            includeFontPadding = false
-                            gravity = Gravity.CENTER
+                        ImageButton(this@MainActivity).apply {
+                            setImageResource(
+                                if (isActiveHold(item, plannedSet)) R.drawable.ic_timer_stop
+                                else R.drawable.ic_timer_start
+                            )
+                            scaleType = ImageView.ScaleType.CENTER
+                            background = null
                             setPadding(0, 0, 0, 0)
-                            setTextColor(ui.color(R.color.cream))
+                            imageTintList = ColorStateList.valueOf(ui.color(R.color.cream))
                             contentDescription =
                                 if (isActiveHold(item, plannedSet)) "Stop set ${setIndex + 1} hold"
                                 else "Start set ${setIndex + 1} hold"
@@ -3274,7 +3278,7 @@ class MainActivity : AppCompatActivity() {
         item: WorkoutExercise,
         set: PlannedSet,
         amount: EditText,
-        button: TextView,
+        button: ImageButton,
         done: CheckBox,
     ) {
         liveWorkoutMeasurement.interrupt()?.let { refreshLiveSetValues(it.pull.set) }
@@ -3294,7 +3298,7 @@ class MainActivity : AppCompatActivity() {
         amount.setText("0")
         updatingHoldTimer = false
         amount.isEnabled = false
-        button.text = "■"
+        button.setImageResource(R.drawable.ic_timer_stop)
         button.contentDescription = button.contentDescription.toString().replace("Start", "Stop")
         repository.save()
         updateWorkoutNotification(force = true)
@@ -3333,7 +3337,7 @@ class MainActivity : AppCompatActivity() {
         updatingHoldTimer = false
         holdTimerText?.isEnabled = true
         holdTimerButton?.apply {
-            text = "▶"
+            setImageResource(R.drawable.ic_timer_start)
             contentDescription = contentDescription.toString().replace("Stop", "Start")
         }
         repository.save()
