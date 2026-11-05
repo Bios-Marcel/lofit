@@ -100,17 +100,14 @@ internal class ExerciseScreens(
                                 ui.metaText(
                                     listOf(
                                             exerciseTrackingLabel(movement),
-                                            if (movement.asymmetric) "left / right" else null,
+                                            if (movement.asymmetric) "Asymmetrical" else null,
                                         )
                                         .filterNotNull()
                                         .joinToString(" · ")
                                 )
                             )
-                            addView(
-                                ui.metaText(
-                                    "Primary: ${movement.primaryMuscle} · Secondary: ${movement.secondaryMuscles}"
-                                )
-                            )
+                            if (movement.secondaryMuscles.isNotBlank())
+                                addView(ui.metaText("Secondary: ${movement.secondaryMuscles}"))
                             recordFor(movement)?.let { addView(ui.accentText(it)) }
                             if (movement.custom)
                                 addView(
