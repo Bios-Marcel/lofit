@@ -95,74 +95,95 @@ internal class LofitViews(
     }
 
     private fun editableTitle(value: String, onChange: (String) -> Unit): View =
-        LinearLayout(activityContext).apply {
-            layoutParams =
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                )
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            var savedTitle = value
-            val title = titleText(value).apply { textSize = 26f }
-            val field =
-                textField("Workout title").apply {
-                    visibility = View.GONE
-                    textSize = 26f
-                    contentDescription = "Workout title"
-                    inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
-                    imeOptions = EditorInfo.IME_ACTION_DONE
-                    setText(value)
-                    doAfterTextChanged {
-                        val name = it.toString().trim()
-                        if (name.isNotBlank() && name != savedTitle) {
-                            savedTitle = name
-                            onChange(name)
-                        }
-                    }
+        object : LinearLayout(activityContext) {
+                override fun getBaseline(): Int {
+                    val text =
+                        (0 until childCount)
+                            .map { getChildAt(it) }
+                            .filterIsInstance<TextView>()
+                            .firstOrNull { it.visibility == View.VISIBLE } ?: return -1
+                    // Expose the visible text's baseline, including its vertical centering.
+                    return (measuredHeight - text.measuredHeight) / 2 + text.baseline
                 }
-            val pen =
-                ImageButton(activityContext).apply {
-                    setImageResource(R.drawable.ic_edit)
-                    imageTintList = ColorStateList.valueOf(color(R.color.white))
-                    background = null
-                    contentDescription = "Edit workout title"
-                    setOnClickListener {
-                        title.visibility = View.GONE
+            }
+            .apply {
+                layoutParams =
+                    LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    )
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                var savedTitle = value
+                val title = titleText(value).apply { textSize = 26f }
+                val field =
+                    textField("Workout title").apply {
                         visibility = View.GONE
-                        field.setText(savedTitle)
-                        field.visibility = View.VISIBLE
-                        field.requestFocus()
-                        field.selectAll()
-                        field.post {
-                            activityContext
-                                .getSystemService(InputMethodManager::class.java)
-                                .showSoftInput(field, 0)
+                        textSize = 26f
+                        contentDescription = "Workout title"
+                        inputType =
+                            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+                        imeOptions = EditorInfo.IME_ACTION_DONE
+                        setText(value)
+                        doAfterTextChanged {
+                            val name = it.toString().trim()
+                            if (name.isNotBlank() && name != savedTitle) {
+                                savedTitle = name
+                                onChange(name)
+                            }
                         }
                     }
+                val pen =
+                    ImageButton(activityContext).apply {
+                        setImageResource(R.drawable.ic_edit)
+                        imageTintList = ColorStateList.valueOf(color(R.color.white))
+                        background = null
+                        contentDescription = "Edit workout title"
+                        setOnClickListener {
+                            title.visibility = View.GONE
+                            visibility = View.GONE
+                            field.setText(savedTitle)
+                            field.visibility = View.VISIBLE
+                            field.requestFocus()
+                            field.selectAll()
+                            field.post {
+                                activityContext
+                                    .getSystemService(InputMethodManager::class.java)
+                                    .showSoftInput(field, 0)
+                            }
+                        }
+                    }
+                field.setOnFocusChangeListener { _, focused ->
+                    field.background = fieldBackground(focused)
+                    if (!focused) {
+                        title.text = savedTitle
+                        field.visibility = View.GONE
+                        title.visibility = View.VISIBLE
+                        pen.visibility = View.VISIBLE
+                    }
                 }
-            field.setOnFocusChangeListener { _, focused ->
-                field.background = fieldBackground(focused)
-                if (!focused) {
-                    title.text = savedTitle
-                    field.visibility = View.GONE
-                    title.visibility = View.VISIBLE
-                    pen.visibility = View.VISIBLE
+                field.setOnEditorActionListener { _, action, _ ->
+                    if (action == EditorInfo.IME_ACTION_DONE) {
+                        activityContext
+                            .getSystemService(InputMethodManager::class.java)
+                            .hideSoftInputFromWindow(field.windowToken, 0)
+                        field.clearFocus()
+                        true
+                    } else false
                 }
+                addView(
+                    title,
+                    LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
+                )
+                addView(
+                    pen,
+                    LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginStart = dp(4) },
+                )
+                addView(
+                    field,
+                    LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
+                )
             }
-            field.setOnEditorActionListener { _, action, _ ->
-                if (action == EditorInfo.IME_ACTION_DONE) {
-                    activityContext
-                        .getSystemService(InputMethodManager::class.java)
-                        .hideSoftInputFromWindow(field.windowToken, 0)
-                    field.clearFocus()
-                    true
-                } else false
-            }
-            addView(title, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-            addView(pen, LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginStart = dp(4) })
-            addView(field, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        }
 
     fun card(horizontalPadding: Int = 10, build: LinearLayout.() -> Unit): View =
         MaterialCardView(activityContext).apply {
