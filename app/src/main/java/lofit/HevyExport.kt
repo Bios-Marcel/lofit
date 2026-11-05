@@ -143,11 +143,7 @@ class HevyExport(private val context: Context, private val settings: HevySetting
                                 put("index", index)
                                 put(
                                     "weight_kg",
-                                    if (
-                                        exercise.weighted &&
-                                            template.type in setOf("weight_reps", "weight_duration")
-                                    )
-                                        set.weightKg
+                                    if (exercise.weighted && template.supportsWeight) set.weightKg
                                     else JSONObject.NULL,
                                 )
                                 put(
@@ -170,10 +166,7 @@ class HevyExport(private val context: Context, private val settings: HevySetting
                                 if (exercise.type.tracksDuration)
                                     put("duration_seconds", set.holdSeconds)
                                 else put("reps", set.reps)
-                                if (
-                                    exercise.weighted &&
-                                        template.type in setOf("weight_reps", "weight_duration")
-                                )
+                                if (exercise.weighted && template.supportsWeight)
                                     put("weight_kg", set.weightKg)
                             }
                         }

@@ -2,6 +2,7 @@ package lofit
 
 import java.io.File
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -131,11 +132,44 @@ class HevyExerciseMappingTest {
     }
 
     @Test
-    fun bodyweightTemplateCannotLoseAddedWeight() {
+    fun repsOnlyTemplateCannotLoseAddedWeight() {
         val pushUp = exercise("push-up", "Push-up")
-        val templates = listOf(HevyTemplate("push", "Push Up", "bodyweight_reps"))
+        val templates = listOf(HevyTemplate("push", "Push Up", "reps_only"))
         assertEquals("push", HevyExerciseMapping.find(pushUp, listOf(set()), templates)?.id)
         assertNull(HevyExerciseMapping.find(pushUp, listOf(set(10.0)), templates))
+    }
+
+    @Test
+    fun weightedPullUpUsesWeightedTemplateEvenForZeroLoadSets() {
+        val exercises = ExerciseCatalog.exercises().associateBy { it.id }
+        val plain = HevyTemplate("1B2B1E7C", "Pull Up", "reps_only")
+        val weighted = HevyTemplate("729237D1", "Pull Up (Weighted)", "bodyweight_reps")
+        val templates = listOf(plain, weighted)
+        for (weight in listOf(0.0, 20.0)) {
+            val match =
+                HevyExerciseMapping.find(
+                    exercises.getValue("weighted-pull-up"),
+                    listOf(set(weight)),
+                    templates,
+                )
+            assertEquals(weighted, match)
+            assertTrue(requireNotNull(match).supportsWeight)
+        }
+        assertEquals(
+            plain,
+            HevyExerciseMapping.find(exercises.getValue("pull-up"), listOf(set()), templates),
+        )
+        assertFalse(plain.supportsWeight)
+    }
+
+    @Test
+    fun weightedPullUpAliasMatchesOlderTemplateLists() {
+        val pullUp = ExerciseCatalog.exercises().single { it.id == "weighted-pull-up" }
+        val template = HevyTemplate("older-id", "Pull Up (weighted)", "bodyweight_reps")
+        assertEquals(
+            template,
+            HevyExerciseMapping.find(pullUp, listOf(set(20.0)), listOf(template)),
+        )
     }
 
     @Test

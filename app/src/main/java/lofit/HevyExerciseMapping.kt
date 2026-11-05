@@ -5,7 +5,10 @@ internal data class HevyTemplate(
     val title: String,
     val type: String,
     val custom: Boolean = false,
-)
+) {
+    val supportsWeight: Boolean
+        get() = type in setOf("weight_reps", "weight_duration", "bodyweight_reps")
+}
 
 /** Match reviewed default exercises by stable Hevy IDs; uncertain matches use a placeholder. */
 internal object HevyExerciseMapping {
@@ -345,6 +348,7 @@ internal object HevyExerciseMapping {
             "spiderman-push-up" to "392887AA", // Push Up
             "wall-push-up" to "392887AA", // Push Up
             "wall-sit" to "C8706C80", // Wall Sit
+            "weighted-pull-up" to "729237D1", // Pull Up (Weighted)
             "wide-grip-push-up" to "392887AA", // Push Up
         )
 
@@ -358,6 +362,7 @@ internal object HevyExerciseMapping {
             "overhead-press" to "Shoulder Press (Barbell)",
             "dumbbell-curl" to "Bicep Curl (Dumbbell)",
             "pull-up" to "Pull Up",
+            "weighted-pull-up" to "Pull Up (Weighted)",
             "push-up" to "Push Up",
         )
 
@@ -410,8 +415,9 @@ internal object HevyExerciseMapping {
 
     private fun compatible(template: HevyTemplate, expectedType: String, sets: List<LoggedSet>) =
         template.type == expectedType ||
+            (expectedType == "weight_reps" && template.type == "bodyweight_reps") ||
             (expectedType == "weight_reps" &&
-                template.type in setOf("bodyweight_reps", "reps_only") &&
+                template.type == "reps_only" &&
                 sets.all { it.weightKg == 0.0 }) ||
             (expectedType == "reps_only" && template.type == "bodyweight_reps") ||
             (expectedType == "weight_duration" &&
