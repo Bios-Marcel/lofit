@@ -2706,15 +2706,27 @@ class MainActivity : AppCompatActivity() {
             val result = runCatching { HevyExport(this, hevySettings).export(workout, catalog) }
             runOnUiThread {
                 if (!isDestroyed) {
-                    val message =
-                        result.fold(
-                            onSuccess = { it },
-                            onFailure = { it.message ?: "Hevy export failed" },
-                        )
-                    AlertDialog.Builder(this)
-                        .setMessage(message)
-                        .setPositiveButton("OK", null)
-                        .show()
+                    result.fold(
+                        onSuccess = { message ->
+                            Snackbar.make(findViewById(android.R.id.content), message, 2_000)
+                                .apply {
+                                    animationMode = Snackbar.ANIMATION_MODE_FADE
+                                    view.layoutParams =
+                                        (view.layoutParams as FrameLayout.LayoutParams).apply {
+                                            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+                                            width = ViewGroup.LayoutParams.WRAP_CONTENT
+                                            topMargin = root.paddingTop + ui.dp(12)
+                                        }
+                                }
+                                .show()
+                        },
+                        onFailure = { error ->
+                            AlertDialog.Builder(this)
+                                .setMessage(error.message ?: "Hevy export failed")
+                                .setPositiveButton("OK", null)
+                                .show()
+                        },
+                    )
                 }
             }
         }
