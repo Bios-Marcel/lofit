@@ -78,6 +78,102 @@ class VoiceTimerFlowTest {
         awaitMicrophone(true)
     }
 
+    private fun speak(
+        scenario: ActivityScenario<MainActivity>,
+        word: String,
+        expected: VoiceCommand,
+    ) {
+        lateinit var target: WorkoutVoiceTarget
+        scenario.onActivity { target = it.visibleWorkoutVoiceTarget()!! }
+        val bytes =
+            instrumentation.context.assets.open("voice-time/lessac-$word.pcm").use {
+                it.readBytes()
+            }
+        val buffer = java.nio.ByteBuffer.wrap(bytes).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        val audio = FloatArray(bytes.size / 2) { buffer.short / 32768f }
+        val commands = mutableListOf<VoiceCommand>()
+        TimeKeywordDetector(context).use { detector ->
+            for (offset in audio.indices step 320) {
+                detector.accept(audio.copyOfRange(offset, minOf(offset + 320, audio.size)))?.let {
+                    command ->
+                    commands.add(command)
+                    scenario.onActivity { it.onWorkoutVoiceCommand(command, target) }
+                }
+            }
+        }
+        assertEquals(listOf(expected), commands)
+    }
+
+    @Test
+    fun spokenDoneCompletesRepetitionSetAndSpokenSkipEndsRest() {
+        LofitRepository(context).apply {
+            item = item.copy(exerciseId = "back-squat")
+            data.activeWorkout!!.exercises[0] = item
+            data.activeWorkout!!.defaultRestSeconds = 90
+            save()
+        }
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            onView(withContentDescription("Set 1 done")).perform(scrollTo(), waitForStableLayout())
+            awaitMicrophone(true)
+            lateinit var oldTarget: WorkoutVoiceTarget
+            scenario.onActivity { oldTarget = it.visibleWorkoutVoiceTarget()!! }
+            speak(scenario, "done", VoiceCommand.DONE)
+            onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
+            onView(withContentDescription("Set 2 done")).check(matches(isNotChecked()))
+            onView(withContentDescription("Rest timer overlay")).check(matches(isDisplayed()))
+            scenario.onActivity { it.onWorkoutVoiceCommand(VoiceCommand.DONE, oldTarget) }
+            assertEquals(1, LofitRepository(context).data.activeWorkout!!.setCount())
+            lateinit var oldRest: WorkoutVoiceTarget
+            scenario.onActivity { oldRest = it.visibleWorkoutVoiceTarget()!! }
+            speak(scenario, "skip", VoiceCommand.SKIP)
+            onView(withContentDescription("Rest timer overlay"))
+                .check(matches(withEffectiveVisibility(Visibility.GONE)))
+            speak(scenario, "done", VoiceCommand.DONE)
+            scenario.onActivity { it.onWorkoutVoiceCommand(VoiceCommand.SKIP, oldRest) }
+            onView(withContentDescription("Rest timer overlay")).check(matches(isDisplayed()))
+            awaitMicrophone(true)
+            speak(scenario, "skip", VoiceCommand.SKIP)
+            awaitMicrophone(false)
+            assertEquals(2, LofitRepository(context).data.activeWorkout!!.setCount())
+        }
+    }
+
+    @Test
+    fun spokenDoneStopsRunningHoldAndStoresItsElapsedTime() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            ready()
+            scenario.onActivity { it.onTimerVoiceCommand(item.plannedSets[0].id) }
+            speak(scenario, "done", VoiceCommand.DONE)
+            onView(withContentDescription("Start set 1 hold")).check(matches(isDisplayed()))
+            onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
+            onView(withContentDescription("Set 2 done")).check(matches(isNotChecked()))
+            val saved = LofitRepository(context).data.activeWorkout!!.exercises.single()
+            assertTrue(saved.plannedSets[0].actualHoldSeconds!! >= 1)
+            assertEquals(1, saved.sets.size)
+            onView(withContentDescription("Rest timer overlay")).check(matches(isDisplayed()))
+        }
+    }
+
+    @Test
+    fun doneAndSkipAreIgnoredInBackground() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            ready()
+            onView(withContentDescription("Set 1 done")).perform(click())
+            lateinit var target: WorkoutVoiceTarget
+            scenario.onActivity { target = it.visibleWorkoutVoiceTarget()!! }
+            scenario.moveToState(Lifecycle.State.CREATED)
+            awaitMicrophone(false)
+            scenario.onActivity {
+                it.onWorkoutVoiceCommand(VoiceCommand.DONE, target)
+                it.onWorkoutVoiceCommand(VoiceCommand.SKIP, target)
+            }
+            scenario.moveToState(Lifecycle.State.RESUMED)
+            onView(withContentDescription("Set 2 done")).check(matches(isNotChecked()))
+            onView(withContentDescription("Rest timer overlay")).check(matches(isDisplayed()))
+            assertEquals(1, LofitRepository(context).data.activeWorkout!!.setCount())
+        }
+    }
+
     @Test
     fun finishingWorkoutStopsVoiceAndRejectsOldCommands() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
@@ -283,7 +379,7 @@ class VoiceTimerFlowTest {
                         if (
                             detector.accept(
                                 audio.copyOfRange(offset, minOf(offset + 320, audio.size))
-                            )
+                            ) == VoiceCommand.TIME
                         ) {
                             commands++
                             scenario.onActivity { it.onTimerVoiceCommand(item.plannedSets[0].id) }
@@ -318,6 +414,10 @@ class VoiceTimerFlowTest {
             awaitMicrophone(true)
             scenario.onActivity { it.onTimerVoiceCommand(item.plannedSets[0].id) }
             onView(withContentDescription("Start set 1 hold")).check(matches(isDisplayed()))
+            awaitMicrophone(true)
+            scenario.onActivity {
+                it.onWorkoutVoiceCommand(VoiceCommand.SKIP, it.visibleWorkoutVoiceTarget()!!)
+            }
             awaitMicrophone(false)
             assertTrue(
                 LofitRepository(context)
@@ -333,7 +433,7 @@ class VoiceTimerFlowTest {
     }
 
     @Test
-    fun scrollingExerciseOffScreenStopsListeningAndReturningResumes() {
+    fun scrollingRejectsHiddenTimerWhileVisibleRepetitionSetRemainsEligible() {
         LofitRepository(context).apply {
             data.activeWorkout!!
                 .exercises
@@ -348,14 +448,18 @@ class VoiceTimerFlowTest {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             ready()
             onView(withText("Finish workout")).perform(scrollTo())
-            awaitMicrophone(false)
-            scenario.onActivity { it.onTimerVoiceCommand(item.plannedSets[0].id) }
+            awaitMicrophone(true)
+            scenario.onActivity {
+                assertNull(it.visibleWorkoutVoiceTarget()!!.timer)
+                assertNotNull(it.visibleWorkoutVoiceTarget()!!.done)
+                it.onTimerVoiceCommand(item.plannedSets[0].id)
+            }
             ready()
         }
     }
 
     @Test
-    fun scaleModeNeverListensAndManualModeCanStart() {
+    fun scaleModeListensForDoneAndManualModeCanStartTimer() {
         LofitRepository(context).apply {
             val scale =
                 Exercise(
@@ -376,8 +480,12 @@ class VoiceTimerFlowTest {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             onView(withContentDescription("Voice Scale live weight graph"))
                 .perform(scrollTo(), waitForStableLayout())
-            assertFalse(microphoneRunning())
-            scenario.onActivity { it.onTimerVoiceCommand(item.plannedSets[0].id) }
+            awaitMicrophone(true)
+            scenario.onActivity {
+                assertNull(it.visibleWorkoutVoiceTarget()!!.timer)
+                assertEquals(item.plannedSets[0].id, it.visibleWorkoutVoiceTarget()!!.done!!.setId)
+                it.onTimerVoiceCommand(item.plannedSets[0].id)
+            }
             onView(withContentDescription("Options for Voice Scale")).perform(scrollTo(), click())
             onView(withText("Use scale")).perform(click())
             ready()

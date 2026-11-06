@@ -14,11 +14,11 @@ import java.util.concurrent.Executors
 /** Captures only while a target is eligible. Audio is neither saved nor sent anywhere. */
 internal class OfflineTimerVoice(
     private val context: Context,
-    private val onTime: (String) -> Unit,
+    private val onCommand: (VoiceCommand, WorkoutVoiceTarget) -> Unit,
     private val onError: () -> Unit,
     private val createDetector: () -> VoiceKeywordDetector = { TimeKeywordDetector(context) },
 ) : AutoCloseable {
-    private class Session(val target: String, val retries: Int = 0) {
+    private class Session(@Volatile var target: WorkoutVoiceTarget, val retries: Int = 0) {
         @Volatile
         var active = true
             private set
@@ -72,8 +72,13 @@ internal class OfflineTimerVoice(
     }
 
     /** Main thread only. Replacing the target also invalidates queued recognition callbacks. */
-    fun update(target: String?) {
+    fun update(target: WorkoutVoiceTarget?) {
         if (closed || target == session?.target) return
+        if (target != null && session?.active == true) {
+            // Keep utterance deduplication when a command advances to the next set or rest.
+            session!!.target = target
+            return
+        }
         // LEGACY: Hiding an ongoing workout stops capture but keeps its model warm.
         session?.stop()
         session = target?.let { Session(it) }
@@ -106,26 +111,31 @@ internal class OfflineTimerVoice(
                     AudioFormat.ENCODING_PCM_16BIT,
                     maxOf(minimum, 3_200),
                 )
+            val audioRoute = VoiceAudioRoute(context, recorder)
             try {
                 check(recorder.state == AudioRecord.STATE_INITIALIZED)
+                audioRoute.start()
                 if (!current.start(recorder)) return
                 val pcm = ShortArray(320) // 20 ms reads; no utterance-end or network wait.
                 val samples = FloatArray(pcm.size)
                 while (current.active) {
+                    val target = current.target
                     val count = recorder.read(pcm, 0, pcm.size, AudioRecord.READ_BLOCKING)
                     if (!current.active) break
                     check(count > 0) { "Microphone read failed: $count" }
                     for (i in 0 until count) samples[i] = pcm[i] / 32768f
-                    if (
+                    val command =
                         model.accept(if (count == samples.size) samples else samples.copyOf(count))
-                    ) {
+                    if (command != null) {
                         main.post {
-                            if (session === current && current.active) onTime(current.target)
+                            if (session === current && current.active && current.target == target)
+                                onCommand(command, target)
                         }
                     }
                 }
             } finally {
                 current.stop()
+                audioRoute.close()
                 current.release(recorder)
             }
         } catch (error: Exception) {

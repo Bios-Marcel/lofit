@@ -105,7 +105,11 @@ internal class SettingsScreen(
                 )
             }
         )
-        addView(ui.metaText("Say “time” to start or stop manual timers. Works offline."))
+        addView(
+            ui.metaText(
+                "Say “time” for timers, “skip” to skip rest, or “done” to finish the current set. Works offline."
+            )
+        )
     }
 
     fun settingsScreen(): View =

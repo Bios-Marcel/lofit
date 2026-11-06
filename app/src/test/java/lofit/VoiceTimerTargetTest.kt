@@ -28,6 +28,26 @@ class VoiceTimerTargetTest {
         )
 
     @Test
+    fun doneIncludesRepetitionAndScaleSetsAndPrioritizesActiveSet() {
+        val repetition = item(reps)
+        val live = item(scale)
+        val workout = WorkoutSession(name = "Test", exercises = mutableListOf(repetition, live))
+        val visible = setOf(repetition.id, live.id)
+        assertEquals(
+            VoiceTimerTarget(repetition.id, repetition.plannedSets[0].id),
+            voiceTimerTarget(workout, exercises, visible, timersOnly = false),
+        )
+        val active = VoiceTimerTarget(live.id, live.plannedSets[1].id)
+        assertEquals(
+            active,
+            voiceTimerTarget(workout, exercises, visible, active, timersOnly = false),
+        )
+        assertNull(
+            voiceTimerTarget(workout, exercises, setOf(repetition.id), active, timersOnly = false)
+        )
+    }
+
+    @Test
     fun choosesFirstUnfinishedSetOfFirstVisibleEligibleExercise() {
         val first = item()
         val second = item()

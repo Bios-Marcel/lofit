@@ -7,11 +7,23 @@ import org.json.JSONObject
 import org.vosk.Model
 import org.vosk.Recognizer
 
+internal enum class VoiceCommand(val word: String) {
+    TIME("time"),
+    SKIP("skip"),
+    DONE("done"),
+}
+
+internal data class WorkoutVoiceTarget(
+    val timer: VoiceTimerTarget? = null,
+    val done: VoiceTimerTarget? = null,
+    val restEndsAt: Long? = null,
+)
+
 /** One streaming, local keyword model. All instance calls belong to the audio worker. */
 internal interface VoiceKeywordDetector : AutoCloseable {
     fun reset()
 
-    fun accept(samples: FloatArray): Boolean
+    fun accept(samples: FloatArray): VoiceCommand?
 }
 
 internal class TimeKeywordDetector(context: Context) : VoiceKeywordDetector {
@@ -36,7 +48,7 @@ internal class TimeKeywordDetector(context: Context) : VoiceKeywordDetector {
         triggered = false
     }
 
-    override fun accept(samples: FloatArray): Boolean {
+    override fun accept(samples: FloatArray): VoiceCommand? {
         val pcm =
             ShortArray(samples.size) {
                 (samples[it] * 32768f).toInt().coerceIn(-32768, 32767).toShort()
@@ -45,9 +57,9 @@ internal class TimeKeywordDetector(context: Context) : VoiceKeywordDetector {
         val result = JSONObject(if (ended) recognizer.result else recognizer.partialResult)
         val text = result.optString(if (ended) "text" else "partial")
         // Partial results start promptly. Competitors and [unk] prevent forcing every sound to
-        // "time".
-        val detected = !triggered && text == "time"
-        if (detected) triggered = true
+        // a command.
+        val detected = VoiceCommand.entries.firstOrNull { !triggered && text == it.word }
+        if (detected != null) triggered = true
         // A final result for the same utterance must not trigger a second toggle.
         if (ended) triggered = false
         return detected

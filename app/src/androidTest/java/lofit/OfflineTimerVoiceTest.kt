@@ -23,9 +23,9 @@ class OfflineTimerVoiceTest {
 
         override fun reset() = Unit
 
-        override fun accept(samples: FloatArray): Boolean {
+        override fun accept(samples: FloatArray): VoiceCommand? {
             audio.countDown()
-            return false
+            return null
         }
 
         override fun close() {
@@ -37,9 +37,58 @@ class OfflineTimerVoiceTest {
     private fun await(latch: CountDownLatch) = assertTrue(latch.await(8, TimeUnit.SECONDS))
 
     @Test
+    fun changingTargetsKeepsUtteranceStateAndRoutesEachCommand() {
+        instrumentation.uiAutomation.grantRuntimePermission(
+            context.packageName,
+            Manifest.permission.RECORD_AUDIO,
+        )
+        val commands = LinkedBlockingQueue<VoiceCommand>()
+        val delivered = LinkedBlockingQueue<Pair<VoiceCommand, WorkoutVoiceTarget>>()
+        val resets = AtomicInteger()
+        val frames = LinkedBlockingQueue<Unit>()
+        val model =
+            object : VoiceKeywordDetector {
+                override fun reset() {
+                    resets.incrementAndGet()
+                }
+
+                override fun accept(samples: FloatArray): VoiceCommand? {
+                    frames.add(Unit)
+                    return commands.poll()
+                }
+
+                override fun close() = Unit
+            }
+        val voice =
+            OfflineTimerVoice(
+                context,
+                { command, target -> delivered.add(command to target) },
+                {},
+                { model },
+            )
+        val first = WorkoutVoiceTarget(done = VoiceTimerTarget("exercise", "first"))
+        val second =
+            WorkoutVoiceTarget(done = VoiceTimerTarget("exercise", "second"), restEndsAt = 123L)
+        try {
+            instrumentation.runOnMainSync { voice.update(first) }
+            commands.add(VoiceCommand.DONE)
+            assertEquals(VoiceCommand.DONE to first, delivered.poll(8, TimeUnit.SECONDS))
+            instrumentation.runOnMainSync { voice.update(second) }
+            // A read already underway can belong to the old target; wait for a fresh audio frame.
+            frames.clear()
+            repeat(2) { assertNotNull(frames.poll(8, TimeUnit.SECONDS)) }
+            commands.add(VoiceCommand.SKIP)
+            assertEquals(VoiceCommand.SKIP to second, delivered.poll(8, TimeUnit.SECONDS))
+            assertEquals(1, resets.get())
+        } finally {
+            instrumentation.runOnMainSync { voice.close() }
+        }
+    }
+
+    @Test
     fun unloadClosesOnceAndNextWorkoutCreatesFreshModel() {
         val models = LinkedBlockingQueue<Detector>()
-        val voice = OfflineTimerVoice(context, {}, {}, { Detector().also(models::add) })
+        val voice = OfflineTimerVoice(context, { _, _ -> }, {}, { Detector().also(models::add) })
         try {
             instrumentation.runOnMainSync { voice.prepare() }
             val first = models.poll(8, TimeUnit.SECONDS)!!
@@ -69,7 +118,7 @@ class OfflineTimerVoiceTest {
         val voice =
             OfflineTimerVoice(
                 context,
-                {},
+                { _, _ -> },
                 {},
                 {
                     if (creates.incrementAndGet() == 1) {
@@ -107,9 +156,11 @@ class OfflineTimerVoiceTest {
         )
         val model = Detector()
         val errors = AtomicInteger()
-        val voice = OfflineTimerVoice(context, {}, { errors.incrementAndGet() }, { model })
+        val voice = OfflineTimerVoice(context, { _, _ -> }, { errors.incrementAndGet() }, { model })
         try {
-            instrumentation.runOnMainSync { voice.update("set") }
+            instrumentation.runOnMainSync {
+                voice.update(WorkoutVoiceTarget(done = VoiceTimerTarget("exercise", "set")))
+            }
             await(model.audio)
             instrumentation.runOnMainSync { voice.unload() }
             await(model.closed)

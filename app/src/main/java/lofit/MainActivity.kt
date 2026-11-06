@@ -280,17 +280,18 @@ class MainActivity : AppCompatActivity() {
     private var holdTimerButton: ImageButton? = null
     private var holdDoneCheckBox: CheckBox? = null
     private val voiceTimerCards = mutableMapOf<String, View>()
+    private val voiceDoneButtons = mutableMapOf<String, CheckBox>()
     private val voiceTimerButtons = mutableMapOf<String, ImageButton>()
     private var voiceResumed = false
     private var voicePermissionAsked = false
     private val timerVoice by lazy {
         OfflineTimerVoice(
             applicationContext,
-            onTime = ::onTimerVoiceCommand,
+            onCommand = ::onWorkoutVoiceCommand,
             onError = {
                 Toast.makeText(
                         this,
-                        "Voice timer unavailable. Tap the timer to start.",
+                        "Voice commands unavailable. Use the workout controls.",
                         Toast.LENGTH_LONG,
                     )
                     .show()
@@ -302,7 +303,7 @@ class MainActivity : AppCompatActivity() {
             if (!granted) {
                 Toast.makeText(
                         this,
-                        "Allow microphone access in app settings to say “time”.",
+                        "Allow microphone access in app settings to use voice commands.",
                         Toast.LENGTH_LONG,
                     )
                     .show()
@@ -319,6 +320,7 @@ class MainActivity : AppCompatActivity() {
     private val releaseCueAudioFocus = Runnable {
         cueAudioManager.abandonAudioFocusRequest(cueAudioFocusRequest)
     }
+    private var checkmarkCueId = 0
     private var completionCueId = 0
     private var updatingHoldTimer = false
     private var completingHoldAutomatically = false
@@ -450,6 +452,7 @@ class MainActivity : AppCompatActivity() {
         cueSounds =
             SoundPool.Builder().setMaxStreams(1).setAudioAttributes(cueAudioAttributes).build()
         completionCueId = cueSounds.load(this, R.raw.completion_chime, 1)
+        checkmarkCueId = cueSounds.load(this, R.raw.checkmark_chime, 1)
         if (
             repository.data.activeWorkout != null &&
                 (savedInstanceState == null ||
@@ -764,6 +767,7 @@ class MainActivity : AppCompatActivity() {
         timerVoice.update(null)
         voiceTimerCards.clear()
         voiceTimerButtons.clear()
+        voiceDoneButtons.clear()
         craneScaleScreens.clear()
         liveWorkoutMeasurement.reconcile()
         liveGraphs.clear()
@@ -1060,6 +1064,7 @@ class MainActivity : AppCompatActivity() {
                     workout,
                     repository.data.exercises,
                     workout.exercises.map { it.id }.toSet(),
+                    timersOnly = false,
                 ) != null
         ) {
             timerVoice.prepare()
@@ -1146,7 +1151,10 @@ class MainActivity : AppCompatActivity() {
                     workout.exercises.remove(item)
                     cardViews.remove(item.id)?.let(reorder::remove)
                     voiceTimerCards.remove(item.id)
-                    item.plannedSets.forEach { voiceTimerButtons.remove(it.id) }
+                    item.plannedSets.forEach {
+                        voiceTimerButtons.remove(it.id)
+                        voiceDoneButtons.remove(it.id)
+                    }
                     if (workout.exercises.isEmpty()) {
                         exerciseCards.addView(
                             ui.emptyText(
@@ -1389,6 +1397,7 @@ class MainActivity : AppCompatActivity() {
                 item.plannedSets.subList(fromIndex, endIndex).clear()
                 removedSets.forEach { removedSet ->
                     voiceTimerButtons.remove(removedSet.id)
+                    voiceDoneButtons.remove(removedSet.id)
                     rowViews.remove(removedSet.id)?.let(setRows::removeView)
                     updateRowIndices.remove(removedSet.id)
                     updateRowValues.remove(removedSet.id)
@@ -1408,6 +1417,7 @@ class MainActivity : AppCompatActivity() {
                         contentDescription = "Set ${setIndex + 1} done"
                         stateDescription = if (isChecked) "Done" else "Not done"
                     }
+                if (!editingHistory) voiceDoneButtons[plannedSet.id] = done
                 val doneDrawable = done.buttonDrawable
                 val recordDrawable =
                     ui.sizedButtonDrawable(
@@ -1559,7 +1569,10 @@ class MainActivity : AppCompatActivity() {
                     )
                     saveChanges()
                     onSetsChanged()
-                    if (!editingHistory) updateWorkoutNotification(force = true)
+                    if (!editingHistory) {
+                        updateWorkoutNotification(force = true)
+                        updateTimerVoice()
+                    }
                 }
                 rowViews[plannedSet.id] = setRow
                 setRows.addView(setRow)
@@ -3222,6 +3235,7 @@ class MainActivity : AppCompatActivity() {
         restEndsAt = if (seconds > 0) SystemClock.elapsedRealtime() + seconds * 1_000L else 0L
         updateRestBar()
         updateWorkoutNotification(force = true)
+        updateTimerVoice()
     }
 
     private fun updateWorkoutTimer() {
@@ -3235,6 +3249,7 @@ class MainActivity : AppCompatActivity() {
         timerText?.text = formatWorkoutTime(elapsed)
         updateRestBar()
         updateWorkoutNotification()
+        updateTimerVoice()
     }
 
     private fun createRestBar(): LinearLayout =
@@ -3274,6 +3289,7 @@ class MainActivity : AppCompatActivity() {
         restEndsAt = max(SystemClock.elapsedRealtime(), restEndsAt - 15_000L)
         updateRestBar()
         updateWorkoutNotification(force = true)
+        updateTimerVoice()
     }
 
     private fun addRest() {
@@ -3281,6 +3297,7 @@ class MainActivity : AppCompatActivity() {
         restEndsAt += 15_000L
         updateRestBar()
         updateWorkoutNotification(force = true)
+        updateTimerVoice()
     }
 
     private fun skipRest() {
@@ -3288,6 +3305,7 @@ class MainActivity : AppCompatActivity() {
         restEndsAt = 0L
         updateRestBar()
         updateWorkoutNotification(force = true)
+        updateTimerVoice()
     }
 
     private fun updateRestBar() {
@@ -3333,7 +3351,39 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun visibleVoiceTimerTarget(): VoiceTimerTarget? {
+    internal fun onWorkoutVoiceCommand(command: VoiceCommand, target: WorkoutVoiceTarget) {
+        val current = visibleWorkoutVoiceTarget() ?: return
+        if (!hasMicrophonePermission()) return
+        when (command) {
+            VoiceCommand.TIME -> {
+                if (target.timer != null && target.timer == current.timer) {
+                    onTimerVoiceCommand(target.timer.setId)
+                }
+            }
+            VoiceCommand.SKIP -> {
+                if (target.restEndsAt != null && target.restEndsAt == current.restEndsAt) {
+                    skipRest()
+                    playCue()
+                }
+            }
+            VoiceCommand.DONE -> {
+                if (target.done == null || target.done != current.done) return
+                val done = voiceDoneButtons[target.done.setId] ?: return
+                if (done.isChecked) {
+                    if (activeHoldPlannedSetId != target.done.setId) return
+                    stopActiveHold()
+                } else {
+                    done.performClick()
+                }
+                if (done.isChecked) playCue(checkmarkCueId)
+            }
+        }
+        updateTimerVoice()
+    }
+
+    private fun visibleVoiceTimerTarget(): VoiceTimerTarget? = visibleWorkoutVoiceTarget()?.timer
+
+    internal fun visibleWorkoutVoiceTarget(): WorkoutVoiceTarget? {
         if (
             !voiceResumed ||
                 !repository.data.voiceCommandsEnabled ||
@@ -3341,8 +3391,7 @@ class MainActivity : AppCompatActivity() {
                 !window.decorView.hasWindowFocus() ||
                 currentScreen != Screen.WORKOUT ||
                 route != Route.Root ||
-                drawerLayout.isDrawerVisible(GravityCompat.START) ||
-                liveWorkoutMeasurement.active != null
+                drawerLayout.isDrawerVisible(GravityCompat.START)
         )
             return null
         val viewport = Rect()
@@ -3357,13 +3406,26 @@ class MainActivity : AppCompatActivity() {
         val active = activeHoldWorkoutExerciseId?.let { exerciseId ->
             activeHoldPlannedSetId?.let { VoiceTimerTarget(exerciseId, it) }
         }
-        return voiceTimerTarget(
-                repository.data.activeWorkout,
-                repository.data.exercises,
-                visible,
-                active,
-            )
-            ?.takeIf { voiceTimerButtons[it.setId]?.isAttachedToWindow == true }
+        val workout = repository.data.activeWorkout ?: return null
+        val timer =
+            voiceTimerTarget(workout, repository.data.exercises, visible, active)
+                ?.takeIf { liveWorkoutMeasurement.active == null }
+                ?.takeIf { voiceTimerButtons[it.setId]?.isAttachedToWindow == true }
+        val doneActive =
+            liveWorkoutMeasurement.active?.let { VoiceTimerTarget(it.item.id, it.set.id) } ?: active
+        val done =
+            voiceTimerTarget(
+                    workout,
+                    repository.data.exercises,
+                    visible,
+                    doneActive,
+                    timersOnly = false,
+                )
+                ?.takeIf { voiceDoneButtons[it.setId]?.isAttachedToWindow == true }
+        val rest = restEndsAt.takeIf { it > SystemClock.elapsedRealtime() }
+        return WorkoutVoiceTarget(timer, done, rest).takeIf {
+            timer != null || done != null || rest != null
+        }
     }
 
     private fun updateTimerVoice() {
@@ -3371,7 +3433,7 @@ class MainActivity : AppCompatActivity() {
             timerVoice.unload()
             return
         }
-        val target = visibleVoiceTimerTarget()
+        val target = visibleWorkoutVoiceTarget()
         if (target == null || !hasMicrophonePermission()) {
             timerVoice.update(null)
             if (
@@ -3384,7 +3446,7 @@ class MainActivity : AppCompatActivity() {
             }
             return
         }
-        timerVoice.update(target.setId)
+        timerVoice.update(target)
     }
 
     private fun onWorkoutScaleReading(atMillis: Long, kilograms: Double) {
@@ -3563,7 +3625,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun playCue() {
+    private fun playCue(soundId: Int = completionCueId) {
         getSystemService(VibratorManager::class.java)
             ?.defaultVibrator
             ?.takeIf { it.hasVibrator() }
@@ -3571,7 +3633,7 @@ class MainActivity : AppCompatActivity() {
         if (!repository.data.soundCuesEnabled) return
         handler.removeCallbacks(releaseCueAudioFocus)
         cueAudioManager.requestAudioFocus(cueAudioFocusRequest)
-        cueSounds.play(completionCueId, 1f, 1f, 1, 0, 1f)
+        cueSounds.play(soundId, 1f, 1f, 1, 0, 1f)
         handler.postDelayed(releaseCueAudioFocus, 1_200L)
     }
 

@@ -11,7 +11,7 @@ Piper TTS, default synthesis settings:
 en_US-lessac-medium (time-natural and lessac-*),
 en_US-amy-medium (time-female and amy-*).
 Source models: https://huggingface.co/rhasspy/piper-voices/tree/main/en/en_US
-Each file speaks the word in its name. Competing words test false starts.
+Each file speaks the word in its name. skip and done are positive command fixtures. Competing words test false starts.
 These voice-generation models are not bundled in the app.
 
 WAV output is linearly resampled from 22050 Hz to mono 16000 Hz, with 200 ms

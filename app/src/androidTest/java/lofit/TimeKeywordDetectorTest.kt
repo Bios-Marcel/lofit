@@ -26,9 +26,31 @@ class TimeKeywordDetectorTest {
         val detections = mutableListOf<Int>()
         for (offset in samples.indices step 320) {
             val end = minOf(offset + 320, samples.size)
-            if (model.accept(samples.copyOfRange(offset, end))) detections.add(end)
+            if (model.accept(samples.copyOfRange(offset, end)) != null) detections.add(end)
         }
         return detections
+    }
+
+    @Test
+    fun recognizesSkipAndDoneOncePerUtteranceAlongsideTime() {
+        TimeKeywordDetector(instrumentation.targetContext).use { model ->
+            for (voice in listOf("lessac", "amy")) {
+                model.reset()
+                val audio =
+                    samples("$voice-skip") + samples("$voice-done") + samples("time-natural")
+                val commands = mutableListOf<VoiceCommand>()
+                for (offset in audio.indices step 320) {
+                    model
+                        .accept(audio.copyOfRange(offset, minOf(offset + 320, audio.size)))
+                        ?.let(commands::add)
+                }
+                assertEquals(
+                    voice,
+                    listOf(VoiceCommand.SKIP, VoiceCommand.DONE, VoiceCommand.TIME),
+                    commands,
+                )
+            }
+        }
     }
 
     @Test

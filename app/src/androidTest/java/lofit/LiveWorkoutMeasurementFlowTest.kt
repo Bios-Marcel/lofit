@@ -140,6 +140,35 @@ class LiveWorkoutMeasurementFlowTest {
     }
 
     @Test
+    fun voiceDoneCompletesActiveScaleSetAndKeepsItsMeasurement() {
+        LofitRepository(context).apply {
+            data.voiceCommandsEnabled = true
+            data.activeWorkout!!.exercises.single().plannedSets.single().holdSeconds = 60
+            save()
+        }
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            onView(withContentDescription("Scale Pull live weight graph"))
+                .perform(scrollTo(), waitForStableLayout())
+            lateinit var scanner: FakeScanner
+            scenario.onActivity {
+                scanner = fakeScanner(it)
+                scanner.reading(selected, 20.0)
+                scaleTimeMillis += 2_000
+                scanner.reading(selected, 20.0)
+                val target = it.visibleWorkoutVoiceTarget()!!
+                assertNull(target.timer)
+                assertNotNull(target.done)
+                it.onWorkoutVoiceCommand(VoiceCommand.DONE, target)
+            }
+            onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
+            val saved = LofitRepository(context).data.activeWorkout!!.exercises.single()
+            assertEquals(1, saved.sets.size)
+            assertEquals(20.0, saved.sets.single().weightKg, 0.01)
+            assertEquals(2, saved.plannedSets.single().actualHoldSeconds)
+        }
+    }
+
+    @Test
     fun graphStaysVisibleThroughManySetsAndReturnsToItsOriginalPosition() {
         seedLongExercises()
         ActivityScenario.launch(MainActivity::class.java).use {
