@@ -153,6 +153,26 @@ class RepositoryPersistenceTest {
     }
 
     @Test
+    fun voiceConsentDefaultsOffForNewAndExistingInstallsAndPersistsChoices() {
+        assertFalse(LofitRepository(context).data.voiceCommandsEnabled)
+        val repository = LofitRepository(context)
+        repository.data.onboardingComplete = true
+        repository.data.activeWorkout = WorkoutSession(name = "Existing workout")
+        for (enabled in listOf(true, false, true)) {
+            repository.data.voiceCommandsEnabled = enabled
+            repository.save()
+            assertEquals(enabled, LofitRepository(context).data.voiceCommandsEnabled)
+        }
+        store(JSONObject(stored()).apply { remove("voiceCommandsEnabled") }.toString())
+        val loaded = LofitRepository(context)
+        assertFalse(loaded.data.voiceCommandsEnabled)
+        assertTrue(loaded.data.onboardingComplete)
+        assertEquals("Existing workout", loaded.data.activeWorkout!!.name)
+        loaded.save()
+        assertFalse(LofitRepository(context).data.voiceCommandsEnabled)
+    }
+
+    @Test
     fun bodyWeight_survivesRestartFinishAndResume() {
         val repository = LofitRepository(context)
         repository.data.activeWorkout = WorkoutSession(name = "Weighted", bodyWeightKg = 72.25)

@@ -14,6 +14,7 @@ An Android-native local fitness app.
 * Rudimentary Android Health integration
 * Share active workout
 * Optional local MCP server (off by default)
+* Optional offline [voice timer](docs/VOICE_TIMER.md): say “time” while an unfinished timed exercise is visible
 
 ## Tech
 

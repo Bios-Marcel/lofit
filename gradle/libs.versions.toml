@@ -8,8 +8,10 @@ appcompat = "1.8.0"
 material = "1.14.0"
 drawerLayout = "1.2.0"
 viewPager = "1.0.0"
+vosk = "0.3.75"
 
 [libraries]
+vosk-android = { group = "com.alphacephei", name = "vosk-android", version.ref = "vosk" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }

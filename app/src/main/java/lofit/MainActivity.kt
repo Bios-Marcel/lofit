@@ -244,6 +244,7 @@ class MainActivity : AppCompatActivity() {
     private var healthPermissionPending = false
     private var onboardingGender = BiologicalGender.MALE
     private var onboardingHealthEnabled = false
+    private var onboardingVoiceEnabled = false
     private var bodyMetricsReadGeneration = 0
     private lateinit var content: FrameLayout
     private lateinit var root: LinearLayout
@@ -278,6 +279,36 @@ class MainActivity : AppCompatActivity() {
     private var holdTimerText: TextView? = null
     private var holdTimerButton: ImageButton? = null
     private var holdDoneCheckBox: CheckBox? = null
+    private val voiceTimerCards = mutableMapOf<String, View>()
+    private val voiceTimerButtons = mutableMapOf<String, ImageButton>()
+    private var voiceResumed = false
+    private var voicePermissionAsked = false
+    private val timerVoice by lazy {
+        OfflineTimerVoice(
+            applicationContext,
+            onTime = ::onTimerVoiceCommand,
+            onError = {
+                Toast.makeText(
+                        this,
+                        "Voice timer unavailable. Tap the timer to start.",
+                        Toast.LENGTH_LONG,
+                    )
+                    .show()
+            },
+        )
+    }
+    private val microphonePermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (!granted) {
+                Toast.makeText(
+                        this,
+                        "Allow microphone access in app settings to say “time”.",
+                        Toast.LENGTH_LONG,
+                    )
+                    .show()
+            }
+            updateTimerVoice()
+        }
     private var activeHoldWorkoutExerciseId: String? = null
     private var activeHoldPlannedSetId: String? = null
     private var holdStartedAt = 0L
@@ -396,12 +427,14 @@ class MainActivity : AppCompatActivity() {
             override fun run() {
                 updateWorkoutTimer()
                 updateHoldTimer()
+                updateTimerVoice()
                 handler.postDelayed(this, 250)
             }
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        voicePermissionAsked = savedInstanceState?.getBoolean("voicePermissionAsked") ?: false
         hevySettings
         repository = LofitRepository(this)
         val cueAudioAttributes =
@@ -432,6 +465,9 @@ class MainActivity : AppCompatActivity() {
         onboardingHealthEnabled =
             savedInstanceState?.getBoolean("onboardingHealthEnabled")
                 ?: (repository.data.bodyMetricsEnabled == true)
+        onboardingVoiceEnabled =
+            savedInstanceState?.getBoolean("onboardingVoiceEnabled")
+                ?: repository.data.voiceCommandsEnabled
         exerciseDraft = savedInstanceState?.getBundle("exerciseDraft")
         exerciseDraft?.let {
             currentScreen = Screen.EXERCISES
@@ -511,7 +547,20 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPostResume() {
         super.onPostResume()
+        voiceResumed = true
+        updateTimerVoice()
         showPendingImportedPlan()
+    }
+
+    override fun onPause() {
+        voiceResumed = false
+        timerVoice.update(null)
+        super.onPause()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        updateTimerVoice()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -522,6 +571,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean("voicePermissionAsked", voicePermissionAsked)
         outState.putBoolean("showActiveWorkout", currentScreen == Screen.WORKOUT)
         outState.putBoolean("showLiveMeasurement", currentScreen == Screen.LIVE_MEASUREMENT)
         outState.putBoolean("showBodyMeasurements", currentScreen == Screen.BODY_MEASUREMENTS)
@@ -534,6 +584,7 @@ class MainActivity : AppCompatActivity() {
         outState.putBoolean("healthPermissionPending", healthPermissionPending)
         outState.putString("onboardingGender", onboardingGender.name)
         outState.putBoolean("onboardingHealthEnabled", onboardingHealthEnabled)
+        outState.putBoolean("onboardingVoiceEnabled", onboardingVoiceEnabled)
         outState.putBundle("exerciseDraft", exerciseDraft)
         super.onSaveInstanceState(outState)
     }
@@ -548,6 +599,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        timerVoice.close()
         craneScaleScreens.clear()
         mcpServer?.close()
         mcpServer = null
@@ -630,6 +682,16 @@ class MainActivity : AppCompatActivity() {
             },
         )
         setContentView(drawerLayout)
+        root.viewTreeObserver.addOnScrollChangedListener { updateTimerVoice() }
+        root.viewTreeObserver.addOnGlobalLayoutListener { updateTimerVoice() }
+        drawerLayout.addDrawerListener(
+            object : DrawerLayout.SimpleDrawerListener() {
+                override fun onDrawerSlide(drawerView: View, slideOffset: Float) =
+                    updateTimerVoice()
+
+                override fun onDrawerClosed(drawerView: View) = updateTimerVoice()
+            }
+        )
     }
 
     private fun drawerMenu(): View =
@@ -699,6 +761,9 @@ class MainActivity : AppCompatActivity() {
         scrollToBottom: Boolean = false,
         focusExerciseId: String? = null,
     ) {
+        timerVoice.update(null)
+        voiceTimerCards.clear()
+        voiceTimerButtons.clear()
         craneScaleScreens.clear()
         liveWorkoutMeasurement.reconcile()
         liveGraphs.clear()
@@ -832,8 +897,12 @@ class MainActivity : AppCompatActivity() {
                 }
             )
             body.addView(
+                settings.voiceCommandsChoice(onboardingVoiceEnabled) { onboardingVoiceEnabled = it }
+            )
+            body.addView(
                 ui.actionButton("Get started") {
                     repository.data.biologicalGender = onboardingGender
+                    repository.data.voiceCommandsEnabled = onboardingVoiceEnabled
                     repository.data.onboardingComplete = true
                     repository.save()
                     render()
@@ -985,6 +1054,16 @@ class MainActivity : AppCompatActivity() {
         }
 
     private fun activeWorkoutScreen(workout: WorkoutSession): View {
+        if (
+            repository.data.voiceCommandsEnabled &&
+                voiceTimerTarget(
+                    workout,
+                    repository.data.exercises,
+                    workout.exercises.map { it.id }.toSet(),
+                ) != null
+        ) {
+            timerVoice.prepare()
+        }
         val finishButton =
             ui.actionButton("Finish workout") {
                 if (workout.setCount() > 0) {
@@ -1066,6 +1145,8 @@ class MainActivity : AppCompatActivity() {
                     if (activeHoldWorkoutExerciseId == item.id) clearActiveHold()
                     workout.exercises.remove(item)
                     cardViews.remove(item.id)?.let(reorder::remove)
+                    voiceTimerCards.remove(item.id)
+                    item.plannedSets.forEach { voiceTimerButtons.remove(it.id) }
                     if (workout.exercises.isEmpty()) {
                         exerciseCards.addView(
                             ui.emptyText(
@@ -1155,6 +1236,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun discardActiveWorkout() {
         repository.data.activeWorkout = null
+        timerVoice.unload()
         currentScreen = Screen.HOME
         previousScreens.clear()
         restEndsAt = 0L
@@ -1172,6 +1254,7 @@ class MainActivity : AppCompatActivity() {
         editingHistory: Boolean = false,
     ): View =
         ui.card(horizontalPadding = 0) {
+            if (!editingHistory) voiceTimerCards[item.id] = this
             val saveChanges: () -> Unit = {
                 exerciseEditUndo?.dismiss()
                 if (!editingHistory) repository.save()
@@ -1305,6 +1388,7 @@ class MainActivity : AppCompatActivity() {
                 item.sets.removeAll { it.id in loggedIds }
                 item.plannedSets.subList(fromIndex, endIndex).clear()
                 removedSets.forEach { removedSet ->
+                    voiceTimerButtons.remove(removedSet.id)
                     rowViews.remove(removedSet.id)?.let(setRows::removeView)
                     updateRowIndices.remove(removedSet.id)
                     updateRowValues.remove(removedSet.id)
@@ -1374,6 +1458,7 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                     else null
+                holdButton?.let { voiceTimerButtons[plannedSet.id] = it }
                 val rowActions =
                     LinearLayout(this@MainActivity).apply {
                         orientation = LinearLayout.HORIZONTAL
@@ -3235,6 +3320,73 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    private fun hasMicrophonePermission(): Boolean =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+
+    internal fun onTimerVoiceCommand(target: String) {
+        // LEGACY: Manual taps may replace a running timer; voice targets that timer until stopped.
+        val current = visibleVoiceTimerTarget()
+        if (current != null && current.setId == target && hasMicrophonePermission()) {
+            // Use the same start/stop action as a tap, including rest and set bookkeeping.
+            voiceTimerButtons[current.setId]?.performClick()
+        }
+    }
+
+    private fun visibleVoiceTimerTarget(): VoiceTimerTarget? {
+        if (
+            !voiceResumed ||
+                !repository.data.voiceCommandsEnabled ||
+                !::content.isInitialized ||
+                !window.decorView.hasWindowFocus() ||
+                currentScreen != Screen.WORKOUT ||
+                route != Route.Root ||
+                drawerLayout.isDrawerVisible(GravityCompat.START) ||
+                liveWorkoutMeasurement.active != null
+        )
+            return null
+        val viewport = Rect()
+        if (!content.getGlobalVisibleRect(viewport)) return null
+        val visible =
+            voiceTimerCards
+                .filterValues { card ->
+                    val bounds = Rect()
+                    card.isShown && card.getGlobalVisibleRect(bounds) && bounds.intersect(viewport)
+                }
+                .keys
+        val active = activeHoldWorkoutExerciseId?.let { exerciseId ->
+            activeHoldPlannedSetId?.let { VoiceTimerTarget(exerciseId, it) }
+        }
+        return voiceTimerTarget(
+                repository.data.activeWorkout,
+                repository.data.exercises,
+                visible,
+                active,
+            )
+            ?.takeIf { voiceTimerButtons[it.setId]?.isAttachedToWindow == true }
+    }
+
+    private fun updateTimerVoice() {
+        if (::repository.isInitialized && repository.data.activeWorkout == null) {
+            timerVoice.unload()
+            return
+        }
+        val target = visibleVoiceTimerTarget()
+        if (target == null || !hasMicrophonePermission()) {
+            timerVoice.update(null)
+            if (
+                target != null &&
+                    !voicePermissionAsked &&
+                    packageManager.hasSystemFeature(PackageManager.FEATURE_MICROPHONE)
+            ) {
+                voicePermissionAsked = true
+                microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
+            }
+            return
+        }
+        timerVoice.update(target.setId)
+    }
+
     private fun onWorkoutScaleReading(atMillis: Long, kilograms: Double) {
         val change =
             liveWorkoutMeasurement.read(
@@ -3300,6 +3452,7 @@ class MainActivity : AppCompatActivity() {
         amount.isEnabled = false
         button.setImageResource(R.drawable.ic_timer_stop)
         button.contentDescription = button.contentDescription.toString().replace("Start", "Stop")
+        updateTimerVoice()
         repository.save()
         updateWorkoutNotification(force = true)
     }
@@ -3346,6 +3499,7 @@ class MainActivity : AppCompatActivity() {
             startRest(item, workout)
         }
         updateWorkoutNotification(force = true)
+        updateTimerVoice()
     }
 
     private fun clearActiveHold() {

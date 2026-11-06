@@ -1,0 +1,19 @@
+Offline "time" keyword recognition
+
+Runtime: Vosk Android 0.3.75, Alpha Cephei Inc, Apache License 2.0.
+https://github.com/alphacep/vosk-api
+https://alphacephei.com/vosk/android
+The Android library is fetched only at build time from Maven Central.
+
+Model: vosk-model-small-en-us-0.15.
+Copyright 2020 Alpha Cephei Inc. License: Apache License 2.0.
+https://alphacephei.com/vosk/models
+Download: https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
+SHA-256: 30f26242c4eb449f948e42cb302dd7a686cb29a3423a8367f99ff41780942498
+
+model.zip is the unmodified upstream model archive, renamed for packaging.
+It is bundled with the APK and unpacked locally on first use. No model download
+is needed at runtime. grammar.json limits recognition to "time", similar words
+and an unknown-word path. Only the exact result "time" starts or stops a timer.
+
+See LICENSE for the Apache License 2.0 text.

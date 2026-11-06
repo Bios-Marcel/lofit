@@ -52,6 +52,7 @@ class LiveWorkoutMeasurementFlowTest {
     @Before
     fun setup() {
         listOf(
+                Manifest.permission.RECORD_AUDIO,
                 Manifest.permission.BLUETOOTH_SCAN,
                 Manifest.permission.BLUETOOTH_CONNECT,
                 Manifest.permission.BLUETOOTH_ADVERTISE,

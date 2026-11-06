@@ -280,6 +280,7 @@ data class AppData(
     val history: MutableList<WorkoutSession> = mutableListOf(),
     var activeWorkout: WorkoutSession? = null,
     var soundCuesEnabled: Boolean = true,
+    var voiceCommandsEnabled: Boolean = false,
     var bodyMetricsEnabled: Boolean? = null,
     var biologicalGender: BiologicalGender = BiologicalGender.MALE,
     var onboardingComplete: Boolean = false,

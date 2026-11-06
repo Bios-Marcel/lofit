@@ -80,6 +80,10 @@ class WorkoutFlowTest {
         val context = instrumentation.targetContext
         instrumentation.uiAutomation.grantRuntimePermission(
             context.packageName,
+            Manifest.permission.RECORD_AUDIO,
+        )
+        instrumentation.uiAutomation.grantRuntimePermission(
+            context.packageName,
             Manifest.permission.POST_NOTIFICATIONS,
         )
         instrumentation.uiAutomation.grantRuntimePermission(
@@ -131,7 +135,7 @@ class WorkoutFlowTest {
         onView(withText("Female")).perform(click())
         onView(withContentDescription("Android health integration"))
             .check(matches(not(isChecked())))
-        onView(withText("Get started")).perform(click())
+        onView(withText("Get started")).perform(scrollTo(), click())
         assertEquals(BiologicalGender.FEMALE, LofitRepository(context).data.biologicalGender)
         assertTrue(LofitRepository(context).data.onboardingComplete)
         assertEquals(false, LofitRepository(context).data.bodyMetricsEnabled)
@@ -161,7 +165,7 @@ class WorkoutFlowTest {
 
         onView(withContentDescription("Android health integration")).perform(click())
         assertEquals(null, LofitRepository(context).data.bodyMetricsEnabled)
-        onView(withText("Get started")).perform(click())
+        onView(withText("Get started")).perform(scrollTo(), click())
         assertEquals(true, LofitRepository(context).data.bodyMetricsEnabled)
         onView(withText("Welcome to Lofit")).check(doesNotExist())
         instrumentation.runOnMainSync { activity.finish() }

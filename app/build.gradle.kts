@@ -59,6 +59,7 @@ android {
 }
 
 dependencies {
+    implementation(libs.vosk.android)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.core.ktx)
     implementation(libs.material)

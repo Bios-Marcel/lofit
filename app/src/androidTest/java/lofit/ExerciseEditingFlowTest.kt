@@ -38,6 +38,10 @@ class ExerciseEditingFlowTest {
     fun resetData() {
         instrumentation.uiAutomation.grantRuntimePermission(
             context.packageName,
+            Manifest.permission.RECORD_AUDIO,
+        )
+        instrumentation.uiAutomation.grantRuntimePermission(
+            context.packageName,
             Manifest.permission.POST_NOTIFICATIONS,
         )
         context.getSystemService(NotificationManager::class.java).cancelAll()
