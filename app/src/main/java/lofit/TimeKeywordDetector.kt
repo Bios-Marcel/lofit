@@ -7,12 +7,6 @@ import org.json.JSONObject
 import org.vosk.Model
 import org.vosk.Recognizer
 
-internal enum class VoiceCommand(val word: String) {
-    TIME("time"),
-    SKIP("skip"),
-    DONE("done"),
-}
-
 internal data class WorkoutVoiceTarget(
     val timer: VoiceTimerTarget? = null,
     val done: VoiceTimerTarget? = null,
@@ -27,28 +21,22 @@ internal interface VoiceKeywordDetector : AutoCloseable {
 }
 
 internal class TimeKeywordDetector(context: Context) : VoiceKeywordDetector {
+    private val grammar =
+        context.assets.open("voice-time/grammar.json").bufferedReader().use { it.readText() }
     private val model = Model(prepareModel(context).absolutePath)
-    private val recognizer =
-        try {
-            Recognizer(
-                model,
-                16_000f,
-                context.assets.open("voice-time/grammar.json").bufferedReader().use {
-                    it.readText()
-                },
-            )
-        } catch (error: Exception) {
-            model.close()
-            throw error
-        }
-    private var triggered = false
+    private var recognizer: Recognizer? = null
+    private val commands = VoiceCommandGate()
 
     override fun reset() {
-        recognizer.reset()
-        triggered = false
+        // A capture may stop before even one decoder frame exists. Reusing Vosk's partial
+        // pipeline in that state can abort natively; retain the model, replace the decoder.
+        recognizer?.close()
+        recognizer = null
+        commands.reset()
     }
 
     override fun accept(samples: FloatArray): VoiceCommand? {
+        val recognizer = recognizer ?: Recognizer(model, 16_000f, grammar).also { recognizer = it }
         val pcm =
             ShortArray(samples.size) {
                 (samples[it] * 32768f).toInt().coerceIn(-32768, 32767).toShort()
@@ -56,17 +44,12 @@ internal class TimeKeywordDetector(context: Context) : VoiceKeywordDetector {
         val ended = recognizer.acceptWaveForm(pcm, pcm.size)
         val result = JSONObject(if (ended) recognizer.result else recognizer.partialResult)
         val text = result.optString(if (ended) "text" else "partial")
-        // Partial results start promptly. Competitors and [unk] prevent forcing every sound to
-        // a command.
-        val detected = VoiceCommand.entries.firstOrNull { !triggered && text == it.word }
-        if (detected != null) triggered = true
-        // A final result for the same utterance must not trigger a second toggle.
-        if (ended) triggered = false
-        return detected
+        return commands.accept(text, ended)
     }
 
     override fun close() {
-        recognizer.close()
+        recognizer?.close()
+        recognizer = null
         model.close()
     }
 

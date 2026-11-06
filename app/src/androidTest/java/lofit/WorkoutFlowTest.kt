@@ -538,6 +538,8 @@ class WorkoutFlowTest {
                     .activeNotifications
                     .single()
             notification.notification.contentIntent.send()
+            onView(isAssignableFrom(DrawerLayout::class.java))
+                .perform(waitUntilMatches(hasDescendant(withText("Finish workout"))))
             onView(withText("Finish workout")).perform(scrollTo(), click())
             onView(withText("Export to Hevy")).check(matches(not(isChecked())))
             onView(withText("Finish and save")).perform(click())

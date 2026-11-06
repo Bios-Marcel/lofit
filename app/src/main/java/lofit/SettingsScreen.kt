@@ -107,7 +107,7 @@ internal class SettingsScreen(
         )
         addView(
             ui.metaText(
-                "Say “time” for timers, “skip” to skip rest, or “done” to finish the current set. Works offline."
+                "Say “time” for timers, “skip” to skip rest, or “done” to finish the current set. Say “set fifty times eight” for 50 kg and 8 reps or seconds. Without weight, say “set eight”. Works offline, including with the screen locked."
             )
         )
     }

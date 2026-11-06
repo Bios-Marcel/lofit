@@ -15,6 +15,11 @@ internal val Context.repositoryHistoryFile: File
     get() = File(filesDir, "lofit-history.json")
 
 internal fun Context.clearRepositoryTestData() {
+    if (this !is RepositoryTestContext) {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.runOnMainSync { WorkoutVoiceService.stop() }
+        instrumentation.waitForIdleSync()
+    }
     assertTrue(getSharedPreferences("lofit-data", 0).edit().clear().commit())
     AtomicFile(repositoryStateFile).delete()
     AtomicFile(repositoryHistoryFile).delete()

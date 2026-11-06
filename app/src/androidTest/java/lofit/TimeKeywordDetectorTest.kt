@@ -32,6 +32,40 @@ class TimeKeywordDetectorTest {
     }
 
     @Test
+    fun recognizesFullNumberCommandsAndRejectsIncompletePhrases() {
+        TimeKeywordDetector(instrumentation.targetContext).use { model ->
+            for (voice in listOf("lessac", "amy")) {
+                for ((phrase, expected) in
+                    listOf(
+                        "set-values" to VoiceCommand.SetValues(50.0, 8),
+                        "set-decimal" to VoiceCommand.SetValues(12.5, 10),
+                        "set-hundred" to VoiceCommand.SetValues(125.0, 12),
+                        "set-zero" to VoiceCommand.SetValues(0.0, 15),
+                        "set-single" to VoiceCommand.SetValues(null, 15),
+                        "set-seconds" to VoiceCommand.SetValues(null, 30),
+                        "set-four" to VoiceCommand.SetValues(null, 4),
+                        "set-four-pair" to VoiceCommand.SetValues(4.0, 4),
+                        "set-timed" to VoiceCommand.SetValues(12.5, 30),
+                        "set-for" to null,
+                        "set-incomplete" to null,
+                        "set-reversed" to null,
+                        "set-negative" to null,
+                    )) {
+                    model.reset()
+                    val audio = samples("$voice-$phrase")
+                    val commands = mutableListOf<VoiceCommand>()
+                    for (offset in audio.indices step 320) {
+                        model
+                            .accept(audio.copyOfRange(offset, minOf(offset + 320, audio.size)))
+                            ?.let(commands::add)
+                    }
+                    assertEquals("$voice-$phrase", listOfNotNull(expected), commands)
+                }
+            }
+        }
+    }
+
+    @Test
     fun recognizesSkipAndDoneOncePerUtteranceAlongsideTime() {
         TimeKeywordDetector(instrumentation.targetContext).use { model ->
             for (voice in listOf("lessac", "amy")) {
@@ -94,6 +128,20 @@ class TimeKeywordDetectorTest {
                         detect(model, samples("$voice-$word")).isEmpty(),
                     )
                 }
+            }
+        }
+    }
+
+    @Test
+    fun captureCanRestartAfterOnlyAFewAudioFrames() {
+        TimeKeywordDetector(instrumentation.targetContext).use { model ->
+            val audio = samples("time-natural")
+            for (frames in listOf(1, 2, 4, 8, 16, 24)) {
+                model.reset()
+                repeat(frames) { model.accept(audio.copyOfRange(it * 320, (it + 1) * 320)) }
+                model.reset()
+                assertTrue(detect(model, FloatArray(16000)).isEmpty())
+                assertEquals(1, detect(model, audio).size)
             }
         }
     }

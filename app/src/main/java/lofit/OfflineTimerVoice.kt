@@ -79,7 +79,7 @@ internal class OfflineTimerVoice(
             session!!.target = target
             return
         }
-        // LEGACY: Hiding an ongoing workout stops capture but keeps its model warm.
+        // No eligible set: stop capture but keep the workout model warm.
         session?.stop()
         session = target?.let { Session(it) }
         session?.let { next ->
@@ -88,7 +88,9 @@ internal class OfflineTimerVoice(
         }
     }
 
-    @SuppressLint("MissingPermission") // The activity checks and requests RECORD_AUDIO first.
+    @SuppressLint(
+        "MissingPermission"
+    ) // The foreground service verifies RECORD_AUDIO before capture.
     private fun listen(current: Session) {
         if (!current.active) return
         try {

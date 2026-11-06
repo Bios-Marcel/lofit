@@ -51,6 +51,8 @@ class LiveWorkoutMeasurementFlowTest {
 
     @Before
     fun setup() {
+        instrumentation.runOnMainSync { WorkoutVoiceService.stop() }
+        instrumentation.waitForIdleSync()
         listOf(
                 Manifest.permission.RECORD_AUDIO,
                 Manifest.permission.BLUETOOTH_SCAN,
@@ -66,6 +68,7 @@ class LiveWorkoutMeasurementFlowTest {
             runCatching { AtomicFile(context.repositoryHistoryFile).readFully() }.getOrNull()
         LofitRepository(context).apply {
             data.onboardingComplete = true
+            data.voiceCommandsEnabled = false
             data.bodyMetricsEnabled = false
             data.mcpEnabled = false
             data.craneScale = selected
@@ -87,6 +90,8 @@ class LiveWorkoutMeasurementFlowTest {
 
     @After
     fun restore() {
+        instrumentation.runOnMainSync { WorkoutVoiceService.stop() }
+        instrumentation.waitForIdleSync()
         listOf(
                 context.repositoryStateFile to savedState,
                 context.repositoryHistoryFile to savedHistory,

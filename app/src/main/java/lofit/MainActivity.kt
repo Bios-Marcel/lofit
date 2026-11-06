@@ -281,23 +281,12 @@ class MainActivity : AppCompatActivity() {
     private var holdDoneCheckBox: CheckBox? = null
     private val voiceTimerCards = mutableMapOf<String, View>()
     private val voiceDoneButtons = mutableMapOf<String, CheckBox>()
+    private val voiceSetValueActions = mutableMapOf<String, (VoiceCommand.SetValues) -> Unit>()
     private val voiceTimerButtons = mutableMapOf<String, ImageButton>()
     private var voiceResumed = false
     private var voicePermissionAsked = false
-    private val timerVoice by lazy {
-        OfflineTimerVoice(
-            applicationContext,
-            onCommand = ::onWorkoutVoiceCommand,
-            onError = {
-                Toast.makeText(
-                        this,
-                        "Voice commands unavailable. Use the workout controls.",
-                        Toast.LENGTH_LONG,
-                    )
-                    .show()
-            },
-        )
-    }
+    private lateinit var workoutVoice: WorkoutVoiceRuntime
+    private var voiceRevision = 0
     private val microphonePermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (!granted) {
@@ -310,10 +299,30 @@ class MainActivity : AppCompatActivity() {
             }
             updateTimerVoice()
         }
-    private var activeHoldWorkoutExerciseId: String? = null
-    private var activeHoldPlannedSetId: String? = null
-    private var holdStartedAt = 0L
-    private var holdCuePlayed = false
+    private var activeHoldWorkoutExerciseId: String?
+        get() = workoutVoice.session.activeHoldWorkoutExerciseId
+        set(value) {
+            workoutVoice.session.activeHoldWorkoutExerciseId = value
+        }
+
+    private var activeHoldPlannedSetId: String?
+        get() = workoutVoice.session.activeHoldPlannedSetId
+        set(value) {
+            workoutVoice.session.activeHoldPlannedSetId = value
+        }
+
+    private var holdStartedAt: Long
+        get() = workoutVoice.session.holdStartedAt
+        set(value) {
+            workoutVoice.session.holdStartedAt = value
+        }
+
+    private var holdCuePlayed: Boolean
+        get() = workoutVoice.session.holdCuePlayed
+        set(value) {
+            workoutVoice.session.holdCuePlayed = value
+        }
+
     private lateinit var cueSounds: SoundPool
     private lateinit var cueAudioManager: AudioManager
     private lateinit var cueAudioFocusRequest: AudioFocusRequest
@@ -324,7 +333,12 @@ class MainActivity : AppCompatActivity() {
     private var completionCueId = 0
     private var updatingHoldTimer = false
     private var completingHoldAutomatically = false
-    private var restEndsAt = 0L
+    private var restEndsAt: Long
+        get() = workoutVoice.session.restEndsAt
+        set(value) {
+            workoutVoice.session.restEndsAt = value
+        }
+
     private var lastWorkoutNotification = ""
     private var lastWorkoutNotificationAt = 0L
     private val refreshWorkoutNotification = Runnable { updateWorkoutNotification(force = true) }
@@ -347,7 +361,9 @@ class MainActivity : AppCompatActivity() {
             onRefresh = { render() },
         )
     }
-    private val liveWorkoutMeasurement by lazy { LiveWorkoutMeasurement { repository.data } }
+    private val liveWorkoutMeasurement
+        get() = workoutVoice.session.liveMeasurement
+
     // Readings, completion, timer updates and graph rendering share one monotonic clock.
     internal var liveMeasurementNow: () -> Long = SystemClock::elapsedRealtime
     private val liveGraphs = mutableListOf<LiveMeasurementGraphView>()
@@ -427,10 +443,13 @@ class MainActivity : AppCompatActivity() {
     private val tick =
         object : Runnable {
             override fun run() {
-                updateWorkoutTimer()
-                updateHoldTimer()
-                updateTimerVoice()
-                handler.postDelayed(this, 250)
+                if (isDestroyed) return
+                if (voiceResumed || WorkoutVoiceService.currentRuntime !== workoutVoice) {
+                    updateWorkoutTimer()
+                    updateHoldTimer()
+                    updateTimerVoice()
+                }
+                if (!isDestroyed) handler.postDelayed(this, 250)
             }
         }
 
@@ -438,7 +457,11 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         voicePermissionAsked = savedInstanceState?.getBoolean("voicePermissionAsked") ?: false
         hevySettings
-        repository = LofitRepository(this)
+        workoutVoice =
+            WorkoutVoiceService.currentRuntime
+                ?: WorkoutVoiceRuntime(LofitRepository(applicationContext))
+        repository = workoutVoice.repository
+        voiceRevision = workoutVoice.revision
         val cueAudioAttributes =
             AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_MEDIA)
@@ -551,13 +574,28 @@ class MainActivity : AppCompatActivity() {
     override fun onPostResume() {
         super.onPostResume()
         voiceResumed = true
+        workoutVoice.foreground = true
+        workoutVoice.failed = false
+        workoutVoice.onCommand = ::onWorkoutVoiceCommand
+        workoutVoice.onChanged = {
+            voiceRevision = workoutVoice.revision
+            render(restoreScrollY = (content.getChildAt(0) as? ScrollView)?.scrollY)
+        }
+        if (voiceRevision != workoutVoice.revision) {
+            voiceRevision = workoutVoice.revision
+            render(restoreScrollY = (content.getChildAt(0) as? ScrollView)?.scrollY)
+        }
         updateTimerVoice()
         showPendingImportedPlan()
     }
 
     override fun onPause() {
         voiceResumed = false
-        timerVoice.update(null)
+        workoutVoice.foreground = false
+        workoutVoice.foregroundTarget = null
+        workoutVoice.onCommand = null
+        workoutVoice.onChanged = null
+        WorkoutVoiceService.current?.refresh()
         super.onPause()
     }
 
@@ -602,7 +640,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        timerVoice.close()
+        workoutVoice.onCommand = null
+        workoutVoice.onChanged = null
         craneScaleScreens.clear()
         mcpServer?.close()
         mcpServer = null
@@ -764,10 +803,12 @@ class MainActivity : AppCompatActivity() {
         scrollToBottom: Boolean = false,
         focusExerciseId: String? = null,
     ) {
-        timerVoice.update(null)
+        workoutVoice.foregroundTarget = null
+        WorkoutVoiceService.current?.refresh()
         voiceTimerCards.clear()
         voiceTimerButtons.clear()
         voiceDoneButtons.clear()
+        voiceSetValueActions.clear()
         craneScaleScreens.clear()
         liveWorkoutMeasurement.reconcile()
         liveGraphs.clear()
@@ -1058,17 +1099,6 @@ class MainActivity : AppCompatActivity() {
         }
 
     private fun activeWorkoutScreen(workout: WorkoutSession): View {
-        if (
-            repository.data.voiceCommandsEnabled &&
-                voiceTimerTarget(
-                    workout,
-                    repository.data.exercises,
-                    workout.exercises.map { it.id }.toSet(),
-                    timersOnly = false,
-                ) != null
-        ) {
-            timerVoice.prepare()
-        }
         val finishButton =
             ui.actionButton("Finish workout") {
                 if (workout.setCount() > 0) {
@@ -1154,6 +1184,7 @@ class MainActivity : AppCompatActivity() {
                     item.plannedSets.forEach {
                         voiceTimerButtons.remove(it.id)
                         voiceDoneButtons.remove(it.id)
+                        voiceSetValueActions.remove(it.id)
                     }
                     if (workout.exercises.isEmpty()) {
                         exerciseCards.addView(
@@ -1244,7 +1275,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun discardActiveWorkout() {
         repository.data.activeWorkout = null
-        timerVoice.unload()
+        WorkoutVoiceService.stop()
         currentScreen = Screen.HOME
         previousScreens.clear()
         restEndsAt = 0L
@@ -1398,6 +1429,7 @@ class MainActivity : AppCompatActivity() {
                 removedSets.forEach { removedSet ->
                     voiceTimerButtons.remove(removedSet.id)
                     voiceDoneButtons.remove(removedSet.id)
+                    voiceSetValueActions.remove(removedSet.id)
                     rowViews.remove(removedSet.id)?.let(setRows::removeView)
                     updateRowIndices.remove(removedSet.id)
                     updateRowValues.remove(removedSet.id)
@@ -1551,6 +1583,17 @@ class MainActivity : AppCompatActivity() {
                             if (!editingHistory) updateWorkoutNotification(force = true)
                         },
                     )
+                if (!editingHistory) {
+                    voiceSetValueActions[plannedSet.id] = applyValues@{ command ->
+                        if (loggedSetFor(item, plannedSet) != null) return@applyValues
+                        if (!applyVoiceSetValues(command, exercise, plannedSet)) return@applyValues
+                        updateRowValues[plannedSet.id]?.invoke()
+                        saveChanges()
+                        onSetsChanged()
+                        updateWorkoutNotification(force = true)
+                        playCue()
+                    }
+                }
                 done.setOnCheckedChangeListener { _, checked ->
                     val currentIndex = item.plannedSets.indexOf(plannedSet)
                     if (currentIndex < 0) return@setOnCheckedChangeListener
@@ -3351,10 +3394,16 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // LEGACY: Visible workouts retain their UI actions, including live-scale and field handling.
+    // The service applies commands to shared workout state when this screen is not resumed.
     internal fun onWorkoutVoiceCommand(command: VoiceCommand, target: WorkoutVoiceTarget) {
         val current = visibleWorkoutVoiceTarget() ?: return
         if (!hasMicrophonePermission()) return
         when (command) {
+            is VoiceCommand.SetValues -> {
+                if (target.done == null || target.done != current.done) return
+                voiceSetValueActions[target.done.setId]?.invoke(command)
+            }
             VoiceCommand.TIME -> {
                 if (target.timer != null && target.timer == current.timer) {
                     onTimerVoiceCommand(target.timer.setId)
@@ -3429,16 +3478,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateTimerVoice() {
-        if (::repository.isInitialized && repository.data.activeWorkout == null) {
-            timerVoice.unload()
-            return
+        if (isDestroyed || !voiceResumed || !::workoutVoice.isInitialized) return
+        if (
+            repository.data.activeWorkout == null ||
+                !repository.data.voiceCommandsEnabled ||
+                !hasMicrophonePermission()
+        ) {
+            WorkoutVoiceService.stop()
         }
         val target = visibleWorkoutVoiceTarget()
-        if (target == null || !hasMicrophonePermission()) {
-            timerVoice.update(null)
+        workoutVoice.foregroundTarget = target
+        target?.done?.let { workoutVoice.session.preferredExerciseId = it.exerciseId }
+        if (target != null && !hasMicrophonePermission()) {
             if (
-                target != null &&
-                    !voicePermissionAsked &&
+                !voicePermissionAsked &&
                     packageManager.hasSystemFeature(PackageManager.FEATURE_MICROPHONE)
             ) {
                 voicePermissionAsked = true
@@ -3446,7 +3499,15 @@ class MainActivity : AppCompatActivity() {
             }
             return
         }
-        timerVoice.update(target)
+        if (
+            target != null &&
+                repository.data.activeWorkout != null &&
+                repository.data.voiceCommandsEnabled &&
+                hasMicrophonePermission()
+        ) {
+            WorkoutVoiceService.start(this, workoutVoice)
+            WorkoutVoiceService.current?.refresh()
+        }
     }
 
     private fun onWorkoutScaleReading(atMillis: Long, kilograms: Double) {
@@ -3702,6 +3763,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateWorkoutNotification(force: Boolean = false) {
+        if (isDestroyed) return
+        if (WorkoutVoiceService.currentRuntime === workoutVoice) {
+            WorkoutVoiceService.current?.refresh()
+            return
+        }
         val manager = getSystemService(NotificationManager::class.java)
         val workout = repository.data.activeWorkout
         if (workout == null) {
@@ -3851,31 +3917,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun loggedSetFor(item: WorkoutExercise, plannedSet: PlannedSet): LoggedSet? =
         item.sets.firstOrNull { it.plannedSetId == plannedSet.id }
-
-    private fun loggedSetFrom(
-        plannedSet: PlannedSet,
-        exercise: Exercise,
-        completedAt: Long? = null,
-    ) =
-        LoggedSet(
-            type = plannedSet.type,
-            weightKg = plannedSet.weightKg.takeIf { exercise.weighted } ?: 0.0,
-            reps = if (!exercise.type.tracksDuration) plannedSet.reps else 0,
-            holdSeconds =
-                if (exercise.type.tracksDuration) plannedSet.actualHoldSeconds ?: 0 else 0,
-            side = plannedSet.side,
-            completedAt = completedAt ?: System.currentTimeMillis(),
-            plannedSetId = plannedSet.id,
-        )
-
-    private fun syncLoggedSet(loggedSet: LoggedSet, plannedSet: PlannedSet, exercise: Exercise) {
-        loggedSet.type = plannedSet.type
-        loggedSet.weightKg = plannedSet.weightKg.takeIf { exercise.weighted } ?: 0.0
-        loggedSet.reps = if (!exercise.type.tracksDuration) plannedSet.reps else 0
-        loggedSet.holdSeconds =
-            if (exercise.type.tracksDuration) plannedSet.actualHoldSeconds ?: 0 else 0
-        loggedSet.side = plannedSet.side
-    }
 
     private fun formatSeconds(total: Int): String =
         String.format(Locale.getDefault(), "%d:%02d", total / 60, total % 60)

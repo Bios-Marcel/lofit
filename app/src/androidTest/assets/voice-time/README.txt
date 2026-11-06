@@ -18,3 +18,18 @@ WAV output is linearly resampled from 22050 Hz to mono 16000 Hz, with 200 ms
 of leading silence and 1 second of trailing silence. Files are raw signed
 little-endian PCM16. These fixtures test streaming recognition and latency;
 they do not establish real-world accuracy across speakers or noisy gyms.
+
+Number-command fixtures (Piper lessac and amy, same resampling, 1.5 seconds trailing silence):
+set-values: set fifty times eight
+set-decimal: set twelve point five times ten
+set-hundred: set one hundred and twenty five times twelve
+set-zero: set zero times fifteen
+set-incomplete: set twelve point five times
+set-reversed: fifty times eight
+set-negative: set minus five times eight
+set-single: set fifteen
+set-seconds: set thirty
+set-four: set four
+set-four-pair: set four times four
+set-timed: set twelve point five times thirty
+set-for: set fifty for eight (rejected)
