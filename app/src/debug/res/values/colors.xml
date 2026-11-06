@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Override the shared accent resources for every debug screen. -->
+    <color name="coral">#5E9FE8</color>
+    <color name="coral_dark">#3E70B3</color>
+</resources>
