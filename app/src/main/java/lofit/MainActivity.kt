@@ -281,6 +281,7 @@ class MainActivity : AppCompatActivity() {
     private var holdDoneCheckBox: CheckBox? = null
     private val voiceTimerCards = mutableMapOf<String, View>()
     private val voiceDoneButtons = mutableMapOf<String, CheckBox>()
+    private val workoutSetRows = mutableMapOf<String, View>()
     private val voiceSetValueActions = mutableMapOf<String, (VoiceCommand.SetValues) -> Unit>()
     private val voiceTimerButtons = mutableMapOf<String, ImageButton>()
     private var voiceResumed = false
@@ -803,11 +804,24 @@ class MainActivity : AppCompatActivity() {
         scrollToBottom: Boolean = false,
         focusExerciseId: String? = null,
     ) {
+        // Service and scale completion update the model before rebuilding the set checkboxes.
+        val newlyCompletedSetId =
+            repository.data.activeWorkout
+                ?.exercises
+                ?.flatMap { item ->
+                    item.plannedSets.filter {
+                        voiceDoneButtons[it.id]?.isChecked == false &&
+                            loggedSetFor(item, it) != null
+                    }
+                }
+                ?.lastOrNull()
+                ?.id
         workoutVoice.foregroundTarget = null
         WorkoutVoiceService.current?.refresh()
         voiceTimerCards.clear()
         voiceTimerButtons.clear()
         voiceDoneButtons.clear()
+        workoutSetRows.clear()
         voiceSetValueActions.clear()
         craneScaleScreens.clear()
         liveWorkoutMeasurement.reconcile()
@@ -915,6 +929,7 @@ class MainActivity : AppCompatActivity() {
             restoreScrollY?.let { scrollY ->
                 (view as? ScrollView)?.doOnPreDraw { view.scrollTo(0, scrollY) }
             }
+        newlyCompletedSetId?.let(::revealNextWorkoutSet)
         updateWorkoutNotification()
     }
 
@@ -1184,6 +1199,7 @@ class MainActivity : AppCompatActivity() {
                     item.plannedSets.forEach {
                         voiceTimerButtons.remove(it.id)
                         voiceDoneButtons.remove(it.id)
+                        workoutSetRows.remove(it.id)
                         voiceSetValueActions.remove(it.id)
                     }
                     if (workout.exercises.isEmpty()) {
@@ -1429,6 +1445,7 @@ class MainActivity : AppCompatActivity() {
                 removedSets.forEach { removedSet ->
                     voiceTimerButtons.remove(removedSet.id)
                     voiceDoneButtons.remove(removedSet.id)
+                    workoutSetRows.remove(removedSet.id)
                     voiceSetValueActions.remove(removedSet.id)
                     rowViews.remove(removedSet.id)?.let(setRows::removeView)
                     updateRowIndices.remove(removedSet.id)
@@ -1615,8 +1632,10 @@ class MainActivity : AppCompatActivity() {
                     if (!editingHistory) {
                         updateWorkoutNotification(force = true)
                         updateTimerVoice()
+                        if (checked) revealNextWorkoutSet(plannedSet.id)
                     }
                 }
+                if (!editingHistory) workoutSetRows[plannedSet.id] = setRow
                 rowViews[plannedSet.id] = setRow
                 setRows.addView(setRow)
             }
@@ -3718,6 +3737,42 @@ class MainActivity : AppCompatActivity() {
             syncLoggedSet(loggedSet, plannedSet, movement)
         }
         if (!editingHistory && !completingHoldAutomatically) startRest(item, workout)
+    }
+
+    private fun revealNextWorkoutSet(completedSetId: String) {
+        if (currentScreen != Screen.WORKOUT || route != Route.Root) return
+        val scroll = content.getChildAt(0) as? ScrollView ?: return
+        // Wait for the rest bar and any restored scroll position to settle before measuring rows.
+        scroll.doOnPreDraw {
+            if (content.getChildAt(0) !== scroll) return@doOnPreDraw
+            val sets =
+                repository.data.activeWorkout?.exercises?.flatMap { it.plannedSets }
+                    ?: return@doOnPreDraw
+            val completedIndex = sets.indexOfFirst { it.id == completedSetId }
+            if (completedIndex < 0) return@doOnPreDraw
+            val followingRows =
+                sets.drop(completedIndex + 1).mapNotNull {
+                    workoutSetRows[it.id]?.takeIf { row -> row.isAttachedToWindow }
+                }
+            val viewport = Rect()
+            if (!scroll.getLocalVisibleRect(viewport)) return@doOnPreDraw
+            fun bounds(row: View) =
+                Rect().also {
+                    row.getDrawingRect(it)
+                    scroll.offsetDescendantRectToMyCoords(row, it)
+                }
+            if (
+                followingRows.any { row ->
+                    val rect = bounds(row)
+                    rect.top >= viewport.top && rect.bottom <= viewport.bottom
+                }
+            )
+                return@doOnPreDraw
+            val next = followingRows.firstOrNull() ?: return@doOnPreDraw
+            val distance = bounds(next).bottom - viewport.bottom
+            if (distance > 0) scroll.scrollBy(0, distance)
+        }
+        scroll.invalidate()
     }
 
     private fun completeNotificationSet(intent: Intent) {

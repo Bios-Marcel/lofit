@@ -145,6 +145,37 @@ class LiveWorkoutMeasurementFlowTest {
     }
 
     @Test
+    fun scaleCompletion_revealsNextRowAfterRender() {
+        LofitRepository(context).apply {
+            val item = data.activeWorkout!!.exercises.single()
+            item.plannedSets.clear()
+            item.plannedSets.addAll(List(20) { PlannedSet(holdSeconds = 1) })
+            item.sets.addAll(item.plannedSets.take(9).map { loggedSetFrom(it, movement) })
+            save()
+        }
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            lateinit var scanner: FakeScanner
+            scenario.onActivity { scanner = fakeScanner(it) }
+            onView(withContentDescription("Set 10 row")).check { view, _ ->
+                val scroll = graphScroll(view)
+                scroll.scrollTo(0, naturalTop(view, scroll) + view.height - scroll.height)
+            }
+            onView(withContentDescription("Set 10 row")).perform(waitForStableLayout())
+            onView(withContentDescription("Set 11 row"))
+                .check(matches(not(isCompletelyDisplayed())))
+            scenario.onActivity {
+                scanner.reading(selected, 20.0)
+                scaleTimeMillis += 1_100
+                scanner.reading(selected, 0.0)
+            }
+            onView(withContentDescription("Set 10 done")).check(matches(isChecked()))
+            onView(withContentDescription("Set 11 row"))
+                .perform(waitUntilMatches(isCompletelyDisplayed()))
+                .check(matches(isCompletelyDisplayed()))
+        }
+    }
+
+    @Test
     fun voiceDoneCompletesActiveScaleSetAndKeepsItsMeasurement() {
         LofitRepository(context).apply {
             data.voiceCommandsEnabled = true
