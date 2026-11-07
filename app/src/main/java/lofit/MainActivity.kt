@@ -2068,88 +2068,92 @@ class MainActivity : AppCompatActivity() {
                 addView(resultLabel)
             }
         val results =
-            LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
+            ExerciseResultRows(this).apply {
                 setPadding(ui.dp(14), 0, ui.dp(14), ui.dp(12))
             }
+        val empty = ui.emptyText("No matching exercises.")
+        val searchTerms = exercises.associate { it.id to exerciseSearchTerms(it) }
         val resultsScroll =
             ScrollView(this).apply {
                 isFillViewport = true
-                addView(results)
+                addView(
+                    LinearLayout(this@MainActivity).apply {
+                        orientation = LinearLayout.VERTICAL
+                        addView(empty)
+                        addView(results)
+                    }
+                )
             }
         fun updateResults(query: String) {
-            results.removeAllViews()
+            val searchQuery = SearchQuery(query)
             val allMatches = exercises.filter { exercise ->
-                matchesSearchQuery(
-                    query,
+                searchQuery.matches(
                     exercise.name,
                     exercise.primaryMuscle,
                     exercise.secondaryMuscles,
-                    exerciseSearchTerms(exercise),
+                    searchTerms.getValue(exercise.id),
                 )
             }
             val matches = allMatches.take(40)
-            if (matches.isEmpty()) results.addView(ui.emptyText("No matching exercises."))
+            empty.visibility = if (matches.isEmpty()) View.VISIBLE else View.GONE
             resultLabel.text = "Showing 40 of ${allMatches.size}. Search to narrow the list."
             resultLabel.visibility = if (allMatches.size > matches.size) View.VISIBLE else View.GONE
-            matches.forEach { movement ->
-                results.addView(
-                    ui.card {
-                        addView(ui.exerciseHeading(movement, large = true))
-                        addView(
-                            ui.metaText(
-                                listOf(
-                                        exerciseTrackingLabel(movement),
-                                        if (movement.asymmetric) "Asymmetrical" else null,
-                                    )
-                                    .filterNotNull()
-                                    .joinToString(" · ")
-                            )
-                        )
-                        if (movement.secondaryMuscles.isNotBlank())
-                            addView(ui.metaText("Secondary: ${movement.secondaryMuscles}"))
-                        addView(
-                            LinearLayout(this@MainActivity).apply {
-                                orientation = LinearLayout.HORIZONTAL
-                                gravity = Gravity.CENTER_VERTICAL
-                                setPadding(0, ui.dp(8), 0, 0)
-                                if (!replacing)
-                                    addView(
-                                        ui.largeCheckBox().apply {
-                                            contentDescription = "Select ${movement.name}"
-                                            isChecked = movement.id in picker.selectedIds
-                                            setOnCheckedChangeListener { _, checked ->
-                                                if (checked) picker.selectedIds.add(movement.id)
-                                                else picker.selectedIds.remove(movement.id)
-                                                updateSelection()
-                                            }
-                                        },
-                                        LinearLayout.LayoutParams(ui.dp(56), ui.dp(56)).apply {
-                                            marginEnd = ui.dp(12)
-                                        },
-                                    )
-                                addView(
-                                    ui.actionButton(
-                                            if (hasLoggedSets && !keepsLoggedSets(movement))
-                                                "Replace remaining"
-                                            else if (replacing) "Replace" else "Add"
-                                        ) {
-                                            addExercises(listOf(movement))
-                                        }
-                                        .apply {
-                                            contentDescription =
-                                                "${if (replacing) "Replace with" else "Add"} ${movement.name}"
-                                        },
-                                    LinearLayout.LayoutParams(
-                                        0,
-                                        ViewGroup.LayoutParams.WRAP_CONTENT,
-                                        1f,
-                                    ),
+            results.update(matches) { movement ->
+                ui.card {
+                    addView(ui.exerciseHeading(movement, large = true))
+                    addView(
+                        ui.metaText(
+                            listOf(
+                                    exerciseTrackingLabel(movement),
+                                    if (movement.asymmetric) "Asymmetrical" else null,
                                 )
-                            }
+                                .filterNotNull()
+                                .joinToString(" · ")
                         )
-                    }
-                )
+                    )
+                    if (movement.secondaryMuscles.isNotBlank())
+                        addView(ui.metaText("Secondary: ${movement.secondaryMuscles}"))
+                    addView(
+                        LinearLayout(this@MainActivity).apply {
+                            orientation = LinearLayout.HORIZONTAL
+                            gravity = Gravity.CENTER_VERTICAL
+                            setPadding(0, ui.dp(8), 0, 0)
+                            if (!replacing)
+                                addView(
+                                    ui.largeCheckBox().apply {
+                                        contentDescription = "Select ${movement.name}"
+                                        isChecked = movement.id in picker.selectedIds
+                                        setOnCheckedChangeListener { _, checked ->
+                                            if (checked) picker.selectedIds.add(movement.id)
+                                            else picker.selectedIds.remove(movement.id)
+                                            updateSelection()
+                                        }
+                                    },
+                                    LinearLayout.LayoutParams(ui.dp(56), ui.dp(56)).apply {
+                                        marginEnd = ui.dp(12)
+                                    },
+                                )
+                            addView(
+                                ui.actionButton(
+                                        if (hasLoggedSets && !keepsLoggedSets(movement))
+                                            "Replace remaining"
+                                        else if (replacing) "Replace" else "Add"
+                                    ) {
+                                        addExercises(listOf(movement))
+                                    }
+                                    .apply {
+                                        contentDescription =
+                                            "${if (replacing) "Replace with" else "Add"} ${movement.name}"
+                                    },
+                                LinearLayout.LayoutParams(
+                                    0,
+                                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                                    1f,
+                                ),
+                            )
+                        }
+                    )
+                }
             }
         }
         search.doAfterTextChanged {

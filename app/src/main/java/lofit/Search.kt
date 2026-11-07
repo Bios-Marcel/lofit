@@ -3,8 +3,15 @@ package lofit
 private val searchWhitespace = Regex("\\s+")
 
 fun matchesSearchQuery(query: String, vararg values: String): Boolean {
-    val words = query.trim().split(searchWhitespace).filter(String::isNotEmpty)
-    return words.all { word -> values.any { it.contains(word, ignoreCase = true) } }
+    return SearchQuery(query).matches(*values)
+}
+
+internal class SearchQuery(query: String) {
+    private val words = query.trim().split(searchWhitespace).filter(String::isNotEmpty)
+
+    fun matches(vararg values: String): Boolean = words.all { word ->
+        values.any { it.contains(word, ignoreCase = true) }
+    }
 }
 
 internal fun exerciseSearchTerms(exercise: Exercise): String =

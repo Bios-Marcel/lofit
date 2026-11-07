@@ -68,10 +68,12 @@ internal class ExerciseScreens(
             )
             val search = ui.textField("Search name or muscle")
             val filters = ui.choiceGroup(listOf("Recent", "Custom", "All"), 0)
-            val results =
-                LinearLayout(activityContext).apply { orientation = LinearLayout.VERTICAL }
+            val results = ExerciseResultRows(activityContext)
+            val empty = ui.emptyText("No matching exercises.")
+            val resultLabel = ui.metaText("")
+            val searchTerms = data().exercises.associate { it.id to exerciseSearchTerms(it) }
             fun updateResults(query: String) {
-                results.removeAllViews()
+                val searchQuery = SearchQuery(query)
                 val exercises =
                     when (ui.selectedChoice(filters)) {
                         0 -> data().exercisesByRecency(includeUnused = false)
@@ -79,50 +81,46 @@ internal class ExerciseScreens(
                         else -> data().exercises.filter { !it.retired }
                     }
                 val allMatches = exercises.filter { movement ->
-                    matchesSearchQuery(
-                        query,
+                    searchQuery.matches(
                         movement.name,
                         movement.primaryMuscle,
                         movement.secondaryMuscles,
-                        exerciseSearchTerms(movement),
+                        searchTerms.getValue(movement.id),
                     )
                 }
                 val matches = allMatches.take(40)
-                if (matches.isEmpty()) results.addView(ui.emptyText("No matching exercises."))
-                if (allMatches.size > matches.size)
-                    results.addView(
-                        ui.metaText("Showing 40 of ${allMatches.size}. Search to narrow the list.")
-                    )
-                matches.forEach { movement ->
-                    results.addView(
-                        ui.card {
-                            addView(ui.exerciseHeading(movement, large = true))
+                empty.visibility = if (matches.isEmpty()) View.VISIBLE else View.GONE
+                resultLabel.text = "Showing 40 of ${allMatches.size}. Search to narrow the list."
+                resultLabel.visibility =
+                    if (allMatches.size > matches.size) View.VISIBLE else View.GONE
+                results.update(matches) { movement ->
+                    ui.card {
+                        addView(ui.exerciseHeading(movement, large = true))
+                        addView(
+                            ui.metaText(
+                                listOf(
+                                        exerciseTrackingLabel(movement),
+                                        if (movement.asymmetric) "Asymmetrical" else null,
+                                    )
+                                    .filterNotNull()
+                                    .joinToString(" · ")
+                            )
+                        )
+                        if (movement.secondaryMuscles.isNotBlank())
+                            addView(ui.metaText("Secondary: ${movement.secondaryMuscles}"))
+                        recordFor(movement)?.let { addView(ui.accentText(it)) }
+                        if (movement.custom)
                             addView(
-                                ui.metaText(
-                                    listOf(
-                                            exerciseTrackingLabel(movement),
-                                            if (movement.asymmetric) "Asymmetrical" else null,
-                                        )
-                                        .filterNotNull()
-                                        .joinToString(" · ")
+                                ui.horizontalActions(
+                                    ui.actionButton("Edit", secondary = true) {
+                                        onEdit(movement.id)
+                                    },
+                                    ui.actionButton("Delete", secondary = true) {
+                                        onDelete(movement.id)
+                                    },
                                 )
                             )
-                            if (movement.secondaryMuscles.isNotBlank())
-                                addView(ui.metaText("Secondary: ${movement.secondaryMuscles}"))
-                            recordFor(movement)?.let { addView(ui.accentText(it)) }
-                            if (movement.custom)
-                                addView(
-                                    ui.horizontalActions(
-                                        ui.actionButton("Edit", secondary = true) {
-                                            onEdit(movement.id)
-                                        },
-                                        ui.actionButton("Delete", secondary = true) {
-                                            onDelete(movement.id)
-                                        },
-                                    )
-                                )
-                        }
-                    )
+                    }
                 }
             }
             search.doAfterTextChanged { updateResults(it.toString()) }
@@ -136,6 +134,8 @@ internal class ExerciseScreens(
                     )
                     .apply { bottomMargin = ui.dp(12) },
             )
+            body.addView(empty)
+            body.addView(resultLabel)
             body.addView(results)
             updateResults("")
         }
