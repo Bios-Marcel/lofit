@@ -58,6 +58,11 @@ Unless asked otherwise, follow these rules:
 * No useless explanation labels
 * Keep space between buttons / between buttons and other components
 
+## Exercise Images
+
+- Process every new or regenerated bundled image with `./scripts/prepare-exercise-image.sh SOURCE exercise_resource_name`, including female variants. It applies background cleanup and WebP compression.
+- Use the original generated PNG. Inspect the result for background artifacts and damaged dark details. Follow [the image guide](art/exercise-images/README.md) for a custom background mask when needed.
+
 ## Code Guidelines
 
 - When changing logic that leaves legacy logic, make a `// LEGACY:` marker with explanation

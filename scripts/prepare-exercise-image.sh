@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -ne 2 ]]; then
-  echo "usage: $0 INPUT_IMAGE exercise_resource_name" >&2
+if [[ $# -lt 2 || $# -gt 3 ]]; then
+  echo "usage: $0 INPUT_IMAGE exercise_resource_name [BACKGROUND_MASK]" >&2
   exit 2
 fi
 
@@ -24,16 +24,14 @@ if ! command -v magick >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! command -v node >/dev/null 2>&1; then
+  echo "Node.js is required for background cleanup" >&2
+  exit 1
+fi
+
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 output="$root/app/src/main/res/drawable-nodpi/$name.webp"
 
-magick "$input" \
-  -auto-orient \
-  -resize '627x314^' \
-  -gravity center \
-  -extent 627x314 \
-  -strip \
-  -quality 82 \
-  "$output"
+node "$root/scripts/clean-exercise-background.mjs" "$input" "$output" "${@:3}"
 
 echo "$output"

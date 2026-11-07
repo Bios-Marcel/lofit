@@ -225,6 +225,38 @@
         "app/src/main/res/drawable-nodpi/exercise_db_250.webp"
       ],
       "validation": "Visually inspected source and normalized 627x314 output: one straight collinear shaft from floor pivot through plates to exposed sleeve, both hands on V handle, active bent-over row, complete body and equipment."
+    },
+    {
+      "exercise": "Alternate Leg Diagonal Bound",
+      "gender": "male",
+      "output": "app/src/main/res/drawable-nodpi/exercise_db_010.webp",
+      "generated_source": "/home/marcel/.codex/generated_images/01a1b5cc-6be6-7402-b5d8-02b94b343370/exec-dc33558e-7b0f-475f-94a8-e7bd5eca045e.png",
+      "prompt": "Use case: stylized-concept\nAsset type: Lofit exercise card illustration\nInput image: strict reference for character identity, anatomy, outfit, palette,\nbackground, lighting, linework, and rendering style.\n\nExercise: Alternate Leg Diagonal Bound\nPose: Airborne during an explosive diagonal forward bound from one foot to the other, driving the leading knee forward, slightly outward and up to hip height while the opposite leg trails back after push-off and the arms swing naturally in opposition for balance.\nEquipment: none — this is a pure bodyweight plyometric exercise\nView: front three-quarter, showing the diagonal travel and both legs clearly\n\nCreate one polished instructional illustration of the reference athlete doing\nthe exercise. Keep his face, hair, build, off-white T-shirt, deep green shorts,\nwhite socks, and gray shoes unchanged. Use the same near-black charcoal card\nbackground and softly cel-shaded 2D finish as the reference. Show the whole\nbody and all equipment, centered with generous padding, on a wide 2:1 canvas.\nChoose a clear, anatomically correct key position.\n\nNo text, labels, logos, watermark, scenery, panel borders, motion trail,\ncropped body parts, extra limbs, or extra equipment. Do not change the outfit,\ncharacter, colors, or art style.\n\nExactly ONE athlete in ONE active bounding pose, not the three views from the\nreference sheet. Both feet, both hands and the entire head must remain inside\nthe frame with generous margins. Use a uniform near-black blue-grey background\nwithout texture, gradient, floor line or ground shadow. Absolutely no machine,\nbench, rack, platform, mat, cables, bands, handles, weights, support or props\nanywhere. Hands are empty. The athlete is entirely unsupported.",
+      "mode": "built-in image_gen",
+      "references": [
+        "art/exercise-images/style-seed.png"
+      ],
+      "exercise_reference": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Alternate_Leg_Diagonal_Bound.json",
+      "reason": "Remove an unrelated machine from this bodyweight exercise and show an active diagonal bound.",
+      "postprocessing": "scripts/prepare-exercise-image.sh: 627 x 314, automatic background cleanup to #171A1A, WebP quality 82 and method 6.",
+      "validation": "Visually inspected generated source and normalized output: one unsupported athlete in an airborne diagonal bound, no machine or other equipment, complete body and both shoes visible, outfit and illustration style preserved."
+    },
+    {
+      "exercise": "Alternate Leg Diagonal Bound",
+      "gender": "female",
+      "output": "app/src/main/res/drawable-nodpi/exercise_db_010_female.webp",
+      "generated_source": "/home/marcel/.codex/generated_images/01a1b5cc-6be6-7402-b5d8-02b94b343370/exec-45fe561a-4290-4a75-b444-663dafaf4279.png",
+      "prompt": "Use case: identity-preserve\nAsset type: Lofit exercise card illustration, female Alternate Leg Diagonal Bound\nInput image 1: strict original art style, palette, clothing, linework and lighting reference.\nInput image 2: strict female character identity reference, athletic adult woman with dark brown ponytail.\nInput image 3: edit target and exact reference for the corrected BODYWEIGHT bounding pose, view, scale and composition.\n\nReplace only the male athlete in image 3 with the same athletic adult woman from image 2. Keep her face, ponytail, natural female anatomy, off-white T-shirt, deep green shorts, white socks and gray shoes. Preserve the exact active pose in image 3: airborne during a diagonal forward bound, one knee driven forward, slightly outward and up to hip height, opposite leg trailing back after push-off, arms naturally balancing the jump. Keep the same camera angle, proportions within the frame, limb directions and single clear pose.\n\nThere is NO equipment. Keep the entire background empty. No machine, bench, rack, cables, mat, platform, bands, weights, straps, handle, prop or support anywhere. Both hands empty; body entirely unsupported.\nUse one uniform near-black blue-grey background without texture, gradient, floor line or ground shadow; same softly cel-shaded 2D finish. Wide 2:1 canvas with complete body, head, both hands and both shoes visible and generous margins. Exactly one woman in one pose, not the three-view reference sheet. No text, labels, logos, watermark, borders, scenery, motion trails, extra limbs or extra equipment.",
+      "mode": "built-in image_gen",
+      "references": [
+        "art/exercise-images/style-seed.png",
+        "art/exercise-images/style-seed-female.png",
+        "/home/marcel/.codex/generated_images/01a1b5cc-6be6-7402-b5d8-02b94b343370/exec-dc33558e-7b0f-475f-94a8-e7bd5eca045e.png"
+      ],
+      "exercise_reference": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Alternate_Leg_Diagonal_Bound.json",
+      "reason": "Remove an unrelated machine from this bodyweight exercise and show an active diagonal bound.",
+      "postprocessing": "scripts/prepare-exercise-image.sh: 627 x 314, automatic background cleanup to #171A1A, WebP quality 82 and method 6.",
+      "validation": "Visually inspected generated source and normalized output: one unsupported athlete in an airborne diagonal bound, no machine or other equipment, complete body and both shoes visible, outfit and illustration style preserved."
     }
   ]
 }

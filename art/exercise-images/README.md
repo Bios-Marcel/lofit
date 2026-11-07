@@ -32,14 +32,46 @@ character, colors, or art style.
 ```
 
 Keep the seed and prompt unchanged between images. Change only exercise, pose,
-equipment, and view. Then normalize the chosen output:
+equipment, and view. Always process the original generated PNG with the prep
+script, for both new images and regenerated replacements:
 
 ```sh
 ./scripts/prepare-exercise-image.sh generated.png exercise_lateral_raise
 ```
 
-The result is written to `app/src/main/res/drawable-nodpi/<name>.webp` at the
-same 627 x 314 size as the original Lofit illustrations.
+The script requires ImageMagick and Node.js. It normalizes to 627 x 314, estimates
+the blue-grey background from the image border, replaces background pixels with
+app charcoal (`#171A1A`), and removes tiny isolated background specks. It then
+encodes WebP at quality 82 with compression method 6 and strips metadata. Pixels
+outside the cleanup mask are preserved before WebP encoding. Use the original
+PNG each time; reprocessing a WebP adds another lossy compression pass.
+
+The result is written to `app/src/main/res/drawable-nodpi/<name>.webp`. A failed
+conversion leaves an existing resource untouched.
+
+Inspect every result at native size and zoomed in, especially dark plates,
+cables, benches, walls, and the athlete's outline. Background cleanup is a
+colour-based mask, so those details can need a manually corrected mask. For such
+images, supply a black-and-white PNG aligned to the normalized 627 x 314 image:
+white replaces a pixel with charcoal; black preserves its original colour.
+This mask replaces automatic detection, allowing floor shadows to be cleared
+while retaining a wall or equipment. Do not reuse a mask from a different pose
+or generation. A background outside the supported dark blue-grey palette also
+requires a mask.
+
+```sh
+./scripts/prepare-exercise-image.sh generated.png exercise_wall_sit background-mask.png
+```
+
+The mask must already be exactly 627 x 314 and contain only black and white;
+the script does not resize it. WebP can introduce small colour variations near
+edges; the background is exactly `#171A1A` before encoding.
+
+Check the prep workflow with:
+
+```sh
+node --test scripts/tests/clean-exercise-background.test.mjs
+```
 
 ## Female variants
 
