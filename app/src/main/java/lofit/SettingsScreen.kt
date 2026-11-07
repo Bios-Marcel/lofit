@@ -68,11 +68,7 @@ internal class SettingsScreen(
                 )
             }
         )
-        addView(
-            ui.metaText(
-                "Save weight with workouts. Allow heart rate access for future use; heart rate is not read yet."
-            )
-        )
+        addView(ui.metaText("Save weight and average heart rate with workouts."))
     }
 
     fun voiceCommandsChoice(enabled: Boolean, onChange: (Boolean) -> Unit): View = ui.card {

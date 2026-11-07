@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Instrumentation fixtures only. Release builds only read health data. -->
     <uses-permission android:name="android.permission.health.WRITE_WEIGHT" />
+    <uses-permission android:name="android.permission.health.WRITE_HEART_RATE" />
     <application>
         <activity android:name=".DemoHistoryActivity" android:exported="true" />
     </application>

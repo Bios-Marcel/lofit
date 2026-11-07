@@ -325,6 +325,7 @@ class LofitRepository(context: Context) {
             put("id", workout.id)
             put("name", workout.name)
             put("bodyWeightKg", workout.bodyWeightKg?.let(::roundBodyWeight) ?: JSONObject.NULL)
+            put("averageHeartRateBpm", workout.averageHeartRateBpm ?: JSONObject.NULL)
             put(
                 "sourceRoutine",
                 workout.sourceRoutine?.let { encodeRoutine(it, includeExerciseOptions) }
@@ -544,6 +545,10 @@ class LofitRepository(context: Context) {
             bodyWeightKg =
                 if (value.isNull("bodyWeightKg")) null
                 else roundBodyWeight(value.getDouble("bodyWeightKg")),
+            // LEGACY: Workouts saved before heart rate support have no average.
+            averageHeartRateBpm =
+                if (value.isNull("averageHeartRateBpm")) null
+                else value.getDouble("averageHeartRateBpm"),
             sourceRoutine =
                 if (value.isNull("sourceRoutine")) null
                 else decodeRoutine(value.getJSONObject("sourceRoutine")),

@@ -131,6 +131,7 @@ data class WorkoutSession(
     val exercises: MutableList<WorkoutExercise> = mutableListOf(),
     var bodyWeightKg: Double? = null,
     val sourceRoutine: Routine? = null,
+    var averageHeartRateBpm: Double? = null,
 ) {
     constructor(
         id: String = UUID.randomUUID().toString(),
@@ -141,6 +142,7 @@ data class WorkoutSession(
         exercises: MutableList<WorkoutExercise> = mutableListOf(),
         bodyWeightKg: Double? = null,
         sourceRoutine: Routine? = null,
+        averageHeartRateBpm: Double? = null,
     ) : this(
         id,
         name,
@@ -149,6 +151,7 @@ data class WorkoutSession(
         exercises,
         bodyWeightKg,
         sourceRoutine,
+        averageHeartRateBpm,
     )
 
     init {
@@ -307,6 +310,7 @@ data class AppData(
                     (finishedWorkout.intervals + WorkoutInterval(startedAt = resumedAt))
                         .toMutableList(),
                 sourceRoutine = finishedWorkout.captureRoutineBaseline(),
+                averageHeartRateBpm = null,
             )
             .also { activeWorkout = it }
     }

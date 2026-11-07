@@ -67,6 +67,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 class MainActivity : AppCompatActivity() {
     private companion object {
@@ -241,6 +242,8 @@ class MainActivity : AppCompatActivity() {
 
     private val previousScreens = mutableListOf<PreviousScreen>()
     private val healthWeightReader by lazy { HealthConnectWeightReader(this) }
+    private val healthHeartRateReader by lazy { HealthConnectHeartRateReader(this) }
+    private var historyHeartRateReadPending = false
     private var healthPermissionPending = false
     private var onboardingGender = BiologicalGender.MALE
     private var onboardingHealthEnabled = false
@@ -419,7 +422,11 @@ class MainActivity : AppCompatActivity() {
     private val healthPermission =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
             healthPermissionPending = false
-            if (repository.data.bodyMetricsEnabled == true && !healthWeightReader.canReadWeight) {
+            if (
+                repository.data.bodyMetricsEnabled == true &&
+                    !healthWeightReader.canReadWeight &&
+                    !healthHeartRateReader.canReadHeartRate
+            ) {
                 repository.data.bodyMetricsEnabled = false
                 repository.save()
             }
@@ -428,6 +435,17 @@ class MainActivity : AppCompatActivity() {
                 ?.let(::queryWorkoutWeight)
             if (currentScreen == Screen.SETTINGS) render()
             ensureWorkoutNotification()
+        }
+    private val heartRatePermission =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+            if (healthHeartRateReader.canReadHeartRate) requestHistoryHeartRates()
+            else
+                Toast.makeText(
+                        this,
+                        "Allow heart rate access in Health Connect",
+                        Toast.LENGTH_SHORT,
+                    )
+                    .show()
         }
     private val notificationActionReceiver =
         object : BroadcastReceiver() {
@@ -2170,6 +2188,26 @@ class MainActivity : AppCompatActivity() {
         updateHistoryPager(pageCount, history.isNotEmpty())
         val muscleMaps = LazyMuscleMaps(this, repository.data.biologicalGender)
         return ui.page("History", "Your training stays on this device.") { body ->
+                if (history.isNotEmpty()) {
+                    body.addView(
+                        ui.actionButton(
+                                if (historyHeartRateReadPending) "Reading heart rates…"
+                                else "Request heart rates",
+                                secondary = true,
+                            ) {
+                                requestHistoryHeartRates()
+                            }
+                            .apply {
+                                contentDescription = "Request history heart rates"
+                                isEnabled = !historyHeartRateReadPending
+                            },
+                        LinearLayout.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.WRAP_CONTENT,
+                            )
+                            .apply { bottomMargin = ui.dp(12) },
+                    )
+                }
                 if (history.isEmpty())
                     body.addView(ui.emptyText("Complete a workout and it will appear here."))
                 val dateFormat = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
@@ -2197,6 +2235,7 @@ class MainActivity : AppCompatActivity() {
                                 }
                             )
                             addView(ui.metaText(dateFormat.format(Date(workout.startedAt))))
+                            workout.averageHeartRateBpm?.let { addView(heartRateText(it)) }
                             addView(
                                 ui.metaText(
                                     "${workout.setCount()} sets · ${formatWeight(workout.totalVolume(repository.data.exercises))} kg volume · ${formatDuration(workout.durationMillis())}"
@@ -2379,7 +2418,10 @@ class MainActivity : AppCompatActivity() {
             if (index >= 0) {
                 val original = repository.data.history[index]
                 repository.data.history[index] =
-                    draft.copy(intervals = original.intervals.toMutableList())
+                    draft.copy(
+                        intervals = original.intervals.toMutableList(),
+                        averageHeartRateBpm = original.averageHeartRateBpm,
+                    )
                 repository.saveHistory()
             }
         }
@@ -2412,6 +2454,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 },
         ) { body ->
+            workout.averageHeartRateBpm?.let { body.addView(heartRateText(it)) }
             body.addView(
                 ui.metaText(
                     "${workout.setCount()} sets · ${formatWeight(workout.totalVolume(repository.data.exercises))} kg volume"
@@ -2659,6 +2702,7 @@ class MainActivity : AppCompatActivity() {
                                     repository.data.recordWorkout(workout)
                                     repository.data.history.add(workout)
                                     repository.saveHistory()
+                                    queryWorkoutHeartRate(workout)
                                     if (exportToHevy?.isChecked == true) {
                                         exportWorkoutToHevy(
                                             workout,
@@ -3187,6 +3231,122 @@ class MainActivity : AppCompatActivity() {
         ui.metaText(getString(R.string.body_weight, formatBodyWeight(weight))).apply {
             contentDescription = "Workout body weight"
         }
+
+    private fun heartRateText(average: Double): TextView =
+        ui.metaText(getString(R.string.average_heart_rate, average.roundToInt())).apply {
+            contentDescription = "Average heart rate: ${average.roundToInt()} beats per minute"
+        }
+
+    private fun refreshHeartRateHistory() {
+        if (isDestroyed || (route as? Route.WorkoutHistory)?.editing == true) return
+        if (currentScreen == Screen.HISTORY || route is Route.WorkoutHistory) {
+            render((content.getChildAt(0) as? ScrollView)?.scrollY)
+        }
+    }
+
+    private fun queryWorkoutHeartRate(
+        workout: WorkoutSession,
+        onFinished: (Result<Boolean>) -> Unit = {},
+    ) {
+        if (repository.data.bodyMetricsEnabled != true || !healthHeartRateReader.canReadHeartRate) {
+            onFinished(Result.success(false))
+            return
+        }
+        val generation = bodyMetricsReadGeneration
+        val intervals = workout.intervals.toList()
+        healthHeartRateReader.readAverage(intervals) { result ->
+            val savedWorkout = repository.data.history.firstOrNull { it.id == workout.id }
+            if (
+                isDestroyed ||
+                    repository.data.bodyMetricsEnabled != true ||
+                    generation != bodyMetricsReadGeneration ||
+                    savedWorkout == null ||
+                    savedWorkout.intervals != intervals
+            ) {
+                onFinished(Result.success(false))
+                return@readAverage
+            }
+            onFinished(
+                result.map { average ->
+                    if (average == null || savedWorkout.averageHeartRateBpm != null) false
+                    else {
+                        savedWorkout.averageHeartRateBpm = average
+                        historyEditDraft?.takeIf { it.id == savedWorkout.id }?.averageHeartRateBpm =
+                            average
+                        repository.saveHistory()
+                        refreshHeartRateHistory()
+                        true
+                    }
+                }
+            )
+        }
+    }
+
+    private fun requestHistoryHeartRates() {
+        if (historyHeartRateReadPending) return
+        if (repository.data.bodyMetricsEnabled != true) {
+            Toast.makeText(
+                    this,
+                    "Enable Android health integration in Settings",
+                    Toast.LENGTH_SHORT,
+                )
+                .show()
+            return
+        }
+        if (!healthWeightReader.available) {
+            Toast.makeText(this, "Health Connect unavailable", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (!healthHeartRateReader.canReadHeartRate) {
+            heartRatePermission.launch(
+                arrayOf(
+                    HealthPermissions.READ_HEART_RATE,
+                    HealthPermissions.READ_HEALTH_DATA_HISTORY,
+                )
+            )
+            return
+        }
+        // Snapshot the boundary before fetching: newly found data must not stop this batch.
+        val workouts = workoutsMissingHeartRate(repository.data.history)
+        if (workouts.isEmpty()) {
+            Toast.makeText(this, "Heart rates are up to date", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val generation = bodyMetricsReadGeneration
+        var updated = 0
+        historyHeartRateReadPending = true
+        refreshHeartRateHistory()
+        fun finish(message: String) {
+            historyHeartRateReadPending = false
+            if (isDestroyed) return
+            refreshHeartRateHistory()
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+        }
+        fun readNext(index: Int) {
+            if (
+                isDestroyed ||
+                    generation != bodyMetricsReadGeneration ||
+                    repository.data.bodyMetricsEnabled != true
+            ) {
+                historyHeartRateReadPending = false
+                return
+            }
+            if (index == workouts.size) {
+                finish(if (updated == 0) "No new heart rate data" else "Heart rates updated")
+                return
+            }
+            queryWorkoutHeartRate(workouts[index]) { result ->
+                result.fold(
+                    onSuccess = { saved ->
+                        if (saved) updated++
+                        handler.post { readNext(index + 1) }
+                    },
+                    onFailure = { finish("Heart rate data unavailable. Try again later.") },
+                )
+            }
+        }
+        readNext(0)
+    }
 
     private fun continueHistoryWorkout(workout: WorkoutSession) {
         if (repository.data.activeWorkout != null) {
