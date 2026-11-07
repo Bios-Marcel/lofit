@@ -134,6 +134,7 @@ data class WorkoutSession(
     val sourceRoutine: Routine? = null,
     var averageHeartRateBpm: Double? = null,
     var autoStartCardio: Boolean = true,
+    var voiceCommandsEnabled: Boolean = true,
 ) {
     constructor(
         id: String = UUID.randomUUID().toString(),
@@ -146,6 +147,7 @@ data class WorkoutSession(
         sourceRoutine: Routine? = null,
         averageHeartRateBpm: Double? = null,
         autoStartCardio: Boolean = true,
+        voiceCommandsEnabled: Boolean = true,
     ) : this(
         id,
         name,
@@ -156,6 +158,7 @@ data class WorkoutSession(
         sourceRoutine,
         averageHeartRateBpm,
         autoStartCardio,
+        voiceCommandsEnabled,
     )
 
     init {

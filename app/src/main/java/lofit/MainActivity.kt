@@ -3010,6 +3010,18 @@ class MainActivity : AppCompatActivity() {
                 contentDescription = "Workout options"
                 setOnClickListener {
                     PopupMenu(this@MainActivity, this, Gravity.END).apply {
+                        if (repository.data.voiceCommandsEnabled) {
+                            menu.add("Voice commands").apply {
+                                isCheckable = true
+                                isChecked = workout.voiceCommandsEnabled
+                                setOnMenuItemClickListener {
+                                    workout.voiceCommandsEnabled = !isChecked
+                                    repository.save()
+                                    updateTimerVoice()
+                                    true
+                                }
+                            }
+                        }
                         menu.add("Auto-start cardio").apply {
                             isCheckable = true
                             isChecked = workout.autoStartCardio
@@ -3821,7 +3833,7 @@ class MainActivity : AppCompatActivity() {
     internal fun visibleWorkoutVoiceTarget(): WorkoutVoiceTarget? {
         if (
             !voiceResumed ||
-                !repository.data.voiceCommandsEnabled ||
+                !workoutVoice.session.enabled ||
                 !::content.isInitialized ||
                 !window.decorView.hasWindowFocus() ||
                 currentScreen != Screen.WORKOUT ||
@@ -3865,11 +3877,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateTimerVoice() {
         if (isDestroyed || !voiceResumed || !::workoutVoice.isInitialized) return
-        if (
-            repository.data.activeWorkout == null ||
-                !repository.data.voiceCommandsEnabled ||
-                !hasMicrophonePermission()
-        ) {
+        if (!workoutVoice.session.enabled || !hasMicrophonePermission()) {
             WorkoutVoiceService.stop()
         }
         val target = visibleWorkoutVoiceTarget()
@@ -3885,12 +3893,7 @@ class MainActivity : AppCompatActivity() {
             }
             return
         }
-        if (
-            target != null &&
-                repository.data.activeWorkout != null &&
-                repository.data.voiceCommandsEnabled &&
-                hasMicrophonePermission()
-        ) {
+        if (target != null && workoutVoice.session.enabled && hasMicrophonePermission()) {
             WorkoutVoiceService.start(this, workoutVoice)
             WorkoutVoiceService.current?.refresh()
         }

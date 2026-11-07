@@ -216,6 +216,28 @@ class RepositoryPersistenceTest {
     }
 
     @Test
+    fun workoutVoiceChoicePersistsIndependentlyAndDefaultsOnForOlderWorkouts() {
+        val repository = LofitRepository(context)
+        repository.data.voiceCommandsEnabled = true
+        repository.data.activeWorkout =
+            WorkoutSession(name = "Quiet workout", voiceCommandsEnabled = false)
+        repository.save()
+        val loaded = LofitRepository(context).data
+        assertTrue(loaded.voiceCommandsEnabled)
+        assertFalse(loaded.activeWorkout!!.voiceCommandsEnabled)
+        assertTrue(
+            loaded.workoutFromRoutine(loaded.activeWorkout!!.toRoutine()).voiceCommandsEnabled
+        )
+
+        val root = JSONObject(stored())
+        root.getJSONObject("activeWorkout").remove("voiceCommandsEnabled")
+        store(root.toString())
+        val legacy = LofitRepository(context).data
+        assertTrue(legacy.voiceCommandsEnabled)
+        assertTrue(legacy.activeWorkout!!.voiceCommandsEnabled)
+    }
+
+    @Test
     fun voiceConsentDefaultsOffForNewAndExistingInstallsAndPersistsChoices() {
         assertFalse(LofitRepository(context).data.voiceCommandsEnabled)
         val repository = LofitRepository(context)

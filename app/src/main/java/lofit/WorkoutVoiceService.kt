@@ -167,11 +167,7 @@ class WorkoutVoiceService : Service() {
     }
 
     private fun eligible(): Boolean =
-        runtime.repository.data.let {
-            it.voiceCommandsEnabled &&
-                it.activeWorkout != null &&
-                it.activeWorkout?.completedAt == null
-        } &&
+        runtime.session.enabled &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
                 PackageManager.PERMISSION_GRANTED
 

@@ -349,6 +349,7 @@ class LofitRepository(context: Context) {
             )
             put("defaultRestSeconds", workout.defaultRestSeconds)
             put("autoStartCardio", workout.autoStartCardio)
+            put("voiceCommandsEnabled", workout.voiceCommandsEnabled)
             put(
                 "exercises",
                 JSONArray().apply {
@@ -577,6 +578,8 @@ class LofitRepository(context: Context) {
             defaultRestSeconds = value.getInt("defaultRestSeconds"),
             // LEGACY: Workouts saved before this switch keep automatic cardio transitions enabled.
             autoStartCardio = value.optBoolean("autoStartCardio", true),
+            // LEGACY: Existing workouts continue to follow the app's voice consent setting.
+            voiceCommandsEnabled = value.optBoolean("voiceCommandsEnabled", true),
             exercises =
                 value
                     .getJSONArray("exercises")

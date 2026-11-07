@@ -19,6 +19,13 @@ internal class WorkoutVoiceSession(
     var preferredExerciseId: String? = null
     val liveMeasurement = LiveWorkoutMeasurement(data)
 
+    val enabled: Boolean
+        get() =
+            data().voiceCommandsEnabled &&
+                data().activeWorkout?.let {
+                    it.voiceCommandsEnabled && it.completedAt == null
+                } == true
+
     private fun resolve(target: VoiceTimerTarget?): Pair<WorkoutExercise, PlannedSet>? {
         target ?: return null
         val item =
@@ -34,7 +41,7 @@ internal class WorkoutVoiceSession(
 
     fun backgroundTarget(): WorkoutVoiceTarget? {
         val workout = data().activeWorkout ?: return null
-        if (!data().voiceCommandsEnabled || workout.completedAt != null) return null
+        if (!enabled) return null
         val active =
             liveMeasurement.active?.let { VoiceTimerTarget(it.item.id, it.set.id) }
                 ?: activeTarget()
@@ -116,7 +123,7 @@ internal class WorkoutVoiceSession(
         set.actualHoldSeconds = 0
     }
 
-    /** Called only when a timed set finishes automatically. */
+    /** Starts only a later set of the same exercise after its timer finishes automatically. */
     fun startFollowingCardio(item: WorkoutExercise, completedSet: PlannedSet): Boolean {
         val workout = data().activeWorkout ?: return false
         if (!workout.autoStartCardio) return false
@@ -124,31 +131,17 @@ internal class WorkoutVoiceSession(
         if (completedSet.type == SetType.FAILURE || liveMeasurement.active != null) return false
         val exercise = data().exercises.firstOrNull { it.id == item.exerciseId } ?: return false
         if (!exercise.cardio || !exercise.type.tracksDuration) return false
+        if (exercise.supportsLiveMeasurement && !item.manualMeasurement) return false
         if (item.restSecondsAfterSet(workout.defaultRestSeconds, exercise) != 0) return false
-        val index = workout.exercises.indexOfFirst { it.id == item.id }
-        if (index < 0) return false
-        val remainingSet =
+        if (workout.exercises.none { it.id == item.id }) return false
+        val nextSet =
             item.plannedSets.firstOrNull { set ->
                 item.sets.none { it.plannedSetId == set.id }
-            }
-        val nextItem =
-            if (remainingSet != null) {
-                if (
-                    item.plannedSets.indexOf(remainingSet) <= item.plannedSets.indexOf(completedSet)
-                )
-                    return false
-                item
-            } else workout.exercises.getOrNull(index + 1) ?: return false
-        val nextExercise =
-            data().exercises.firstOrNull { it.id == nextItem.exerciseId } ?: return false
-        if (!nextExercise.cardio || !nextExercise.type.tracksDuration) return false
-        if (nextExercise.supportsLiveMeasurement && !nextItem.manualMeasurement) return false
-        val nextSet =
-            nextItem.plannedSets.firstOrNull { set ->
-                nextItem.sets.none { it.plannedSetId == set.id }
             } ?: return false
-        startHold(nextItem, nextSet)
-        preferredExerciseId = nextItem.id
+        if (item.plannedSets.indexOf(nextSet) <= item.plannedSets.indexOf(completedSet))
+            return false
+        startHold(item, nextSet)
+        preferredExerciseId = item.id
         save()
         return true
     }
