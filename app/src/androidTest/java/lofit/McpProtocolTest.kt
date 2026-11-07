@@ -238,6 +238,8 @@ class McpProtocolTest {
         assertTrue(exercise.weighted)
         assertFalse(exercise.asymmetric)
         assertFalse(exercise.liveMeasurement)
+        assertFalse(exercise.cardio)
+        assertFalse(saved.getBoolean("cardio"))
         assertEquals(30, exercise.minimumHoldSeconds)
         assertEquals(1, changes)
         assertEquals(
@@ -291,6 +293,7 @@ class McpProtocolTest {
                 weighted = true,
                 imageFile = "custom.webp",
                 liveMeasurement = true,
+                cardio = true,
             )
         repository.data.exercises.add(existing)
         repository.data.routines.add(
@@ -326,6 +329,7 @@ class McpProtocolTest {
                     .put("liveMeasurement", false)
                     .put("weighted", false)
                     .put("asymmetric", false)
+                    .put("cardio", false)
                     .put("primaryMuscle", "front delts")
                     .put("secondaryMuscles", "Triceps, chest, Triceps")
                     .put("minimumHoldSeconds", 0),
@@ -336,6 +340,7 @@ class McpProtocolTest {
         assertFalse(updated.weighted)
         assertFalse(updated.asymmetric)
         assertFalse(updated.liveMeasurement)
+        assertFalse(updated.cardio)
         assertEquals("Front deltoids", updated.primaryMuscle)
         assertEquals("Triceps, Chest", updated.secondaryMuscles)
         assertEquals(0, updated.minimumHoldSeconds)
@@ -383,6 +388,8 @@ class McpProtocolTest {
                 JSONObject().put("type", "INVALID"),
                 JSONObject().put("weighted", "true"),
                 JSONObject().put("asymmetric", 1),
+                JSONObject().put("cardio", "true"),
+                JSONObject().put("cardio", JSONObject.NULL),
                 JSONObject().put("liveMeasurement", JSONObject.NULL),
                 JSONObject().put("minimumHoldSeconds", -1),
                 JSONObject().put("minimumHoldSeconds", 1.5),
@@ -439,6 +446,69 @@ class McpProtocolTest {
     }
 
     @Test
+    fun cardioPrimaryMuscleIsOptionalButDisablingCardioRequiresOne() {
+        val created = call("create_exercise", JSONObject().put("name", "Run").put("cardio", true))
+        assertFalse(created.getBoolean("isError"))
+        val saved = created.getJSONObject("structuredContent").getJSONObject("exercise")
+        val id = saved.getString("id")
+        fun loaded() = LofitRepository(context).data.exercises.single { it.id == id }
+        assertEquals("", loaded().primaryMuscle)
+        assertEquals("", saved.getString("primaryMuscle"))
+        assertFalse(
+            call("edit_exercise", JSONObject().put("exerciseId", id).put("name", "Easy run"))
+                .getBoolean("isError")
+        )
+        val before = loaded()
+        assertTrue(
+            call("edit_exercise", JSONObject().put("exerciseId", id).put("cardio", false))
+                .getBoolean("isError")
+        )
+        assertEquals(before, loaded())
+        assertTrue(
+            call(
+                    "edit_exercise",
+                    JSONObject().put("exerciseId", id).put("primaryMuscle", "Unknown"),
+                )
+                .getBoolean("isError")
+        )
+        assertEquals(before, loaded())
+        assertFalse(
+            call(
+                    "edit_exercise",
+                    JSONObject()
+                        .put("exerciseId", id)
+                        .put("cardio", false)
+                        .put("primaryMuscle", " core "),
+                )
+                .getBoolean("isError")
+        )
+        assertEquals("Core", loaded().primaryMuscle)
+        assertFalse(loaded().cardio)
+        assertFalse(
+            call(
+                    "edit_exercise",
+                    JSONObject()
+                        .put("exerciseId", id)
+                        .put("cardio", true)
+                        .put("primaryMuscle", "  "),
+                )
+                .getBoolean("isError")
+        )
+        assertEquals("", loaded().primaryMuscle)
+        assertTrue(loaded().cardio)
+        assertTrue(
+            call(
+                    "create_exercise",
+                    JSONObject()
+                        .put("name", "Bad cardio")
+                        .put("cardio", true)
+                        .put("primaryMuscle", "Unknown"),
+                )
+                .getBoolean("isError")
+        )
+    }
+
+    @Test
     fun createsTimedExerciseWithAllOptions() {
         val result =
             call(
@@ -451,6 +521,7 @@ class McpProtocolTest {
                     .put("weighted", true)
                     .put("liveMeasurement", true)
                     .put("asymmetric", true)
+                    .put("cardio", true)
                     .put("minimumHoldSeconds", 15),
             )
         assertFalse(result.getBoolean("isError"))
@@ -467,6 +538,7 @@ class McpProtocolTest {
                 custom = true,
                 weighted = true,
                 liveMeasurement = true,
+                cardio = true,
             ),
             LofitRepository(context).data.exercises.single { it.id == id },
         )

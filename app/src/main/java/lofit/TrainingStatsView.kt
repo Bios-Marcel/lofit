@@ -8,7 +8,9 @@ import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ArrayAdapter
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
@@ -342,6 +344,7 @@ internal class TrainingStatsView(
         val zone = ZoneId.systemDefault()
         val today = LocalDate.now(zone)
         val month = calendarMonth
+        val exercisesById = data().exercises.associateBy { it.id }
         val trainingDays =
             data()
                 .history
@@ -425,14 +428,23 @@ internal class TrainingStatsView(
                                 val cellDate = date
                                 val isInMonth = YearMonth.from(cellDate) == month
                                 addView(
-                                    TextView(activityContext).apply {
-                                        text = cellDate.dayOfMonth.toString()
-                                        textSize = 14f
-                                        gravity = Gravity.CENTER
-                                        setTextColor(
+                                    FrameLayout(activityContext).apply {
+                                        val dayLabel =
+                                            TextView(activityContext).apply {
+                                                text = cellDate.dayOfMonth.toString()
+                                                textSize = 14f
+                                                gravity = Gravity.CENTER
+                                                importantForAccessibility =
+                                                    View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                                            }
+                                        dayLabel.setTextColor(
                                             ui.color(if (isInMonth) R.color.cream else R.color.sage)
                                         )
                                         val workouts = trainingDays[cellDate].orEmpty()
+                                        val cardioWorkoutIds =
+                                            workouts
+                                                .filter { it.hasCardio(exercisesById) }
+                                                .mapTo(mutableSetOf()) { it.id }
                                         val workoutCount = workouts.size
                                         val trained = workoutCount > 0
                                         contentDescription =
@@ -440,21 +452,44 @@ internal class TrainingStatsView(
                                 0 -> "no workout"
                                 1 -> "workout completed"
                                 else -> "$workoutCount workouts completed"
-                            }}"
+                            }}" +
+                                                if (cardioWorkoutIds.isEmpty()) ""
+                                                else
+                                                    ", ${cardioWorkoutIds.size} workout${if (cardioWorkoutIds.size == 1) "" else "s"} with cardio"
                                         if (trained || cellDate == today) {
-                                            textSize = 16f
-                                            setTypeface(typeface, Typeface.BOLD)
+                                            dayLabel.textSize = 16f
+                                            dayLabel.setTypeface(dayLabel.typeface, Typeface.BOLD)
+                                        }
+                                        addView(
+                                            dayLabel,
+                                            FrameLayout.LayoutParams(
+                                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                            ),
+                                        )
+                                        if (cardioWorkoutIds.isNotEmpty()) {
+                                            addView(
+                                                ImageView(activityContext).apply {
+                                                    setImageResource(R.drawable.ic_cardio)
+                                                    importantForAccessibility =
+                                                        View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                                                },
+                                                FrameLayout.LayoutParams(ui.dp(12), ui.dp(12))
+                                                    .apply {
+                                                        gravity = Gravity.BOTTOM or Gravity.START
+                                                        marginStart = ui.dp(2)
+                                                        bottomMargin = ui.dp(2)
+                                                    },
+                                            )
                                         }
                                         if (trained) {
-                                            setTextColor(ui.color(R.color.charcoal))
+                                            dayLabel.setTextColor(ui.color(R.color.charcoal))
                                             elevation = 0f
                                             isFocusable = true
                                             setOnClickListener {
                                                 if (workouts.size == 1) {
                                                     onOpenWorkout(workouts.single())
                                                 } else {
-                                                    val timeFormat =
-                                                        DateFormat.getTimeInstance(DateFormat.SHORT)
                                                     AlertDialog.Builder(activityContext)
                                                         .setTitle(
                                                             DateFormat.getDateInstance(
@@ -464,12 +499,11 @@ internal class TrainingStatsView(
                                                                     Date(workouts.first().startedAt)
                                                                 )
                                                         )
-                                                        .setItems(
-                                                            workouts
-                                                                .map { workout ->
-                                                                    "${workout.name} · ${timeFormat.format(Date(workout.startedAt))}"
-                                                                }
-                                                                .toTypedArray()
+                                                        .setAdapter(
+                                                            calendarWorkoutAdapter(
+                                                                workouts,
+                                                                cardioWorkoutIds,
+                                                            )
                                                         ) { _, index ->
                                                             onOpenWorkout(workouts[index])
                                                         }
@@ -504,5 +538,29 @@ internal class TrainingStatsView(
                 }
             }
             .apply { contentDescription = "Workout calendar" }
+    }
+
+    private fun calendarWorkoutAdapter(
+        workouts: List<WorkoutSession>,
+        cardioWorkoutIds: Set<String>,
+    ): ArrayAdapter<String> {
+        val timeFormat = DateFormat.getTimeInstance(DateFormat.SHORT)
+        val labels = workouts.map { "${it.name} · ${timeFormat.format(Date(it.startedAt))}" }
+        return object :
+            ArrayAdapter<String>(activityContext, android.R.layout.select_dialog_item, labels) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
+                (super.getView(position, convertView, parent) as TextView).apply {
+                    val cardio = workouts[position].id in cardioWorkoutIds
+                    val icon =
+                        if (cardio)
+                            activityContext.getDrawable(R.drawable.ic_cardio)?.apply {
+                                setBounds(0, 0, ui.dp(20), ui.dp(20))
+                            }
+                        else null
+                    compoundDrawablePadding = ui.dp(12)
+                    setCompoundDrawablesRelative(null, null, icon, null)
+                    contentDescription = labels[position] + if (cardio) ", includes cardio" else ""
+                }
+        }
     }
 }

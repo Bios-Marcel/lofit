@@ -7,6 +7,19 @@ import org.junit.Test
 
 class ExerciseEditingTest {
     @Test
+    fun primaryMuscleCanBeEmptyOnlyForCardioAndStillValidatesNames() {
+        for (blank in listOf("", "  ", "\t")) {
+            assertEquals("", MuscleGroups.canonicalPrimary(blank, cardio = true))
+            assertNull(MuscleGroups.canonicalPrimary(blank, cardio = false))
+        }
+        for (cardio in listOf(true, false)) {
+            assertEquals("Chest", MuscleGroups.canonicalPrimary(" chest ", cardio))
+            assertEquals("Front deltoids", MuscleGroups.canonicalPrimary("front delts", cardio))
+            assertNull(MuscleGroups.canonicalPrimary("Unknown", cardio))
+        }
+    }
+
+    @Test
     fun overrideBelowCopiesOnlyTargetsAndPreservesOtherFields() {
         val sets =
             listOf(

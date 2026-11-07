@@ -3,10 +3,63 @@ package lofit
 import java.time.LocalDate
 import java.time.ZoneOffset
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CalendarStatsTest {
     private val today = LocalDate.of(2026, 10, 29)
+
+    @Test
+    fun cardioRequiresLoggedSetsAndKnownCardioExercises() {
+        val cardio = Exercise("cardio", "Run", ExerciseType.TIMED, false, "Legs", "", cardio = true)
+        val catalog = mapOf(cardio.id to cardio)
+        val session = workout(today)
+        assertFalse(session.hasCardio(catalog))
+        session.exercises.add(
+            WorkoutExercise(exerciseId = cardio.id, plannedSets = mutableListOf(PlannedSet()))
+        )
+        assertFalse(session.hasCardio(catalog))
+        session.exercises.single().sets.add(loggedSet())
+        assertTrue(session.hasCardio(catalog))
+        assertFalse(session.hasCardio(emptyMap()))
+        cardio.cardio = false
+        assertFalse(session.hasCardio(catalog))
+    }
+
+    @Test
+    fun cardioIncludesMixedLoggedWorkoutsWithEitherTrackingType() {
+        val timed = Exercise("run", "Run", ExerciseType.TIMED, false, "Legs", "", cardio = true)
+        val repetitions = timed.copy(id = "jumps", type = ExerciseType.REPETITIONS)
+        val strength = timed.copy(id = "squat", cardio = false)
+        val catalog = listOf(timed, repetitions, strength).associateBy { it.id }
+        val session =
+            workout(today)
+                .copy(
+                    exercises =
+                        mutableListOf(
+                            WorkoutExercise(
+                                exerciseId = timed.id,
+                                sets = mutableListOf(loggedSet()),
+                            ),
+                            WorkoutExercise(
+                                exerciseId = repetitions.id,
+                                sets = mutableListOf(loggedSet()),
+                            ),
+                            WorkoutExercise(
+                                exerciseId = strength.id,
+                                plannedSets = mutableListOf(PlannedSet()),
+                            ),
+                        )
+                )
+        assertTrue(session.hasCardio(catalog))
+        session.exercises.last().sets.add(loggedSet())
+        assertTrue(session.hasCardio(catalog))
+        session.exercises.first().sets.clear()
+        assertTrue(session.hasCardio(catalog))
+        session.exercises[1].sets.clear()
+        assertFalse(session.hasCardio(catalog))
+    }
 
     @Test
     fun rhythmCountsDistinctDaysAndUsesFourCompletedWeeksForAverage() {

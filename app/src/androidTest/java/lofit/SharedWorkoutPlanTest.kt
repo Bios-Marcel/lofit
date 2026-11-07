@@ -186,6 +186,51 @@ class SharedWorkoutPlanTest {
     }
 
     @Test
+    fun cardioSurvivesTransferAndImportWithoutLosingMetadataToLocalMatch() {
+        val cardio = movement.copy(cardio = true)
+        val payload = SharedWorkoutPlan.encode(workout(), listOf(cardio))
+        val plan = SharedWorkoutPlan.decodeTransfer(SharedWorkoutPlan.compressForTransfer(payload))
+        assertEquals(cardio, plan.exercises.single())
+        val data = AppData(exercises = mutableListOf(movement))
+        val received = plan.startIn(data)
+        assertEquals(2, data.exercises.size)
+        val imported = data.exercises.single { it.id == received.exercises.single().exerciseId }
+        assertTrue(imported.cardio)
+        assertFalse(data.exercises.single { it.id == movement.id }.cardio)
+        assertEquals(cardio.copy(id = imported.id), imported)
+
+        val matching = AppData(exercises = mutableListOf(cardio.copy(id = "local-cardio")))
+        assertEquals("local-cardio", plan.startIn(matching).exercises.single().exerciseId)
+        assertEquals(1, matching.exercises.size)
+
+        val old = JSONObject(payload.toString(Charsets.UTF_8))
+        old.getJSONArray("movements").getJSONObject(0).remove("cardio")
+        assertEquals(
+            movement,
+            SharedWorkoutPlan.decode(old.toString().toByteArray()).exercises.single(),
+        )
+    }
+
+    @Test
+    fun cardioWithoutPrimaryMuscleSurvivesSharingWhileStrengthStillRequiresOne() {
+        val cardio = movement.copy(cardio = true, primaryMuscle = "")
+        val payload = SharedWorkoutPlan.encode(workout(), listOf(cardio))
+        val plan = SharedWorkoutPlan.decodeTransfer(SharedWorkoutPlan.compressForTransfer(payload))
+        assertEquals(cardio, plan.exercises.single())
+        val data = AppData(exercises = mutableListOf())
+        val received = plan.startIn(data)
+        assertEquals(
+            cardio.copy(id = received.exercises.single().exerciseId),
+            data.exercises.single(),
+        )
+        val json = JSONObject(payload.toString(Charsets.UTF_8))
+        json.getJSONArray("movements").getJSONObject(0).put("cardio", false)
+        assertThrows(IllegalArgumentException::class.java) {
+            SharedWorkoutPlan.decode(json.toString().toByteArray())
+        }
+    }
+
+    @Test
     fun start_doesNotReplaceActiveWorkoutOrImportExercises() {
         val plan = SharedWorkoutPlan.decode(SharedWorkoutPlan.encode(workout(), listOf(movement)))
         val data =

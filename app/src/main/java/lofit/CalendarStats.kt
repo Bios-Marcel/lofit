@@ -14,6 +14,11 @@ data class WeeklyRhythm(
     val previousFourWeekAverage: Double,
 )
 
+internal fun WorkoutSession.hasCardio(exercisesById: Map<String, Exercise>): Boolean =
+    exercises.any {
+        it.sets.isNotEmpty() && exercisesById[it.exerciseId]?.cardio == true
+    }
+
 fun List<WorkoutSession>.weeklyRhythm(
     today: LocalDate = LocalDate.now(),
     zone: ZoneId = ZoneId.systemDefault(),

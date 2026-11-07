@@ -39,6 +39,7 @@ data class Exercise(
     var imageFile: String? = null,
     var liveMeasurement: Boolean = false,
     internal val retired: Boolean = false,
+    var cardio: Boolean = false,
 ) {
     init {
         require(!liveMeasurement || (type.tracksDuration && weighted)) {

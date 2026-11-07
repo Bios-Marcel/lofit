@@ -125,6 +125,40 @@ class ExerciseLibraryFilterTest {
     }
 
     @Test
+    fun cardioLabelReplacesPrimaryMuscleAndCanBeSearchedWithOrWithoutAMuscle() {
+        LofitRepository(context).apply {
+            listOf("Cycle" to "Chest", "Walk" to "").forEach { (name, primary) ->
+                data.exercises.add(
+                    Exercise(
+                        name,
+                        name,
+                        ExerciseType.TIMED,
+                        false,
+                        primary,
+                        "",
+                        custom = true,
+                        cardio = true,
+                    )
+                )
+            }
+            save()
+        }
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            openLibrary(scenario)
+            onView(withText("Custom")).perform(scrollTo(), click())
+            listOf("Cycle", "Walk").forEach { name ->
+                search("cardio $name")
+                exerciseName(name).check(matches(isDisplayed()))
+                onView(withText("Cardio")).check(matches(isDisplayed()))
+                onView(withText("Chest")).check(doesNotExist())
+            }
+            search("Recent curl")
+            onView(withText("Biceps")).check(matches(isDisplayed()))
+            onView(withText("Cardio")).check(doesNotExist())
+        }
+    }
+
+    @Test
     fun emptyRecentStillAllowsBrowsingAllAndCustomExercises() {
         LofitRepository(context).apply {
             data.exerciseLastSelectedAt.clear()

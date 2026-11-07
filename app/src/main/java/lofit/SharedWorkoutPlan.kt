@@ -73,6 +73,7 @@ data class SharedWorkoutPlan(val routine: Routine, val exercises: List<Exercise>
                 a.secondaryMuscles == b.secondaryMuscles &&
                 a.minimumHoldSeconds == b.minimumHoldSeconds &&
                 a.weighted == b.weighted &&
+                a.cardio == b.cardio &&
                 a.supportsLiveMeasurement == b.supportsLiveMeasurement
 
         fun encode(workout: WorkoutSession, catalog: List<Exercise>): ByteArray {
@@ -101,6 +102,7 @@ data class SharedWorkoutPlan(val routine: Routine, val exercises: List<Exercise>
                                         .put("secondary", e.secondaryMuscles)
                                         .put("hold", e.minimumHoldSeconds)
                                         .put("weighted", e.weighted)
+                                        .put("cardio", e.cardio)
                                         .put("liveMeasurement", e.supportsLiveMeasurement)
                                 )
                             }
@@ -155,11 +157,14 @@ data class SharedWorkoutPlan(val routine: Routine, val exercises: List<Exercise>
                         name = e.text("name"),
                         type = ExerciseType.valueOf(e.getString("type")),
                         asymmetric = e.getBoolean("asymmetric"),
-                        primaryMuscle = e.text("primary"),
+                        primaryMuscle =
+                            e.text("primary", allowBlank = e.optBoolean("cardio", false)),
                         secondaryMuscles =
                             e.getString("secondary").also { require(it.length <= 500) },
                         minimumHoldSeconds = e.number("hold", 1, 3_600),
                         weighted = e.getBoolean("weighted"),
+                        // LEGACY: Older shared plans have no cardio metadata.
+                        cardio = e.optBoolean("cardio", false),
                         liveMeasurement = e.optBoolean("liveMeasurement", false),
                         custom = true,
                     )
@@ -215,9 +220,9 @@ data class SharedWorkoutPlan(val routine: Routine, val exercises: List<Exercise>
             return List(length()) { getJSONObject(it) }
         }
 
-        private fun JSONObject.text(key: String): String =
+        private fun JSONObject.text(key: String, allowBlank: Boolean = false): String =
             getString(key).also {
-                require(it.isNotBlank() && it.length <= 200)
+                require((allowBlank || it.isNotBlank()) && it.length <= 200)
             }
 
         private fun JSONObject.number(key: String, min: Int, max: Int): Int =

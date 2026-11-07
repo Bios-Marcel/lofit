@@ -10,6 +10,7 @@ fun matchesSearchQuery(query: String, vararg values: String): Boolean {
 internal fun exerciseSearchTerms(exercise: Exercise): String =
     listOf(
             exercise.type.label,
+            "Cardio".takeIf { exercise.cardio },
             "Weighted".takeIf { exercise.weighted },
             "Live measurement".takeIf { exercise.supportsLiveMeasurement },
         )

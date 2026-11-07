@@ -55,6 +55,9 @@ object MuscleGroups {
             ?: aliases[normalized.lowercase()]
     }
 
+    fun canonicalPrimary(value: String, cardio: Boolean): String? =
+        if (cardio && value.isBlank()) "" else canonical(value)
+
     fun canonicalList(value: String): String? {
         if (value.isBlank() || value.trim() == "—") return ""
         val groups =

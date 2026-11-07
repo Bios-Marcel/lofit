@@ -19,6 +19,39 @@ class RepositoryPersistenceTest {
     }
 
     @Test
+    fun cardioPersistsAndDefaultsOffForExistingExercises() {
+        val repository = LofitRepository(context)
+        assertTrue(repository.data.exercises.all { !it.cardio })
+        val exercise =
+            repository.data.exercises
+                .first()
+                .copy(id = "custom-cardio", custom = true, cardio = true)
+        repository.data.exercises.add(exercise)
+        repository.save()
+        val loaded = LofitRepository(context)
+        assertEquals(exercise, loaded.data.exercises.single { it.id == exercise.id })
+        assertTrue(loaded.data.exercises.filter { !it.custom }.all { !it.cardio })
+
+        loaded.data.exercises.single { it.id == exercise.id }.cardio = false
+        loaded.save()
+        assertEquals(
+            exercise.copy(cardio = false),
+            LofitRepository(context).data.exercises.single { it.id == exercise.id },
+        )
+
+        val root = JSONObject(stored())
+        val exercises = root.getJSONArray("exercises")
+        for (index in 0 until exercises.length()) exercises.getJSONObject(index).remove("cardio")
+        store(root.toString())
+        val legacy = LofitRepository(context).data
+        assertTrue(legacy.exercises.all { !it.cardio })
+        assertEquals(
+            exercise.copy(cardio = false),
+            legacy.exercises.single { it.id == exercise.id },
+        )
+    }
+
+    @Test
     fun pairedRestPersistsAndDefaultsOffForOldPlans() {
         val repository = LofitRepository(context)
         val item = WorkoutExercise(exerciseId = "pistol-squat", pauseEverySecondSet = true)

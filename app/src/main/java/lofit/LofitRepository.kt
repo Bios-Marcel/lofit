@@ -274,6 +274,7 @@ class LofitRepository(context: Context) {
             put("secondaryMuscles", exercise.secondaryMuscles)
             put("minimumHoldSeconds", exercise.minimumHoldSeconds)
             put("weighted", exercise.weighted)
+            put("cardio", exercise.cardio)
             put("liveMeasurement", exercise.supportsLiveMeasurement)
             put("custom", exercise.custom)
             put("imageResource", exercise.imageResource ?: JSONObject.NULL)
@@ -510,6 +511,8 @@ class LofitRepository(context: Context) {
                 if (value.isNull("imageResource")) null else value.getInt("imageResource"),
             imageName = if (value.isNull("imageName")) null else value.getString("imageName"),
             weighted = value.getBoolean("weighted"),
+            // LEGACY: Exercises saved before cardio metadata was added default to false.
+            cardio = value.optBoolean("cardio", false),
             liveMeasurement = value.optBoolean("liveMeasurement", false),
             imageFile = if (value.isNull("imageFile")) null else value.getString("imageFile"),
         )

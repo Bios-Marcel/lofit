@@ -46,6 +46,7 @@ internal class ExerciseScreens(
             putInt("type", existing?.type?.ordinal ?: 0)
             putInt("weight", if (existing?.weighted == true) 1 else 0)
             putBoolean("liveMeasurement", existing?.supportsLiveMeasurement == true)
+            putBoolean("cardio", existing?.cardio == true)
             putInt("tracking", if (existing?.asymmetric == true) 1 else 0)
             putString("imageFile", existing?.imageFile)
         }
@@ -181,6 +182,15 @@ internal class ExerciseScreens(
                 draft.putBoolean("liveMeasurement", checked)
             }
             val asymmetric = exerciseOption("Asymmetrical", draft.getInt("tracking") == 1)
+            val cardio = exerciseOption("Cardio", draft.getBoolean("cardio"))
+            val primaryLabel =
+                ui.fieldLabel(
+                    if (cardio.isChecked) "Primary muscle (optional)" else "Primary muscle"
+                )
+            cardio.setOnCheckedChangeListener { _, checked ->
+                draft.putBoolean("cardio", checked)
+                primaryLabel.text = if (checked) "Primary muscle (optional)" else "Primary muscle"
+            }
             name.doAfterTextChanged { draft.putString("name", it.toString()) }
             primary.doAfterTextChanged { draft.putString("primary", it.toString()) }
             secondary.doAfterTextChanged { draft.putString("secondary", it.toString()) }
@@ -323,7 +333,8 @@ internal class ExerciseScreens(
                 }
             )
             body.addView(liveMeasurement)
-            body.addView(ui.fieldLabel("Primary muscle"))
+            body.addView(cardio)
+            body.addView(primaryLabel)
             body.addView(primary)
             body.addView(ui.fieldLabel("Secondary muscles"))
             body.addView(secondary)
@@ -338,12 +349,14 @@ internal class ExerciseScreens(
                             .show()
                         return@actionButton
                     }
-                    val primaryMuscle = MuscleGroups.canonical(primary.text.toString())
+                    val primaryMuscle =
+                        MuscleGroups.canonicalPrimary(primary.text.toString(), cardio.isChecked)
                     val secondaryMuscles = MuscleGroups.canonicalList(secondary.text.toString())
                     if (name.text.isBlank() || primaryMuscle == null) {
                         Toast.makeText(
                                 activityContext,
-                                "Add a name and choose a primary muscle",
+                                if (name.text.isBlank()) "Add a name"
+                                else "Choose a primary muscle from the list",
                                 Toast.LENGTH_SHORT,
                             )
                             .show()
@@ -374,6 +387,7 @@ internal class ExerciseScreens(
                     movement.weighted = weighted.isChecked
                     movement.liveMeasurement = liveMeasurement.isChecked
                     movement.asymmetric = asymmetric.isChecked
+                    movement.cardio = cardio.isChecked
                     movement.primaryMuscle = primaryMuscle
                     movement.secondaryMuscles = secondaryMuscles
                     val oldPicture = movement.imageFile

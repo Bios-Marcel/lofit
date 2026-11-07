@@ -16,6 +16,7 @@ import androidx.test.espresso.action.ViewActions.scrollTo
 import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom
+import androidx.test.espresso.matcher.ViewMatchers.isChecked
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.isRoot
 import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
@@ -24,6 +25,7 @@ import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.hamcrest.Matchers.allOf
+import org.hamcrest.Matchers.not
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
@@ -95,6 +97,64 @@ class ExerciseEditingFlowTest {
             (root.getChildAt(0) as DrawerLayout).openDrawer(GravityCompat.START, false)
         }
         onView(allOf(withText(label), isAssignableFrom(Button::class.java))).perform(click())
+    }
+
+    @Test
+    fun cardioDraftSurvivesRecreationAndOnlySavesOnConfirmation() {
+        launch().use { scenario ->
+            navigate(scenario, R.string.nav_exercises)
+            onView(withText("Create custom exercise")).perform(scrollTo(), click())
+            onView(withHint("Exercise name")).perform(replaceText("Cardio movement"))
+            onView(withText("Cardio"))
+                .perform(scrollTo())
+                .check(matches(not(isChecked())))
+                .perform(click())
+            scenario.recreate()
+            onView(withText("Cardio")).check(matches(isChecked()))
+            onView(withText("Repetitions")).check(matches(isChecked()))
+            onView(withText("Weighted")).check(matches(not(isChecked())))
+            onView(withText("Asymmetrical")).check(matches(not(isChecked())))
+            onView(withText("Live measurement")).check(matches(not(isChecked())))
+            onView(withText("Primary muscle (optional)"))
+                .perform(scrollTo())
+                .check(matches(isDisplayed()))
+            onView(withText("Save exercise")).perform(scrollTo(), click())
+            val saved =
+                LofitRepository(context).data.exercises.single { it.name == "Cardio movement" }
+            assertTrue(saved.cardio)
+            assertEquals("", saved.primaryMuscle)
+
+            onView(withText("Custom")).perform(scrollTo(), click())
+            onView(withText("Cardio")).check(matches(isDisplayed()))
+            onView(withText("Edit")).perform(scrollTo(), click())
+            onView(withText("Cardio"))
+                .perform(scrollTo())
+                .check(matches(isChecked()))
+                .perform(click())
+            onView(withText("Cancel")).perform(scrollTo(), click())
+            assertEquals(
+                saved,
+                LofitRepository(context).data.exercises.single { it.id == saved.id },
+            )
+
+            onView(withText("Custom")).perform(scrollTo(), click())
+            onView(withText("Edit")).perform(scrollTo(), click())
+            onView(withText("Cardio"))
+                .perform(scrollTo())
+                .check(matches(isChecked()))
+                .perform(click())
+            onView(withText("Save exercise")).perform(scrollTo(), click())
+            assertEquals(
+                saved,
+                LofitRepository(context).data.exercises.single { it.id == saved.id },
+            )
+            onView(withHint("Search primary muscle")).perform(scrollTo(), replaceText("Core"))
+            onView(withText("Save exercise")).perform(scrollTo(), click())
+            assertEquals(
+                saved.copy(cardio = false, primaryMuscle = "Core"),
+                LofitRepository(context).data.exercises.single { it.id == saved.id },
+            )
+        }
     }
 
     @Test

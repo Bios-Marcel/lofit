@@ -244,11 +244,13 @@ internal class McpProtocol(
     private fun exerciseFields(args: JSONObject, existing: Exercise? = null): Exercise {
         val name = if (args.has("name")) args.string("name", 200).trim() else existing?.name
         require(!name.isNullOrBlank()) { "name must not be blank" }
+        val cardio = args.boolean("cardio", existing?.cardio ?: false)
         val primary =
-            if (args.has("primaryMuscle")) MuscleGroups.canonical(args.string("primaryMuscle", 200))
-            else existing?.primaryMuscle
-        require(primary != null) {
-            "primaryMuscle must be one of: ${MuscleGroups.all.joinToString()}"
+            if (args.has("primaryMuscle"))
+                MuscleGroups.canonicalPrimary(args.string("primaryMuscle", 200), cardio)
+            else existing?.primaryMuscle ?: MuscleGroups.canonicalPrimary("", cardio)
+        require(primary != null && (cardio || primary.isNotBlank())) {
+            "primaryMuscle is required unless cardio is true; when provided, use one of: ${MuscleGroups.all.joinToString()}"
         }
         val secondary =
             if (args.has("secondaryMuscles"))
@@ -274,6 +276,7 @@ internal class McpProtocol(
             weighted =
                 args.boolean("weighted", existing?.weighted ?: (type == ExerciseType.REPETITIONS)),
             liveMeasurement = args.boolean("liveMeasurement", existing?.liveMeasurement ?: false),
+            cardio = cardio,
         )
     }
 
@@ -287,6 +290,7 @@ internal class McpProtocol(
             "minimumHoldSeconds",
             "weighted",
             "liveMeasurement",
+            "cardio",
         )
         val exercise = exerciseFields(args)
         repository.data.exercises.add(exercise)
@@ -311,6 +315,7 @@ internal class McpProtocol(
             "minimumHoldSeconds",
             "weighted",
             "liveMeasurement",
+            "cardio",
             "imageBase64",
         )
         val id = args.string("exerciseId", 200)
@@ -364,10 +369,11 @@ internal class McpProtocol(
                 "name":{"type":"string","minLength":1,"maxLength":200},
                 "type":{"type":"string","enum":["REPETITIONS","TIMED"]},
                 "asymmetric":{"type":"boolean"},
-                "primaryMuscle":{"type":"string","minLength":1,"maxLength":200},
+                "primaryMuscle":{"type":"string","maxLength":200},
                 "secondaryMuscles":{"type":"string","maxLength":2000,"description":"Comma-separated muscle groups; empty string clears the list."},
                 "minimumHoldSeconds":{"type":"integer","minimum":0,"maximum":2147483647},
                 "weighted":{"type":"boolean"},
+                "cardio":{"type":"boolean","description":"Metadata only; does not change exercise tracking. Defaults to false."},
                 "liveMeasurement":{"type":"boolean","description":"Requires type TIMED and weighted true."}
             }"""
             )
@@ -375,7 +381,7 @@ internal class McpProtocol(
             .getJSONObject("primaryMuscle")
             .put(
                 "description",
-                "Muscle group: ${MuscleGroups.all.joinToString()}. Case-insensitive; front delts and rear delts are accepted aliases.",
+                "Required unless cardio is true; cardio exercises may omit it or use an empty string. Omitted fields on edits keep their current values. Muscle group: ${MuscleGroups.all.joinToString()}. Case-insensitive; front delts and rear delts are accepted aliases.",
             )
         if (edit) {
             properties.put(
@@ -394,14 +400,26 @@ internal class McpProtocol(
                     ),
             )
         }
-        return JSONObject()
-            .put("type", "object")
-            .put("additionalProperties", false)
-            .put(
-                "required",
-                JSONArray(if (edit) listOf("exerciseId") else listOf("name", "primaryMuscle")),
+        val schema =
+            JSONObject()
+                .put("type", "object")
+                .put("additionalProperties", false)
+                .put(
+                    "required",
+                    JSONArray(if (edit) listOf("exerciseId") else listOf("name")),
+                )
+                .put("properties", properties)
+        if (!edit)
+            schema.put(
+                "anyOf",
+                JSONArray(
+                    """[
+            {"required":["cardio"],"properties":{"cardio":{"const":true}}},
+            {"required":["primaryMuscle"],"properties":{"primaryMuscle":{"minLength":1}}}
+        ]"""
+                ),
             )
-            .put("properties", properties)
+        return schema
     }
 
     private fun toolDefinitions(): JSONArray {
@@ -496,7 +514,7 @@ internal class McpProtocol(
             put(
                 tool(
                     "create_exercise",
-                    "Save a new custom exercise with a generated ID usable in create_routine. Defaults: REPETITIONS, weighted true for repetitions and false for timed, asymmetric false, liveMeasurement false, minimumHoldSeconds 30, no secondary muscles. Returns the saved exercise.",
+                    "Save a new custom exercise with a generated ID usable in create_routine. Defaults: REPETITIONS, weighted true for repetitions and false for timed, asymmetric false, cardio false, liveMeasurement false, minimumHoldSeconds 30, no secondary muscles. Returns the saved exercise.",
                     exerciseSchema(false),
                     false,
                 )

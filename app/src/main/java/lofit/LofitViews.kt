@@ -235,7 +235,8 @@ internal class LofitViews(
                 LinearLayout(activityContext).apply {
                     orientation = LinearLayout.VERTICAL
                     addView(titleText(exercise.name))
-                    if (showMuscle) addView(metaText(exercise.primaryMuscle))
+                    if (showMuscle)
+                        addView(metaText(if (exercise.cardio) "Cardio" else exercise.primaryMuscle))
                 },
                 LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
             )
