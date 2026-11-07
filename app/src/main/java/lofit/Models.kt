@@ -300,6 +300,7 @@ data class AppData(
     var mcpPort: Int = BuildConfig.MCP_PORT,
     var craneScale: CraneScaleDevice? = null,
     val bodyMeasurements: MutableList<BodyMeasurement> = mutableListOf(),
+    var recordCelebrationsEnabled: Boolean = false,
 ) {
     fun resumeWorkout(
         workoutId: String,
@@ -425,52 +426,8 @@ data class AppData(
             .sortedBy { it.exercise.name.lowercase() }
 
     fun recordSetIds(workout: WorkoutSession): Set<String> {
-        val exercisesById = exercises.associateBy { it.id }
-        val recordIds = mutableSetOf<String>()
-
-        workout.exercises
-            .flatMap { item -> item.sets.map { item.exerciseId to it } }
-            .groupBy({ it.first }, { it.second })
-            .forEach { (exerciseId, loggedSets) ->
-                val exercise = exercisesById[exerciseId] ?: return@forEach
-                val sets = loggedSets.filter { it.isRecordEligible(exercise) }
-                val previousRecord = exerciseRecords[exerciseId]?.lastOrNull() ?: return@forEach
-                if (exercise.type.tracksDuration) {
-                    sets
-                        .maxWithOrNull(
-                            compareBy<LoggedSet> { it.holdSeconds }
-                                .thenByDescending { it.completedAt }
-                        )
-                        ?.takeIf { it.holdSeconds > previousRecord.set.holdSeconds }
-                        ?.let { recordIds.add(it.id) }
-                } else if (exercise.weighted) {
-                    sets
-                        .maxWithOrNull(
-                            compareBy<LoggedSet> { it.weightKg }.thenByDescending { it.completedAt }
-                        )
-                        ?.takeIf { it.weightKg > previousRecord.set.weightKg }
-                        ?.let { recordIds.add(it.id) }
-                    val previousVolume = previousRecord.volumeSet?.volume(exercise.asymmetric)
-                    if (previousVolume != null) {
-                        sets
-                            .maxWithOrNull(
-                                compareBy<LoggedSet> { it.volume(exercise.asymmetric) }
-                                    .thenByDescending { it.completedAt }
-                            )
-                            ?.takeIf { it.volume(exercise.asymmetric) > previousVolume }
-                            ?.let { recordIds.add(it.id) }
-                    }
-                } else {
-                    sets
-                        .maxWithOrNull(
-                            compareBy<LoggedSet> { it.reps }.thenByDescending { it.completedAt }
-                        )
-                        ?.takeIf { it.reps > previousRecord.set.reps }
-                        ?.let { recordIds.add(it.id) }
-                }
-            }
-
-        return recordIds
+        // LEGACY: Set crowns stay deduplicated when one set earns multiple record types.
+        return workoutRecords(workout).mapTo(mutableSetOf()) { it.setId }
     }
 }
 

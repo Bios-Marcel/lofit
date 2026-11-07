@@ -70,15 +70,33 @@ class JsonStorageMigrationTest {
     fun newInstall_savesAndRestartsUsingJsonWithoutCreatingXml() {
         val repository = LofitRepository(context)
         assertEquals(AppData(), repository.data)
+        assertFalse(repository.data.recordCelebrationsEnabled)
         val xml = context.legacyXmlFile.readBytes()
         repository.data.soundCuesEnabled = false
+        repository.data.recordCelebrationsEnabled = true
 
         repository.save()
 
         assertFalse(JSONObject(stateFile.readText()).getBoolean("soundCuesEnabled"))
         assertFalse(LofitRepository(context).data.soundCuesEnabled)
+        assertTrue(JSONObject(stateFile.readText()).getBoolean("recordCelebrationsEnabled"))
+        assertTrue(LofitRepository(context).data.recordCelebrationsEnabled)
         assertArrayEquals(xml, context.legacyXmlFile.readBytes())
         assertFalse(preferences.contains("state"))
+    }
+
+    @Test
+    fun legacyRecordCelebrations_defaultToOffAndPersistExplicitChoice() {
+        val raw = JSONObject(sampleJson()).apply { remove("recordCelebrationsEnabled") }
+        stateFile.writeText(raw.toString())
+        val repository = LofitRepository(context)
+        assertFalse(repository.data.recordCelebrationsEnabled)
+        repository.data.recordCelebrationsEnabled = true
+        repository.save()
+        assertTrue(LofitRepository(context).data.recordCelebrationsEnabled)
+        repository.data.recordCelebrationsEnabled = false
+        repository.save()
+        assertFalse(LofitRepository(context).data.recordCelebrationsEnabled)
     }
 
     @Test

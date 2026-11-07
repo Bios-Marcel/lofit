@@ -31,6 +31,12 @@ import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.VibratorManager
 import android.text.InputType
+import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.style.AbsoluteSizeSpan
+import android.text.style.ForegroundColorSpan
+import android.text.style.StyleSpan
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -248,6 +254,7 @@ class MainActivity : AppCompatActivity() {
     private var onboardingGender = BiologicalGender.MALE
     private var onboardingHealthEnabled = false
     private var onboardingVoiceEnabled = false
+    private var onboardingRecordCelebrationsEnabled = false
     private var bodyMetricsReadGeneration = 0
     private lateinit var content: FrameLayout
     private lateinit var root: LinearLayout
@@ -262,6 +269,8 @@ class MainActivity : AppCompatActivity() {
     private var routineDraft: Routine? = null
     private var historyEditDraft: WorkoutSession? = null
     private var exerciseEditUndo: Snackbar? = null
+    private val recordNotifications = WorkoutRecordNotifications()
+    private var refreshWorkoutSetStates: (() -> Unit)? = null
     private var exerciseDraft: Bundle? = null
     private val exercisePictures by lazy { ExercisePictures(this) }
     private val pictureWorker = Executors.newSingleThreadExecutor()
@@ -335,6 +344,8 @@ class MainActivity : AppCompatActivity() {
     }
     private var checkmarkCueId = 0
     private var completionCueId = 0
+    private var recordCueId = 0
+    private var recordCueStreamId = 0
     private var updatingHoldTimer = false
     private var completingHoldAutomatically = false
     private var restEndsAt: Long
@@ -492,9 +503,10 @@ class MainActivity : AppCompatActivity() {
                 .setAudioAttributes(cueAudioAttributes)
                 .build()
         cueSounds =
-            SoundPool.Builder().setMaxStreams(1).setAudioAttributes(cueAudioAttributes).build()
+            SoundPool.Builder().setMaxStreams(2).setAudioAttributes(cueAudioAttributes).build()
         completionCueId = cueSounds.load(this, R.raw.completion_chime, 1)
         checkmarkCueId = cueSounds.load(this, R.raw.checkmark_chime, 1)
+        recordCueId = cueSounds.load(this, R.raw.record_fanfare, 1)
         if (
             repository.data.activeWorkout != null &&
                 (savedInstanceState == null ||
@@ -513,6 +525,9 @@ class MainActivity : AppCompatActivity() {
         onboardingVoiceEnabled =
             savedInstanceState?.getBoolean("onboardingVoiceEnabled")
                 ?: repository.data.voiceCommandsEnabled
+        onboardingRecordCelebrationsEnabled =
+            savedInstanceState?.getBoolean("onboardingRecordCelebrationsEnabled")
+                ?: repository.data.recordCelebrationsEnabled
         exerciseDraft = savedInstanceState?.getBundle("exerciseDraft")
         exerciseDraft?.let {
             currentScreen = Screen.EXERCISES
@@ -645,6 +660,10 @@ class MainActivity : AppCompatActivity() {
         outState.putString("onboardingGender", onboardingGender.name)
         outState.putBoolean("onboardingHealthEnabled", onboardingHealthEnabled)
         outState.putBoolean("onboardingVoiceEnabled", onboardingVoiceEnabled)
+        outState.putBoolean(
+            "onboardingRecordCelebrationsEnabled",
+            onboardingRecordCelebrationsEnabled,
+        )
         outState.putBundle("exerciseDraft", exerciseDraft)
         super.onSaveInstanceState(outState)
     }
@@ -822,6 +841,7 @@ class MainActivity : AppCompatActivity() {
         scrollToBottom: Boolean = false,
         focusExerciseId: String? = null,
     ) {
+        refreshWorkoutSetStates = null
         // Service and scale completion update the model before rebuilding the set checkboxes.
         val newlyCompletedSetId =
             repository.data.activeWorkout
@@ -978,9 +998,15 @@ class MainActivity : AppCompatActivity() {
                 settings.voiceCommandsChoice(onboardingVoiceEnabled) { onboardingVoiceEnabled = it }
             )
             body.addView(
+                settings.recordCelebrationsChoice(onboardingRecordCelebrationsEnabled) {
+                    onboardingRecordCelebrationsEnabled = it
+                }
+            )
+            body.addView(
                 ui.actionButton("Get started") {
                     repository.data.biologicalGender = onboardingGender
                     repository.data.voiceCommandsEnabled = onboardingVoiceEnabled
+                    repository.data.recordCelebrationsEnabled = onboardingRecordCelebrationsEnabled
                     repository.data.onboardingComplete = true
                     repository.save()
                     render()
@@ -1132,6 +1158,13 @@ class MainActivity : AppCompatActivity() {
         }
 
     private fun activeWorkoutScreen(workout: WorkoutSession): View {
+        val workoutTotals =
+            ui.metaText("").apply {
+                contentDescription = "Workout totals"
+                gravity = Gravity.END or Gravity.CENTER_VERTICAL
+                maxLines = 1
+                setAutoSizeTextTypeUniformWithConfiguration(11, 14, 1, TypedValue.COMPLEX_UNIT_SP)
+            }
         val finishButton =
             ui.actionButton("Finish workout") {
                 if (workout.setCount() > 0) {
@@ -1139,8 +1172,13 @@ class MainActivity : AppCompatActivity() {
                     render()
                 }
             }
-        fun updateFinishButton() {
-            finishButton.isEnabled = workout.setCount() > 0
+        fun updateWorkoutTotals(records: List<WorkoutRecord>) {
+            val count = workout.setCount()
+            val sets = if (count == 1) "set" else "sets"
+            val recordLabel = if (records.size == 1) "record" else "records"
+            workoutTotals.text =
+                "$count $sets done · ${formatWeight(workout.totalVolume(repository.data.exercises))} kg volume · ${records.size} $recordLabel"
+            finishButton.isEnabled = count > 0
             finishButton.backgroundTintList =
                 ColorStateList.valueOf(
                     ui.color(
@@ -1151,7 +1189,6 @@ class MainActivity : AppCompatActivity() {
                 ui.color(if (finishButton.isEnabled) R.color.white else R.color.sage)
             )
         }
-        updateFinishButton()
         val workoutTimer =
             TextView(this).apply {
                 textSize = 18f
@@ -1174,7 +1211,22 @@ class MainActivity : AppCompatActivity() {
             ) { body ->
                 updateWorkoutTimer()
                 body.addView(
-                    workoutTimer,
+                    LinearLayout(this).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.CENTER_VERTICAL
+                        addView(
+                            workoutTimer,
+                            LinearLayout.LayoutParams(
+                                ViewGroup.LayoutParams.WRAP_CONTENT,
+                                ViewGroup.LayoutParams.WRAP_CONTENT,
+                            ),
+                        )
+                        addView(
+                            workoutTotals,
+                            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                                .apply { marginStart = ui.dp(16) },
+                        )
+                    },
                     LinearLayout.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -1201,9 +1253,16 @@ class MainActivity : AppCompatActivity() {
                     }
                 val doneStateUpdaters = mutableMapOf<String, (Set<String>) -> Unit>()
                 fun updateDoneStates() {
-                    val recordSetIds = repository.data.recordSetIds(workout)
+                    val records = repository.data.workoutRecords(workout)
+                    val recordSetIds = records.mapTo(mutableSetOf()) { it.setId }
                     doneStateUpdaters.values.forEach { it(recordSetIds) }
+                    updateWorkoutTotals(records)
+                    val newRecords = recordNotifications.update(workout.id, records)
+                    if (newRecords.isNotEmpty()) {
+                        showRecordPopup(newRecords)
+                    }
                 }
+                refreshWorkoutSetStates = ::updateDoneStates
                 fun removeWorkoutExercise(item: WorkoutExercise) {
                     if (activeHoldWorkoutExerciseId == item.id) clearActiveHold()
                     workout.exercises.remove(item)
@@ -1214,6 +1273,7 @@ class MainActivity : AppCompatActivity() {
                         voiceDoneButtons.remove(it.id)
                         workoutSetRows.remove(it.id)
                         voiceSetValueActions.remove(it.id)
+                        doneStateUpdaters.remove(it.id)
                     }
                     if (workout.exercises.isEmpty()) {
                         exerciseCards.addView(
@@ -1223,7 +1283,7 @@ class MainActivity : AppCompatActivity() {
                         )
                     }
                     repository.save()
-                    updateFinishButton()
+                    updateDoneStates()
                     updateWorkoutNotification(force = true)
                 }
                 if (workout.exercises.isEmpty()) {
@@ -1244,10 +1304,7 @@ class MainActivity : AppCompatActivity() {
                                 onDoneStateUpdaterReady = { setId, update ->
                                     doneStateUpdaters[setId] = update
                                 },
-                                onSetsChanged = {
-                                    updateDoneStates()
-                                    updateFinishButton()
-                                },
+                                onSetsChanged = ::updateDoneStates,
                             )
                         cardViews[item.id] = card
                         card.tag = item.id
@@ -2759,19 +2816,7 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 if (!isDestroyed) {
                     result.fold(
-                        onSuccess = { message ->
-                            Snackbar.make(findViewById(android.R.id.content), message, 2_000)
-                                .apply {
-                                    animationMode = Snackbar.ANIMATION_MODE_FADE
-                                    view.layoutParams =
-                                        (view.layoutParams as FrameLayout.LayoutParams).apply {
-                                            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-                                            width = ViewGroup.LayoutParams.WRAP_CONTENT
-                                            topMargin = root.paddingTop + ui.dp(12)
-                                        }
-                                }
-                                .show()
-                        },
+                        onSuccess = { message -> showFadingPopup(message) },
                         onFailure = { error ->
                             AlertDialog.Builder(this)
                                 .setMessage(error.message ?: "Hevy export failed")
@@ -2782,6 +2827,118 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun showRecordPopup(records: List<WorkoutRecord>) {
+        if (!repository.data.recordCelebrationsEnabled) return
+        val message = SpannableStringBuilder()
+        fun appendStyled(text: String, size: Int, color: Int, bold: Boolean = false) {
+            val start = message.length
+            message.append(text)
+            message.setSpan(
+                AbsoluteSizeSpan(size, true),
+                start,
+                message.length,
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+            )
+            message.setSpan(
+                ForegroundColorSpan(color),
+                start,
+                message.length,
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+            )
+            if (bold) {
+                message.setSpan(
+                    StyleSpan(Typeface.BOLD),
+                    start,
+                    message.length,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+                )
+            }
+        }
+        records
+            .groupBy { it.exerciseId }
+            .values
+            .forEachIndexed { index, exerciseRecords ->
+                if (index > 0) message.append("\n\n")
+                appendStyled(
+                    exerciseRecords.first().exerciseName,
+                    16,
+                    ui.color(R.color.cream),
+                    bold = true,
+                )
+                exerciseRecords.forEach { record ->
+                    message.append("\n")
+                    val amount = formatWeight(record.value)
+                    appendStyled(amount, 22, ui.color(R.color.record_yellow), bold = true)
+                    appendStyled(
+                        record.message().removePrefix("${record.exerciseName} $amount"),
+                        14,
+                        ui.color(R.color.cream),
+                    )
+                }
+            }
+        showFadingPopup(message, crown = true)
+        cueSounds.stop(recordCueStreamId)
+        recordCueStreamId = playCue(recordCueId, priority = 2)
+    }
+
+    private fun showFadingPopup(message: CharSequence, crown: Boolean = false) {
+        Snackbar.make(findViewById(android.R.id.content), message, if (crown) 6_000 else 2_000)
+            .apply {
+                animationMode = Snackbar.ANIMATION_MODE_FADE
+                view.layoutParams =
+                    (view.layoutParams as FrameLayout.LayoutParams).apply {
+                        gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+                        width = ViewGroup.LayoutParams.WRAP_CONTENT
+                        topMargin = root.paddingTop + ui.dp(12)
+                    }
+                if (crown) {
+                    setAction("×") { dismiss() }
+                    view
+                        .findViewById<TextView>(com.google.android.material.R.id.snackbar_action)
+                        .apply {
+                            text = ""
+                            contentDescription = "Dismiss record popup"
+                            setCompoundDrawablesWithIntrinsicBounds(R.drawable.ic_close, 0, 0, 0)
+                            setPadding(ui.dp(12), ui.dp(12), ui.dp(12), ui.dp(12))
+                            minimumWidth = ui.dp(48)
+                            minimumHeight = ui.dp(48)
+                            layoutParams =
+                                (layoutParams as LinearLayout.LayoutParams).apply {
+                                    gravity = Gravity.TOP
+                                    topMargin = ui.dp(8)
+                                    marginStart = ui.dp(8)
+                                }
+                        }
+                    view.layoutParams =
+                        (view.layoutParams as FrameLayout.LayoutParams).apply {
+                            width =
+                                minOf(resources.displayMetrics.widthPixels - ui.dp(32), ui.dp(440))
+                        }
+                    view.backgroundTintList = null
+                    view.background =
+                        GradientDrawable().apply {
+                            cornerRadius = ui.dp(20).toFloat()
+                            setColor(ui.color(R.color.charcoal_light))
+                            setStroke(ui.dp(1), ui.color(R.color.record_yellow))
+                        }
+                    view.elevation = ui.dp(12).toFloat()
+                    view.setPadding(ui.dp(4), ui.dp(4), ui.dp(4), ui.dp(4))
+                    view
+                        .findViewById<TextView>(com.google.android.material.R.id.snackbar_text)
+                        .apply {
+                            maxLines = Int.MAX_VALUE
+                            setLineSpacing(ui.dp(4).toFloat(), 1f)
+                            val icon =
+                                ContextCompat.getDrawable(this@MainActivity, R.drawable.ic_crown)
+                            icon?.setBounds(0, 0, ui.dp(36), ui.dp(36))
+                            setCompoundDrawables(icon, null, null, null)
+                            compoundDrawablePadding = ui.dp(16)
+                        }
+                }
+            }
+            .show()
     }
 
     private fun Routine.editableCopy(): Routine =
@@ -3849,6 +4006,7 @@ class MainActivity : AppCompatActivity() {
         clearActiveHold()
         if (loggedSet != null && movement != null) {
             startRest(item, workout)
+            refreshWorkoutSetStates?.invoke()
         }
         updateWorkoutNotification(force = true)
         updateTimerVoice()
@@ -3923,16 +4081,21 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun playCue(soundId: Int = completionCueId) {
+    private fun playCue(soundId: Int = completionCueId, priority: Int = 1): Int {
         getSystemService(VibratorManager::class.java)
             ?.defaultVibrator
             ?.takeIf { it.hasVibrator() }
             ?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 180, 100, 180), -1))
-        if (!repository.data.soundCuesEnabled) return
+        val soundEnabled =
+            if (soundId == recordCueId) repository.data.recordCelebrationsEnabled
+            else repository.data.soundCuesEnabled
+        if (!soundEnabled) return 0
         handler.removeCallbacks(releaseCueAudioFocus)
         cueAudioManager.requestAudioFocus(cueAudioFocusRequest)
-        cueSounds.play(soundId, 1f, 1f, 1, 0, 1f)
+        // LEGACY: Timer and checkmark sounds keep normal priority beside record fanfares.
+        val streamId = cueSounds.play(soundId, 1f, 1f, priority, 0, 1f)
         handler.postDelayed(releaseCueAudioFocus, 1_200L)
+        return streamId
     }
 
     private fun completeWorkoutSet(

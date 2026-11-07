@@ -25,14 +25,18 @@ internal fun awaitCondition(
     }
 }
 
-internal fun waitUntil(description: String, condition: (View) -> Boolean): ViewAction =
+internal fun waitUntil(
+    description: String,
+    timeoutMillis: Long = 5_000,
+    condition: (View) -> Boolean,
+): ViewAction =
     object : ViewAction {
         override fun getDescription() = "wait for $description"
 
         override fun getConstraints(): Matcher<View> = isAssignableFrom(View::class.java)
 
         override fun perform(uiController: UiController, view: View) {
-            awaitCondition(uiController, description) { condition(view) }
+            awaitCondition(uiController, description, timeoutMillis) { condition(view) }
         }
     }
 

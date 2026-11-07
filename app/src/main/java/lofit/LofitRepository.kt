@@ -228,6 +228,7 @@ class LofitRepository(context: Context) {
             )
             put("activeWorkout", data.activeWorkout?.let(::encodeWorkout) ?: JSONObject.NULL)
             put("soundCuesEnabled", data.soundCuesEnabled)
+            put("recordCelebrationsEnabled", data.recordCelebrationsEnabled)
             put("voiceCommandsEnabled", data.voiceCommandsEnabled)
             put("mcpEnabled", data.mcpEnabled)
             put("mcpPort", data.mcpPort)
@@ -438,6 +439,8 @@ class LofitRepository(context: Context) {
                 if (root.isNull("activeWorkout")) null
                 else decodeWorkout(root.getJSONObject("activeWorkout")),
             soundCuesEnabled = root.getBoolean("soundCuesEnabled"),
+            // LEGACY: Saved installs without a record celebration choice remain opted out.
+            recordCelebrationsEnabled = root.optBoolean("recordCelebrationsEnabled", false),
             // LEGACY: Installs saved before voice consent was added remain opted out.
             voiceCommandsEnabled = root.optBoolean("voiceCommandsEnabled", false),
             mcpEnabled = root.optBoolean("mcpEnabled", false),

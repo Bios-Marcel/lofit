@@ -135,10 +135,14 @@ class WorkoutFlowTest {
         onView(withText("Female")).perform(click())
         onView(withContentDescription("Android health integration"))
             .check(matches(not(isChecked())))
+        onView(withContentDescription("Record celebrations"))
+            .perform(scrollTo())
+            .check(matches(not(isChecked())))
         onView(withText("Get started")).perform(scrollTo(), click())
         assertEquals(BiologicalGender.FEMALE, LofitRepository(context).data.biologicalGender)
         assertTrue(LofitRepository(context).data.onboardingComplete)
         assertEquals(false, LofitRepository(context).data.bodyMetricsEnabled)
+        assertFalse(LofitRepository(context).data.recordCelebrationsEnabled)
         instrumentation.runOnMainSync { activity.finish() }
 
         val restarted = instrumentation.startActivitySync(intent)
@@ -146,7 +150,37 @@ class WorkoutFlowTest {
         onView(withText(R.string.start_workout)).perform(click())
         assertEquals(false, LofitRepository(context).data.bodyMetricsEnabled)
         assertEquals(null, LofitRepository(context).data.activeWorkout!!.bodyWeightKg)
+        assertFalse(LofitRepository(context).data.recordCelebrationsEnabled)
         instrumentation.runOnMainSync { restarted.finish() }
+    }
+
+    @Test
+    fun onboarding_recordCelebrationsChoiceSurvivesRecreationAndPersists() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        LofitRepository(context).apply {
+            data.onboardingComplete = false
+            save()
+        }
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            onView(withContentDescription("Record celebrations"))
+                .perform(scrollTo())
+                .check(matches(not(isChecked())))
+                .perform(click())
+            assertFalse(LofitRepository(context).data.recordCelebrationsEnabled)
+            scenario.recreate()
+            onView(withContentDescription("Record celebrations"))
+                .perform(scrollTo())
+                .check(matches(isChecked()))
+            onView(withText("Get started")).perform(scrollTo(), click())
+            assertTrue(LofitRepository(context).data.recordCelebrationsEnabled)
+            scenario.recreate()
+            onView(withText("Welcome to Lofit")).check(doesNotExist())
+            onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+            onView(withText(R.string.nav_settings)).perform(click())
+            onView(withContentDescription("Record celebrations"))
+                .perform(scrollTo())
+                .check(matches(isChecked()))
+        }
     }
 
     @Test
@@ -311,6 +345,12 @@ class WorkoutFlowTest {
             .perform(scrollTo(), click())
             .check(matches(not(isChecked())))
         assertFalse(LofitRepository(context).data.soundCuesEnabled)
+        onView(withContentDescription("Record celebrations"))
+            .perform(scrollTo())
+            .check(matches(not(isChecked())))
+            .perform(click())
+            .check(matches(isChecked()))
+        assertTrue(LofitRepository(context).data.recordCelebrationsEnabled)
         checkMaps(BiologicalGender.FEMALE)
         instrumentation.runOnMainSync { activity.finish() }
 
@@ -325,6 +365,12 @@ class WorkoutFlowTest {
         onView(withContentDescription("Sound cues"))
             .perform(scrollTo())
             .check(matches(not(isChecked())))
+        onView(withContentDescription("Record celebrations"))
+            .perform(scrollTo())
+            .check(matches(isChecked()))
+            .perform(click())
+            .check(matches(not(isChecked())))
+        assertFalse(LofitRepository(context).data.recordCelebrationsEnabled)
         onView(withText("Female")).perform(scrollTo()).check(matches(isChecked()))
         onView(withText("Male")).perform(scrollTo(), click())
         checkMaps(BiologicalGender.MALE)
@@ -1466,24 +1512,35 @@ class WorkoutFlowTest {
     @Test
     fun finishWorkout_requiresDoneSetAndUpdatesAfterChanges() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
+        seedWorkout(
+            WorkoutExercise(
+                exerciseId = "bench-press",
+                restSecondsOverride = 0,
+                plannedSets =
+                    mutableListOf(
+                        PlannedSet(weightKg = 60.0, reps = 5),
+                        PlannedSet(weightKg = 70.0, reps = 6),
+                    ),
+            )
+        )
         ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)).use {
             scenario ->
-            onView(withText(R.string.start_workout)).perform(click())
-            onView(withText("Finish workout")).perform(scrollTo()).check(matches(not(isEnabled())))
-            onView(withText("Add exercise")).perform(scrollTo(), click())
-            onView(withHint("Search name or muscle")).perform(replaceText("Bench press"))
-            onView(withContentDescription("Add Bench press")).perform(scrollTo(), click())
-            onView(withText("Add set")).perform(scrollTo(), click())
+            onView(withContentDescription("Workout totals")).check(matches(isDisplayed()))
+            assertWorkoutTotals("0 sets done · 0 kg volume")
             onView(withText("Finish workout")).perform(scrollTo()).check(matches(not(isEnabled())))
             onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
+            assertWorkoutTotals("1 set done · 300 kg volume")
             onView(withText("Finish workout")).perform(scrollTo()).check(matches(isEnabled()))
             onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
+            assertWorkoutTotals("0 sets done · 0 kg volume")
             onView(withText("Finish workout")).perform(scrollTo()).check(matches(not(isEnabled())))
             onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
             scenario.recreate()
+            assertWorkoutTotals("1 set done · 300 kg volume")
             onView(withText("Finish workout")).perform(scrollTo()).check(matches(isEnabled()))
             onView(withContentDescription("Options for Bench press")).perform(scrollTo(), click())
             onView(withText("Remove exercise")).perform(click())
+            assertWorkoutTotals("0 sets done · 0 kg volume")
             onView(withText("Finish workout")).perform(scrollTo()).check(matches(not(isEnabled())))
             onView(withText("Discard workout")).perform(scrollTo(), click())
             assertEquals(null, LofitRepository(context).data.activeWorkout)
@@ -1830,12 +1887,25 @@ class WorkoutFlowTest {
                         )
                     ),
             )
+        repository.data.activeWorkout!!.exercises.single().apply {
+            plannedSets.forEach {
+                sets.add(
+                    LoggedSet(
+                        type = it.type,
+                        weightKg = it.weightKg,
+                        reps = it.reps,
+                        plannedSetId = it.id,
+                    )
+                )
+            }
+        }
         repository.save()
         val intent =
             Intent(instrumentation.targetContext, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         instrumentation.startActivitySync(intent)
 
+        assertWorkoutTotals("4 sets done · 1200 kg volume")
         val page = arrayOfNulls<View>(1)
         val survivingRow = arrayOfNulls<View>(1)
         onView(isAssignableFrom(ScrollView::class.java)).check { view, _ -> page[0] = view }
@@ -1844,6 +1914,7 @@ class WorkoutFlowTest {
         onView(withContentDescription("Delete set 1"))
             .check(matches(isDisplayed()))
             .perform(click())
+        assertWorkoutTotals("3 sets done · 900 kg volume")
         onView(isAssignableFrom(ScrollView::class.java)).check { view, _ ->
             assertSame(page[0], view)
         }
@@ -1865,6 +1936,7 @@ class WorkoutFlowTest {
         onView(withContentDescription("Delete set 2 and all below"))
             .check(matches(isDisplayed()))
             .perform(click())
+        assertWorkoutTotals("1 set done · 300 kg volume")
         onView(withContentDescription("Set 1 row")).check { view, _ ->
             assertSame(survivingRow[0], view)
         }
@@ -2500,10 +2572,13 @@ class WorkoutFlowTest {
         onView(withContentDescription("Set 2 done")).perform(scrollTo(), click())
         assertSetDoneState(1, "Done, record")
         assertSetDoneState(2, "Done")
+        assertWorkoutTotals("2 sets done · 610 kg volume", records = 2)
         onView(withContentDescription("Set 2 weight")).perform(replaceText("62"))
+        assertWorkoutTotals("2 sets done · 615 kg volume", records = 2)
         assertSetDoneState(1, "Done")
         assertSetDoneState(2, "Done, record")
         onView(withContentDescription("Set 2 done")).perform(click())
+        assertWorkoutTotals("1 set done · 305 kg volume", records = 2)
         assertSetDoneState(2, "Not done")
         assertSetDoneState(1, "Done, record")
         assertEquals(
@@ -2512,6 +2587,7 @@ class WorkoutFlowTest {
         )
         onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
         assertSetDoneState(1, "Not done")
+        assertWorkoutTotals("0 sets done · 0 kg volume")
         assertEquals(
             0,
             LofitRepository(instrumentation.targetContext).data.activeWorkout!!.setCount(),
@@ -3525,6 +3601,12 @@ class WorkoutFlowTest {
         onView(withContentDescription("Start set 1 hold")).perform(click())
         onView(withContentDescription("Rest timer overlay")).check(matches(not(isDisplayed())))
         onView(withContentDescription("Stop set 1 hold")).perform(click())
+    }
+
+    private fun assertWorkoutTotals(text: String, records: Int = 0) {
+        val label = if (records == 1) "record" else "records"
+        onView(withContentDescription("Workout totals"))
+            .check(matches(withText("$text · $records $label")))
     }
 
     private fun assertSetDoneState(index: Int, state: String) {
