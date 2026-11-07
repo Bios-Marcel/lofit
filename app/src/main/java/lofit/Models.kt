@@ -67,9 +67,10 @@ data class LoggedSet(
         require(holdSeconds >= 0) { "Hold duration cannot be negative" }
     }
 
-    fun volume(asymmetric: Boolean = false): Double =
+    fun volume(asymmetric: Boolean = false, timed: Boolean = false): Double =
         (weightKg.toBigDecimal() *
-                reps.toBigDecimal() *
+                // LEGACY: Repetition sets keep using weight multiplied by their rep count.
+                (if (timed) 1 else reps).toBigDecimal() *
                 (if (asymmetric && side == Side.BOTH) 2 else 1).toBigDecimal())
             .toDouble()
 }
@@ -193,10 +194,17 @@ data class WorkoutSession(
     }
 
     fun totalVolume(exerciseCatalog: List<Exercise>): Double {
-        val asymmetricIds = exerciseCatalog.filter { it.asymmetric }.map { it.id }.toSet()
+        val exercisesById = exerciseCatalog.associateBy { it.id }
         return exercises
             .sumOf { item ->
-                item.sets.sumOf { it.volume(item.exerciseId in asymmetricIds).toBigDecimal() }
+                val exercise = exercisesById[item.exerciseId]
+                item.sets.sumOf {
+                    it.volume(
+                            asymmetric = exercise?.asymmetric == true,
+                            timed = exercise?.type?.tracksDuration == true,
+                        )
+                        .toBigDecimal()
+                }
             }
             .toDouble()
     }

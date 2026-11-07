@@ -2610,7 +2610,7 @@ class WorkoutFlowTest {
                 weighted = true,
             )
         )
-        repository.data.recordWorkout(
+        val previousWorkout =
             WorkoutSession(
                 name = "Old hold",
                 completedAt = 100,
@@ -2629,7 +2629,9 @@ class WorkoutFlowTest {
                         )
                     ),
             )
-        )
+        repository.data.recordWorkout(previousWorkout)
+        repository.data.history.add(previousWorkout)
+        repository.saveHistory()
         repository.data.activeWorkout =
             WorkoutSession(
                 name = "Weighted hold",
@@ -2682,8 +2684,10 @@ class WorkoutFlowTest {
                 )
             }
             onView(withContentDescription("Start set 1 hold")).check(matches(isDisplayed()))
+            assertWorkoutTotals("0 sets done · 0 kg volume")
             onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
             assertSetDoneState(1, "Done, record")
+            assertWorkoutTotals("1 set done · 20 kg volume", records = 1)
             onView(withContentDescription("Set 1 done")).check { view, _ ->
                 val actions = view.parent as ViewGroup
                 assertEquals(1, actions.childCount)
@@ -2692,17 +2696,29 @@ class WorkoutFlowTest {
             onView(withContentDescription("Set 1 Active time in seconds"))
                 .perform(replaceText("20"))
             assertSetDoneState(1, "Done")
+            assertWorkoutTotals("1 set done · 20 kg volume")
             onView(withContentDescription("Set 1 Active time in seconds"))
                 .perform(replaceText("46"))
             assertSetDoneState(1, "Done, record")
+            onView(withContentDescription("Set 1 weight")).perform(replaceText("15"))
+            assertWorkoutTotals("1 set done · 30 kg volume", records = 1)
             scenario.recreate()
             assertSetDoneState(1, "Done, record")
+            assertWorkoutTotals("1 set done · 30 kg volume", records = 1)
             onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
             assertSetDoneState(1, "Not done")
+            assertWorkoutTotals("0 sets done · 0 kg volume")
             assertEquals(
                 0,
                 LofitRepository(instrumentation.targetContext).data.activeWorkout!!.setCount(),
             )
+            onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+            onView(withText(R.string.nav_history)).perform(click())
+            onView(withText(startsWith("1 sets · 20 kg volume ·")))
+                .perform(scrollTo())
+                .check(matches(isDisplayed()))
+            onView(withContentDescription("View Old hold")).perform(scrollTo(), click())
+            onView(withText("1 sets · 20 kg volume")).check(matches(isDisplayed()))
         }
     }
 
