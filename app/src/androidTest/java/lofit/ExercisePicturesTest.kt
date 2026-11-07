@@ -205,14 +205,20 @@ class ExercisePicturesTest {
             examples.forEach { exercise ->
                 onView(withHint("Search name or muscle"))
                     .perform(scrollTo(), replaceText(exercise.name))
-                onView(withContentDescription("${exercise.name} illustration")).check { view, _ ->
-                    val expectedId = pictures.bundledResource(exercise, gender)!!
-                    val expected = BitmapFactory.decodeResource(context.resources, expectedId)
-                    assertTrue(
-                        expected.sameAs(((view as ImageView).drawable as BitmapDrawable).bitmap)
+                onView(withContentDescription("${exercise.name} illustration"))
+                    .perform(
+                        waitUntil("thumbnail decoded") {
+                            (it as ImageView).drawable is BitmapDrawable
+                        }
                     )
-                    expected.recycle()
-                }
+                    .check { view, _ ->
+                        val expectedId = pictures.bundledResource(exercise, gender)!!
+                        val expected =
+                            pictures.thumbnail(null, expectedId, view.width, view.height)!!
+                        assertTrue(
+                            expected.sameAs(((view as ImageView).drawable as BitmapDrawable).bitmap)
+                        )
+                    }
             }
         }
         ActivityScenario.launch<MainActivity>(
@@ -231,6 +237,21 @@ class ExercisePicturesTest {
                 onView(withText("Male")).perform(click())
                 checkPicture(scenario, BiologicalGender.MALE)
             }
+    }
+
+    @Test
+    fun thumbnailsFitDisplaySizeKeepGenderSeparateAndFallBackForMissingFiles() {
+        val exercise = ExerciseCatalog.exercises().first { it.id == "bench-press" }
+        val maleResource = pictures.bundledResource(exercise, BiologicalGender.MALE)!!
+        val femaleResource = pictures.bundledResource(exercise, BiologicalGender.FEMALE)!!
+        val male = pictures.thumbnail(null, maleResource, 84, 60)!!
+        val female = pictures.thumbnail(null, femaleResource, 84, 60)!!
+        assertEquals(60, male.height)
+        assertTrue(male.width in 84 until 627)
+        assertSame(male, pictures.thumbnail(null, maleResource, 84, 60))
+        assertFalse(male.sameAs(female))
+        assertTrue(male.sameAs(pictures.thumbnail("missing.webp", maleResource, 84, 60)))
+        assertNull(pictures.thumbnail("../missing.webp", null, 84, 60))
     }
 
     @Test

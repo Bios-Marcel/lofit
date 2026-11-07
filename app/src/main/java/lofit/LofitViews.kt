@@ -319,24 +319,19 @@ internal class LofitViews(
         }
 
     fun exerciseThumbnail(exercise: Exercise, width: Int, height: Int): View {
-        exercise.imageFile
-            ?.let { exercisePictures.thumbnail(it, width, height) }
-            ?.let { bitmap ->
-                return ImageView(activityContext).apply {
-                    setImageBitmap(bitmap)
-                    scaleType = ImageView.ScaleType.CENTER_CROP
-                    contentDescription = "${exercise.name} illustration"
-                }
-            }
         val resource = exercisePictures.bundledResource(exercise, biologicalGender())
-        return resource?.let {
-            ImageView(activityContext).apply {
-                setImageResource(it)
-                scaleType = ImageView.ScaleType.CENTER_CROP
-                contentDescription = "${exercise.name} illustration"
-            }
-        }
-            ?: TextView(activityContext).apply {
+        return if (exercise.imageFile != null || resource != null) {
+            ExerciseThumbnailView(
+                activityContext,
+                exercisePictures,
+                exercise.name,
+                exercise.imageFile,
+                resource,
+                width,
+                height,
+            )
+        } else
+            TextView(activityContext).apply {
                 text = exercise.name.take(1).uppercase(Locale.getDefault())
                 textSize = 30f
                 gravity = Gravity.CENTER

@@ -9,6 +9,7 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.util.UUID
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 /** Own the selected picture so moving or deleting the source does not break exercises. */
 class ExercisePictures(private val context: Context) {
@@ -65,23 +66,41 @@ class ExercisePictures(private val context: Context) {
         }
     }
 
-    fun thumbnail(name: String, width: Int, height: Int): Bitmap? {
-        val key = "$name:$width:$height"
+    // LEGACY: Synchronous decoding remains available to storage clients; views use the worker.
+    fun thumbnail(name: String, width: Int, height: Int): Bitmap? =
+        thumbnail(name, null, width, height)
+
+    internal fun cachedThumbnail(name: String?, resource: Int?, width: Int, height: Int): Bitmap? =
+        thumbnails.get("$name:$resource:$width:$height")
+
+    internal fun thumbnail(name: String?, resource: Int?, width: Int, height: Int): Bitmap? {
+        val key = "$name:$resource:$width:$height"
         thumbnails.get(key)?.let {
             return it
         }
-        return runCatching {
-            ImageDecoder.decodeBitmap(ImageDecoder.createSource(file(name))) { decoder, info, _ ->
-                    val sample =
-                        minOf(
-                            info.size.width / width.coerceAtLeast(1),
-                            info.size.height / height.coerceAtLeast(1),
-                        )
-                    decoder.setTargetSampleSize(sample.coerceAtLeast(1))
+        fun decode(source: ImageDecoder.Source): Bitmap =
+            ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+                val scale =
+                    minOf(
+                        1.0,
+                        max(
+                            width.coerceAtLeast(1).toDouble() / info.size.width,
+                            height.coerceAtLeast(1).toDouble() / info.size.height,
+                        ),
+                    )
+                decoder.setTargetSize(
+                    (info.size.width * scale).roundToInt().coerceAtLeast(1),
+                    (info.size.height * scale).roundToInt().coerceAtLeast(1),
+                )
+                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+            }
+        val bitmap =
+            name?.let { runCatching { decode(ImageDecoder.createSource(file(it))) }.getOrNull() }
+                ?: resource?.let {
+                    runCatching { decode(ImageDecoder.createSource(context.resources, it)) }
+                        .getOrNull()
                 }
-                .also { thumbnails.put(key, it) }
-        }
-            .getOrNull()
+        return bitmap?.also { thumbnails.put(key, it) }
     }
 
     fun delete(name: String) {
