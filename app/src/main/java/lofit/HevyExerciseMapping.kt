@@ -67,6 +67,7 @@ internal object HevyExerciseMapping {
             "barbell-side-split-squat" to "0F24286A", // Bulgarian Split Squat (Barbell)
             "barbell-squat" to "D04AC939", // Squat (Barbell)
             "barbell-squat-to-a-bench" to "38FC1AB9", // Box Squat (Barbell)
+            "barbell-upright-row" to "7AB9A362", // Upright Row (Barbell)
             "barbell-walking-lunge" to "6E6EE645", // Lunge (Barbell)
             "behind-head-chest-stretch" to "527DA061", // Stretching
             "bench-dips" to "CD6DC8E5", // Bench Dip
@@ -108,6 +109,7 @@ internal object HevyExerciseMapping {
             "cable-seated-crunch" to "23A48484", // Cable Crunch
             "cable-seated-lateral-raise" to "BE289E45", // Lateral Raise (Cable)
             "cable-shrugs" to "FFABC123", // Shrug (Cable)
+            "cable-upright-row" to "286C1D0B", // Upright Row (Cable)
             "calf-press" to "91237BDD", // Calf Press (Machine)
             "calf-press-on-the-leg-press-machine" to "91237BDD", // Calf Press (Machine)
             "calf-stretch-elbows-against-wall" to "527DA061", // Stretching
@@ -190,6 +192,7 @@ internal object HevyExerciseMapping {
             "dumbbell-squat-to-a-bench" to "DCFF3E9F", // Squat (Dumbbell)
             "dumbbell-step-ups" to "BF6ECE89", // Dumbbell Step Up
             "dumbbell-tricep-extension-pronated-grip" to "3765684D", // Triceps Extension (Dumbbell)
+            "dumbbell-upright-row" to "797F0782", // Upright Row (Dumbbell)
             "dynamic-back-stretch" to "527DA061", // Stretching
             "dynamic-chest-stretch" to "527DA061", // Stretching
             "elbow-circles" to "79EF4E4F", // Warm Up

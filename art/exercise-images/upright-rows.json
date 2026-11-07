@@ -1,0 +1,71 @@
+{
+  "generator": "built-in image_gen",
+  "images": [
+    {
+      "exercise": "Barbell Upright Row",
+      "variant": "male",
+      "source": "/home/marcel/.codex/generated_images/01a1b5c6-81e1-75b0-ae34-a3368337ea16/exec-e7269897-0481-4f5e-bbfc-29febb3e9c52.png",
+      "destination": "app/src/main/res/drawable-nodpi/exercise_barbell_upright_row.webp",
+      "references": [
+        "art/exercise-images/style-seed.png"
+      ],
+      "prompt": "Use case: stylized-concept\nAsset type: Lofit exercise card illustration\nInput image: strict reference for character identity, anatomy, outfit, palette,\nbackground, lighting, linework, and rendering style.\n\nExercise: Barbell Upright Row\nPose: Standing tall with feet hip-width apart, pulling a level barbell close to the body to lower chest height using a shoulder-width overhand grip, both elbows flared to the sides and slightly higher than the hands but no higher than the shoulders, wrists straight and legs still.\nEquipment: One physically correct straight barbell with modest dark gray round plates, a continuous rigid shaft through the center of every plate on one straight axis, all plates parallel and perpendicular to the shaft.\nView: nearly frontal with a slight three-quarter angle so both elbows and the whole bar are clearly visible\n\nCreate one polished instructional illustration of the reference athlete doing\nthe exercise. Keep his face, hair, build, off-white T-shirt, deep green shorts,\nwhite socks, and gray shoes unchanged. Use the same near-black charcoal card\nbackground and softly cel-shaded 2D finish as the reference. Show the whole\nbody and all equipment, centered with generous padding, on a wide 2:1 canvas.\nChoose a clear, anatomically correct key position.\n\nNo text, labels, logos, watermark, scenery, panel borders, motion trail,\ncropped body parts, extra limbs, or extra equipment. Do not change the outfit,\ncharacter, colors, or art style. One athlete doing one exercise, not the three-view reference sheet."
+    },
+    {
+      "exercise": "Barbell Upright Row",
+      "variant": "female",
+      "source": "/home/marcel/.codex/generated_images/01a1b5c6-81e1-75b0-ae34-a3368337ea16/exec-577719b5-0071-45eb-a1e0-2703711510a0.png",
+      "destination": "app/src/main/res/drawable-nodpi/exercise_barbell_upright_row_female.webp",
+      "references": [
+        "art/exercise-images/style-seed.png",
+        "art/exercise-images/style-seed-female.png",
+        "app/src/main/res/drawable-nodpi/exercise_barbell_upright_row.webp"
+      ],
+      "prompt": "Use case: identity-preserve\nAsset type: Lofit exercise card illustration, female Barbell Upright Row\nInput image 1: strict reference for original Lofit illustration palette, linework, lighting, and softly cel-shaded 2D style.\nInput image 2: strict reference for the female athlete's identity, face, dark brown ponytail, athletic build, off-white T-shirt, deep green shorts, white socks and gray shoes.\nInput image 3: edit target and EXACT reference for exercise pose, equipment, camera, scale and composition.\n\nReplace only the male athlete in image 3 with the woman from image 2. Preserve the exact Barbell Upright Row pose, both raised elbows, grip, all contact points, still legs, body position, equipment geometry, view, framing, charcoal background, lighting and rendering style. Natural female anatomy and correct exercise technique. Do not copy the male face or male body. Keep the short sleeves and outfit.\nExercise pose: Standing tall with feet hip-width apart, pulling a level barbell close to the body to lower chest height using a shoulder-width overhand grip, both elbows flared to the sides and slightly higher than the hands but no higher than the shoulders, wrists straight and legs still.\nEquipment to preserve unchanged: One physically correct straight barbell with modest dark gray round plates, a continuous rigid shaft through the center of every plate on one straight axis, all plates parallel and perpendicular to the shaft.\n\nOne woman doing one exercise, full body and equipment visible with generous padding on a wide 2:1 canvas. Do not reproduce the three views from the reference sheet. No text, labels, logos, watermark, panels, scenery, motion trails, cropped body parts, extra limbs or extra equipment."
+    },
+    {
+      "exercise": "Dumbbell Upright Row",
+      "variant": "male",
+      "source": "/home/marcel/.codex/generated_images/01a1b5c6-81e1-75b0-ae34-a3368337ea16/exec-4bb6aba0-cc7b-488c-a8ea-47fc21b5d89e.png",
+      "destination": "app/src/main/res/drawable-nodpi/exercise_dumbbell_upright_row.webp",
+      "references": [
+        "art/exercise-images/style-seed.png"
+      ],
+      "prompt": "Use case: stylized-concept\nAsset type: Lofit exercise card illustration\nInput image: strict reference for character identity, anatomy, outfit, palette,\nbackground, lighting, linework, and rendering style.\n\nExercise: Dumbbell Upright Row\nPose: Standing tall with feet hip-width apart, lifting TWO separate dumbbells simultaneously close to the torso to lower chest height with palms facing the body, BOTH elbows flared outward and slightly higher than both hands but no higher than the shoulders, both hands at the same height with straight wrists and still legs.\nEquipment: Two matching dark gray dumbbells, one gripped in each hand, visibly separate with no connecting bar.\nView: nearly frontal with a slight three-quarter angle so both raised elbows and both separate dumbbells are clearly visible\n\nCreate one polished instructional illustration of the reference athlete doing\nthe exercise. Keep his face, hair, build, off-white T-shirt, deep green shorts,\nwhite socks, and gray shoes unchanged. Use the same near-black charcoal card\nbackground and softly cel-shaded 2D finish as the reference. Show the whole\nbody and all equipment, centered with generous padding, on a wide 2:1 canvas.\nChoose a clear, anatomically correct key position.\n\nNo text, labels, logos, watermark, scenery, panel borders, motion trail,\ncropped body parts, extra limbs, or extra equipment. Do not change the outfit,\ncharacter, colors, or art style. One athlete doing one exercise, not the three-view reference sheet."
+    },
+    {
+      "exercise": "Dumbbell Upright Row",
+      "variant": "female",
+      "source": "/home/marcel/.codex/generated_images/01a1b5c6-81e1-75b0-ae34-a3368337ea16/exec-e881cbec-862e-40e8-9d81-b809537fb9a5.png",
+      "destination": "app/src/main/res/drawable-nodpi/exercise_dumbbell_upright_row_female.webp",
+      "references": [
+        "art/exercise-images/style-seed.png",
+        "art/exercise-images/style-seed-female.png",
+        "app/src/main/res/drawable-nodpi/exercise_dumbbell_upright_row.webp"
+      ],
+      "prompt": "Use case: identity-preserve\nAsset type: Lofit exercise card illustration, female Dumbbell Upright Row\nInput image 1: strict reference for original Lofit illustration palette, linework, lighting, and softly cel-shaded 2D style.\nInput image 2: strict reference for the female athlete's identity, face, dark brown ponytail, athletic build, off-white T-shirt, deep green shorts, white socks and gray shoes.\nInput image 3: edit target and EXACT reference for exercise pose, equipment, camera, scale and composition.\n\nReplace only the male athlete in image 3 with the woman from image 2. Preserve the exact Dumbbell Upright Row pose, both raised elbows, grip, all contact points, still legs, body position, equipment geometry, view, framing, charcoal background, lighting and rendering style. Natural female anatomy and correct exercise technique. Do not copy the male face or male body. Keep the short sleeves and outfit.\nExercise pose: Standing tall with feet hip-width apart, lifting TWO separate dumbbells simultaneously close to the torso to lower chest height with palms facing the body, BOTH elbows flared outward and slightly higher than both hands but no higher than the shoulders, both hands at the same height with straight wrists and still legs.\nEquipment to preserve unchanged: Two matching dark gray dumbbells, one gripped in each hand, visibly separate with no connecting bar.\n\nOne woman doing one exercise, full body and equipment visible with generous padding on a wide 2:1 canvas. Do not reproduce the three views from the reference sheet. No text, labels, logos, watermark, panels, scenery, motion trails, cropped body parts, extra limbs or extra equipment."
+    },
+    {
+      "exercise": "Cable Upright Row",
+      "variant": "male",
+      "source": "/home/marcel/.codex/generated_images/01a1b5c6-81e1-75b0-ae34-a3368337ea16/exec-2d9ebf90-60a5-48d3-8520-d20edc126bfd.png",
+      "destination": "app/src/main/res/drawable-nodpi/exercise_cable_upright_row.webp",
+      "references": [
+        "art/exercise-images/style-seed.png"
+      ],
+      "prompt": "Use case: stylized-concept\nAsset type: Lofit exercise card illustration\nInput image: strict reference for character identity, anatomy, outfit, palette,\nbackground, lighting, linework, and rendering style.\n\nExercise: Cable Upright Row\nPose: Standing tall a short step in front of a low-pulley cable station, pulling a short straight bar close to the torso to lower chest height with a shoulder-width overhand grip, both elbows flared to the sides and slightly above the hands but no higher than the shoulders, wrists straight and legs still.\nEquipment: One compact dark gray cable weight-stack tower in front and to one side of the athlete, a visible FLOOR-LEVEL pulley, and one taut cable rising diagonally from that low pulley to a central attachment on one short straight bar held in both hands; no weight plates on the hand-held bar.\nView: three-quarter front, complete cable tower and low pulley beside the athlete visible without obscuring either arm or the bar\n\nCreate one polished instructional illustration of the reference athlete doing\nthe exercise. Keep his face, hair, build, off-white T-shirt, deep green shorts,\nwhite socks, and gray shoes unchanged. Use the same near-black charcoal card\nbackground and softly cel-shaded 2D finish as the reference. Show the whole\nbody and all equipment, centered with generous padding, on a wide 2:1 canvas.\nChoose a clear, anatomically correct key position.\n\nNo text, labels, logos, watermark, scenery, panel borders, motion trail,\ncropped body parts, extra limbs, or extra equipment. Do not change the outfit,\ncharacter, colors, or art style. One athlete doing one exercise, not the three-view reference sheet."
+    },
+    {
+      "exercise": "Cable Upright Row",
+      "variant": "female",
+      "source": "/home/marcel/.codex/generated_images/01a1b5c6-81e1-75b0-ae34-a3368337ea16/exec-9256217a-5db3-431f-8742-1465a4d3a813.png",
+      "destination": "app/src/main/res/drawable-nodpi/exercise_cable_upright_row_female.webp",
+      "references": [
+        "art/exercise-images/style-seed.png",
+        "art/exercise-images/style-seed-female.png",
+        "app/src/main/res/drawable-nodpi/exercise_cable_upright_row.webp"
+      ],
+      "prompt": "Use case: identity-preserve\nAsset type: Lofit exercise card illustration, female Cable Upright Row\nInput image 1: strict reference for original Lofit illustration palette, linework, lighting, and softly cel-shaded 2D style.\nInput image 2: strict reference for the female athlete's identity, face, dark brown ponytail, athletic build, off-white T-shirt, deep green shorts, white socks and gray shoes.\nInput image 3: edit target and EXACT reference for exercise pose, equipment, camera, scale and composition.\n\nReplace only the male athlete in image 3 with the woman from image 2. Preserve the exact Cable Upright Row pose, both raised elbows, grip, all contact points, still legs, body position, equipment geometry, view, framing, charcoal background, lighting and rendering style. Natural female anatomy and correct exercise technique. Do not copy the male face or male body. Keep the short sleeves and outfit.\nExercise pose: Standing tall a short step in front of a low-pulley cable station, pulling a short straight bar close to the torso to lower chest height with a shoulder-width overhand grip, both elbows flared to the sides and slightly above the hands but no higher than the shoulders, wrists straight and legs still.\nEquipment to preserve unchanged: One compact dark gray cable weight-stack tower in front and to one side of the athlete, a visible FLOOR-LEVEL pulley, and one taut cable rising diagonally from that low pulley to a central attachment on one short straight bar held in both hands; no weight plates on the hand-held bar.\n\nOne woman doing one exercise, full body and equipment visible with generous padding on a wide 2:1 canvas. Do not reproduce the three views from the reference sheet. No text, labels, logos, watermark, panels, scenery, motion trails, cropped body parts, extra limbs or extra equipment."
+    }
+  ]
+}
