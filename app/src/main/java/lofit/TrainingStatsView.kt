@@ -40,7 +40,21 @@ internal class TrainingStatsView(
 
     fun workoutCalendar(): View = ui.card {
         val names = listOf("Calendar", "Weekly rhythm", "Muscle balance")
-        val pages = listOf(calendarGrid(), weeklyRhythmPage(), muscleBalancePage())
+        val factories: List<() -> View> =
+            listOf(::calendarGrid, ::weeklyRhythmPage, ::muscleBalancePage)
+        val pages = names.map { FrameLayout(activityContext) }
+        fun loadPage(position: Int) {
+            val page = pages[position]
+            if (page.childCount == 0)
+                page.addView(
+                    factories[position](),
+                    FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                    ),
+                )
+        }
+        loadPage(calendarPage)
         val pager =
             ViewPager(activityContext).apply {
                 contentDescription = "Calendar and training stats"
@@ -87,6 +101,7 @@ internal class TrainingStatsView(
             }
         }
         fun selectPage(position: Int) {
+            loadPage(position)
             calendarPage = position
             pager.stateDescription = "Page ${position + 1} of ${names.size}"
             dots.forEachIndexed { index, dot ->
@@ -110,6 +125,18 @@ internal class TrainingStatsView(
         pager.addOnPageChangeListener(
             object : ViewPager.SimpleOnPageChangeListener() {
                 override fun onPageSelected(position: Int) = selectPage(position)
+
+                override fun onPageScrolled(
+                    position: Int,
+                    positionOffset: Float,
+                    positionOffsetPixels: Int,
+                ) {
+                    // A neighboring page needs content only once a swipe actually reveals it.
+                    if (positionOffsetPixels > 0) {
+                        loadPage(position)
+                        if (position < pages.lastIndex) loadPage(position + 1)
+                    }
+                }
             }
         )
         selectPage(calendarPage)
