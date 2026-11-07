@@ -3695,10 +3695,11 @@ class MainActivity : AppCompatActivity() {
             return
         }
         val elapsed = (workout.durationMillis() / 1_000).toInt()
-        timerText?.text = formatWorkoutTime(elapsed)
+        val label = formatWorkoutTime(elapsed)
+        timerText?.let { if (it.text.toString() != label) it.text = label }
         updateRestBar()
-        updateWorkoutNotification()
-        updateTimerVoice()
+        // The tick refreshes voice once, after both workout and hold timers have advanced.
+        if (WorkoutVoiceService.currentRuntime !== workoutVoice) updateWorkoutNotification()
     }
 
     private fun createRestBar(): LinearLayout =
@@ -3772,7 +3773,8 @@ class MainActivity : AppCompatActivity() {
             updateWorkoutNotification(force = true)
             return
         }
-        restTimeText.text = "Rest ${formatSeconds(remaining)}"
+        val label = "Rest ${formatSeconds(remaining)}"
+        if (restTimeText.text.toString() != label) restTimeText.text = label
         restBar.visibility = View.VISIBLE
     }
 

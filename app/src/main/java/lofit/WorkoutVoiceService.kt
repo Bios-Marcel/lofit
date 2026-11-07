@@ -104,6 +104,7 @@ class WorkoutVoiceService : Service() {
     private var foregroundStarted = false
     private var wakeRenewedAt = 0L
     private var notificationAt = 0L
+    private var lastNotification: WorkoutVoiceNotificationState? = null
     private val releaseFocus = Runnable { audioManager.abandonAudioFocusRequest(audioFocus) }
     private val tick =
         object : Runnable {
@@ -178,12 +179,20 @@ class WorkoutVoiceService : Service() {
         }
         if (!foregroundStarted) {
             try {
+                val state =
+                    runtime.session.notificationState(
+                        runtime.repository.data,
+                        runtime.session.backgroundTarget(),
+                        SystemClock.elapsedRealtime(),
+                    )
                 startForeground(
                     NOTIFICATION_ID,
-                    notification(),
+                    notification(state),
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE,
                 )
                 foregroundStarted = true
+                lastNotification = state
+                notificationAt = SystemClock.elapsedRealtime()
             } catch (error: RuntimeException) {
                 runtime.failed = true
                 Log.w("WorkoutVoice", "Microphone foreground service unavailable", error)
@@ -267,34 +276,21 @@ class WorkoutVoiceService : Service() {
         }
         if (now - notificationAt >= 500) {
             notificationAt = now
-            getSystemService(NotificationManager::class.java)
-                .notify(NOTIFICATION_ID, notification())
+            val state =
+                runtime.session.notificationState(
+                    runtime.repository.data,
+                    if (runtime.foreground) runtime.session.backgroundTarget() else target,
+                    now,
+                )
+            if (state != lastNotification) {
+                getSystemService(NotificationManager::class.java)
+                    .notify(NOTIFICATION_ID, notification(state))
+                lastNotification = state
+            }
         }
     }
 
-    private fun notification(): Notification {
-        val workout = runtime.repository.data.activeWorkout
-        val target = runtime.session.backgroundTarget()
-        val item = workout?.exercises?.firstOrNull { it.id == target?.done?.exerciseId }
-        val set = item?.plannedSets?.firstOrNull { it.id == target?.done?.setId }
-        val exercise = runtime.repository.data.exercises.firstOrNull { it.id == item?.exerciseId }
-        val detail = buildList {
-            add("Voice on")
-            if (set != null && exercise != null) {
-                add("Set ${item!!.plannedSets.indexOf(set) + 1}")
-                if (exercise.weighted) add("${formatWeight(set.weightKg)} kg")
-                add(if (exercise.type.tracksDuration) "${set.holdSeconds}s" else "${set.reps} reps")
-            } else add("All sets done")
-            target?.restEndsAt?.let {
-                add("Rest ${((it - SystemClock.elapsedRealtime() + 999) / 1000).coerceAtLeast(0)}s")
-            }
-            if (runtime.session.activeHoldPlannedSetId != null) {
-                add(
-                    "Hold ${((SystemClock.elapsedRealtime() - runtime.session.holdStartedAt) / 1000).coerceAtLeast(0)}s"
-                )
-            }
-        }
-            .joinToString(" · ")
+    private fun notification(state: WorkoutVoiceNotificationState): Notification {
         val open =
             PendingIntent.getActivity(
                 this,
@@ -307,9 +303,9 @@ class WorkoutVoiceService : Service() {
         val builder =
             NotificationCompat.Builder(this, CHANNEL)
                 .setSmallIcon(R.drawable.ic_workout_notification)
-                .setContentTitle(exercise?.name ?: workout?.name ?: "Workout")
-                .setContentText(detail)
-                .setStyle(NotificationCompat.BigTextStyle().bigText(detail))
+                .setContentTitle(state.title)
+                .setContentText(state.detail)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(state.detail))
                 .setContentIntent(open)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
@@ -319,9 +315,9 @@ class WorkoutVoiceService : Service() {
             val intent =
                 Intent(this, WorkoutVoiceService::class.java)
                     .setAction(name)
-                    .putExtra("workoutId", workout?.id)
-                    .putExtra("setId", set?.id)
-                    .putExtra("restEndsAt", target?.restEndsAt ?: -1)
+                    .putExtra("workoutId", state.workoutId)
+                    .putExtra("setId", state.setId)
+                    .putExtra("restEndsAt", state.restEndsAt ?: -1)
             builder.addAction(
                 0,
                 label,
@@ -333,11 +329,11 @@ class WorkoutVoiceService : Service() {
                 ),
             )
         }
-        if (target?.restEndsAt != null) {
+        if (state.restEndsAt != null) {
             action(SUBTRACT, "−15s", 11)
             action(ADD, "+15s", 12)
             action(SKIP, "Skip", 13)
-        } else if (set != null && item.sets.none { it.plannedSetId == set.id }) {
+        } else if (state.canComplete) {
             action(COMPLETE, "Complete Set", 14)
         }
         return builder.build()
