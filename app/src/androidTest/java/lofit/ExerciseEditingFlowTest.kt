@@ -153,7 +153,7 @@ class ExerciseEditingFlowTest {
             chooseAction("Bench press", "Replace exercise")
             onView(withText("Replace Bench press")).check(matches(isDisplayed()))
             onView(withContentDescription("Add selected exercises")).check(doesNotExist())
-            onView(withContentDescription("Select Dumbbell curl")).check(doesNotExist())
+            onView(withContentDescription("Select Dumbbell Bicep Curl")).check(doesNotExist())
             pressBack()
             assertEquals(before, active())
             chooseAction("Bench press", "Remove exercise")
@@ -166,22 +166,23 @@ class ExerciseEditingFlowTest {
         launch().use {
             chooseAction("Plank", "Add exercise above")
             onView(withText("Add above Plank")).check(matches(isDisplayed()))
-            search("Dumbbell curl")
-            onView(withContentDescription("Select Dumbbell curl")).perform(scrollTo(), click())
+            search("Dumbbell Bicep Curl")
+            onView(withContentDescription("Select Dumbbell Bicep Curl"))
+                .perform(scrollTo(), click())
             search("Back squat")
             onView(withContentDescription("Select Back squat")).perform(scrollTo(), click())
             onView(withContentDescription("Add selected exercises")).perform(click())
             assertEquals(
-                listOf("bench-press", "dumbbell-curl", "back-squat", "plank"),
+                listOf("bench-press", "dumbbell-bicep-curl", "back-squat", "plank"),
                 active().exercises.map { it.exerciseId },
             )
             onView(withText("Undo")).perform(click())
             assertEquals(listOf("bench-press", "plank"), active().exercises.map { it.exerciseId })
             chooseAction("Bench press", "Add exercise below")
-            search("Dumbbell curl")
-            onView(withContentDescription("Add Dumbbell curl")).perform(scrollTo(), click())
+            search("Dumbbell Bicep Curl")
+            onView(withContentDescription("Add Dumbbell Bicep Curl")).perform(scrollTo(), click())
             assertEquals(
-                listOf("bench-press", "dumbbell-curl", "plank"),
+                listOf("bench-press", "dumbbell-bicep-curl", "plank"),
                 active().exercises.map { it.exerciseId },
             )
         }
@@ -197,7 +198,7 @@ class ExerciseEditingFlowTest {
                     exercises =
                         mutableListOf(
                             WorkoutExercise(
-                                exerciseId = "dumbbell-curl",
+                                exerciseId = "dumbbell-bicep-curl",
                                 note = "Curl setup",
                                 sets =
                                     mutableListOf(
@@ -212,11 +213,14 @@ class ExerciseEditingFlowTest {
         val before = active()
         launch().use { scenario ->
             chooseAction("Bench press", "Replace exercise")
-            search("Dumbbell curl")
-            onView(withContentDescription("Replace with Dumbbell curl"))
+            search("Dumbbell Bicep Curl")
+            onView(withContentDescription("Replace with Dumbbell Bicep Curl"))
                 .perform(scrollTo(), click())
             val replaced = active()
-            assertEquals(listOf("dumbbell-curl", "plank"), replaced.exercises.map { it.exerciseId })
+            assertEquals(
+                listOf("dumbbell-bicep-curl", "plank"),
+                replaced.exercises.map { it.exerciseId },
+            )
             val curl = replaced.exercises.first()
             assertEquals(listOf(5, 7), curl.plannedSets.map { it.reps })
             assertEquals(listOf(SetType.WARMUP, SetType.NORMAL), curl.plannedSets.map { it.type })
@@ -463,8 +467,8 @@ class ExerciseEditingFlowTest {
             navigate(scenario, R.string.nav_routines)
             onView(withText("Edit")).perform(scrollTo(), click())
             chooseAction("Bench press", "Add exercise above")
-            search("Dumbbell curl")
-            onView(withContentDescription("Add Dumbbell curl")).perform(scrollTo(), click())
+            search("Dumbbell Bicep Curl")
+            onView(withContentDescription("Add Dumbbell Bicep Curl")).perform(scrollTo(), click())
             chooseAction("Bench press", "Add exercise below")
             search("Plank")
             onView(withContentDescription("Add Plank")).perform(scrollTo(), click())
@@ -475,7 +479,7 @@ class ExerciseEditingFlowTest {
             onView(withText("Save routine")).perform(scrollTo(), click())
             val saved = LofitRepository(context).data.routines.single()
             assertEquals(
-                listOf("dumbbell-curl", "back-squat", "plank"),
+                listOf("dumbbell-bicep-curl", "back-squat", "plank"),
                 saved.exercises.map { it.exerciseId },
             )
             assertEquals(5, saved.exercises[1].plannedSets.single().reps)
@@ -512,13 +516,16 @@ class ExerciseEditingFlowTest {
             search("Plank")
             onView(withContentDescription("Add Plank")).perform(scrollTo(), click())
             chooseAction("Bench press", "Replace exercise")
-            search("Dumbbell curl")
-            onView(withContentDescription("Replace with Dumbbell curl"))
+            search("Dumbbell Bicep Curl")
+            onView(withContentDescription("Replace with Dumbbell Bicep Curl"))
                 .perform(scrollTo(), click())
             assertEquals(finished, LofitRepository(context).data.history.single())
             onView(withText("Save changes")).perform(scrollTo(), click())
             val saved = LofitRepository(context).data.history.single()
-            assertEquals(listOf("dumbbell-curl", "plank"), saved.exercises.map { it.exerciseId })
+            assertEquals(
+                listOf("dumbbell-bicep-curl", "plank"),
+                saved.exercises.map { it.exerciseId },
+            )
             assertEquals(finished.intervals, saved.intervals)
             assertEquals(activeBefore, active())
         }

@@ -46,7 +46,11 @@ class DemoHistoryActivity : Activity() {
                             )
                         1 -> listOf("back-squat" to 62.0, "deadlift" to 76.0)
                         else ->
-                            listOf("dumbbell-curl" to 12.0, "bench-press" to 42.0, "plank" to 0.0)
+                            listOf(
+                                "dumbbell-bicep-curl" to 12.0,
+                                "bench-press" to 42.0,
+                                "plank" to 0.0,
+                            )
                     }
                 WorkoutSession(
                     id = "demo-calendar-$date",

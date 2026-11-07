@@ -27,14 +27,12 @@ internal object HevyExerciseMapping {
             "deadlift" to "C6272009", // Deadlift (Barbell)
             "decline-push-up" to "C43825EA", // Decline Push Up
             "diamond-push-up" to "6575F52D", // Diamond Push Up
-            "dumbbell-curl" to "37FCC2BB", // Bicep Curl (Dumbbell)
             "3-4-sit-up" to "022DF610", // Sit Up
             "90-90-hamstring" to "527DA061", // Stretching
             "ab-crunch-machine" to "EB43ADD4", // Crunch (Machine)
             "ab-roller" to "99D5F10E", // Ab Wheel
             "adductor" to "527DA061", // Stretching
             "adductor-groin" to "527DA061", // Stretching
-            "all-fours-quad-stretch" to "527DA061", // Stretching
             "alternate-hammer-curl" to "7E3BC8B6", // Hammer Curl (Dumbbell)
             "alternate-heel-touchers" to "567FB505", // Heel Taps
             "alternate-incline-dumbbell-curl" to "8BAB2735", // Seated Incline Curl (Dumbbell)
@@ -80,7 +78,6 @@ internal object HevyExerciseMapping {
             "bent-over-barbell-row" to "55E6546F", // Bent Over Row (Barbell)
             "bent-over-dumbbell-rear-delt-raise-with-head-on-bench" to
                 "E5988A0A", // Rear Delt Reverse Fly (Dumbbell)
-            "bent-over-one-arm-long-bar-row" to "D7D7FCCE", // Landmine Row
             "bent-over-two-arm-long-bar-row" to "D7D7FCCE", // Landmine Row
             "bent-over-two-dumbbell-row" to "23E92538", // Bent Over Row (Dumbbell)
             "bent-over-two-dumbbell-row-with-palms-in" to "23E92538", // Bent Over Row (Dumbbell)
@@ -275,7 +272,6 @@ internal object HevyExerciseMapping {
             "leverage-iso-row" to "91FAFBA3", // Iso-Lateral Low Row
             "leverage-shoulder-press" to "059E835D", // Shoulder Press (Machine Plates)
             "leverage-shrug" to "19A38071", // Shrug (Machine)
-            "looking-at-ceiling" to "79EF4E4F", // Warm Up
             "low-cable-crossover" to "293483AD", // Low Cable Fly Crossovers
             "low-cable-triceps-extension" to "21310F5F", // Triceps Extension (Cable)
             "lower-back-curl" to "527DA061", // Stretching
@@ -330,7 +326,6 @@ internal object HevyExerciseMapping {
             "reverse-grip-triceps-pushdown" to "8B5BED30", // Reverse Grip Triceps Pushdown
             "reverse-hyperextension" to "7C0028C3", // Reverse Hyperextension
             "reverse-machine-flyes" to "D8281C62", // Rear Delt Reverse Fly (Machine)
-            "rope-crunch" to "23A48484", // Cable Crunch
             "side-bridge" to "E3EDA509", // Side Plank
             "incline-dumbbell-bench-press" to "07B38369", // Incline Bench Press (Dumbbell)
             "knee-push-up" to "B74A95BB", // Kneeling Push Up
@@ -359,7 +354,6 @@ internal object HevyExerciseMapping {
             "cable-tricep-extension" to "Triceps Extension (Cable)",
             "deadlift" to "Deadlift (Barbell)",
             "overhead-press" to "Shoulder Press (Barbell)",
-            "dumbbell-curl" to "Bicep Curl (Dumbbell)",
             "pull-up" to "Pull Up",
             "weighted-pull-up" to "Pull Up (Weighted)",
             "push-up" to "Push Up",

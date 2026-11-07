@@ -402,7 +402,17 @@ class LofitRepository(context: Context) {
         val savedExercises = root.getJSONArray("exercises").mapObjects(::decodeExercise)
         val defaults = DefaultData.exercises()
         val defaultIds = defaults.mapTo(mutableSetOf()) { it.id }
-        val exercises = (defaults + savedExercises.filter { it.id !in defaultIds }).toMutableList()
+        // LEGACY: Keep removed built-ins for saved plans and history, but retire them from
+        // selection.
+        // Their old drawable IDs and names may no longer identify bundled images.
+        val savedExtras =
+            savedExercises
+                .filter { it.id !in defaultIds }
+                .map { exercise ->
+                    if (exercise.custom) exercise
+                    else exercise.copy(retired = true, imageResource = null, imageName = null)
+                }
+        val exercises = (defaults + savedExtras).toMutableList()
         return AppData(
             bodyMeasurements =
                 root

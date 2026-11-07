@@ -7,6 +7,21 @@ class ExerciseRecencyTest {
     private fun exercise(id: String) =
         Exercise(id, id, ExerciseType.REPETITIONS, false, "Chest", "")
 
+    @Test
+    fun retiredExercisesStayAvailableToHistoryButNotSelection() {
+        val retired = exercise("retired").copy(retired = true)
+        val current = exercise("current")
+        val data =
+            AppData(
+                exercises = mutableListOf(retired, current),
+                exerciseLastSelectedAt = mutableMapOf(retired.id to 200, current.id to 100),
+            )
+
+        assertEquals(listOf(current), data.exercisesByRecency())
+        assertEquals(listOf(current), data.exercisesByRecency(includeUnused = false))
+        assertEquals(listOf(retired, current), data.exercises)
+    }
+
     private fun logged(id: String, vararg times: Long) =
         WorkoutExercise(
             exerciseId = id,

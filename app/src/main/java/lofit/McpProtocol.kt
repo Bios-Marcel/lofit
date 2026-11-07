@@ -121,7 +121,7 @@ internal class McpProtocol(
                         page(
                             arguments,
                             "exercises",
-                            repository.data.exercises,
+                            repository.data.exercises.filter { !it.retired },
                             repository::encodeExercise,
                         )
                     "get_history" ->

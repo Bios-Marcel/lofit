@@ -43,8 +43,11 @@ same 627 x 314 size as the original Lofit illustrations.
 
 ## Female variants
 
-Every bundled `exercise_*.webp` has a sibling `<name>_female.webp`. The original
-resource is the male variant. `ExercisePictures.bundledResource` selects the
+Every bundled male exercise resource has a sibling `<name>_female` resource.
+Some resource names share a retained WebP through
+[`exercise_image_aliases.xml`](../../app/src/main/res/values/exercise_image_aliases.xml).
+Male and female sharing decisions are independent. The original resource is
+the male variant. `ExercisePictures.bundledResource` selects the
 variant using the saved biological gender, for both resource IDs and image
 names. User-uploaded pictures keep priority over bundled illustrations.
 
@@ -57,3 +60,10 @@ an off-white T-shirt, deep green shorts, white socks, and gray shoes.
 `female-variants.json` records every source, destination, exercise name, and
 full prompt from the built-in `image_gen` generation run. Normalize female
 outputs with the same script, passing `<original_name>_female` as the name.
+
+For an aliased image, follow its alias to find the current reference bitmap.
+To regenerate only that resource, remove its alias entry before writing the
+replacement WebP; leave the other variant's alias unchanged.
+
+[`applied-deduplication.json`](applied-deduplication.json) records approved
+sharing decisions and later regeneration overrides.

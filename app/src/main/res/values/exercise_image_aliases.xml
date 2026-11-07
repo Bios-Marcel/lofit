@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Approved image sharing; keep gender-specific names stable for catalog and saved references. -->
+    <item type="drawable" name="exercise_back_extension_hold">@drawable/exercise_back_extension</item>
+    <item type="drawable" name="exercise_back_extension_hold_female">@drawable/exercise_back_extension_female</item>
+    <item type="drawable" name="exercise_band_shoulder_internal_rotation">@drawable/exercise_band_external_rotation_walkout</item>
+    <item type="drawable" name="exercise_band_shoulder_internal_rotation_female">@drawable/exercise_band_external_rotation_walkout_female</item>
+    <item type="drawable" name="exercise_db_026">@drawable/exercise_db_014</item>
+    <item type="drawable" name="exercise_db_054">@drawable/exercise_db_052</item>
+    <item type="drawable" name="exercise_db_054_female">@drawable/exercise_db_052_female</item>
+    <item type="drawable" name="exercise_db_055">@drawable/exercise_db_053</item>
+    <item type="drawable" name="exercise_db_055_female">@drawable/exercise_db_053_female</item>
+    <item type="drawable" name="exercise_db_057">@drawable/exercise_db_049</item>
+    <item type="drawable" name="exercise_db_057_female">@drawable/exercise_db_049_female</item>
+    <item type="drawable" name="exercise_db_058">@drawable/exercise_db_052</item>
+    <item type="drawable" name="exercise_db_058_female">@drawable/exercise_db_052_female</item>
+    <item type="drawable" name="exercise_db_059">@drawable/exercise_db_049</item>
+    <item type="drawable" name="exercise_db_059_female">@drawable/exercise_db_049_female</item>
+    <item type="drawable" name="exercise_db_109">@drawable/exercise_db_062</item>
+    <item type="drawable" name="exercise_db_111">@drawable/exercise_db_108</item>
+    <item type="drawable" name="exercise_db_111_female">@drawable/exercise_db_108_female</item>
+    <item type="drawable" name="exercise_db_230_female">@drawable/exercise_db_224_female</item>
+    <item type="drawable" name="exercise_db_253">@drawable/exercise_db_053</item>
+    <item type="drawable" name="exercise_db_253_female">@drawable/exercise_db_053_female</item>
+    <item type="drawable" name="exercise_db_264">@drawable/exercise_db_263</item>
+    <item type="drawable" name="exercise_db_264_female">@drawable/exercise_db_263_female</item>
+    <item type="drawable" name="exercise_db_265">@drawable/exercise_db_263</item>
+    <item type="drawable" name="exercise_db_265_female">@drawable/exercise_db_263_female</item>
+    <item type="drawable" name="exercise_db_267">@drawable/exercise_db_263</item>
+    <item type="drawable" name="exercise_db_267_female">@drawable/exercise_db_263_female</item>
+    <item type="drawable" name="exercise_db_288">@drawable/exercise_db_015</item>
+    <item type="drawable" name="exercise_db_288_female">@drawable/exercise_db_015_female</item>
+    <item type="drawable" name="exercise_db_289">@drawable/exercise_db_015</item>
+    <item type="drawable" name="exercise_db_289_female">@drawable/exercise_db_015_female</item>
+    <item type="drawable" name="exercise_db_305_female">@drawable/exercise_db_012_female</item>
+    <item type="drawable" name="exercise_db_328">@drawable/exercise_db_015</item>
+    <item type="drawable" name="exercise_db_328_female">@drawable/exercise_db_015_female</item>
+    <item type="drawable" name="exercise_db_339">@drawable/exercise_db_333</item>
+    <item type="drawable" name="exercise_db_339_female">@drawable/exercise_db_333_female</item>
+    <item type="drawable" name="exercise_db_381_female">@drawable/exercise_db_227_female</item>
+    <item type="drawable" name="exercise_incline_dumbbell_bench_press">@drawable/exercise_db_300</item>
+    <item type="drawable" name="exercise_incline_dumbbell_bench_press_female">@drawable/exercise_db_300_female</item>
+    <item type="drawable" name="exercise_plank">@drawable/exercise_db_334</item>
+    <item type="drawable" name="exercise_plank_female">@drawable/exercise_db_334_female</item>
+    <item type="drawable" name="exercise_push_up">@drawable/exercise_db_005</item>
+    <item type="drawable" name="exercise_push_up_female">@drawable/exercise_db_005_female</item>
+</resources>

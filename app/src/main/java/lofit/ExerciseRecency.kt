@@ -14,7 +14,7 @@ fun AppData.exercisesByRecency(includeUnused: Boolean = true): List<Exercise> {
     }
     // Stable sort keeps the catalog order for unused exercises and equal timestamps.
     return exercises
-        .filter { includeUnused || it.id in lastUsedAt }
+        .filter { !it.retired && (includeUnused || it.id in lastUsedAt) }
         .sortedByDescending { lastUsedAt[it.id] ?: Long.MIN_VALUE }
 }
 

@@ -75,7 +75,7 @@ internal class ExerciseScreens(
                     when (ui.selectedChoice(filters)) {
                         0 -> data().exercisesByRecency(includeUnused = false)
                         1 -> data().exercises.filter { it.custom }
-                        else -> data().exercises
+                        else -> data().exercises.filter { !it.retired }
                     }
                 val allMatches = exercises.filter { movement ->
                     matchesSearchQuery(

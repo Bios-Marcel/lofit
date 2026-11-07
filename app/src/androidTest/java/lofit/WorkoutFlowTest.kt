@@ -1429,7 +1429,7 @@ class WorkoutFlowTest {
         }
 
         onView(withText("Add exercise")).perform(scrollTo(), click())
-        onView(withHint("Search name or muscle")).perform(replaceText("dumbbell curl"))
+        onView(withHint("Search name or muscle")).perform(replaceText("dumbbell bicep curl"))
 
         val root = activity.window.decorView
         val drawn = CountDownLatch(1)
@@ -1446,7 +1446,7 @@ class WorkoutFlowTest {
         }
         instrumentation.runOnMainSync { root.viewTreeObserver.addOnDrawListener(listener) }
         try {
-            onView(withContentDescription("Add Dumbbell curl")).perform(scrollTo(), click())
+            onView(withContentDescription("Add Dumbbell Bicep Curl")).perform(scrollTo(), click())
             assertTrue("Workout never drew", drawn.await(5, TimeUnit.SECONDS))
             val (scrollY, bottom) = firstPosition.get()
             assertTrue("Workout must exceed the viewport", bottom > 0)

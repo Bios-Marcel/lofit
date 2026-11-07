@@ -38,6 +38,7 @@ data class Exercise(
     var weighted: Boolean = type == ExerciseType.REPETITIONS,
     var imageFile: String? = null,
     var liveMeasurement: Boolean = false,
+    internal val retired: Boolean = false,
 ) {
     init {
         require(!liveMeasurement || (type.tracksDuration && weighted)) {

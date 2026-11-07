@@ -1,0 +1,230 @@
+{
+  "mode": "built-in image_gen",
+  "size": [
+    627,
+    314
+  ],
+  "reason": "Replace incorrect execution and idle start poses with clear active exercise positions.",
+  "curl_target": "The former Dumbbell curl entry was removed; its requested correction applies to the remaining Dumbbell Bicep Curl.",
+  "images": [
+    {
+      "exercise": "Dumbbell Bicep Curl",
+      "gender": "male",
+      "output": "app/src/main/res/drawable-nodpi/exercise_db_295.webp",
+      "generated_source": "/home/marcel/.codex/generated_images/01a1b59f-91db-7a60-a3c7-1c9d12ae0b4e/exec-fb9ec5a3-cc29-4516-9664-df8936295165.png",
+      "prompt": "Use case: stylized-concept\nAsset type: Lofit exercise card illustration\nInput image 1: strict reference for character identity, anatomy, outfit, palette, background, lighting, linework, and rendering style. Input image 2: old incorrect exercise card to replace; keep its style, but completely correct its pose.\nCreate ONE polished instructional illustration of the reference adult male athlete. Keep his face, hair, athletic build, off-white T-shirt, deep green shorts, white socks, and gray shoes unchanged. Same near-black charcoal card background and softly cel-shaded 2D finish. Whole body and all equipment centered, with generous padding above and below, on a wide 2:1 canvas. One athlete only. No text, labels, logos, watermark, scenery, panel borders, motion trails, cropped body parts, extra limbs, or extra equipment. Do not reproduce the multiple views from the reference sheet.\nExercise: Dumbbell Bicep Curl.\nPose: At the top of a simultaneous two-arm standing biceps curl: upright torso, feet shoulder-width apart, both elbows tucked beside ribs, both elbows flexed equally, both forearms raised, and BOTH dumbbells lifted to just below the shoulders at the same height. Both hands use a fully supinated palms-up curl grip, wrists straight. Upper arms remain vertical next to torso. Show clearly contracted biceps. NOT alternating arms: neither arm may hang down. NOT a hammer curl, shoulder press or upright row.\nEquipment: two identical dark gray dumbbells with round plates.\nView: front three-quarter, slight angle only, both curled arms clearly visible.",
+      "mode": "built-in image_gen",
+      "references": [
+        "art/exercise-images/style-seed.png",
+        "app/src/main/res/drawable-nodpi/exercise_db_295.webp"
+      ]
+    },
+    {
+      "exercise": "Dumbbell Bicep Curl",
+      "gender": "female",
+      "output": "app/src/main/res/drawable-nodpi/exercise_db_295_female.webp",
+      "generated_source": "/home/marcel/.codex/generated_images/01a1b59f-91db-7a60-a3c7-1c9d12ae0b4e/exec-58910ab0-71c6-4740-97f6-d1968596ba83.png",
+      "prompt": "Use case: stylized-concept\nAsset type: Lofit exercise card illustration, female variant.\nInput image 1: strict original male style and palette reference. Input image 2: female character reference for identity, face, hair, body and clothes. Input image 3: EDIT TARGET and exact reference for corrected exercise pose, equipment, camera, scale and composition.\nExercise: Dumbbell Bicep Curl.\nReplace only the male athlete in image 3 with the SAME adult athletic woman from image 2: natural female anatomy, dark brown ponytail, off-white T-shirt, deep green shorts, white socks and gray shoes. Preserve image3 exercise pose, body joint angles, contact points, equipment, hand grips, camera view, charcoal background and softly cel-shaded 2D style. Keep BOTH elbows bent symmetrically, BOTH dumbbells curled up together near shoulders at the same height, both palms supinated. This is a simultaneous two-arm biceps curl, never alternating; neither arm hangs down.\nOne woman doing one exercise, whole body and all equipment visible with generous padding on a wide 2:1 canvas. Do not reproduce multiple views from either character sheet. No text, labels, logos, watermark, panel borders, motion trails, cropped body parts, extra limbs or extra equipment.",
+      "mode": "built-in image_gen",
+      "references": [
+        "art/exercise-images/style-seed.png",
+        "art/exercise-images/style-seed-female.png",
+        "app/src/main/res/drawable-nodpi/exercise_db_295.webp"
+      ]
+    },
+    {
+      "exercise": "Barbell Lunge",
+      "gender": "male",
+      "output": "app/src/main/res/drawable-nodpi/exercise_db_018.webp",
+      "generated_source": "/home/marcel/.codex/generated_images/01a1b5b9-287d-7551-a408-fe31b05a9a3e/exec-f5067835-b1d9-4f92-be54-793f056ae373.png",
+      "prompt": "Use case: stylized-concept\nAsset type: Lofit exercise card illustration\nInput image: strict reference for character identity, anatomy, outfit, palette,\nbackground, lighting, linework, and rendering style.\n\nExercise: Barbell Lunge\nPose: Bottom of an actual forward lunge, with upright torso and hips lowered, front foot flat on the floor and its knee bent about 90 degrees, rear leg extended behind with rear knee hovering just above the floor and heel raised; feet stay on separate hip-width tracks, both legs and both feet clearly distinguishable, and both hands hold the barbell outside shoulder width across the upper back.\nEquipment: A physically correct straight barbell on the upper trapezius behind the neck. One continuous rigid shaft passes through the CENTER of every weight plate along ONE single straight left-to-right axis. The shoulders are almost square to the camera so the bar is almost horizontal in the image. Both stacks of circular plates are parallel to each other and perpendicular to the shaft; from this nearly frontal view the plates are viewed almost EDGE-ON as very NARROW vertical ellipses, NOT round faces. A short straight sleeve protrudes OUTWARD beyond each stack, the image-left sleeve toward image-left and the image-right sleeve toward image-right, all perfectly collinear. Symmetric modest black plate stacks. No curved shaft, no disconnected bar segments, no mismatched perspective.\nView: Almost frontal with only a 10-degree turn of the whole athlete and a slightly elevated camera looking down 15 degrees, to show the front leg in the foreground and rear leg behind in depth while keeping the bar almost parallel to the image plane. Show one clearly deep lunge, not a standing stance or kneeling pose.\n\nCreate one polished instructional illustration of the reference athlete doing\nthe exercise. Keep his face, hair, build, off-white T-shirt, deep green shorts,\nwhite socks, and gray shoes unchanged. Use the same near-black charcoal card\nbackground and softly cel-shaded 2D finish as the reference. Show the whole\nbody and all equipment, centered with generous padding, on a wide 2:1 canvas.\nChoose a clear, anatomically correct key position.\n\nNo text, labels, logos, watermark, scenery, panel borders, motion trail,\ncropped body parts, extra limbs, or extra equipment. Do not change the outfit,\ncharacter, colors, or art style.",
+      "mode": "built-in image_gen",
+      "reason": "Correct physically impossible barbell and weight-plate perspective. Frontal camera keeps the straight horizontal shaft, parallel nearly edge-on plates and outward sleeves geometrically consistent while showing an active deep lunge.",
+      "references": [
+        "art/exercise-images/style-seed.png"
+      ],
+      "validation": "Visually inspected generated source and normalized 627x314 output: straight collinear bar and outward sleeves; parallel narrow plate ellipses; clear bottom lunge; full athlete and equipment."
+    },
+    {
+      "exercise": "Barbell Lunge",
+      "gender": "female",
+      "output": "app/src/main/res/drawable-nodpi/exercise_db_018_female.webp",
+      "generated_source": "/home/marcel/.codex/generated_images/01a1b5b9-287d-7551-a408-fe31b05a9a3e/exec-1b145c09-d1d0-4ad5-9f57-ccdee5b4b10a.png",
+      "prompt": "Use case: identity-preserve\nAsset type: Lofit exercise card illustration, female Barbell Lunge\nInput image 1: strict reference for the established illustration style, clothes, palette and charcoal background.\nInput image 2: strict reference for the female character identity, facial features, dark brown ponytail, feminine athletic anatomy, off-white T-shirt, deep green shorts, white socks and gray shoes.\nInput image 3: edit target and EXACT exercise pose, camera angle, framing, barbell geometry, plate orientations and equipment reference.\n\nReplace the male athlete in image 3 with the female athlete from image 2. Preserve the exact frontal deep barbell lunge: upright torso, front knee bent approximately 90 degrees with front foot flat, rear leg behind with knee just above floor and heel lifted, visible separation between both feet. Preserve the entire composition and image 3's physically correct barbell geometry without any perspective change: one straight horizontal shaft behind the neck across upper trapezius, parallel weight plates on its single axis viewed almost edge-on as narrow vertical ellipses, short sleeves protruding outward to left and right beyond the plates. Hands outside shoulder width holding the same bar. Keep the bar perfectly straight through the center of all plates. Do not rotate the athlete, camera, plates, bar or legs. Keep shoulders square to camera.\n\nCreate ONE full-body female athlete, not a lineup. Same softly cel-shaded 2D art, muted colors, near-black charcoal background, complete equipment, generous padding, wide 2:1 canvas. No text, logos, watermark, arrows, extra equipment, extra limbs, duplicate figures, panels, borders or motion trails.",
+      "mode": "built-in image_gen",
+      "reason": "Correct physically impossible barbell and weight-plate perspective. Frontal camera keeps the straight horizontal shaft, parallel nearly edge-on plates and outward sleeves geometrically consistent while showing an active deep lunge.",
+      "references": [
+        "art/exercise-images/style-seed.png",
+        "art/exercise-images/style-seed-female.png",
+        "/home/marcel/.codex/generated_images/01a1b5b9-287d-7551-a408-fe31b05a9a3e/exec-f5067835-b1d9-4f92-be54-793f056ae373.png"
+      ],
+      "validation": "Visually inspected generated source and normalized 627x314 output: straight collinear bar and outward sleeves; parallel narrow plate ellipses; clear bottom lunge; full athlete and equipment."
+    },
+    {
+      "exercise": "Barbell Squat",
+      "gender": "male",
+      "output": "app/src/main/res/drawable-nodpi/exercise_db_242.webp",
+      "generated_source": "/home/marcel/.codex/generated_images/01a1b59f-69e0-73f1-8f30-0299c75666eb/exec-b285681e-ad28-4d23-bd07-2ee52d173259.png",
+      "prompt": "Use case: stylized-concept\nAsset type: Lofit exercise card illustration.\nInput image 1: strict reference for male character identity, outfit, palette, background, lighting, linework and rendering style.\nInput image 2: current Barbell Squat illustration to correct, used only for character/equipment; replace the standing pose completely.\n\nExercise: Barbell Squat\nPose: The adult athlete is clearly at the BOTTOM of a barbell back squat: feet approximately shoulder width and slightly turned out, both heels and forefeet flat on floor, hips lowered to knee height or slightly lower, thighs at least parallel to floor, both knees bent deeply tracking in the same direction as toes, chest lifted with a braced neutral spine and natural forward torso inclination. Both hands hold a steel barbell resting securely across upper trapezius behind shoulders.\nEquipment: one steel barbell with matching dark charcoal circular weight plates.\nView: three-quarter side/front view, facing right, clearly showing the depth of bent knees, thighs and planted heels.\n\nCreate one polished instructional illustration of this key executed squat position. Keep the same adult male face, short dark brown hair, athletic build, off-white T-shirt, deep green shorts, white socks and gray shoes. Same near-black charcoal background and softly cel-shaded2D style. One athlete, one pose. Wide2:1 canvas with entire body, shoes, bar and plates visible and10 percent safe margins. Centered with generous padding.\nNo straight-legged standing start, no shallow quarter squat, no front squat, no elevated heels, no bench or rack. No text, labels, logos, watermark, scenery, borders, motion trails, cropped limbs, extra limbs or extra equipment.",
+      "mode": "built-in image_gen",
+      "validation": "Visually inspected source and normalized 627x314 output; active bottom position, correct equipment, full body and equipment framing."
+    },
+    {
+      "exercise": "Barbell Squat",
+      "gender": "female",
+      "output": "app/src/main/res/drawable-nodpi/exercise_db_242_female.webp",
+      "generated_source": "/home/marcel/.codex/generated_images/01a1b59f-69e0-73f1-8f30-0299c75666eb/exec-376e0f95-1a2d-47a8-9aab-ba3efa6c1996.png",
+      "prompt": "Use case: identity-preserve\nAsset type: Lofit exercise card illustration, female variant.\nInput image1: strict original art style/palette reference.\nInput image2: female athlete identity reference.\nInput image3: corrected Barbell Squat male illustration, exact executed squat pose and composition target.\nReplace ONLY the male athlete in image3 with the same athletic adult woman from image2, dark brown hair in a ponytail, off-white T-shirt, deep green shorts, white socks and gray shoes. Preserve exact exercise pose: BOTTOM of a deep barbell back squat, hips at or just below knee height, thighs parallel or slightly below, knees deeply bent tracking the toes, both whole feet flat, neutral spine and lifted chest. Steel bar with matching charcoal plates rests across upper traps behind shoulders, both hands gripping. Keep same camera, stance, barbell, charcoal background, scale, framing and safe margins. Natural female anatomy. Single woman, single clear bottom squat pose, softly cel-shaded2D illustration, wide2:1 canvas. Entire body and equipment visible. No standing start, no shallow squat, no front squat, no elevated heels, no extra person, extra limbs, text, labels, logos, watermark, scenery or panels.",
+      "mode": "built-in image_gen",
+      "validation": "Visually inspected source and normalized 627x314 output; active bottom position, correct equipment, full body and equipment framing."
+    },
+    {
+      "exercise": "Barbell Side Bend",
+      "gender": "male",
+      "output": "app/src/main/res/drawable-nodpi/exercise_db_241.webp",
+      "generated_source": "/home/marcel/.codex/generated_images/01a1b59f-bba0-7012-b7ac-587f0535e7e1/exec-f8fafae5-4764-49a5-8c1f-416748dcafeb.png",
+      "prompt": "Use case: stylized-concept\nAsset type: Lofit exercise card illustration.\nReference image 1 is a strict STYLE and CHARACTER reference only. Reference image 2 is the OLD INCORRECT exercise image to replace. Correct the exercise pose completely while preserving its palette, athlete identity and instructional illustration style.\nExercise: Barbell Side Bend.\nShow ONE athletic adult male in the clearly bent working position of a barbell side bend: front view, feet shoulder-width apart and planted flat, legs straight, pelvis centered over the feet. His ribcage, shoulders and head lean distinctly to HIS RIGHT (viewer left) around 25 degrees via lateral waist flexion in the plane of the image. His right ribs approach his right hip while the other side lengthens. Torso faces the camera with no rotation and no forward hinge. A dark gray barbell with modest black plates rests ACROSS THE BACK of his shoulders/upper traps, both hands securely holding it outside the shoulders. The bar tilts with his shoulders down toward viewer left, making the lateral bend unmistakable. Head stays aligned with torso, eyes forward. This must depict an actual visible side bend, never an upright starting pose.\nKeep his dark hair, off-white T-shirt, deep green shorts, white socks and gray shoes. Same softly cel-shaded 2D illustration and near-black charcoal background as reference. Show full body, entire barbell and plates, generous clear space around every edge, one centered athlete on a WIDE 2:1 canvas. Athlete and bar occupy central 75% of frame. No text, labels, logos, watermark, scenery, panels, extra people, motion trails, extra limbs or cropped equipment.",
+      "references": [
+        "art/exercise-images/style-seed.png",
+        "app/src/main/res/drawable-nodpi/exercise_db_241.webp (previous incorrect version)"
+      ],
+      "pose_source": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Side_Bend.json",
+      "reason": "Replace upright starting position with actual exercise execution.",
+      "validated": "Visually checked full body and equipment, correct execution phase, matching style; normalized 627x314 WebP."
+    },
+    {
+      "exercise": "Barbell Side Bend",
+      "gender": "female",
+      "output": "app/src/main/res/drawable-nodpi/exercise_db_241_female.webp",
+      "generated_source": "/home/marcel/.codex/generated_images/01a1b59f-bba0-7012-b7ac-587f0535e7e1/exec-5a4ffc92-80ad-4b7f-94ce-1c21a3a3b4f9.png",
+      "prompt": "Use case: stylized-concept\nAsset type: Lofit exercise card illustration, female variant.\nInput image 1: strict style palette and background reference.\nInput image 2: female identity/outfit reference.\nInput image 3: corrected male Barbell Side Bend illustration, exact pose/equipment/composition reference.\nReplace the male athlete in input 3 with the SAME athletic adult woman from input 2, dark brown hair in ponytail, off-white T-shirt, deep green shorts, white socks and gray shoes. Preserve the lateral-bend pose: legs straight, feet flat, hips centered, torso and head clearly tilted to viewer left around 25 degrees, barbell across BACK of shoulders tilts down toward viewer left. Both hands hold the bar outside shoulders. Keep all bar geometry, plates, anatomy contact points, camera front view, near-black charcoal background, softly cel-shaded 2D style. The image must unmistakably show an actual side bend, not a standing starting pose.\nOne woman only, whole body and bar fully visible, WIDE 2:1 landscape. Scale the whole athlete and equipment slightly smaller than reference 3 to allow clear padding above the highest plate and below both shoes; preserve pose and centered composition. No text labels logos watermark, extra limbs, panels, scenery or cropping.",
+      "references": [
+        "art/exercise-images/style-seed.png",
+        "art/exercise-images/style-seed-female.png",
+        "app/src/main/res/drawable-nodpi/exercise_db_241.webp"
+      ],
+      "pose_source": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Barbell_Side_Bend.json",
+      "reason": "Female version of corrected working-position illustration.",
+      "validated": "Visually checked full body and equipment, correct execution phase, matching style; normalized 627x314 WebP."
+    },
+    {
+      "exercise": "One Half Locust",
+      "gender": "male",
+      "output": "app/src/main/res/drawable-nodpi/exercise_db_123.webp",
+      "generated_source": "/home/marcel/.codex/generated_images/01a1b57b-b640-7841-a238-73b2edbff2cd/exec-a6405866-2cd9-4f68-b206-0fb02a18f75d.png",
+      "prompt": "Use case: stylized-concept\nAsset type: Lofit exercise card illustration replacing an incorrect hands-and-knees image.\nInput image 1: strict reference for male character identity, face, dark hair, anatomy, off-white T-shirt, deep green shorts, white socks, gray shoes, palette, charcoal background, lighting and softly cel-shaded 2D rendering. It is a style reference, not the pose to reproduce. Draw ONE athlete only.\nExercise: One Half Locust, the catalog's prone single-leg foot-hold stretch.\nPose: The athlete lies face DOWN on a blue mat, torso almost horizontal, pelvis in contact with the mat. LEFT leg extends straight backward along the mat. LEFT hand is tucked under the LEFT hipbone for padding. RIGHT knee bends to about 90 degrees, RIGHT hand reaches backward and grasps the RIGHT foot/ankle; the held RIGHT foot lifts up and slightly back, with the RIGHT thigh just off the mat. Chest and shoulders lift slightly off the mat, gaze forward and down, a modest controlled back extension. Show the active stretch, not the setup. Anatomically coherent: two arms and two legs, same-side right hand holds right foot; one straight grounded leg and one bent raised leg. Do not depict hands-and-knees, a bird dog, or a standing stretch.\nEquipment: one thin blue exercise mat only.\nView: clear side view from the athlete's RIGHT side, head to image right, so the right hand gripping the raised right ankle is plainly visible and the left extended leg rests on the mat.\nComposition: wide 2:1 landscape canvas, whole body and mat visible, centered, full head-to-toe figure within central 80 percent of width and 75 percent of height, generous charcoal padding on all edges.\nNo text, labels, logos, watermark, scenery, panel borders, motion trails, extra limbs, extra equipment, or cropped body parts.",
+      "pose_source": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/One_Half_Locust.json",
+      "reason": "Previous illustration showed an unrelated hands-and-knees starting position."
+    },
+    {
+      "exercise": "One Half Locust",
+      "gender": "female",
+      "output": "app/src/main/res/drawable-nodpi/exercise_db_123_female.webp",
+      "generated_source": "/home/marcel/.codex/generated_images/01a1b57b-b640-7841-a238-73b2edbff2cd/exec-0ed6dff8-5942-484a-b6cf-b2a26075adbe.png",
+      "prompt": "Use case: stylized-concept\nAsset type: Lofit exercise card illustration, female variant.\nInput image 1 is strict reference for original palette, charcoal background and softly cel-shaded 2D art style. Input image 2 is strict female identity and outfit reference: adult athletic woman, dark brown ponytail, off-white short-sleeved T-shirt, deep green shorts, white socks and gray shoes. Input image 3 is the edit target and exact pose/composition reference for One Half Locust.\nReplace ONLY the male athlete in input image 3 with the woman from input image 2. Preserve the visible active stretch: lying face DOWN on a blue mat, left leg straight along floor, left hand padding under left hip, right knee bent with right hand holding the lifted right ankle/foot, chest and shoulders lifted slightly. Keep same-side hand-foot grip, exactly two arms/two legs, head facing image right, side view, mat, character scale, camera, lighting and charcoal background unchanged. Do NOT change to hands-and-knees or standing. Show one female athlete, not the three views in the reference sheet. Natural anatomy. Wide 2:1 canvas with entire body/mat and generous padding. No labels, text, logos, watermark, scenery, extra limbs, motion trails or crops.",
+      "pose_source": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/One_Half_Locust.json",
+      "reason": "Previous illustration showed an unrelated hands-and-knees starting position."
+    },
+    {
+      "exercise": "Dumbbell Squat",
+      "gender": "male",
+      "output": "app/src/main/res/drawable-nodpi/exercise_db_311.webp",
+      "generated_source": "/home/marcel/.codex/generated_images/01a1b59f-91db-7a60-a3c7-1c9d12ae0b4e/exec-945f3014-664a-4d45-8f40-b2dc698edf68.png",
+      "prompt": "Use case: stylized-concept\nAsset type: Lofit exercise card illustration\nInput image 1: strict reference for character identity, anatomy, outfit, palette, background, lighting, linework, and rendering style. Input image 2: old incorrect exercise card to replace; keep its style, but completely correct its pose.\nCreate ONE polished instructional illustration of the reference adult male athlete. Keep his face, hair, athletic build, off-white T-shirt, deep green shorts, white socks, and gray shoes unchanged. Same near-black charcoal card background and softly cel-shaded 2D finish. Whole body and all equipment centered, with generous padding above and below, on a wide 2:1 canvas. One athlete only. No text, labels, logos, watermark, scenery, panel borders, motion trails, cropped body parts, extra limbs, or extra equipment. Do not reproduce the multiple views from the reference sheet.\nExercise: Dumbbell Squat.\nPose: At the bottom of a real bilateral squat with the hips lowered to knee height, thighs parallel to the floor or slightly lower, knees bent deeply and tracking over toes, both heels planted flat, neutral braced back and torso leaning forward naturally. Both arms hang straight down outside the knees, holding one dumbbell on either side of the body near the ankles; dumbbells do not rest on ground. Feet shoulder-width apart, toes slightly outward. Clearly show deep hip and knee flexion, not the standing start position. Do not put dumbbells at shoulders or between the legs.\nEquipment: two identical dark gray dumbbells with round plates.\nView: three-quarter side/front, showing squat depth and both weights clearly.",
+      "mode": "built-in image_gen",
+      "references": [
+        "art/exercise-images/style-seed.png",
+        "app/src/main/res/drawable-nodpi/exercise_db_311.webp"
+      ]
+    },
+    {
+      "exercise": "Dumbbell Squat",
+      "gender": "female",
+      "output": "app/src/main/res/drawable-nodpi/exercise_db_311_female.webp",
+      "generated_source": "/home/marcel/.codex/generated_images/01a1b59f-91db-7a60-a3c7-1c9d12ae0b4e/exec-75dd3bba-113e-473b-b9db-5b7e5972d7c9.png",
+      "prompt": "Use case: stylized-concept\nAsset type: Lofit exercise card illustration, female variant.\nInput image 1: strict original male style and palette reference. Input image 2: female character reference for identity, face, hair, body and clothes. Input image 3: EDIT TARGET and exact reference for corrected exercise pose, equipment, camera, scale and composition.\nExercise: Dumbbell Squat.\nReplace only the male athlete in image 3 with the SAME adult athletic woman from image 2: natural female anatomy, dark brown ponytail, off-white T-shirt, deep green shorts, white socks and gray shoes. Preserve image3 exercise pose, body joint angles, contact points, equipment, hand grips, camera view, charcoal background and softly cel-shaded 2D style. Keep the deep bottom squat with thighs at or below parallel, both knees deeply bent, both heels planted, neutral back, both arms straight holding dumbbells outside the knees near ankles, weights not resting on ground. Never return to standing.\nOne woman doing one exercise, whole body and all equipment visible with generous padding on a wide 2:1 canvas. Do not reproduce multiple views from either character sheet. No text, labels, logos, watermark, panel borders, motion trails, cropped body parts, extra limbs or extra equipment.",
+      "mode": "built-in image_gen",
+      "references": [
+        "art/exercise-images/style-seed.png",
+        "art/exercise-images/style-seed-female.png",
+        "app/src/main/res/drawable-nodpi/exercise_db_311.webp"
+      ]
+    },
+    {
+      "exercise": "Frankenstein Squat",
+      "gender": "male",
+      "output": "app/src/main/res/drawable-nodpi/exercise_db_321.webp",
+      "generated_source": "/home/marcel/.codex/generated_images/01a1b59f-bba0-7012-b7ac-587f0535e7e1/exec-ee6d5255-cd25-4a58-9bb6-69d31e8b388d.png",
+      "prompt": "Use case: stylized-concept\nAsset type: Lofit exercise card illustration.\nReference image 1 is a strict STYLE and CHARACTER reference only. Reference image 2 is the OLD INCORRECT pose to replace. Completely correct the exercise position while preserving athlete identity, outfit and rendering.\nExercise: Frankenstein Squat (hands-free front squat).\nShow ONE athletic adult male at the BOTTOM of a DEEP front squat. Three-quarter SIDE view, facing viewer right so the shoulder contact and the arms extending in front are unmistakable. Both feet flat shoulder width apart, heels grounded, knees deeply flexed and tracking toes, thighs below parallel, hips low between the heels, hamstrings approaching calves. Trunk upright and braced with neutral spine.\nThe barbell rests DIRECTLY ON THE FRONT OF BOTH SHOULDERS, near the base of the neck, supported on the deltoid shelf. The bar axis runs left/right across his shoulders, perpendicular to the direction he faces. BOTH ARMS reach STRAIGHT FORWARD horizontally at shoulder height, elbows fully extended, palms facing down, open hands far in front of the body. HIS HANDS DO NOT TOUCH OR GRIP THE BAR. Bar rests at the shoulder roots of the arms, NOT at his hands and NOT on his upper back. Moderate black weight plates at both ends, entire bar visible. Make the deep squat and straight zombie-style arms perfectly clear.\nKeep dark hair, off-white T-shirt, deep green shorts, white socks, gray shoes, softly cel-shaded 2D illustration, near-black charcoal background. Entire body and barbell with generous clear edge margins on WIDE 2:1 canvas. One athlete only. No text, labels, logos, watermark, scenery, motion trails, extra limbs, panels or cropped equipment.",
+      "references": [
+        "art/exercise-images/style-seed.png",
+        "app/src/main/res/drawable-nodpi/exercise_db_321.webp (previous incorrect version)"
+      ],
+      "pose_source": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Frankenstein_Squat.json",
+      "reason": "Replace upright starting position with actual exercise execution.",
+      "validated": "Visually checked full body and equipment, correct execution phase, matching style; normalized 627x314 WebP."
+    },
+    {
+      "exercise": "Frankenstein Squat",
+      "gender": "female",
+      "output": "app/src/main/res/drawable-nodpi/exercise_db_321_female.webp",
+      "generated_source": "/home/marcel/.codex/generated_images/01a1b59f-bba0-7012-b7ac-587f0535e7e1/exec-6bd98bd2-84f3-4a8b-97be-67538a2efd3b.png",
+      "prompt": "Use case: stylized-concept\nAsset type: Lofit exercise card illustration, female variant.\nInput image 1: strict style palette and background reference.\nInput image 2: female identity/outfit reference.\nInput image 3: corrected male Frankenstein Squat illustration, exact pose/equipment/composition reference.\nReplace the male athlete in input 3 with the SAME athletic adult woman from input 2, dark brown ponytail, off-white T-shirt, deep green shorts, white socks and gray shoes. Preserve the deep squat working position exactly: both knees deeply bent, hips low between heels, thighs below parallel, heels firmly flat, torso upright. BOTH arms extend straight forward at shoulder height, elbows fully extended, open hands palms down. The barbell lies across the FRONT OF HER SHOULDERS near base of neck, with the bar supported on deltoid shelf. Hands are far in front of the bar and DO NOT touch or grip it. Preserve three-quarter side view facing viewer right, complete bar and weight plates, anatomy contact points and framing. No back squat, no standing start and no gripping the bar.\nOne woman, entire body and equipment visible with generous margins on WIDE 2:1 landscape. Near-black charcoal backdrop, same softly cel-shaded 2D rendering. No text, logos, labels, watermark, extra limbs, panels or scenery.",
+      "references": [
+        "art/exercise-images/style-seed.png",
+        "art/exercise-images/style-seed-female.png",
+        "app/src/main/res/drawable-nodpi/exercise_db_321.webp"
+      ],
+      "pose_source": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Frankenstein_Squat.json",
+      "reason": "Female version of corrected working-position illustration.",
+      "validated": "Visually checked full body and equipment, correct execution phase, matching style; normalized 627x314 WebP."
+    },
+    {
+      "exercise": "Band External Rotation",
+      "gender": "male",
+      "output": "app/src/main/res/drawable-nodpi/exercise_band_external_rotation.webp",
+      "generated_source": "/home/marcel/.codex/generated_images/01a1b57b-b640-7841-a238-73b2edbff2cd/exec-155e40fd-b2aa-47b0-92c6-a2620782ba11.png",
+      "prompt": "Use case: stylized-concept\nAsset type: Lofit exercise card illustration.\nInput image 1: strict male identity, off-white T-shirt/deep-green shorts/white socks/gray shoes, charcoal background, palette, lighting, softly cel-shaded 2D style reference.\nInput image 2: incorrect edit target; FIX the working arm and resistance direction. Do not copy its near-anchor hand.\nInput image 3: correct far-arm band setup reference.\nExercise: Band External Rotation (shoulder).\nExact view and geometry: athlete faces the camera squarely. One dark-gray fixed upright anchor post stands on the FAR LEFT of the image, with a red band tied at elbow height. The WORKING arm is the athlete's LEFT arm, appearing on the viewer's RIGHT, farthest from the anchor. The athlete's right arm at viewer LEFT hangs relaxed and does NOT hold the band. Working left upper arm stays vertical, pressed beside the ribs, elbow bent exactly 90 degrees. Show the active externally rotated position: forearm swings OUTWARD approximately 45 degrees away from the abdomen and anchor, hand is clearly to the RIGHT of its elbow and still slightly in front of the torso. Wrist neutral, thumb upward. Do not abduct the upper arm or rotate the torso. The red band must run continuously from the LEFT post across the FRONT of the abdomen to the LEFT hand at viewer RIGHT, under tension. This makes the band pull the far hand inward while the shoulder resists outward. Do not put the gripping hand next to the anchor. Do not show the hand crossed inward across the abdomen.\nFeet hip-width, neutral upright trunk, hips and shoulders square, both feet planted. One person, two arms, two legs. Entire athlete and whole simple anchor post/base visible, no other equipment.\nMatch the source athlete and style. Wide 2:1 landscape, generous charcoal padding on all sides, no text/arrows/logos/watermarks/motion trails/panels. Keep full hands, feet and post uncropped.",
+      "pose_source": "https://www.orthoinfo.org/bodypart/shoulder/rotator-cuff-and-shoulder-conditioning-program/",
+      "pose_reference": "Exercise 9: External Rotation. Far-side working arm, elbow tucked, rotate outward against the band.",
+      "reason": "Previous asset held the band with the arm nearest the anchor, reversing the resistance direction.",
+      "mode": "built-in image_gen"
+    },
+    {
+      "exercise": "Band External Rotation",
+      "gender": "female",
+      "output": "app/src/main/res/drawable-nodpi/exercise_band_external_rotation_female.webp",
+      "generated_source": "/home/marcel/.codex/generated_images/01a1b57b-b640-7841-a238-73b2edbff2cd/exec-294dcb97-bf0e-4585-a0d2-b742a6d87671.png",
+      "prompt": "Use case: stylized-concept\nAsset type: Lofit exercise card illustration, female Band External Rotation.\nInput1: original male style/palette reference. Input2: strict female character reference (adult athletic woman, dark brown ponytail, off-white tee, deep green shorts, white socks, gray shoes). Input3: corrected male pose image to edit.\nReplace only the male athlete in input3 with the woman from input2. Preserve the exact CORRECT external-rotation setup: anchor post on image LEFT, gripping hand on image RIGHT in athlete's LEFT arm, farthest from anchor. The red band passes across the front of the abdomen from post to far-side hand. Working upper arm vertical tucked to ribs, elbow90degrees, hand rotated outward away from midline/anchor and right of elbow, wrist neutral thumb up. Opposite arm hangs relaxed and does not grip. Do not swap gripping hands or reverse band direction. Keep shoulders and pelvis facing front. One athlete with two arms/two legs.\nKeep post, band, view, active pose, lighting and charcoal background consistent. Wide 2:1 with full body and post/base uncropped; slightly more top padding is welcome. Match softly cel-shaded 2D style. No labels, text, arrows, logos, watermark, panels, motion trails or extra equipment.",
+      "pose_source": "https://www.orthoinfo.org/bodypart/shoulder/rotator-cuff-and-shoulder-conditioning-program/",
+      "pose_reference": "Exercise 9: External Rotation. Far-side working arm, elbow tucked, rotate outward against the band.",
+      "reason": "Previous asset held the band with the arm nearest the anchor, reversing the resistance direction.",
+      "mode": "built-in image_gen"
+    },
+    {
+      "exercise": "Bent Over Two-Arm Long Bar Row",
+      "gender": "male",
+      "output": "app/src/main/res/drawable-nodpi/exercise_db_250.webp",
+      "generated_source": "/home/marcel/.codex/generated_images/01a1b57b-b640-7841-a238-73b2edbff2cd/exec-1c955bd0-923f-463b-90a3-8b2fa801bc43.png",
+      "prompt": "Use case: stylized-concept\nAsset type: Lofit exercise card illustration.\nReference image1: strict male athlete identity, anatomy, off-white T-shirt, deep green shorts, white socks, gray shoes, charcoal background, softly cel-shaded 2D linework and lighting.\nExercise: Bent Over TWO-ARM LONG BAR ROW (landmine T-bar row).\nCORRECT equipment and geometry are the main purpose: ONE long, straight Olympic barbell lies lengthwise between the athlete's feet, not across his body. Its rear UNLOADED end is visibly captured in a small fixed floor landmine pivot BEHIND him at image LEFT. Its front LOADED end is at image RIGHT beneath his lower chest. The entire bar is a SINGLE rigid straight steel line angled upward from the low rear pivot to the raised front end. Put TWO SMALL dark circular weight plates together ONLY on the front sleeve. All plate center holes and the exposed sleeve share exactly the SAME straight axis as the bar. Plate planes are parallel to each other and perpendicular to that shaft. The shaft continues visibly a short distance beyond the front plates. No plates at the rear pivot. NO conventional horizontal barbell across two hands and NO disconnected or crooked steel segments.\nPose: Adult male straddles the shaft with feet planted shoulder-width, hips hinged, knees moderately bent, torso nearly parallel to floor with neutral flat back, head aligned facing image RIGHT. Show TOP of the two-arm row: BOTH hands grip the two ends of a compact V-shaped close-grip handle looped around the shaft immediately behind its front plates, BOTH elbows bend backwards close to ribs, and front plates are pulled toward lower chest. Full two arms and two legs, clear contact of hands with handle, balanced stance. The straight bar passes in the open space BETWEEN the legs and below the torso, never through a shin or knee. Keep all long bar, floor pivot, handle and weight plates in the image.\nView: instructional side-three-quarter view, modest perspective, camera approximately perpendicular to the bar length so its long straight axis is clearly visible and its pivot and loaded end cannot be confused. No wide-angle distortion. Clearly show the continuous shaft and coherent plate ellipses.\nComposition: ONE person and ONE pose, wide 2:1 landscape. Full body and entire equipment assembly centered with generous charcoal padding on every edge. Same reference athlete/clothes/charcoal setting and illustration style. No text, arrows, motion trails, labels, logos, watermarks, panels, scenery or extra equipment.",
+      "mode": "built-in image_gen",
+      "pose_source": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Bent_Over_Two-Arm_Long_Bar_Row.json",
+      "reason": "Correct the equipment and bar perspective: one continuous straight landmine bar from rear floor pivot to front loaded plates, two-handed row."
+    },
+    {
+      "exercise": "Bent Over Two-Arm Long Bar Row",
+      "gender": "female",
+      "output": "app/src/main/res/drawable-nodpi/exercise_db_250_female.webp",
+      "generated_source": "/home/marcel/.codex/generated_images/01a1b5b9-287d-7551-a408-fe31b05a9a3e/exec-8e8ab17b-51eb-4c4d-bcdd-02c217c7b6bb.png",
+      "prompt": "Use case: identity-preserve\nAsset type: Lofit exercise card illustration, female Bent Over Two-Arm Long Bar Row\nInput image 1: strict original art style, palette, outfit and charcoal background reference.\nInput image 2: strict female character identity, face, feminine athletic anatomy, dark brown ponytail and clothing reference.\nInput image 3: EDIT TARGET and exact reference for the corrected row pose, physically correct straight landmine bar, plates, handle, floor pivot, camera angle, framing and composition.\n\nReplace ONLY the male athlete in image 3 with the female athlete from image 2. Preserve the exact bent-over two-arm long bar row: hips hinged back, knees softly bent, neutral back and braced torso leaning forward, BOTH hands gripping the two sides of the same close-grip V-shaped rowing handle, elbows flexed and pulled back, handle drawn toward the lower abdomen. Maintain the same feet positions straddling the bar.\n\nPreserve image 3 equipment geometry exactly: a single straight rigid diagonal bar runs from a visible small secured floor pivot at the LOWER LEFT of the image toward the raised loaded end at the RIGHT. The entire shaft, plate centers and projecting free sleeve form ONE perfectly straight shared axis. Both black weight plates are parallel, perpendicular to that bar axis, and consistently foreshortened as in image 3. A short sleeve projects outward beyond the rightmost plate along that exact same axis. The V-shaped handle is securely attached near the loaded end just before the plates, both hands grip it. Keep the floor pivot, bar direction, bar length, all plates, sleeve and handle contact points unchanged. Do not bend the bar, duplicate it, twist the plate faces, move the floor anchor or add an unsupported floating shaft.\n\nFemale character remains off-white T-shirt, deep green shorts, white socks, gray shoes, dark brown ponytail, natural athletic adult anatomy. One woman doing one active bent-over row. Same softly cel-shaded 2D finish and near-black charcoal background. Wide 2:1 canvas, full body and complete equipment visible, centered with generous padding on every side. Do not copy the character reference lineup. No text, labels, arrows, logos, watermark, scenery, extra objects, extra limbs, panels or motion trails.",
+      "mode": "built-in image_gen",
+      "reason": "Replace the incorrect shared female row illustration with a dedicated two-hand landmine row using physically consistent bar and plate perspective.",
+      "references": [
+        "art/exercise-images/style-seed.png",
+        "art/exercise-images/style-seed-female.png",
+        "app/src/main/res/drawable-nodpi/exercise_db_250.webp"
+      ],
+      "validation": "Visually inspected source and normalized 627x314 output: one straight collinear shaft from floor pivot through plates to exposed sleeve, both hands on V handle, active bent-over row, complete body and equipment."
+    }
+  ]
+}

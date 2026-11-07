@@ -49,11 +49,11 @@ class WorkoutSessionTest {
 
     @Test
     fun search_matchesEachWordAcrossFieldsIgnoringCase() {
-        assert(matchesSearchQuery("CURL dumb", "Dumbbell curl", "Biceps"))
-        assert(matchesSearchQuery("dumb bic", "Dumbbell curl", "Biceps"))
-        assert(matchesSearchQuery("  dumb   BIC  ", "Dumbbell curl", "Biceps"))
-        assert(!matchesSearchQuery("dumb tri", "Dumbbell curl", "Biceps"))
-        assert(matchesSearchQuery("", "Dumbbell curl", "Biceps"))
+        assert(matchesSearchQuery("CURL dumb", "Dumbbell Bicep Curl", "Biceps"))
+        assert(matchesSearchQuery("dumb fore", "Dumbbell Bicep Curl", "Forearms"))
+        assert(matchesSearchQuery("  dumb   FORE  ", "Dumbbell Bicep Curl", "Forearms"))
+        assert(!matchesSearchQuery("dumb tri", "Dumbbell Bicep Curl", "Biceps"))
+        assert(matchesSearchQuery("", "Dumbbell Bicep Curl", "Biceps"))
     }
 
     @Test
@@ -400,7 +400,7 @@ class WorkoutSessionTest {
         val exercises = DefaultData.exercises()
 
         assertEquals(listOf("Repetitions", "Timed"), ExerciseType.entries.map { it.label })
-        assertEquals(476, exercises.size)
+        assertEquals(470, exercises.size)
         assert(
             exercises
                 .map { it.id }
