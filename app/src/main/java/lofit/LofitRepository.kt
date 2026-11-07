@@ -1,14 +1,20 @@
 package lofit
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.AtomicFile
 import java.io.File
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
 import org.json.JSONArray
 import org.json.JSONObject
 
 class LofitRepository(context: Context) {
     private companion object {
         const val SCHEMA_VERSION = 4
+        private val writer = Executors.newSingleThreadExecutor()
     }
 
     private val stateFile = AtomicFile(File(context.filesDir, "lofit-data.json"))
@@ -19,11 +25,53 @@ class LofitRepository(context: Context) {
     var data: AppData = load()
         private set
 
+    private val saveHandler by lazy { Handler(Looper.getMainLooper()) }
+    private var savePending = false
+    private var stateWrite: Future<*>? = null
+    private val deferredSave = Runnable { enqueueStateSave() }
+
     // Save exercises, routines, body measurements, the active workout, and settings. Call
     // saveHistory()
     // separately whenever history changes so frequent saves do not encode or write it.
     fun save() {
-        write(encode(data).toString())
+        cancelDeferredSave()
+        enqueueStateSave()
+        awaitStateWrite()
+    }
+
+    /** Keep typing in memory; capture one owned snapshot after a burst of edits. */
+    fun saveDeferred() {
+        savePending = true
+        saveHandler.removeCallbacks(deferredSave)
+        saveHandler.postDelayed(deferredSave, 200)
+    }
+
+    fun flushPendingSave() {
+        if (savePending) {
+            cancelDeferredSave()
+            enqueueStateSave()
+        }
+        awaitStateWrite()
+    }
+
+    private fun cancelDeferredSave() {
+        if (savePending) saveHandler.removeCallbacks(deferredSave)
+        savePending = false
+    }
+
+    private fun enqueueStateSave() {
+        savePending = false
+        val snapshot = data.stateSnapshot()
+        stateWrite = writer.submit { write(encode(snapshot).toString()) }
+    }
+
+    private fun awaitStateWrite() {
+        try {
+            stateWrite?.get()
+            stateWrite = null
+        } catch (failure: ExecutionException) {
+            throw (failure.cause ?: failure)
+        }
     }
 
     fun saveHistory() {
@@ -32,6 +80,7 @@ class LofitRepository(context: Context) {
 
     // LEGACY: Keep the internal reset API after removing the reset action from settings.
     fun reset() {
+        flushPendingSave()
         val fresh = AppData()
         val history = encodeHistory(fresh.history).toString()
         write(encode(fresh).toString())
@@ -654,6 +703,57 @@ class LofitRepository(context: Context) {
             }
             .toMutableList()
 }
+
+// The writer never traverses the mutable model owned by the UI and voice service.
+private fun AppData.stateSnapshot(): AppData =
+    copy(
+        exercises = exercises.map { it.copy() }.toMutableList(),
+        routines = routines.map { it.storageCopy() }.toMutableList(),
+        history = mutableListOf(),
+        activeWorkout =
+            activeWorkout?.let { workout ->
+                workout.copy(
+                    intervals = workout.intervals.toMutableList(),
+                    sourceRoutine = workout.sourceRoutine?.storageCopy(),
+                    exercises =
+                        workout.exercises
+                            .map { item ->
+                                item.copy(
+                                    sets = item.sets.map { it.copy() }.toMutableList(),
+                                    plannedSets =
+                                        item.plannedSets.map { it.copy() }.toMutableList(),
+                                )
+                            }
+                            .toMutableList(),
+                )
+            },
+        exerciseRecords =
+            exerciseRecords
+                .mapValues { (_, records) ->
+                    records
+                        .map {
+                            it.copy(
+                                exercise = it.exercise.copy(),
+                                set = it.set.copy(),
+                                volumeSet = it.volumeSet?.copy(),
+                            )
+                        }
+                        .toMutableList()
+                }
+                .toMutableMap(),
+        exerciseLastSelectedAt = exerciseLastSelectedAt.toMutableMap(),
+        bodyMeasurements = bodyMeasurements.toMutableList(),
+    )
+
+private fun Routine.storageCopy(): Routine =
+    copy(
+        exercises =
+            exercises
+                .map { item ->
+                    item.copy(plannedSets = item.plannedSets.map { it.copy() }.toMutableList())
+                }
+                .toMutableList()
+    )
 
 private fun <T> JSONArray.mapObjects(transform: (JSONObject) -> T): List<T> =
     (0 until length()).map { transform(getJSONObject(it)) }

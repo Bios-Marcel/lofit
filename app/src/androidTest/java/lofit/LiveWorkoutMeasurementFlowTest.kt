@@ -384,6 +384,18 @@ class LiveWorkoutMeasurementFlowTest {
             onView(withContentDescription("Set 1 weight"))
                 .check(matches(isEnabled()))
                 .perform(replaceText("20.5"))
+                .perform(
+                    waitUntil("edited target weight saved") {
+                        LofitRepository(context)
+                            .data
+                            .activeWorkout!!
+                            .exercises
+                            .single()
+                            .plannedSets
+                            .single()
+                            .weightKg == 20.5
+                    }
+                )
             assertEquals(
                 20.5,
                 LofitRepository(context)
@@ -424,7 +436,20 @@ class LiveWorkoutMeasurementFlowTest {
                     (view as LiveMeasurementGraphView).series.samples.map { it.kilograms },
                 )
             }
-            onView(withContentDescription("Set 1 weight")).perform(replaceText("16.5"))
+            onView(withContentDescription("Set 1 weight"))
+                .perform(
+                    replaceText("16.5"),
+                    waitUntil("edited measured weight saved") {
+                        LofitRepository(context)
+                            .data
+                            .activeWorkout!!
+                            .exercises
+                            .single()
+                            .sets
+                            .single()
+                            .weightKg == 16.5
+                    },
+                )
             assertEquals(
                 16.5,
                 LofitRepository(context)

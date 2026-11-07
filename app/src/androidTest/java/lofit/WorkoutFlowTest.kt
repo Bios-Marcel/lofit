@@ -3503,6 +3503,18 @@ class WorkoutFlowTest {
             .check(matches(isEnabled()))
             .perform(replaceText("12"))
             .check(matches(withText("12")))
+            .perform(
+                waitUntil("edited hold duration saved") {
+                    LofitRepository(instrumentation.targetContext)
+                        .data
+                        .activeWorkout
+                        ?.exercises
+                        ?.single()
+                        ?.plannedSets
+                        ?.single()
+                        ?.actualHoldSeconds == 12
+                }
+            )
         assertEquals(
             12,
             LofitRepository(instrumentation.targetContext)

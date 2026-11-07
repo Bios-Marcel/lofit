@@ -624,6 +624,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
+        repository.flushPendingSave()
         voiceResumed = false
         workoutVoice.foreground = false
         workoutVoice.foregroundTarget = null
@@ -841,6 +842,7 @@ class MainActivity : AppCompatActivity() {
         scrollToBottom: Boolean = false,
         focusExerciseId: String? = null,
     ) {
+        repository.flushPendingSave()
         refreshWorkoutSetStates = null
         // Service and scale completion update the model before rebuilding the set checkboxes.
         val newlyCompletedSetId =
@@ -1205,7 +1207,7 @@ class MainActivity : AppCompatActivity() {
                 headerEnd = workoutMenuButton(workout),
                 onTitleChange = { name ->
                     workout.name = name
-                    repository.save()
+                    repository.saveDeferred()
                     updateWorkoutNotification(force = true)
                 },
             ) { body ->
@@ -1239,7 +1241,7 @@ class MainActivity : AppCompatActivity() {
                 body.addView(
                     ui.restInput(workout.defaultRestSeconds) { seconds ->
                         workout.defaultRestSeconds = seconds
-                        repository.save()
+                        repository.saveDeferred()
                     }
                 )
 
@@ -1665,7 +1667,8 @@ class MainActivity : AppCompatActivity() {
                             loggedSetFor(item, plannedSet)?.let {
                                 syncLoggedSet(it, plannedSet, exercise)
                             }
-                            saveChanges()
+                            exerciseEditUndo?.dismiss()
+                            if (!editingHistory) repository.saveDeferred()
                             onSetsChanged()
                             if (!editingHistory) updateWorkoutNotification(force = true)
                         },
@@ -1728,7 +1731,8 @@ class MainActivity : AppCompatActivity() {
             addView(
                 ui.restOverrideInput(item.restSecondsOverride) { seconds ->
                     item.restSecondsOverride = seconds
-                    saveChanges()
+                    exerciseEditUndo?.dismiss()
+                    if (!editingHistory) repository.saveDeferred()
                 },
                 ui.insetCardLayoutParams(),
             )
