@@ -2187,27 +2187,13 @@ class MainActivity : AppCompatActivity() {
             history.subList(pageStart, minOf(pageStart + HISTORY_PAGE_SIZE, history.size))
         updateHistoryPager(pageCount, history.isNotEmpty())
         val muscleMaps = LazyMuscleMaps(this, repository.data.biologicalGender)
-        return ui.page("History", "Your training stays on this device.") { body ->
-                if (history.isNotEmpty()) {
-                    body.addView(
-                        ui.actionButton(
-                                if (historyHeartRateReadPending) "Reading heart rates…"
-                                else "Request heart rates",
-                                secondary = true,
-                            ) {
-                                requestHistoryHeartRates()
-                            }
-                            .apply {
-                                contentDescription = "Request history heart rates"
-                                isEnabled = !historyHeartRateReadPending
-                            },
-                        LinearLayout.LayoutParams(
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                ViewGroup.LayoutParams.WRAP_CONTENT,
-                            )
-                            .apply { bottomMargin = ui.dp(12) },
-                    )
-                }
+        return ui.page(
+                "History",
+                headerEnd =
+                    if (history.isNotEmpty() && repository.data.bodyMetricsEnabled == true)
+                        historyMenuButton()
+                    else null,
+            ) { body ->
                 if (history.isEmpty())
                     body.addView(ui.emptyText("Complete a workout and it will appear here."))
                 val dateFormat = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
@@ -2314,6 +2300,25 @@ class MainActivity : AppCompatActivity() {
             }
             .also { muscleMaps.attach(it as ScrollView) }
     }
+
+    private fun historyMenuButton(): MaterialButton =
+        ui.smallButton("⋮") {}
+            .apply {
+                textSize = 20f
+                minimumWidth = ui.dp(48)
+                contentDescription = "History options"
+                isEnabled = !historyHeartRateReadPending
+                stateDescription = if (historyHeartRateReadPending) "Reading heart rates…" else null
+                setOnClickListener {
+                    PopupMenu(this@MainActivity, this, Gravity.END).apply {
+                        menu.add("Request heart rates").setOnMenuItemClickListener {
+                            requestHistoryHeartRates()
+                            true
+                        }
+                        show()
+                    }
+                }
+            }
 
     private fun historyWorkoutMenuButton(workout: WorkoutSession): MaterialButton =
         ui.smallButton("⋮") {}

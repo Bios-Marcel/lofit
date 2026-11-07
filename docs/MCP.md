@@ -47,13 +47,17 @@ and `2025-11-25`. It has no sessions or SSE stream. Send `initialize`, then
 | `get_exercises` | Read the built-in and custom exercise catalog, including IDs. |
 | `get_history` | Read saved workouts and logged sets, newest first. |
 | `create_routine` | Save a new routine with generated IDs. |
-| `create_exercise` | Save a custom exercise with a generated ID. Requires `name` and `primaryMuscle`. |
+| `create_exercise` | Save a custom exercise with a generated ID. Requires `name`; `primaryMuscle` is optional when `cardio` is true. |
 | `edit_exercise` | Update a custom exercise by `exerciseId`; omitted fields stay unchanged. |
 
 Exercise writes support `name`, `type` (`REPETITIONS` or `TIMED`), `primaryMuscle`,
-`secondaryMuscles` (comma-separated), `weighted`, `asymmetric`,
+`secondaryMuscles` (comma-separated), `weighted`, `asymmetric`, `cardio`,
 `minimumHoldSeconds`, and `liveMeasurement`. Muscle groups use the app's list
 shown in the tool schema. Live measurement requires a timed, weighted exercise.
+Cardio defaults to false and is metadata only; it does not change tracking.
+For cardio exercises, omit `primaryMuscle` on creation or pass an empty string to
+clear it. Turning cardio off requires a primary muscle. The app shows “Cardio”
+in place of the primary muscle label for cardio exercises.
 New exercises default to repetitions, weighted, symmetric, a 30-second minimum
 hold, no secondary muscles, and no live measurement. Timed exercises default to
 unweighted. Edits preserve the exercise ID; built-in exercises cannot

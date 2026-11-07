@@ -18,6 +18,7 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.scrollTo
+import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.isEnabled
@@ -101,14 +102,14 @@ class HealthConnectHeartRateReaderTest {
                     workout("Boundary", 120, 90.0),
                     workout("Delayed one", 240),
                     workout("Delayed two", 360),
-                    workout("Still missing", 480),
+                    workout("Still missing", 900),
                 )
             )
             saveHistory()
         }
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             openHistory(scenario)
-            onView(withContentDescription("Request history heart rates")).perform(click())
+            requestHistoryHeartRates()
             awaitRequestFinished()
             assertEquals(
                 1,
@@ -119,7 +120,7 @@ class HealthConnectHeartRateReaderTest {
                     record(start.plusSeconds(offset), listOf(10L to 110L, 20L to 130L))
                 }
             ) {
-                onView(withContentDescription("Request history heart rates")).perform(click())
+                requestHistoryHeartRates()
                 awaitRequestFinished()
                 val history = LofitRepository(context).data.history
                 assertNull(history[0].averageHeartRateBpm)
@@ -164,8 +165,8 @@ class HealthConnectHeartRateReaderTest {
                     read(
                             listOf(
                                 WorkoutInterval(
-                                    start.minusSeconds(120).toEpochMilli(),
-                                    start.minusSeconds(60).toEpochMilli(),
+                                    start.minusSeconds(600).toEpochMilli(),
+                                    start.minusSeconds(300).toEpochMilli(),
                                 )
                             )
                         )
@@ -175,6 +176,64 @@ class HealthConnectHeartRateReaderTest {
                     read(listOf(WorkoutInterval(start.toEpochMilli(), start.toEpochMilli())))
                         .getOrThrow()
                 )
+            }
+        }
+    }
+
+    @Test
+    fun sparseBatchedRecordsUseNearbySamplesAndPersistAnInterpolatedHistoryAverage() {
+        val start = Instant.now().minusSeconds(3_600)
+        val interval = WorkoutInterval(start.toEpochMilli(), start.plusSeconds(60).toEpochMilli())
+        LofitRepository(context).apply {
+            data.history.add(WorkoutSession(name = "Sparse", intervals = mutableListOf(interval)))
+            saveHistory()
+        }
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            // The needed samples are in an old batch behind a full page of unrelated records.
+            val records =
+                listOf(
+                    record(
+                        start.minusSeconds(1_800),
+                        listOf(0L to 200L, 1770L to 80L, 1980L to 160L),
+                    )
+                ) +
+                    List(1000) { index ->
+                        record(start.minusSeconds(300L + index), listOf(0L to 200L))
+                    }
+            withRecords(records) {
+                val expected = 80.0 + 80.0 * 60.0 / 210.0
+                assertEquals(expected, read(listOf(interval)).getOrThrow()!!, 0.000001)
+                openHistory(scenario)
+                requestHistoryHeartRates()
+                awaitRequestFinished()
+                assertEquals(
+                    expected,
+                    LofitRepository(context).data.history.single().averageHeartRateBpm!!,
+                    0.000001,
+                )
+                onView(withText("♥ 103 bpm · average")).check(matches(isDisplayed()))
+            }
+        }
+    }
+
+    @Test
+    fun nearbyReadingsAreUsedOnlyWhenTheWorkoutHasNoSamples() {
+        val start = Instant.now().minusSeconds(3_600)
+        val interval = WorkoutInterval(start.toEpochMilli(), start.plusSeconds(60).toEpochMilli())
+        ActivityScenario.launch(MainActivity::class.java).use {
+            withRecords(listOf(record(start.minusSeconds(121), listOf(0L to 60L, 301L to 130L)))) {
+                assertEquals(130.0, read(listOf(interval)).getOrThrow()!!, 0.0)
+            }
+            withRecords(listOf(record(start.minusSeconds(120), listOf(0L to 90L, 301L to 200L)))) {
+                assertEquals(90.0, read(listOf(interval)).getOrThrow()!!, 0.0)
+            }
+            withRecords(listOf(record(start.minusSeconds(121), listOf(0L to 60L, 302L to 200L)))) {
+                assertNull(read(listOf(interval)).getOrThrow())
+            }
+            withRecords(
+                listOf(record(start.minusSeconds(10), listOf(0L to 60L, 30L to 110L, 80L to 180L)))
+            ) {
+                assertEquals(110.0, read(listOf(interval)).getOrThrow()!!, 0.0)
             }
         }
     }
@@ -191,7 +250,8 @@ class HealthConnectHeartRateReaderTest {
             withRecords(listOf(record(start, listOf(10L to 120L)))) {
                 finishWorkout()
                 openHistory(scenario)
-                onView(withContentDescription("Request history heart rates")).perform(click())
+                onView(withContentDescription("History options")).check(doesNotExist())
+                onView(withText("Request heart rates")).check(doesNotExist())
                 val workout = LofitRepository(context).data.history.single()
                 assertEquals(120.0, read(workout.intervals).getOrThrow()!!, 0.0)
                 assertNull(LofitRepository(context).data.history.single().averageHeartRateBpm)
@@ -259,6 +319,12 @@ class HealthConnectHeartRateReaderTest {
             )
     }
 
+    private fun requestHistoryHeartRates() {
+        onView(withText("Request heart rates")).check(doesNotExist())
+        onView(withContentDescription("History options")).perform(scrollTo(), click())
+        onView(withText("Request heart rates")).perform(click())
+    }
+
     private fun awaitRequestFinished() {
         onView(isRoot())
             .perform(
@@ -266,13 +332,13 @@ class HealthConnectHeartRateReaderTest {
                     val views = ArrayList<android.view.View>()
                     root.findViewsWithText(
                         views,
-                        "Request history heart rates",
+                        "History options",
                         android.view.View.FIND_VIEWS_WITH_CONTENT_DESCRIPTION,
                     )
                     views.singleOrNull()?.isEnabled == true
                 }
             )
-        onView(withContentDescription("Request history heart rates")).check(matches(isEnabled()))
+        onView(withContentDescription("History options")).check(matches(isEnabled()))
     }
 
     private fun record(start: Instant, samples: List<Pair<Long, Long>>) =

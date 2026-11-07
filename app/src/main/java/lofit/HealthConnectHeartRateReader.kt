@@ -7,6 +7,8 @@ import android.health.connect.AggregateRecordsResponse
 import android.health.connect.HealthConnectException
 import android.health.connect.HealthConnectManager
 import android.health.connect.HealthPermissions
+import android.health.connect.ReadRecordsRequestUsingFilters
+import android.health.connect.ReadRecordsResponse
 import android.health.connect.TimeInstantRangeFilter
 import android.health.connect.datatypes.HeartRateRecord
 import android.os.OutcomeReceiver
@@ -43,7 +45,11 @@ class HealthConnectHeartRateReader(private val context: Context) {
 
         fun readInterval(index: Int) {
             if (index == ranges.size) {
-                callback(Result.success(if (sampleCount == 0L) null else totalBpm / sampleCount))
+                if (sampleCount > 0L) {
+                    // LEGACY: Keep the sample-weighted Health Connect average when readings exist.
+                    callback(Result.success(totalBpm / sampleCount))
+                } else if (ranges.isEmpty()) callback(Result.success(null))
+                else readNearbySamples(manager, ranges, earliest, callback)
                 return
             }
             val (start, end) = ranges[index]
@@ -84,5 +90,71 @@ class HealthConnectHeartRateReader(private val context: Context) {
             }
         }
         readInterval(0)
+    }
+
+    private fun readNearbySamples(
+        manager: HealthConnectManager,
+        ranges: List<Pair<Instant, Instant>>,
+        earliest: Instant,
+        callback: (Result<Double?>) -> Unit,
+    ) {
+        val average =
+            WorkoutHeartRateAverage(
+                ranges.map { (start, end) ->
+                    WorkoutInterval(start.toEpochMilli(), end.toEpochMilli())
+                }
+            )
+        val end = ranges.maxOf { it.second }.plusMillis(HEART_RATE_NEARBY_WINDOW_MILLIS + 1)
+        fun readPage(token: Long? = null) {
+            try {
+                // Health Connect filters series by their start time. Older batches can contain
+                // samples beside this workout, so page through them and filter the samples.
+                val request =
+                    ReadRecordsRequestUsingFilters.Builder(HeartRateRecord::class.java)
+                        .setTimeRangeFilter(
+                            TimeInstantRangeFilter.Builder()
+                                .setStartTime(earliest)
+                                .setEndTime(end)
+                                .build()
+                        )
+                        .setPageSize(1000)
+                        .apply {
+                            if (token == null) setAscending(false) else setPageToken(token)
+                        }
+                        .build()
+                manager.readRecords(
+                    request,
+                    context.mainExecutor,
+                    object :
+                        OutcomeReceiver<
+                            ReadRecordsResponse<HeartRateRecord>,
+                            HealthConnectException,
+                        > {
+                        override fun onResult(result: ReadRecordsResponse<HeartRateRecord>) {
+                            result.records.forEach { record ->
+                                record.samples.forEach { sample ->
+                                    if (!sample.time.isBefore(earliest)) {
+                                        average.add(
+                                            sample.time.toEpochMilli(),
+                                            sample.beatsPerMinute.toDouble(),
+                                        )
+                                    }
+                                }
+                            }
+                            if (result.nextPageToken == -1L)
+                                callback(Result.success(average.average()))
+                            else readPage(result.nextPageToken)
+                        }
+
+                        override fun onError(error: HealthConnectException) {
+                            callback(Result.failure(error))
+                        }
+                    },
+                )
+            } catch (error: RuntimeException) {
+                callback(Result.failure(error))
+            }
+        }
+        readPage()
     }
 }
