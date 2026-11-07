@@ -23,6 +23,7 @@ data class SharedWorkoutPlan(val routine: Routine, val exercises: List<Exercise>
         return WorkoutSession(
             name = routine.name,
             defaultRestSeconds = routine.defaultRestSeconds,
+            autoStartCardio = routine.autoStartCardio,
             exercises =
                 routine.exercises
                     .map { item ->
@@ -88,6 +89,7 @@ data class SharedWorkoutPlan(val routine: Routine, val exercises: List<Exercise>
                     .put("version", 1)
                     .put("name", workout.name)
                     .put("rest", workout.defaultRestSeconds)
+                    .put("autoStartCardio", workout.autoStartCardio)
                     .put(
                         "movements",
                         JSONArray().apply {
@@ -174,6 +176,8 @@ data class SharedWorkoutPlan(val routine: Routine, val exercises: List<Exercise>
                 Routine(
                     name = root.text("name"),
                     defaultRestSeconds = root.number("rest", 0, 3_600),
+                    // LEGACY: Older shared plans predate the optional cardio auto-start switch.
+                    autoStartCardio = root.optBoolean("autoStartCardio", true),
                     exercises =
                         root
                             .getJSONArray("exercises")

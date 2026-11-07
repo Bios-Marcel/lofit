@@ -80,14 +80,7 @@ internal class WorkoutVoiceSession(
             }
             VoiceCommand.TIME -> {
                 if (activeTarget() == target) stopHold(item, set, exercise)
-                else {
-                    activeHoldWorkoutExerciseId = item.id
-                    activeHoldPlannedSetId = set.id
-                    holdStartedAt = now()
-                    holdCuePlayed = false
-                    restEndsAt = 0
-                    set.actualHoldSeconds = 0
-                }
+                else startHold(item, set)
             }
             VoiceCommand.DONE -> {
                 if (activeTarget() == target) stopHold(item, set, exercise)
@@ -112,6 +105,52 @@ internal class WorkoutVoiceSession(
         val workout = data().activeWorkout ?: return
         val seconds = item.restSecondsAfterSet(workout.defaultRestSeconds, exercise)
         restEndsAt = if (seconds > 0) now() + seconds * 1000L else 0L
+    }
+
+    private fun startHold(item: WorkoutExercise, set: PlannedSet) {
+        activeHoldWorkoutExerciseId = item.id
+        activeHoldPlannedSetId = set.id
+        holdStartedAt = now()
+        holdCuePlayed = false
+        restEndsAt = 0
+        set.actualHoldSeconds = 0
+    }
+
+    /** Called only when a timed set finishes automatically. */
+    fun startFollowingCardio(item: WorkoutExercise, completedSet: PlannedSet): Boolean {
+        val workout = data().activeWorkout ?: return false
+        if (!workout.autoStartCardio) return false
+        if (workout.completedAt != null || activeTarget() != null) return false
+        if (completedSet.type == SetType.FAILURE || liveMeasurement.active != null) return false
+        val exercise = data().exercises.firstOrNull { it.id == item.exerciseId } ?: return false
+        if (!exercise.cardio || !exercise.type.tracksDuration) return false
+        if (item.restSecondsAfterSet(workout.defaultRestSeconds, exercise) != 0) return false
+        val index = workout.exercises.indexOfFirst { it.id == item.id }
+        if (index < 0) return false
+        val remainingSet =
+            item.plannedSets.firstOrNull { set ->
+                item.sets.none { it.plannedSetId == set.id }
+            }
+        val nextItem =
+            if (remainingSet != null) {
+                if (
+                    item.plannedSets.indexOf(remainingSet) <= item.plannedSets.indexOf(completedSet)
+                )
+                    return false
+                item
+            } else workout.exercises.getOrNull(index + 1) ?: return false
+        val nextExercise =
+            data().exercises.firstOrNull { it.id == nextItem.exerciseId } ?: return false
+        if (!nextExercise.cardio || !nextExercise.type.tracksDuration) return false
+        if (nextExercise.supportsLiveMeasurement && !nextItem.manualMeasurement) return false
+        val nextSet =
+            nextItem.plannedSets.firstOrNull { set ->
+                nextItem.sets.none { it.plannedSetId == set.id }
+            } ?: return false
+        startHold(nextItem, nextSet)
+        preferredExerciseId = nextItem.id
+        save()
+        return true
     }
 
     private fun stopHold(item: WorkoutExercise, set: PlannedSet, exercise: Exercise) {
@@ -158,6 +197,8 @@ internal class WorkoutVoiceSession(
         // LEGACY: Failure sets stay running after the goal until explicitly stopped.
         if (elapsed >= set.holdSeconds && set.type != SetType.FAILURE) {
             stopHold(item, set, exercise)
+            // LEGACY: Other timed exercises still wait for a manual start after completion.
+            startFollowingCardio(item, set)
             save()
         }
         return cue

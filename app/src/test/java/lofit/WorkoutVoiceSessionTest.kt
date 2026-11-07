@@ -121,6 +121,182 @@ class WorkoutVoiceSessionTest {
         assertFalse(session.tick())
     }
 
+    private fun addFollowingCardio(): WorkoutExercise {
+        timed.cardio = true
+        hold.restSecondsOverride = 0
+        val nextExercise = timed.copy(id = "next-cardio", name = "Next cardio")
+        data.exercises.add(nextExercise)
+        val next =
+            WorkoutExercise(
+                exerciseId = nextExercise.id,
+                plannedSets = mutableListOf(PlannedSet(holdSeconds = 20)),
+            )
+        data.activeWorkout!!.exercises.add(next)
+        session.preferredExerciseId = hold.id
+        return next
+    }
+
+    private fun runHoldToGoal() {
+        session.apply(VoiceCommand.TIME, session.backgroundTarget()!!)
+        now += 10_000
+        assertTrue(session.tick())
+    }
+
+    @Test
+    fun consecutiveCardioStartsNextTimerWithoutRestAndStopsAtWorkoutEnd() {
+        val next = addFollowingCardio()
+        runHoldToGoal()
+        assertEquals(10, hold.sets.single().holdSeconds)
+        assertEquals(next.id, session.activeHoldWorkoutExerciseId)
+        assertEquals(next.plannedSets.single().id, session.activeHoldPlannedSetId)
+        assertEquals(now, session.holdStartedAt)
+        assertEquals(0, next.plannedSets.single().actualHoldSeconds)
+        assertTrue(next.sets.isEmpty())
+        assertEquals(0L, session.restEndsAt)
+        assertEquals(next.id, session.backgroundTarget()!!.timer!!.exerciseId)
+        now += 5000
+        assertFalse(session.tick())
+        assertEquals(5, next.plannedSets.single().actualHoldSeconds)
+        now += 15_000
+        assertTrue(session.tick())
+        assertEquals(20, next.sets.single().holdSeconds)
+        assertNull(session.activeHoldPlannedSetId)
+        assertEquals(now + 30_000, session.restEndsAt)
+    }
+
+    @Test
+    fun consecutiveCardioUsesZeroDefaultRestAndWorksWithoutVoiceCommands() {
+        val next = addFollowingCardio()
+        hold.restSecondsOverride = null
+        data.activeWorkout!!.defaultRestSeconds = 0
+        session.apply(VoiceCommand.TIME, session.backgroundTarget()!!)
+        data.voiceCommandsEnabled = false
+        now += 10_000
+        assertTrue(session.tick())
+        assertEquals(next.id, session.activeHoldWorkoutExerciseId)
+    }
+
+    @Test
+    fun consecutiveCardioWithRestWaitsForManualStartEvenAfterRestExpires() {
+        val next = addFollowingCardio()
+        hold.restSecondsOverride = 5
+        runHoldToGoal()
+        assertNull(session.activeHoldPlannedSetId)
+        assertEquals(now + 5000, session.restEndsAt)
+        now += 5000
+        assertTrue(session.tick())
+        assertNull(session.activeHoldPlannedSetId)
+        assertNull(next.plannedSets.single().actualHoldSeconds)
+    }
+
+    @Test
+    fun nonCardioTimerDoesNotStartFollowingCardio() {
+        addFollowingCardio()
+        timed.cardio = false
+        runHoldToGoal()
+        assertNull(session.activeHoldPlannedSetId)
+    }
+
+    @Test
+    fun cardioDoesNotStartFollowingNonCardioTimer() {
+        val next = addFollowingCardio()
+        data.exercises.single { it.id == next.exerciseId }.cardio = false
+        runHoldToGoal()
+        assertNull(session.activeHoldPlannedSetId)
+    }
+
+    @Test
+    fun cardioDoesNotSkipInterveningRepetitionExercise() {
+        addFollowingCardio()
+        data.activeWorkout!!
+            .exercises
+            .add(
+                2,
+                WorkoutExercise(exerciseId = reps.id, plannedSets = mutableListOf(PlannedSet())),
+            )
+        runHoldToGoal()
+        assertNull(session.activeHoldPlannedSetId)
+    }
+
+    @Test
+    fun cardioStartsNextSetBeforeMovingToNextExercise() {
+        val next = addFollowingCardio()
+        hold.plannedSets.add(PlannedSet(holdSeconds = 10))
+        runHoldToGoal()
+        assertEquals(hold.id, session.activeHoldWorkoutExerciseId)
+        assertEquals(hold.plannedSets[1].id, session.activeHoldPlannedSetId)
+        now += 10_000
+        assertTrue(session.tick())
+        assertEquals(2, hold.sets.size)
+        assertEquals(next.id, session.activeHoldWorkoutExerciseId)
+    }
+
+    @Test
+    fun disablingAutoStartDuringHoldStopsTheChainAtCompletion() {
+        val next = addFollowingCardio()
+        session.apply(VoiceCommand.TIME, session.backgroundTarget()!!)
+        data.activeWorkout!!.autoStartCardio = false
+        now += 10_000
+        assertTrue(session.tick())
+        assertEquals(10, hold.sets.single().holdSeconds)
+        assertNull(session.activeHoldPlannedSetId)
+        assertNull(next.plannedSets.single().actualHoldSeconds)
+        assertEquals(0L, session.restEndsAt)
+    }
+
+    @Test
+    fun disabledAutoStartAlsoWaitsBetweenSetsOfSameCardioExercise() {
+        addFollowingCardio()
+        hold.plannedSets.add(PlannedSet(holdSeconds = 10))
+        data.activeWorkout!!.autoStartCardio = false
+        runHoldToGoal()
+        assertEquals(1, hold.sets.size)
+        assertNull(session.activeHoldPlannedSetId)
+        assertNull(hold.plannedSets[1].actualHoldSeconds)
+    }
+
+    @Test
+    fun cardioDoesNotRestartCompletedNextExercise() {
+        val next = addFollowingCardio()
+        next.sets.add(loggedSetFrom(next.plannedSets.single(), timed))
+        runHoldToGoal()
+        assertNull(session.activeHoldPlannedSetId)
+        assertEquals(1, next.sets.size)
+    }
+
+    @Test
+    fun cardioDoesNotStartScaleMeasurementButCanStartManualMode() {
+        val next = addFollowingCardio()
+        data.exercises
+            .single { it.id == next.exerciseId }
+            .apply {
+                weighted = true
+                liveMeasurement = true
+            }
+        runHoldToGoal()
+        assertNull(session.activeHoldPlannedSetId)
+        next.manualMeasurement = true
+        assertTrue(session.startFollowingCardio(hold, hold.plannedSets.single()))
+        assertEquals(next.id, session.activeHoldWorkoutExerciseId)
+    }
+
+    @Test
+    fun cardioFailureSetAndManualCompletionNeverStartNextTimer() {
+        addFollowingCardio()
+        hold.plannedSets.single().type = SetType.FAILURE
+        runHoldToGoal()
+        assertEquals(hold.id, session.activeHoldWorkoutExerciseId)
+        session.apply(VoiceCommand.DONE, session.backgroundTarget()!!)
+        assertNull(session.activeHoldPlannedSetId)
+        hold.plannedSets.single().type = SetType.NORMAL
+        hold.sets.clear()
+        session.apply(VoiceCommand.TIME, session.backgroundTarget()!!)
+        now += 3000
+        session.apply(VoiceCommand.DONE, session.backgroundTarget()!!)
+        assertNull(session.activeHoldPlannedSetId)
+        assertEquals(3, hold.sets.single().holdSeconds)
+    }
+
     @Test
     fun stoppingEarlyDoesNotCompleteButDoneRecordsElapsedTime() {
         session.preferredExerciseId = hold.id

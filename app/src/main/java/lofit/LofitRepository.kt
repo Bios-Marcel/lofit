@@ -290,6 +290,7 @@ class LofitRepository(context: Context) {
             put("id", routine.id)
             put("name", routine.name)
             put("defaultRestSeconds", routine.defaultRestSeconds)
+            put("autoStartCardio", routine.autoStartCardio)
             put(
                 "exercises",
                 JSONArray().apply {
@@ -346,6 +347,7 @@ class LofitRepository(context: Context) {
                 },
             )
             put("defaultRestSeconds", workout.defaultRestSeconds)
+            put("autoStartCardio", workout.autoStartCardio)
             put(
                 "exercises",
                 JSONArray().apply {
@@ -522,6 +524,8 @@ class LofitRepository(context: Context) {
             id = value.getString("id"),
             name = value.getString("name"),
             defaultRestSeconds = value.getInt("defaultRestSeconds"),
+            // LEGACY: Plans saved before this switch keep automatic cardio transitions enabled.
+            autoStartCardio = value.optBoolean("autoStartCardio", true),
             exercises =
                 value
                     .getJSONArray("exercises")
@@ -568,6 +572,8 @@ class LofitRepository(context: Context) {
                     }
                     .toMutableList(),
             defaultRestSeconds = value.getInt("defaultRestSeconds"),
+            // LEGACY: Workouts saved before this switch keep automatic cardio transitions enabled.
+            autoStartCardio = value.optBoolean("autoStartCardio", true),
             exercises =
                 value
                     .getJSONArray("exercises")

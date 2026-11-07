@@ -97,6 +97,24 @@ class SharedWorkoutPlanTest {
     }
 
     @Test
+    fun cardioAutoStartSurvivesSharingAndOlderPlansDefaultOn() {
+        for (enabled in listOf(false, true)) {
+            val source = workout().apply { autoStartCardio = enabled }
+            val bytes = SharedWorkoutPlan.encode(source, listOf(movement))
+            val plan = SharedWorkoutPlan.decode(bytes)
+            assertEquals(enabled, plan.routine.autoStartCardio)
+            assertEquals(enabled, plan.startIn(AppData()).autoStartCardio)
+            val legacy =
+                JSONObject(bytes.toString(Charsets.UTF_8)).apply {
+                    remove("autoStartCardio")
+                }
+            assertTrue(
+                SharedWorkoutPlan.decode(legacy.toString().toByteArray()).routine.autoStartCardio
+            )
+        }
+    }
+
+    @Test
     fun transfer_compressesFullPlan() {
         val json = SharedWorkoutPlan.encode(workout(), listOf(movement))
         val compressed = SharedWorkoutPlan.compressForTransfer(json)

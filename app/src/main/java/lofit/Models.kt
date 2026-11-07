@@ -133,6 +133,7 @@ data class WorkoutSession(
     var bodyWeightKg: Double? = null,
     val sourceRoutine: Routine? = null,
     var averageHeartRateBpm: Double? = null,
+    var autoStartCardio: Boolean = true,
 ) {
     constructor(
         id: String = UUID.randomUUID().toString(),
@@ -144,6 +145,7 @@ data class WorkoutSession(
         bodyWeightKg: Double? = null,
         sourceRoutine: Routine? = null,
         averageHeartRateBpm: Double? = null,
+        autoStartCardio: Boolean = true,
     ) : this(
         id,
         name,
@@ -153,6 +155,7 @@ data class WorkoutSession(
         bodyWeightKg,
         sourceRoutine,
         averageHeartRateBpm,
+        autoStartCardio,
     )
 
     init {
@@ -208,6 +211,7 @@ data class WorkoutSession(
         Routine(
             name = name,
             defaultRestSeconds = defaultRestSeconds,
+            autoStartCardio = autoStartCardio,
             exercises =
                 exercises
                     .map { item ->
@@ -256,6 +260,7 @@ data class Routine(
     var name: String,
     var defaultRestSeconds: Int = 120,
     val exercises: MutableList<RoutineExercise> = mutableListOf(),
+    var autoStartCardio: Boolean = true,
 )
 
 data class RoutineExercise(

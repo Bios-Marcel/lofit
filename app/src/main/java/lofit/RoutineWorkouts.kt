@@ -58,6 +58,7 @@ fun AppData.workoutFromRoutine(routine: Routine): WorkoutSession {
         WorkoutSession(
             name = routine.name,
             defaultRestSeconds = routine.defaultRestSeconds,
+            autoStartCardio = routine.autoStartCardio,
             exercises = items,
             sourceRoutine = routine,
         )

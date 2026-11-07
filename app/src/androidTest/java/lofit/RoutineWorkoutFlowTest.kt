@@ -158,6 +158,55 @@ class RoutineWorkoutFlowTest {
     }
 
     @Test
+    fun routineAutoStartMenuSavesAndWorkoutsInheritAnIndependentSetting() {
+        launch().use { scenario ->
+            editRoutine(scenario)
+            onView(withContentDescription("Routine options")).perform(click())
+            onView(withText("Auto-start cardio")).perform(click())
+            onView(withText("Save routine")).perform(scrollTo(), click())
+            assertFalse(LofitRepository(context).data.routines.single().autoStartCardio)
+            scenario.recreate()
+            editRoutine(scenario)
+            onView(withContentDescription("Routine options")).perform(click())
+            onView(withText("Auto-start cardio")).perform(click())
+            onView(withText("Cancel")).perform(scrollTo(), click())
+            onView(withText("Discard changes")).inRoot(isDialog()).perform(click())
+            assertFalse(LofitRepository(context).data.routines.single().autoStartCardio)
+            onView(withText("Start")).perform(scrollTo(), click())
+            assertFalse(LofitRepository(context).data.activeWorkout!!.autoStartCardio)
+            onView(withContentDescription("Workout options")).perform(click())
+            onView(withText("Auto-start cardio")).perform(click())
+            val loaded = LofitRepository(context).data
+            assertTrue(loaded.activeWorkout!!.autoStartCardio)
+            assertFalse(loaded.routines.single().autoStartCardio)
+            assertFalse(loaded.activeWorkout!!.sourceRoutine!!.autoStartCardio)
+        }
+    }
+
+    @Test
+    fun newRoutineHasAutoStartMenuAndSavesChoice() {
+        launch().use { scenario ->
+            scenario.onActivity { activity ->
+                val root = activity.findViewById<android.view.ViewGroup>(android.R.id.content)
+                (root.getChildAt(0) as DrawerLayout).openDrawer(GravityCompat.START, false)
+            }
+            onView(allOf(withText(R.string.nav_routines), isClickable())).perform(click())
+            onView(withText("Create routine")).perform(scrollTo(), click())
+            onView(withHint("Routine name")).perform(replaceText("Cardio plan"))
+            onView(withContentDescription("Routine options")).perform(click())
+            onView(withText("Auto-start cardio")).perform(click())
+            onView(withText("Save routine")).perform(scrollTo(), click())
+            assertFalse(
+                LofitRepository(context)
+                    .data
+                    .routines
+                    .single { it.name == "Cardio plan" }
+                    .autoStartCardio
+            )
+        }
+    }
+
+    @Test
     fun routineAddSetCopiesLeftAndRightRepsAndLatestWeights() {
         preparePairedRoutine(ExerciseType.REPETITIONS)
         launch().use { scenario ->

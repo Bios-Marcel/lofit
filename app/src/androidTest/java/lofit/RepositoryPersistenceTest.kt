@@ -52,6 +52,36 @@ class RepositoryPersistenceTest {
     }
 
     @Test
+    fun cardioAutoStartPersistsAcrossPlansAndHistoryAndDefaultsOnForOlderData() {
+        val repository = LofitRepository(context)
+        val routine = Routine(name = "Cardio", autoStartCardio = false)
+        val workout = repository.data.workoutFromRoutine(routine)
+        repository.data.routines.add(routine)
+        repository.data.activeWorkout = workout
+        repository.data.history.add(
+            workout.copy(intervals = mutableListOf(WorkoutInterval(100, 200)))
+        )
+        repository.save()
+        repository.saveHistory()
+        val loaded = LofitRepository(context).data
+        assertFalse(loaded.routines.single().autoStartCardio)
+        assertFalse(loaded.activeWorkout!!.autoStartCardio)
+        assertFalse(loaded.activeWorkout!!.sourceRoutine!!.autoStartCardio)
+        assertFalse(loaded.history.single().autoStartCardio)
+        val root = JSONObject(stored())
+        root.getJSONArray("routines").getJSONObject(0).remove("autoStartCardio")
+        root.getJSONObject("activeWorkout").apply {
+            remove("autoStartCardio")
+            getJSONObject("sourceRoutine").remove("autoStartCardio")
+        }
+        store(root.toString())
+        val legacy = LofitRepository(context).data
+        assertTrue(legacy.routines.single().autoStartCardio)
+        assertTrue(legacy.activeWorkout!!.autoStartCardio)
+        assertTrue(legacy.activeWorkout!!.sourceRoutine!!.autoStartCardio)
+    }
+
+    @Test
     fun pairedRestPersistsAndDefaultsOffForOldPlans() {
         val repository = LofitRepository(context)
         val item = WorkoutExercise(exerciseId = "pistol-squat", pauseEverySecondSet = true)

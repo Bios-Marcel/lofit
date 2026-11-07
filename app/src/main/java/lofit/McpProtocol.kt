@@ -169,11 +169,15 @@ internal class McpProtocol(
     }
 
     private fun createRoutine(args: JSONObject): JSONObject {
-        args.only("name", "defaultRestSeconds", "exercises")
+        args.only("name", "defaultRestSeconds", "autoStartCardio", "exercises")
         val name = args.string("name", 200).trim()
         require(name.isNotEmpty()) { "name must not be blank" }
         val routine =
-            Routine(name = name, defaultRestSeconds = args.integer("defaultRestSeconds", 120))
+            Routine(
+                name = name,
+                defaultRestSeconds = args.integer("defaultRestSeconds", 120),
+                autoStartCardio = args.boolean("autoStartCardio", true),
+            )
         val items = args.array("exercises", 1, 200)
         for (index in 0 until items.length()) {
             val item =
@@ -373,7 +377,7 @@ internal class McpProtocol(
                 "secondaryMuscles":{"type":"string","maxLength":2000,"description":"Comma-separated muscle groups; empty string clears the list."},
                 "minimumHoldSeconds":{"type":"integer","minimum":0,"maximum":2147483647},
                 "weighted":{"type":"boolean"},
-                "cardio":{"type":"boolean","description":"Metadata only; does not change exercise tracking. Defaults to false."},
+                "cardio":{"type":"boolean","description":"Marks cardio exercises eligible for zero-rest timer auto-start when enabled in the workout. Defaults to false."},
                 "liveMeasurement":{"type":"boolean","description":"Requires type TIMED and weighted true."}
             }"""
             )
@@ -488,6 +492,7 @@ internal class McpProtocol(
                     "properties":{
                         "name":{"type":"string","minLength":1,"maxLength":200},
                         "defaultRestSeconds":{"type":"integer","minimum":0,"maximum":2147483647,"default":120},
+                        "autoStartCardio":{"type":"boolean","default":true,"description":"Automatically start the next timed cardio set when there is no rest."},
                         "exercises":{"type":"array","minItems":1,"maxItems":200,"items":{
                             "type":"object","additionalProperties":false,"required":["exerciseId"],
                             "properties":{

@@ -370,7 +370,7 @@ internal class LofitViews(
         LinearLayout(activityContext).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(3), 0, dp(3))
+            setPadding(0, dp(3), 0, dp(16))
             addView(
                 TextView(activityContext).apply {
                     text = "Set Rest"

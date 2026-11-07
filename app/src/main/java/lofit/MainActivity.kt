@@ -1157,14 +1157,15 @@ class MainActivity : AppCompatActivity() {
                 textSize = 18f
                 setTextColor(ui.color(R.color.cream))
                 setTypeface(typeface, Typeface.BOLD)
-                gravity = Gravity.END or Gravity.CENTER_VERTICAL
+                gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                includeFontPadding = false
                 contentDescription = "Workout timer"
             }
         timerText = workoutTimer
         val view =
             ui.page(
                 workout.name,
-                headerEnd = workoutTimer,
+                headerEnd = workoutMenuButton(workout),
                 onTitleChange = { name ->
                     workout.name = name
                     repository.save()
@@ -1173,20 +1174,14 @@ class MainActivity : AppCompatActivity() {
             ) { body ->
                 updateWorkoutTimer()
                 body.addView(
-                    togetherMenuButton(
-                        "Share workout",
-                        { shareTogetherWorkout(workout) },
-                        "Share .lofit file",
-                    ) {
-                        shareWorkoutFile(workout)
-                    },
+                    workoutTimer,
                     LinearLayout.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.WRAP_CONTENT,
                         )
                         .apply {
-                            topMargin = ui.dp(12)
-                            bottomMargin = ui.dp(16)
+                            topMargin = ui.dp(4)
+                            bottomMargin = ui.dp(8)
                         },
                 )
                 body.addView(
@@ -2850,6 +2845,36 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun workoutMenuButton(workout: WorkoutSession): MaterialButton =
+        ui.smallButton("⋮") {}
+            .apply {
+                textSize = 20f
+                minimumWidth = ui.dp(48)
+                contentDescription = "Workout options"
+                setOnClickListener {
+                    PopupMenu(this@MainActivity, this, Gravity.END).apply {
+                        menu.add("Auto-start cardio").apply {
+                            isCheckable = true
+                            isChecked = workout.autoStartCardio
+                            setOnMenuItemClickListener {
+                                workout.autoStartCardio = !isChecked
+                                repository.save()
+                                true
+                            }
+                        }
+                        menu.add("Share via Bluetooth").setOnMenuItemClickListener {
+                            shareTogetherWorkout(workout)
+                            true
+                        }
+                        menu.add("Share .lofit file").setOnMenuItemClickListener {
+                            shareWorkoutFile(workout)
+                            true
+                        }
+                        show()
+                    }
+                }
+            }
+
     private fun togetherMenuButton(
         label: String,
         bluetooth: () -> Unit,
@@ -3887,6 +3912,14 @@ class MainActivity : AppCompatActivity() {
                 plannedSet.type != SetType.FAILURE
         ) {
             stopActiveHold()
+            if (workoutVoice.session.startFollowingCardio(item, plannedSet)) {
+                if (currentScreen == Screen.WORKOUT && route == Route.Root) {
+                    render(restoreScrollY = (content.getChildAt(0) as? ScrollView)?.scrollY)
+                    revealNextWorkoutSet(plannedSet.id)
+                }
+                updateWorkoutNotification(force = true)
+                updateTimerVoice()
+            }
         }
     }
 

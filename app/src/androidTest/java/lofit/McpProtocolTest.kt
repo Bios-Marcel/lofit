@@ -118,10 +118,11 @@ class McpProtocolTest {
 
     @Test
     fun createsRoutineWithGeneratedIdsPersistsAndReadsAllData() {
-        val created = call("create_routine", routineArgs())
+        val created = call("create_routine", routineArgs().put("autoStartCardio", false))
         assertFalse(created.getBoolean("isError"))
         val routine = LofitRepository(context).data.routines.single()
         assertEquals("Strength", routine.name)
+        assertFalse(routine.autoStartCardio)
         assertEquals("Slow descent", routine.exercises.single().note)
         assertEquals(20.25, routine.exercises.single().plannedSets.single().weightKg, 0.0)
         assertEquals(SetType.WARMUP, routine.exercises.single().plannedSets.single().type)
@@ -129,6 +130,7 @@ class McpProtocolTest {
         val routines =
             call("get_routines").getJSONObject("structuredContent").getJSONArray("routines")
         assertEquals(routine.id, routines.getJSONObject(0).getString("id"))
+        assertFalse(routines.getJSONObject(0).getBoolean("autoStartCardio"))
         assertEquals(
             created.getJSONObject("structuredContent").toString(),
             created.getJSONArray("content").getJSONObject(0).getString("text"),

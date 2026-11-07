@@ -1,10 +1,12 @@
 package lofit
 
 import android.content.Context
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.Toast
+import androidx.appcompat.widget.PopupMenu
 import androidx.core.widget.doAfterTextChanged
 
 internal class RoutineScreens(
@@ -62,7 +64,10 @@ internal class RoutineScreens(
 
     fun routineEditorScreen(draft: Routine?, originalId: String?): View {
         if (draft == null) return routinesScreen()
-        return ui.page(if (originalId == null) "New routine" else "Edit routine") { body ->
+        return ui.page(
+            if (originalId == null) "New routine" else "Edit routine",
+            headerEnd = routineMenuButton(draft),
+        ) { body ->
             val name =
                 ui.textField("Routine name").apply {
                     setText(draft.name)
@@ -250,4 +255,25 @@ internal class RoutineScreens(
             )
         }
     }
+
+    private fun routineMenuButton(draft: Routine) =
+        ui.smallButton("⋮") {}
+            .apply {
+                textSize = 20f
+                minimumWidth = ui.dp(48)
+                contentDescription = "Routine options"
+                setOnClickListener {
+                    PopupMenu(activityContext, this, Gravity.END).apply {
+                        menu.add("Auto-start cardio").apply {
+                            isCheckable = true
+                            isChecked = draft.autoStartCardio
+                            setOnMenuItemClickListener {
+                                draft.autoStartCardio = !isChecked
+                                true
+                            }
+                        }
+                        show()
+                    }
+                }
+            }
 }

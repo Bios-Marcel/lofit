@@ -60,6 +60,22 @@ class RoutineWorkoutsTest {
         )
 
     @Test
+    fun cardioAutoStartIsInheritedWithoutWorkoutChangesAlteringTheRoutine() {
+        val routine = routine().apply { autoStartCardio = false }
+        val workout = data(routine).workoutFromRoutine(routine)
+        assertFalse(workout.autoStartCardio)
+        assertFalse(workout.sourceRoutine!!.autoStartCardio)
+        assertFalse(workout.toRoutine().autoStartCardio)
+        workout.autoStartCardio = true
+        assertFalse(routine.autoStartCardio)
+        assertFalse(workout.sourceRoutine!!.autoStartCardio)
+        assertTrue(workout.toRoutine().autoStartCardio)
+        assertTrue(
+            data(routine).workoutFromRoutine(routine.copy(autoStartCardio = true)).autoStartCardio
+        )
+    }
+
+    @Test
     fun routineKeepsCountAndKindsButUsesLatestLoadsAndLastRowForExtraSets() {
         val saved = routine()
         val data = data(saved)
