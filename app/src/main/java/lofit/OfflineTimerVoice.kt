@@ -119,15 +119,12 @@ internal class OfflineTimerVoice(
                 audioRoute.start()
                 if (!current.start(recorder)) return
                 val pcm = ShortArray(320) // 20 ms reads; no utterance-end or network wait.
-                val samples = FloatArray(pcm.size)
                 while (current.active) {
                     val target = current.target
                     val count = recorder.read(pcm, 0, pcm.size, AudioRecord.READ_BLOCKING)
                     if (!current.active) break
                     check(count > 0) { "Microphone read failed: $count" }
-                    for (i in 0 until count) samples[i] = pcm[i] / 32768f
-                    val command =
-                        model.accept(if (count == samples.size) samples else samples.copyOf(count))
+                    val command = model.accept(pcm, count)
                     if (command != null) {
                         main.post {
                             if (session === current && current.active && current.target == target)

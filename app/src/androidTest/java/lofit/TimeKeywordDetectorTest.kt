@@ -15,20 +15,35 @@ import org.junit.runner.RunWith
 class TimeKeywordDetectorTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 
-    private fun samples(name: String): FloatArray {
+    private fun samples(name: String): ShortArray {
         val bytes =
             instrumentation.context.assets.open("voice-time/$name.pcm").use { it.readBytes() }
         val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
-        return FloatArray(bytes.size / 2) { buffer.short / 32768f }
+        return ShortArray(bytes.size / 2) { buffer.short }
     }
 
-    private fun detect(model: TimeKeywordDetector, samples: FloatArray): List<Int> {
+    private fun detect(model: TimeKeywordDetector, samples: ShortArray): List<Int> {
         val detections = mutableListOf<Int>()
         for (offset in samples.indices step 320) {
             val end = minOf(offset + 320, samples.size)
             if (model.accept(samples.copyOfRange(offset, end)) != null) detections.add(end)
         }
         return detections
+    }
+
+    @Test
+    fun partialPcmBuffersIgnoreUnusedTail() {
+        TimeKeywordDetector(instrumentation.targetContext).use { model ->
+            val audio = samples("time-natural")
+            val buffer = ShortArray(640) { Short.MAX_VALUE }
+            var commands = 0
+            for (offset in audio.indices step 193) {
+                val count = minOf(193, audio.size - offset)
+                audio.copyInto(buffer, 0, offset, offset + count)
+                if (model.accept(buffer, count) != null) commands++
+            }
+            assertEquals(1, commands)
+        }
     }
 
     @Test
@@ -103,7 +118,7 @@ class TimeKeywordDetectorTest {
                 val started = SystemClock.elapsedRealtime()
                 val detections = detect(model, audio)
                 assertEquals("$name detections", 1, detections.size)
-                val lastSpeech = audio.indexOfLast { kotlin.math.abs(it) > 0.005f }
+                val lastSpeech = audio.indexOfLast { kotlin.math.abs(it.toInt()) > 163 }
                 val latencyMs = (detections.single() - lastSpeech) / 16
                 assertTrue("$name detection lag: ${latencyMs}ms", latencyMs <= 640)
                 Log.i(
@@ -117,7 +132,7 @@ class TimeKeywordDetectorTest {
     @Test
     fun silenceAndOtherWordsDoNotStartTimer() {
         TimeKeywordDetector(instrumentation.targetContext).use { model ->
-            assertTrue(detect(model, FloatArray(16_000 * 10)).isEmpty())
+            assertTrue(detect(model, ShortArray(16_000 * 10)).isEmpty())
             assertTrue(detect(model, samples("other-words")).isEmpty())
             for (voice in listOf("lessac", "amy")) {
                 for (word in
@@ -140,7 +155,7 @@ class TimeKeywordDetectorTest {
                 model.reset()
                 repeat(frames) { model.accept(audio.copyOfRange(it * 320, (it + 1) * 320)) }
                 model.reset()
-                assertTrue(detect(model, FloatArray(16000)).isEmpty())
+                assertTrue(detect(model, ShortArray(16000)).isEmpty())
                 assertEquals(1, detect(model, audio).size)
             }
         }
@@ -150,11 +165,11 @@ class TimeKeywordDetectorTest {
     fun continuousListeningRecognizesLaterCommandsAndResetDropsOldAudio() {
         TimeKeywordDetector(instrumentation.targetContext).use { model ->
             val command = samples("time-us")
-            assertEquals(2, detect(model, command + FloatArray(16_000) + command).size)
+            assertEquals(2, detect(model, command + ShortArray(16_000) + command).size)
             model.reset()
             model.accept(command.copyOfRange(0, 4_000))
             model.reset()
-            assertTrue(detect(model, FloatArray(16_000)).isEmpty())
+            assertTrue(detect(model, ShortArray(16_000)).isEmpty())
             assertEquals(1, detect(model, command).size)
         }
     }
@@ -165,10 +180,14 @@ class TimeKeywordDetectorTest {
             for (name in listOf("time-natural", "time-female")) {
                 val original = samples(name)
                 val random = Random(1)
-                val quiet = FloatArray(original.size) { original[it] * 0.2f }
+                val quiet = ShortArray(original.size) { (original[it] * 0.2f).toInt().toShort() }
                 val hiss =
-                    FloatArray(original.size) {
-                        original[it] + random.nextGaussian().toFloat() * 0.005f
+                    ShortArray(original.size) {
+                        ((original[it] / 32768f + random.nextGaussian().toFloat() * 0.005f) *
+                                32768f)
+                            .toInt()
+                            .coerceIn(-32768, 32767)
+                            .toShort()
                     }
                 for (audio in listOf(quiet, hiss)) {
                     model.reset()
@@ -194,7 +213,7 @@ class TimeKeywordDetectorTest {
                     assertEquals(
                         "$name after $silence samples",
                         1,
-                        detect(model, FloatArray(silence) + samples(name)).size,
+                        detect(model, ShortArray(silence) + samples(name)).size,
                     )
                 }
             }

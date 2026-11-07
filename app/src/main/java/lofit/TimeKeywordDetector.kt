@@ -17,7 +17,8 @@ internal data class WorkoutVoiceTarget(
 internal interface VoiceKeywordDetector : AutoCloseable {
     fun reset()
 
-    fun accept(samples: FloatArray): VoiceCommand?
+    /** Consume only [count] PCM samples; the caller reuses the buffer after this returns. */
+    fun accept(samples: ShortArray, count: Int = samples.size): VoiceCommand?
 }
 
 internal class TimeKeywordDetector(context: Context) : VoiceKeywordDetector {
@@ -35,13 +36,9 @@ internal class TimeKeywordDetector(context: Context) : VoiceKeywordDetector {
         commands.reset()
     }
 
-    override fun accept(samples: FloatArray): VoiceCommand? {
+    override fun accept(samples: ShortArray, count: Int): VoiceCommand? {
         val recognizer = recognizer ?: Recognizer(model, 16_000f, grammar).also { recognizer = it }
-        val pcm =
-            ShortArray(samples.size) {
-                (samples[it] * 32768f).toInt().coerceIn(-32768, 32767).toShort()
-            }
-        val ended = recognizer.acceptWaveForm(pcm, pcm.size)
+        val ended = recognizer.acceptWaveForm(samples, count)
         val result = JSONObject(if (ended) recognizer.result else recognizer.partialResult)
         val text = result.optString(if (ended) "text" else "partial")
         return commands.accept(text, ended)

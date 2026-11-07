@@ -129,7 +129,7 @@ class LockedWorkoutVoiceTest {
         val bytes =
             instrumentation.context.assets.open("voice-time/$phrase.pcm").use { it.readBytes() }
         val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
-        val audio = FloatArray(bytes.size / 2) { buffer.short / 32768f }
+        val audio = ShortArray(bytes.size / 2) { buffer.short }
         val commands = mutableListOf<VoiceCommand>()
         TimeKeywordDetector(context).use { detector ->
             for (offset in audio.indices step 320) {

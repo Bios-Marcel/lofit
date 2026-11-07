@@ -6,7 +6,9 @@ import androidx.test.platform.app.InstrumentationRegistry
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -23,7 +25,7 @@ class OfflineTimerVoiceTest {
 
         override fun reset() = Unit
 
-        override fun accept(samples: FloatArray): VoiceCommand? {
+        override fun accept(samples: ShortArray, count: Int): VoiceCommand? {
             audio.countDown()
             return null
         }
@@ -46,13 +48,18 @@ class OfflineTimerVoiceTest {
         val delivered = LinkedBlockingQueue<Pair<VoiceCommand, WorkoutVoiceTarget>>()
         val resets = AtomicInteger()
         val frames = LinkedBlockingQueue<Unit>()
+        val firstBuffer = AtomicReference<ShortArray>()
+        val reusedBuffer = AtomicBoolean(true)
         val model =
             object : VoiceKeywordDetector {
                 override fun reset() {
                     resets.incrementAndGet()
                 }
 
-                override fun accept(samples: FloatArray): VoiceCommand? {
+                override fun accept(samples: ShortArray, count: Int): VoiceCommand? {
+                    check(count in 1..samples.size)
+                    firstBuffer.compareAndSet(null, samples)
+                    if (firstBuffer.get() !== samples) reusedBuffer.set(false)
                     frames.add(Unit)
                     return commands.poll()
                 }
@@ -80,6 +87,10 @@ class OfflineTimerVoiceTest {
             commands.add(VoiceCommand.SKIP)
             assertEquals(VoiceCommand.SKIP to second, delivered.poll(8, TimeUnit.SECONDS))
             assertEquals(1, resets.get())
+            assertTrue(
+                "One PCM buffer is reused across reads and target changes",
+                reusedBuffer.get(),
+            )
         } finally {
             instrumentation.runOnMainSync { voice.close() }
         }

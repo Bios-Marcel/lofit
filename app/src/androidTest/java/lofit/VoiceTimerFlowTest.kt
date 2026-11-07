@@ -97,7 +97,7 @@ class VoiceTimerFlowTest {
                 it.readBytes()
             }
         val buffer = java.nio.ByteBuffer.wrap(bytes).order(java.nio.ByteOrder.LITTLE_ENDIAN)
-        val audio = FloatArray(bytes.size / 2) { buffer.short / 32768f }
+        val audio = ShortArray(bytes.size / 2) { buffer.short }
         val commands = mutableListOf<VoiceCommand>()
         TimeKeywordDetector(context).use { detector ->
             for (offset in audio.indices step 320) {
@@ -612,7 +612,7 @@ class VoiceTimerFlowTest {
                     it.readBytes()
                 }
             val buffer = java.nio.ByteBuffer.wrap(bytes).order(java.nio.ByteOrder.LITTLE_ENDIAN)
-            val audio = FloatArray(bytes.size / 2) { buffer.short / 32768f }
+            val audio = ShortArray(bytes.size / 2) { buffer.short }
             TimeKeywordDetector(context).use { detector ->
                 var commands = 0
                 fun speak() {
