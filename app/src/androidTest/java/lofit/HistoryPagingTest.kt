@@ -177,11 +177,16 @@ class HistoryPagingTest {
             onView(isAssignableFrom(ScrollView::class.java)).check { view, _ ->
                 assertEquals(scrollY, (view as ScrollView).scrollY)
             }
-            onView(withContentDescription("Edit Paged workout 8")).perform(scrollTo(), click())
+            onView(withContentDescription("View Paged workout 8")).perform(click())
+            onView(withContentDescription("Options for Paged workout 8")).perform(click())
+            onView(withText("Edit")).perform(click())
             onView(withContentDescription("History pages")).check(matches(not(isDisplayed())))
             onView(withText("Save changes")).perform(scrollTo(), click())
             onView(withContentDescription("History page 2 of 3")).check(matches(isDisplayed()))
             checkWorkouts(13 downTo 4)
+            onView(isAssignableFrom(ScrollView::class.java)).check { view, _ ->
+                assertEquals(scrollY, (view as ScrollView).scrollY)
+            }
             onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
             onView(withText(R.string.nav_settings)).perform(click())
             onView(withContentDescription("History pages")).check(matches(not(isDisplayed())))

@@ -3113,7 +3113,9 @@ class WorkoutFlowTest {
 
         onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
         onView(withText(R.string.nav_history)).perform(click())
-        onView(withContentDescription("Edit Past workout")).perform(scrollTo(), click())
+        onView(withContentDescription("View Past workout")).perform(scrollTo(), click())
+        onView(withContentDescription("Options for Past workout")).perform(click())
+        onView(withText("Edit")).perform(click())
         onView(withContentDescription("Workout duration")).check(matches(withText("2:00")))
         onView(withText("Add exercise")).perform(scrollTo(), click())
         onView(withContentDescription("Add Plank")).perform(scrollTo(), click())

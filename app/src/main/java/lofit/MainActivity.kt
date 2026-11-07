@@ -2320,13 +2320,22 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-    private fun historyWorkoutMenuButton(workout: WorkoutSession): MaterialButton =
+    private fun historyWorkoutMenuButton(
+        workout: WorkoutSession,
+        showEdit: Boolean = false,
+    ): MaterialButton =
         ui.smallButton("⋮") {}
             .apply {
                 textSize = 20f
                 contentDescription = "Options for ${workout.name}"
                 setOnClickListener {
                     PopupMenu(this@MainActivity, this, Gravity.END).apply {
+                        if (showEdit) {
+                            menu.add("Edit").setOnMenuItemClickListener {
+                                openWorkoutHistory(workout, editing = true)
+                                true
+                            }
+                        }
                         menu.add("Derive Routine").setOnMenuItemClickListener {
                             routineDraft = workout.toRoutine()
                             route = Route.RoutineEditor(null)
@@ -2392,13 +2401,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openWorkoutHistory(workout: WorkoutSession, editing: Boolean = false) {
+        val returnScrollY =
+            (route as? Route.WorkoutHistory)?.takeIf { it.workoutId == workout.id }?.returnScrollY
+                ?: (content.getChildAt(0) as? ScrollView)?.scrollY
+                ?: 0
         historyEditDraft = if (editing) workout.editableCopy() else null
-        route =
-            Route.WorkoutHistory(
-                workout.id,
-                (content.getChildAt(0) as? ScrollView)?.scrollY ?: 0,
-                editing,
-            )
+        route = Route.WorkoutHistory(workout.id, returnScrollY, editing)
         render()
     }
 
@@ -2451,7 +2459,7 @@ class MainActivity : AppCompatActivity() {
                     )
                     if (!editing) {
                         addView(
-                            historyWorkoutMenuButton(workout),
+                            historyWorkoutMenuButton(workout, showEdit = true),
                             LinearLayout.LayoutParams(ui.dp(48), ui.dp(48)).apply {
                                 marginStart = ui.dp(12)
                             },
