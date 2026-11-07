@@ -685,6 +685,7 @@ class WorkoutFlowTest {
             onView(withText("Discard workout")).perform(scrollTo(), click())
             onView(withText("Ready to move?")).check(matches(isDisplayed()))
             onView(withText("Resume workout")).check(doesNotExist())
+            assertEquals(null, LofitRepository(context).data.activeWorkout)
         } finally {
             instrumentation.runOnMainSync { activity.finish() }
         }
@@ -1643,17 +1644,6 @@ class WorkoutFlowTest {
                 onView(withText("Create routine")).check(matches(isDisplayed()))
                 assertTrue(LofitRepository(context).data.routines.isEmpty())
             }
-        }
-    }
-
-    @Test
-    fun discardWorkout_singleExerciseWithNoDoneSetsNeedsNoConfirmation() {
-        seedWorkout(WorkoutExercise(exerciseId = "bench-press"))
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)).use {
-            onView(withText("Discard workout")).perform(scrollTo(), click())
-            onView(withText(R.string.start_workout)).check(matches(isDisplayed()))
-            assertEquals(null, LofitRepository(context).data.activeWorkout)
         }
     }
 
@@ -3092,7 +3082,8 @@ class WorkoutFlowTest {
     @Test
     fun historyEntry_canContinueFinishedWorkout() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val repository = LofitRepository(instrumentation.targetContext)
+        val context = instrumentation.targetContext
+        val repository = LofitRepository(context)
         val completedAt = System.currentTimeMillis() - 60_000
         val plannedSet = PlannedSet(weightKg = 67.5, reps = 6)
         val workout =
@@ -3119,10 +3110,23 @@ class WorkoutFlowTest {
             )
         repository.data.recordWorkout(workout)
         repository.data.history.add(workout)
-        val olderWorkout = WorkoutSession(name = "Older workout", startedAt = 10, completedAt = 50)
+        val yesterday =
+            LocalDate.now()
+                .minusDays(1)
+                .atTime(23, 59)
+                .atZone(ZoneId.systemDefault())
+                .toInstant()
+                .toEpochMilli()
+        val olderWorkout =
+            WorkoutSession(
+                name = "Older workout",
+                startedAt = yesterday - 60_000,
+                completedAt = yesterday,
+            )
         repository.data.history.add(olderWorkout)
         repository.saveHistory()
         repository.save()
+        val storedState = context.repositoryStateFile.readText()
         val intent =
             Intent(instrumentation.targetContext, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -3137,6 +3141,7 @@ class WorkoutFlowTest {
         onView(withContentDescription("Options for Older workout"))
             .perform(scrollTo())
             .check(matches(isDisplayed()))
+        assertEquals(storedState, context.repositoryStateFile.readText())
         onView(withContentDescription("Continue Push day")).perform(scrollTo(), click())
 
         onView(withContentDescription("Workout timer")).check(matches(isDisplayed()))
@@ -3285,46 +3290,6 @@ class WorkoutFlowTest {
     }
 
     @Test
-    fun historyEntry_cannotContinueYesterdayWorkout() {
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val context = instrumentation.targetContext
-        val repository = LofitRepository(context)
-        val completedAt =
-            LocalDate.now()
-                .minusDays(1)
-                .atTime(23, 59)
-                .atZone(ZoneId.systemDefault())
-                .toInstant()
-                .toEpochMilli()
-        val workout =
-            WorkoutSession(
-                name = "Yesterday",
-                startedAt = completedAt - 60_000,
-                completedAt = completedAt,
-            )
-        repository.data.history.add(workout)
-        repository.saveHistory()
-        repository.save()
-        val storedState = context.repositoryStateFile.readText()
-        val activity =
-            instrumentation.startActivitySync(
-                Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
-
-        onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
-        onView(withText(R.string.nav_history)).perform(click())
-        onView(withContentDescription("Continue Yesterday")).check(doesNotExist())
-        onView(withContentDescription("View Yesterday"))
-            .perform(scrollTo())
-            .check(matches(isDisplayed()))
-        onView(withContentDescription("Options for Yesterday"))
-            .perform(scrollTo())
-            .check(matches(isDisplayed()))
-        assertEquals(storedState, context.repositoryStateFile.readText())
-        instrumentation.runOnMainSync { activity.finish() }
-    }
-
-    @Test
     fun asymmetricRestMenu_persistsAndRestsOnlyAfterEverySecondSet() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val movement = DefaultData.exercises().first { it.asymmetric && !it.type.tracksDuration }
@@ -3342,21 +3307,44 @@ class WorkoutFlowTest {
                                             side = if (it % 2 == 0) Side.LEFT else Side.RIGHT
                                         )
                                     },
-                            )
+                            ),
+                            WorkoutExercise(
+                                exerciseId = "plank",
+                                plannedSets = mutableListOf(PlannedSet()),
+                            ),
                         ),
                 )
             save()
         }
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            val pairedCard =
+                allOf(
+                    isAssignableFrom(MaterialCardView::class.java),
+                    hasDescendant(withText(movement.name)),
+                )
+            onView(withContentDescription("Options for Plank")).perform(scrollTo(), click())
+            onView(withText("Pause every second set")).check(doesNotExist())
+            pressBack()
             onView(withContentDescription("Options for ${movement.name}"))
                 .perform(scrollTo(), click())
             onView(withText("Pause every second set")).perform(click())
             assertTrue(
-                LofitRepository(context).data.activeWorkout!!.exercises.single().pauseEverySecondSet
+                LofitRepository(context)
+                    .data
+                    .activeWorkout!!
+                    .exercises
+                    .first { it.exerciseId == movement.id }
+                    .pauseEverySecondSet
             )
             scenario.recreate()
             repeat(4) { index ->
-                onView(withContentDescription("Set ${index + 1} done")).perform(scrollTo(), click())
+                onView(
+                        allOf(
+                            withContentDescription("Set ${index + 1} done"),
+                            isDescendantOfA(pairedCard),
+                        )
+                    )
+                    .perform(scrollTo(), click())
                 onView(withContentDescription("Rest timer overlay"))
                     .check(matches(if (index % 2 == 0) not(isDisplayed()) else isDisplayed()))
             }
@@ -3364,35 +3352,17 @@ class WorkoutFlowTest {
             onView(withContentDescription("Options for ${movement.name}"))
                 .perform(scrollTo(), click())
             onView(withText("Pause every second set")).perform(click())
-            onView(withContentDescription("Set 3 done")).perform(scrollTo(), click(), click())
+            onView(allOf(withContentDescription("Set 3 done"), isDescendantOfA(pairedCard)))
+                .perform(scrollTo(), click(), click())
             onView(withContentDescription("Rest timer overlay")).check(matches(isDisplayed()))
             assertFalse(
-                LofitRepository(context).data.activeWorkout!!.exercises.single().pauseEverySecondSet
+                LofitRepository(context)
+                    .data
+                    .activeWorkout!!
+                    .exercises
+                    .first { it.exerciseId == movement.id }
+                    .pauseEverySecondSet
             )
-        }
-    }
-
-    @Test
-    fun symmetricExerciseMenu_hidesPairedRest() {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        LofitRepository(context).apply {
-            data.activeWorkout =
-                WorkoutSession(
-                    name = "Rest",
-                    exercises =
-                        mutableListOf(
-                            WorkoutExercise(
-                                exerciseId = "plank",
-                                plannedSets = mutableListOf(PlannedSet()),
-                            )
-                        ),
-                )
-            save()
-        }
-        ActivityScenario.launch(MainActivity::class.java).use {
-            onView(withContentDescription("Options for Plank")).perform(scrollTo(), click())
-            onView(withText("Pause every second set")).check(doesNotExist())
-            pressBack()
         }
     }
 

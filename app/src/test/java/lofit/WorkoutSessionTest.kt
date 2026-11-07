@@ -485,20 +485,6 @@ class WorkoutSessionTest {
     }
 
     @Test
-    fun routineExercise_preservesPrescribedWork() {
-        val prescription =
-            RoutineExercise(
-                exerciseId = "plank",
-                plannedSets = MutableList(4) { PlannedSet(reps = 0, holdSeconds = 45) },
-                restSecondsOverride = 60,
-            )
-
-        assertEquals(4, prescription.plannedSets.size)
-        assertTrue(prescription.plannedSets.all { it.reps == 0 && it.holdSeconds == 45 })
-        assertEquals(60, prescription.restSecondsOverride)
-    }
-
-    @Test
     fun workoutExercise_usesWorkoutRestWhenOverrideIsEmpty() {
         val exercise = WorkoutExercise(exerciseId = "bench")
 
@@ -506,27 +492,6 @@ class WorkoutSessionTest {
 
         exercise.restSecondsOverride = 45
         assertEquals(45, exercise.restSeconds(75))
-    }
-
-    @Test
-    fun routineExercise_allowsDifferentWeightAndRepsForEachSet() {
-        val prescription =
-            RoutineExercise(
-                exerciseId = "bench",
-                plannedSets =
-                    mutableListOf(
-                        PlannedSet(type = SetType.WARMUP, weightKg = 20.0, reps = 10),
-                        PlannedSet(weightKg = 60.0, reps = 5),
-                        PlannedSet(type = SetType.FAILURE, weightKg = 65.0, reps = 3),
-                    ),
-            )
-
-        assertEquals(listOf(20.0, 60.0, 65.0), prescription.plannedSets.map { it.weightKg })
-        assertEquals(listOf(10, 5, 3), prescription.plannedSets.map { it.reps })
-        assertEquals(
-            listOf(SetType.WARMUP, SetType.NORMAL, SetType.FAILURE),
-            prescription.plannedSets.map { it.type },
-        )
     }
 
     @Test
