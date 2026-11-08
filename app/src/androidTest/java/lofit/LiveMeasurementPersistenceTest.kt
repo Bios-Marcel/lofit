@@ -115,26 +115,4 @@ class LiveMeasurementPersistenceTest {
             LiveWorkoutMeasurement { loaded }.isLive(loaded.activeWorkout!!.exercises.single())
         )
     }
-
-    @Test
-    fun sharedPlanPreservesModifierAndManualChoiceWithoutReusingAnOrdinaryExercise() {
-        val exercise = movement()
-        val workout =
-            WorkoutSession(
-                name = "Shared",
-                exercises =
-                    mutableListOf(
-                        WorkoutExercise(exerciseId = exercise.id, manualMeasurement = true)
-                    ),
-            )
-        val shared = SharedWorkoutPlan.decode(SharedWorkoutPlan.encode(workout, listOf(exercise)))
-        assertTrue(shared.exercises.single().supportsLiveMeasurement)
-        assertTrue(shared.routine.exercises.single().manualMeasurement)
-        val data = AppData(exercises = mutableListOf(exercise.copy(liveMeasurement = false)))
-        val imported = shared.startIn(data)
-        val importedExercise =
-            data.exercises.first { it.id == imported.exercises.single().exerciseId }
-        assertTrue(importedExercise.supportsLiveMeasurement)
-        assertTrue(imported.exercises.single().manualMeasurement)
-    }
 }

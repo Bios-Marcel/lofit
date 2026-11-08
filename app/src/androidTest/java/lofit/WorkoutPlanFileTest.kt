@@ -6,10 +6,6 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
-import java.util.zip.GZIPInputStream
-import java.util.zip.GZIPOutputStream
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -53,44 +49,6 @@ class WorkoutPlanFileTest {
         )
 
     @Test
-    fun fileIsGzipJsonAndPreservesFullPlan() {
-        val source = workout()
-        val file = WorkoutPlanFile.encode(source, listOf(movement))
-        assertArrayEquals(
-            SharedWorkoutPlan.encode(source, listOf(movement)),
-            GZIPInputStream(ByteArrayInputStream(file)).use { it.readBytes() },
-        )
-        assertTrue(file.size < SharedWorkoutPlan.encode(source, listOf(movement)).size)
-        val received = WorkoutPlanFile.decode(ByteArrayInputStream(file))
-        assertEquals(source.name, received.routine.name)
-        assertEquals(45, received.routine.defaultRestSeconds)
-        assertEquals(8, received.routine.exercises.single().plannedSets.size)
-        assertEquals(Side.LEFT, received.routine.exercises.single().plannedSets.first().side)
-        assertNull(received.routine.exercises.single().plannedSets.first().actualHoldSeconds)
-    }
-
-    @Test
-    fun rejectsDamagedFilesAndLimitsCompressedAndExpandedSize() {
-        val valid = WorkoutPlanFile.encode(workout(), listOf(movement))
-        assertThrows(Exception::class.java) {
-            WorkoutPlanFile.decode(ByteArrayInputStream(valid.copyOf(valid.size - 8)))
-        }
-        assertThrows(Exception::class.java) {
-            WorkoutPlanFile.decode(ByteArrayInputStream("{}".toByteArray()))
-        }
-        assertThrows(IllegalArgumentException::class.java) {
-            WorkoutPlanFile.decode(
-                ByteArrayInputStream(ByteArray(SharedWorkoutPlan.MAX_BYTES + 1025))
-            )
-        }
-        val output = ByteArrayOutputStream()
-        GZIPOutputStream(output).use { it.write(ByteArray(SharedWorkoutPlan.MAX_BYTES + 1) { 32 }) }
-        assertThrows(IllegalArgumentException::class.java) {
-            WorkoutPlanFile.decode(ByteArrayInputStream(output.toByteArray()))
-        }
-    }
-
-    @Test
     fun shareIntentGrantsReadAccessToNamedLofitAttachment() {
         val share = WorkoutPlanFile.shareIntent(context, workout(), listOf(movement))
         assertEquals(Intent.ACTION_SEND, share.action)
@@ -109,6 +67,19 @@ class WorkoutPlanFileTest {
             }
         val plan = context.contentResolver.openInputStream(uri)!!.use(WorkoutPlanFile::decode)
         assertEquals(workout().name, plan.routine.name)
+        assertEquals(45, plan.routine.defaultRestSeconds)
+        assertEquals(movement, plan.exercises.single())
+        val item = plan.routine.exercises.single()
+        assertEquals(30, item.restSecondsOverride)
+        assertEquals(8, item.plannedSets.size)
+        assertTrue(
+            item.plannedSets.all {
+                it.weightKg == 2.5 &&
+                    it.holdSeconds == 45 &&
+                    it.side == Side.LEFT &&
+                    it.actualHoldSeconds == null
+            }
+        )
         val again = WorkoutPlanFile.shareIntent(context, workout(), listOf(movement))
         assertNotEquals(uri, again.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java))
     }

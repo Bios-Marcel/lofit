@@ -114,7 +114,11 @@ class RoutineWorkoutFlowTest {
         onView(withText("Edit")).perform(scrollTo(), click())
     }
 
-    private fun preparePairedRoutine(type: ExerciseType) {
+    private fun preparePairedRoutine(
+        type: ExerciseType,
+        leftWeight: Double = 10.0,
+        rightWeight: Double = 15.0,
+    ) {
         LofitRepository(context).apply {
             data.exercises.add(
                 Exercise(
@@ -137,14 +141,14 @@ class RoutineWorkoutFlowTest {
                             mutableListOf(
                                 PlannedSet(
                                     side = Side.LEFT,
-                                    weightKg = 10.0,
+                                    weightKg = leftWeight,
                                     reps = 8,
                                     holdSeconds = 40,
                                     actualHoldSeconds = 42,
                                 ),
                                 PlannedSet(
                                     side = Side.RIGHT,
-                                    weightKg = 15.0,
+                                    weightKg = rightWeight,
                                     reps = 6,
                                     holdSeconds = 50,
                                     actualHoldSeconds = 55,
@@ -208,23 +212,29 @@ class RoutineWorkoutFlowTest {
 
     @Test
     fun routineAddSetCopiesLeftAndRightRepsAndLatestWeights() {
-        preparePairedRoutine(ExerciseType.REPETITIONS)
+        preparePairedRoutine(ExerciseType.REPETITIONS, leftWeight = 10.25, rightWeight = 15.125)
+        val separator = java.text.DecimalFormatSymbols.getInstance().decimalSeparator
+        val leftWeight = "10${separator}25"
+        val rightWeight = "15${separator}125"
+        val editedWeight = "12${separator}375"
         launch().use { scenario ->
             editRoutine(scenario)
+            onView(withContentDescription("Set 1 weight")).check(matches(withText(leftWeight)))
+            onView(withContentDescription("Set 2 weight")).check(matches(withText(rightWeight)))
             onView(withText("Add set")).perform(scrollTo(), click())
             onView(withText("Add set")).check(matches(isCompletelyDisplayed()))
             onView(withContentDescription("Set 3 side: Left")).check(matches(withText("L")))
             onView(withContentDescription("Set 4 side: Right")).check(matches(withText("R")))
             onView(withContentDescription("Set 3 weight"))
-                .check(matches(withText("10")))
-                .perform(scrollTo(), replaceText("12"))
-            onView(withContentDescription("Set 4 weight")).check(matches(withText("15")))
+                .check(matches(withText(leftWeight)))
+                .perform(scrollTo(), replaceText(editedWeight))
+            onView(withContentDescription("Set 4 weight")).check(matches(withText(rightWeight)))
             onView(withContentDescription("Set 3 Repetitions")).check(matches(withText("8")))
             onView(withContentDescription("Set 4 Repetitions")).check(matches(withText("6")))
             onView(withText("Add set")).perform(scrollTo(), click())
             onView(withText("Add set")).check(matches(isCompletelyDisplayed()))
-            onView(withContentDescription("Set 5 weight")).check(matches(withText("12")))
-            onView(withContentDescription("Set 6 weight")).check(matches(withText("15")))
+            onView(withContentDescription("Set 5 weight")).check(matches(withText(editedWeight)))
+            onView(withContentDescription("Set 6 weight")).check(matches(withText(rightWeight)))
             onView(withText("Save routine")).perform(scrollTo(), click())
             val sets =
                 LofitRepository(context).data.routines.single().exercises.single().plannedSets
@@ -232,7 +242,10 @@ class RoutineWorkoutFlowTest {
                 listOf(Side.LEFT, Side.RIGHT, Side.LEFT, Side.RIGHT, Side.LEFT, Side.RIGHT),
                 sets.map { it.side },
             )
-            assertEquals(listOf(10.0, 15.0, 12.0, 15.0, 12.0, 15.0), sets.map { it.weightKg })
+            assertEquals(
+                listOf(10.25, 15.125, 12.375, 15.125, 12.375, 15.125),
+                sets.map { it.weightKg },
+            )
             assertEquals(listOf(8, 6, 8, 6, 8, 6), sets.map { it.reps })
             assertEquals(6, sets.map { it.id }.toSet().size)
         }

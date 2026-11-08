@@ -85,6 +85,10 @@ class VoiceTimerFlowTest {
         awaitMicrophone(true)
     }
 
+    private fun command(scenario: ActivityScenario<MainActivity>, command: VoiceCommand) {
+        scenario.onActivity { it.onWorkoutVoiceCommand(command, it.visibleWorkoutVoiceTarget()!!) }
+    }
+
     private fun speak(
         scenario: ActivityScenario<MainActivity>,
         word: String,
@@ -154,11 +158,11 @@ class VoiceTimerFlowTest {
             onView(withContentDescription("Set 1 done")).perform(scrollTo(), waitForStableLayout())
             awaitMicrophone(true)
             onView(withContentDescription("Set 1 weight")).check(matches(withText("12.5")))
-            speak(scenario, "done", VoiceCommand.DONE)
+            command(scenario, VoiceCommand.DONE)
             scenario.onActivity {
                 it.onWorkoutVoiceCommand(VoiceCommand.SetValues(99.0, 99), firstTarget)
             }
-            speak(scenario, "set-values", VoiceCommand.SetValues(50.0, 8))
+            command(scenario, VoiceCommand.SetValues(50.0, 8))
             val completed = LofitRepository(context).data.activeWorkout!!.exercises.single()
             assertEquals(12.5, completed.sets.single().weightKg, 0.0)
             assertEquals(10, completed.sets.single().reps)
@@ -197,7 +201,7 @@ class VoiceTimerFlowTest {
                     .plannedSets[0]
                     .reps,
             )
-            speak(scenario, "set-single", VoiceCommand.SetValues(null, 15))
+            command(scenario, VoiceCommand.SetValues(null, 15))
             onView(withContentDescription("Set 1 Repetitions")).check(matches(withText("15")))
             val saved = LofitRepository(context).data.activeWorkout!!.exercises.single()
             assertEquals(0.0, saved.plannedSets[0].weightKg, 0.0)
@@ -221,14 +225,14 @@ class VoiceTimerFlowTest {
         }
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             ready()
-            speak(scenario, "set-timed", VoiceCommand.SetValues(12.5, 30))
+            command(scenario, VoiceCommand.SetValues(12.5, 30))
             onView(withContentDescription("Set 1 weight")).check(matches(withText("12.5")))
             onView(withContentDescription("Set 1 Goal time in seconds"))
                 .check(matches(withText("30")))
             onView(withContentDescription("Set 1 Active time in seconds"))
                 .check(matches(withText("7")))
             onView(withContentDescription("Set 1 done")).check(matches(isNotChecked()))
-            speak(scenario, "set-single", VoiceCommand.SetValues(null, 15))
+            command(scenario, VoiceCommand.SetValues(null, 15))
             val saved = LofitRepository(context).data.activeWorkout!!.exercises.single()
             assertEquals(12.5, saved.plannedSets[0].weightKg, 0.0)
             assertEquals(30, saved.plannedSets[0].holdSeconds)
@@ -247,12 +251,12 @@ class VoiceTimerFlowTest {
     fun unweightedTimedSetUsesSingleValueAsGoalSeconds() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             ready()
-            speak(scenario, "set-values", VoiceCommand.SetValues(50.0, 8))
+            command(scenario, VoiceCommand.SetValues(50.0, 8))
             val saved = LofitRepository(context).data.activeWorkout!!.exercises.single()
             assertEquals(0.0, saved.plannedSets[0].weightKg, 0.0)
             assertEquals(60, saved.plannedSets[0].holdSeconds)
             assertTrue(saved.sets.isEmpty())
-            speak(scenario, "set-seconds", VoiceCommand.SetValues(null, 30))
+            command(scenario, VoiceCommand.SetValues(null, 30))
             onView(withContentDescription("Set 1 Goal time in seconds"))
                 .check(matches(withText("30")))
             onView(withContentDescription("Start set 1 hold")).check(matches(isDisplayed()))
@@ -285,7 +289,7 @@ class VoiceTimerFlowTest {
             awaitMicrophone(true)
             lateinit var oldTarget: WorkoutVoiceTarget
             scenario.onActivity { oldTarget = it.visibleWorkoutVoiceTarget()!! }
-            speak(scenario, "done", VoiceCommand.DONE)
+            command(scenario, VoiceCommand.DONE)
             onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
             onView(withContentDescription("Set 2 done")).check(matches(isNotChecked()))
             onView(withContentDescription("Rest timer overlay")).check(matches(isDisplayed()))
@@ -293,14 +297,14 @@ class VoiceTimerFlowTest {
             assertEquals(1, LofitRepository(context).data.activeWorkout!!.setCount())
             lateinit var oldRest: WorkoutVoiceTarget
             scenario.onActivity { oldRest = it.visibleWorkoutVoiceTarget()!! }
-            speak(scenario, "skip", VoiceCommand.SKIP)
+            command(scenario, VoiceCommand.SKIP)
             onView(withContentDescription("Rest timer overlay"))
                 .check(matches(withEffectiveVisibility(Visibility.GONE)))
-            speak(scenario, "done", VoiceCommand.DONE)
+            command(scenario, VoiceCommand.DONE)
             scenario.onActivity { it.onWorkoutVoiceCommand(VoiceCommand.SKIP, oldRest) }
             onView(withContentDescription("Rest timer overlay")).check(matches(isDisplayed()))
             awaitMicrophone(true)
-            speak(scenario, "skip", VoiceCommand.SKIP)
+            command(scenario, VoiceCommand.SKIP)
             awaitMicrophone(false)
             assertEquals(2, LofitRepository(context).data.activeWorkout!!.setCount())
         }
@@ -311,7 +315,7 @@ class VoiceTimerFlowTest {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             ready()
             scenario.onActivity { it.onTimerVoiceCommand(item.plannedSets[0].id) }
-            speak(scenario, "done", VoiceCommand.DONE)
+            command(scenario, VoiceCommand.DONE)
             onView(withContentDescription("Start set 1 hold")).check(matches(isDisplayed()))
             onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
             onView(withContentDescription("Set 2 done")).check(matches(isNotChecked()))

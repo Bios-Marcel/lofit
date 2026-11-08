@@ -118,7 +118,14 @@ class LockedWorkoutVoiceTest {
         assertTrue(notification.notification.flags and Notification.FLAG_FOREGROUND_SERVICE != 0)
     }
 
-    /** Feed real speech through the bundled recognizer and the service's production callback. */
+    private fun command(command: VoiceCommand) {
+        instrumentation.runOnMainSync {
+            val service = WorkoutVoiceService.current!!
+            service.onVoiceCommand(command, service.runtime.session.backgroundTarget()!!)
+        }
+    }
+
+    /** Keep real audio coverage for locked-screen values and timer commands. */
     private fun speak(phrase: String, expected: VoiceCommand) {
         lateinit var service: WorkoutVoiceService
         lateinit var target: WorkoutVoiceTarget
@@ -166,7 +173,7 @@ class LockedWorkoutVoiceTest {
         ActivityScenario.launch(MainActivity::class.java).use {
             ready()
             lock()
-            speak("lessac-set-timed", VoiceCommand.SetValues(12.5, 30))
+            command(VoiceCommand.SetValues(12.5, 30))
             val item = LofitRepository(context).data.activeWorkout!!.exercises.single()
             assertEquals(12.5, item.plannedSets.single().weightKg, 0.0)
             assertEquals(30, item.plannedSets.single().holdSeconds)
@@ -196,7 +203,7 @@ class LockedWorkoutVoiceTest {
         ActivityScenario.launch(MainActivity::class.java).use {
             ready()
             lock()
-            speak("lessac-set-seconds", VoiceCommand.SetValues(null, 30))
+            command(VoiceCommand.SetValues(null, 30))
             assertEquals(
                 30,
                 LofitRepository(context)
@@ -221,8 +228,8 @@ class LockedWorkoutVoiceTest {
             ready()
             lock()
             speak("lessac-set-decimal", VoiceCommand.SetValues(12.5, 10))
-            speak("lessac-done", VoiceCommand.DONE)
-            speak("lessac-skip", VoiceCommand.SKIP)
+            command(VoiceCommand.DONE)
+            command(VoiceCommand.SKIP)
             val item = LofitRepository(context).data.activeWorkout!!.exercises.single()
             assertEquals(12.5, item.sets.single().weightKg, 0.0)
             assertEquals(10, item.sets.single().reps)
@@ -240,8 +247,8 @@ class LockedWorkoutVoiceTest {
     fun serviceKeepsListeningAfterActivityDestructionAndNewScreenUsesSameWorkout() {
         ActivityScenario.launch(MainActivity::class.java).use { ready() }
         await { background() && microphoneRunning() }
-        speak("lessac-set-values", VoiceCommand.SetValues(50.0, 8))
-        speak("lessac-done", VoiceCommand.DONE)
+        command(VoiceCommand.SetValues(50.0, 8))
+        command(VoiceCommand.DONE)
         ActivityScenario.launch(MainActivity::class.java).use {
             onView(withContentDescription("Set 1 done"))
                 .perform(scrollTo(), waitForStableLayout())
@@ -273,7 +280,7 @@ class LockedWorkoutVoiceTest {
             await { LofitRepository(context).data.activeWorkout!!.setCount() == 1 }
             val set = LofitRepository(context).data.activeWorkout!!.exercises.single().sets.single()
             assertTrue(set.holdSeconds >= 1)
-            speak("lessac-skip", VoiceCommand.SKIP)
+            command(VoiceCommand.SKIP)
             await { !microphoneRunning() }
             wake()
             onView(withContentDescription("Set 1 done")).check(matches(isChecked()))

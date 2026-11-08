@@ -1,6 +1,5 @@
 package lofit
 
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.util.zip.GZIPInputStream
@@ -9,9 +8,7 @@ import java.util.zip.ZipException
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
-import org.junit.runner.RunWith
 
-@RunWith(AndroidJUnit4::class)
 class SharedWorkoutPlanTest {
     private val movement =
         Exercise(
@@ -292,5 +289,38 @@ class SharedWorkoutPlanTest {
         source.exercises.single().plannedSets.clear()
         val plan = SharedWorkoutPlan.decode(SharedWorkoutPlan.encode(source, listOf(movement)))
         assertTrue(plan.routine.exercises.single().plannedSets.isEmpty())
+    }
+
+    @Test
+    fun sharedPlanPreservesModifierAndManualChoiceWithoutReusingAnOrdinaryExercise() {
+        val exercise =
+            Exercise(
+                "live",
+                "Scale pull",
+                ExerciseType.TIMED,
+                false,
+                "Forearms",
+                "—",
+                weighted = true,
+                liveMeasurement = true,
+                custom = true,
+            )
+        val workout =
+            WorkoutSession(
+                name = "Shared",
+                exercises =
+                    mutableListOf(
+                        WorkoutExercise(exerciseId = exercise.id, manualMeasurement = true)
+                    ),
+            )
+        val shared = SharedWorkoutPlan.decode(SharedWorkoutPlan.encode(workout, listOf(exercise)))
+        assertTrue(shared.exercises.single().supportsLiveMeasurement)
+        assertTrue(shared.routine.exercises.single().manualMeasurement)
+        val data = AppData(exercises = mutableListOf(exercise.copy(liveMeasurement = false)))
+        val imported = shared.startIn(data)
+        val importedExercise =
+            data.exercises.first { it.id == imported.exercises.single().exerciseId }
+        assertTrue(importedExercise.supportsLiveMeasurement)
+        assertTrue(imported.exercises.single().manualMeasurement)
     }
 }

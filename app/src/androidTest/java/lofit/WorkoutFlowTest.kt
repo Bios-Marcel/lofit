@@ -1008,6 +1008,10 @@ class WorkoutFlowTest {
         onView(withContentDescription("Back squat illustration")).check(matches(isDisplayed()))
         onView(withContentDescription("Add Back squat")).perform(scrollTo(), click())
         onView(withText("Back squat")).check(matches(isDisplayed()))
+        awaitWorkoutNotification {
+            it.extras.getCharSequence(Notification.EXTRA_TEXT).toString() ==
+                "Add a set to continue" && it.actions.isNullOrEmpty()
+        }
         onView(withText("Add set")).check { view, _ ->
             var ancestor = view.parent
             while (ancestor !is MaterialCardView) ancestor = ancestor.parent
@@ -1246,17 +1250,6 @@ class WorkoutFlowTest {
     }
 
     @Test
-    fun notification_noCompleteActionWithoutPlannedSet() {
-        seedWorkout(WorkoutExercise(exerciseId = "bench-press"))
-        launchNotificationWorkout().use {
-            awaitWorkoutNotification {
-                it.extras.getCharSequence(Notification.EXTRA_TEXT).toString() ==
-                    "Add a set to continue" && it.actions.isNullOrEmpty()
-            }
-        }
-    }
-
-    @Test
     fun addedSet_preservesFractionalWeightInFieldsStorageAndVolume() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         LofitRepository(context).apply {
@@ -1315,48 +1308,6 @@ class WorkoutFlowTest {
                 onView(withContentDescription("Set 2 weight"))
                     .perform(scrollTo())
                     .check(matches(withText(weightText)))
-            }
-    }
-
-    @Test
-    fun routineAddedSet_preservesFractionalWeight() {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
-        LofitRepository(context).apply {
-            data.routines.add(
-                Routine(
-                    name = "Fractional routine",
-                    exercises =
-                        mutableListOf(
-                            RoutineExercise(
-                                exerciseId = "bench-press",
-                                plannedSets = mutableListOf(PlannedSet(weightKg = 1.25, reps = 1)),
-                            )
-                        ),
-                )
-            )
-            save()
-        }
-        val weightText = "1${java.text.DecimalFormatSymbols.getInstance().decimalSeparator}25"
-        ActivityScenario.launch<MainActivity>(
-                Intent(context, MainActivity::class.java).setAction(Intent.ACTION_MAIN)
-            )
-            .use {
-                onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
-                onView(
-                        allOf(
-                            withText(R.string.nav_routines),
-                            isAssignableFrom(android.widget.Button::class.java),
-                        )
-                    )
-                    .perform(click())
-                onView(withText("Edit")).perform(click())
-                onView(withContentDescription("Set 1 weight")).check(matches(withText(weightText)))
-                onView(withText("Add set")).perform(scrollTo(), click())
-                onView(withContentDescription("Set 2 weight")).check(matches(withText(weightText)))
-                onView(withText("Save routine")).perform(scrollTo(), click())
-                val sets =
-                    LofitRepository(context).data.routines.single().exercises.single().plannedSets
-                assertEquals(listOf(1.25, 1.25), sets.map { it.weightKg })
             }
     }
 
