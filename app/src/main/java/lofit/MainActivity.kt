@@ -3678,10 +3678,9 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private fun startRest(item: WorkoutExercise, workout: WorkoutSession) {
+    private fun startRest(item: WorkoutExercise) {
         val movement = exercise(item.exerciseId) ?: return
-        val seconds = item.restSecondsAfterSet(workout.defaultRestSeconds, movement)
-        restEndsAt = if (seconds > 0) SystemClock.elapsedRealtime() + seconds * 1_000L else 0L
+        workoutVoice.session.startRest(item, movement)
         updateRestBar()
         updateWorkoutNotification(force = true)
         updateTimerVoice()
@@ -3752,10 +3751,21 @@ class MainActivity : AppCompatActivity() {
 
     private fun skipRest() {
         if (restEndsAt <= 0L) return
-        restEndsAt = 0L
+        finishRest()
         updateRestBar()
         updateWorkoutNotification(force = true)
         updateTimerVoice()
+    }
+
+    private fun finishRest() {
+        if (workoutVoice.session.finishRest()) {
+            // Rest can expire while a screen is being built; bind the new timer after rendering.
+            handler.post {
+                if (!isDestroyed && currentScreen == Screen.WORKOUT && route == Route.Root) {
+                    render(restoreScrollY = (content.getChildAt(0) as? ScrollView)?.scrollY)
+                }
+            }
+        }
     }
 
     private fun updateRestBar() {
@@ -3767,7 +3777,7 @@ class MainActivity : AppCompatActivity() {
         }
         val remaining = ((restEndsAt - SystemClock.elapsedRealtime() + 999L) / 1_000L).toInt()
         if (remaining <= 0) {
-            restEndsAt = 0L
+            finishRest()
             restBar.visibility = View.GONE
             playCue()
             updateWorkoutNotification(force = true)
@@ -3924,7 +3934,7 @@ class MainActivity : AppCompatActivity() {
             updateRestBar()
         } else {
             if (change.completed) {
-                repository.data.activeWorkout?.let { startRest(change.pull.item, it) }
+                startRest(change.pull.item)
             }
             render(restoreScrollY = (content.getChildAt(0) as? ScrollView)?.scrollY)
         }
@@ -4018,7 +4028,7 @@ class MainActivity : AppCompatActivity() {
         repository.save()
         clearActiveHold()
         if (loggedSet != null && movement != null) {
-            startRest(item, workout)
+            startRest(item)
             refreshWorkoutSetStates?.invoke()
         }
         updateWorkoutNotification(force = true)
@@ -4130,7 +4140,8 @@ class MainActivity : AppCompatActivity() {
         } else {
             syncLoggedSet(loggedSet, plannedSet, movement)
         }
-        if (!editingHistory && !completingHoldAutomatically) startRest(item, workout)
+        // LEGACY: Manual completion still starts rest without scheduling a cardio continuation.
+        if (!editingHistory && !completingHoldAutomatically) startRest(item)
     }
 
     private fun revealNextWorkoutSet(completedSetId: String) {

@@ -163,8 +163,8 @@ class CardioTimerFlowTest {
     }
 
     @Test
-    fun restKeepsNextCardioTimerStopped() {
-        seed(restSeconds = 30)
+    fun restDelaysNextCardioUntilItExpires() {
+        seed(restSeconds = 3)
         ActivityScenario.launch(MainActivity::class.java).use {
             startRun()
             onView(control("Run", "Set 1 done")).perform(waitUntilMatches(isChecked()))
@@ -172,6 +172,45 @@ class CardioTimerFlowTest {
             onView(control("Cycle", "Start set 1 hold")).perform(scrollTo())
             onView(control("Cycle", "Set 1 Active time in seconds"))
                 .check(matches(allOf(isEnabled(), withText("0"))))
+            awaitCycleStarted()
+        }
+    }
+
+    @Test
+    fun restDelaysNextSetWithinSameCardioExercise() {
+        seed(restSeconds = 2)
+        LofitRepository(context).apply {
+            data.activeWorkout!!.exercises.first().plannedSets.add(PlannedSet(holdSeconds = 60))
+            save()
+        }
+        ActivityScenario.launch(MainActivity::class.java).use {
+            startRun()
+            onView(control("Run", "Set 1 done")).perform(waitUntilMatches(isChecked()))
+            onView(withContentDescription("Rest timer overlay")).check(matches(isDisplayed()))
+            onView(control("Run", "Set 2 Active time in seconds"))
+                .check(matches(allOf(isEnabled(), withText("0"))))
+            onView(isRoot())
+                .perform(waitUntilMatches(hasDescendant(control("Run", "Stop set 2 hold"))))
+            onView(control("Run", "Set 2 Active time in seconds")).check(matches(not(isEnabled())))
+            onView(control("Cycle", "Start set 1 hold")).check(matches(isEnabled()))
+            onView(withContentDescription("Rest timer overlay")).check(matches(not(isDisplayed())))
+        }
+    }
+
+    @Test
+    fun skippingRestStartsNextCardio() {
+        seed(restSeconds = 30)
+        ActivityScenario.launch(MainActivity::class.java).use {
+            startRun()
+            onView(control("Run", "Set 1 done")).perform(waitUntilMatches(isChecked()))
+            onView(
+                    allOf(
+                        withText("Skip"),
+                        isDescendantOfA(withContentDescription("Rest timer overlay")),
+                    )
+                )
+                .perform(click())
+            awaitCycleStarted()
         }
     }
 
@@ -192,7 +231,16 @@ class CardioTimerFlowTest {
 
     @Test
     fun backgroundTimerStartsNextCardioAndRebindsWhenResumed() {
-        seed(firstSeconds = 3, voice = true)
+        assertBackgroundCardioStarts(restSeconds = 0)
+    }
+
+    @Test
+    fun backgroundRestStartsNextCardioAndRebindsWhenResumed() {
+        assertBackgroundCardioStarts(restSeconds = 2)
+    }
+
+    private fun assertBackgroundCardioStarts(restSeconds: Int) {
+        seed(firstSeconds = 3, restSeconds = restSeconds, voice = true)
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             onView(isRoot())
                 .perform(
@@ -204,16 +252,23 @@ class CardioTimerFlowTest {
             scenario.moveToState(Lifecycle.State.CREATED)
             val deadline = SystemClock.uptimeMillis() + 8000
             var started = false
+            var sawRest = false
             while (!started) {
                 instrumentation.runOnMainSync {
                     val runtime = WorkoutVoiceService.current!!.runtime
                     assertFalse(runtime.foreground)
                     val next = runtime.repository.data.activeWorkout!!.exercises[1]
+                    if (runtime.session.restEndsAt > SystemClock.elapsedRealtime()) {
+                        sawRest = true
+                        assertNull(runtime.session.activeHoldPlannedSetId)
+                        assertNull(next.plannedSets.single().actualHoldSeconds)
+                    }
                     started = runtime.session.activeHoldWorkoutExerciseId == next.id
                 }
                 check(SystemClock.uptimeMillis() < deadline) { "Next cardio did not start" }
                 if (!started) SystemClock.sleep(16)
             }
+            if (restSeconds > 0) assertTrue("Rest must run before the next cardio", sawRest)
             scenario.moveToState(Lifecycle.State.RESUMED)
             awaitCycleStarted()
             scenario.recreate()

@@ -11,11 +11,19 @@ internal class WorkoutVoiceSession(
         DONE,
     }
 
+    private data class CardioContinuation(val workoutId: String, val completed: VoiceTimerTarget)
+
+    private var pendingCardio: CardioContinuation? = null
     var activeHoldWorkoutExerciseId: String? = null
     var activeHoldPlannedSetId: String? = null
     var holdStartedAt = 0L
     var holdCuePlayed = false
     var restEndsAt = 0L
+        set(value) {
+            field = value
+            if (value == 0L) pendingCardio = null
+        }
+
     var preferredExerciseId: String? = null
     val liveMeasurement = LiveWorkoutMeasurement(data)
 
@@ -69,7 +77,7 @@ internal class WorkoutVoiceSession(
         if (command == VoiceCommand.SKIP) {
             if (expected.restEndsAt == null || expected.restEndsAt != current.restEndsAt)
                 return null
-            restEndsAt = 0
+            finishRest()
             return Cue.CHANGE
         }
         val target = if (command == VoiceCommand.TIME) expected.timer else expected.done
@@ -108,10 +116,21 @@ internal class WorkoutVoiceSession(
             ?: item.sets.add(loggedSetFrom(set, exercise))
     }
 
-    private fun startRest(item: WorkoutExercise, exercise: Exercise) {
+    fun startRest(item: WorkoutExercise, exercise: Exercise) {
+        pendingCardio = null
         val workout = data().activeWorkout ?: return
         val seconds = item.restSecondsAfterSet(workout.defaultRestSeconds, exercise)
         restEndsAt = if (seconds > 0) now() + seconds * 1000L else 0L
+    }
+
+    /** Ends a rest and resumes an eligible cardio chain, including when rest is skipped. */
+    fun finishRest(): Boolean {
+        val pending = pendingCardio
+        restEndsAt = 0
+        if (pending == null || data().activeWorkout?.id != pending.workoutId) return false
+        val (item, set) = resolve(pending.completed) ?: return false
+        if (item.sets.none { it.plannedSetId == set.id }) return false
+        return startFollowingCardio(item, set)
     }
 
     private fun startHold(item: WorkoutExercise, set: PlannedSet) {
@@ -123,7 +142,7 @@ internal class WorkoutVoiceSession(
         set.actualHoldSeconds = 0
     }
 
-    /** Starts only a later set of the same exercise after its timer finishes automatically. */
+    /** Starts the next timed cardio set in this exercise or the immediately following one. */
     fun startFollowingCardio(item: WorkoutExercise, completedSet: PlannedSet): Boolean {
         val workout = data().activeWorkout ?: return false
         if (!workout.autoStartCardio) return false
@@ -132,16 +151,38 @@ internal class WorkoutVoiceSession(
         val exercise = data().exercises.firstOrNull { it.id == item.exerciseId } ?: return false
         if (!exercise.cardio || !exercise.type.tracksDuration) return false
         if (exercise.supportsLiveMeasurement && !item.manualMeasurement) return false
-        if (item.restSecondsAfterSet(workout.defaultRestSeconds, exercise) != 0) return false
-        if (workout.exercises.none { it.id == item.id }) return false
-        val nextSet =
+        val index = workout.exercises.indexOfFirst { it.id == item.id }
+        if (index < 0) return false
+        val remainingSet =
             item.plannedSets.firstOrNull { set ->
                 item.sets.none { it.plannedSetId == set.id }
-            } ?: return false
-        if (item.plannedSets.indexOf(nextSet) <= item.plannedSets.indexOf(completedSet))
+            }
+        val nextItem =
+            if (remainingSet != null) {
+                if (
+                    item.plannedSets.indexOf(remainingSet) <= item.plannedSets.indexOf(completedSet)
+                )
+                    return false
+                item
+            } else workout.exercises.getOrNull(index + 1) ?: return false
+        val nextExercise =
+            data().exercises.firstOrNull { it.id == nextItem.exerciseId } ?: return false
+        // LEGACY: Non-cardio timers and automatic scale measurements still require a manual start.
+        if (!nextExercise.cardio || !nextExercise.type.tracksDuration) return false
+        if (nextExercise.supportsLiveMeasurement && !nextItem.manualMeasurement) return false
+        val nextSet =
+            remainingSet
+                ?: nextItem.plannedSets.firstOrNull { set ->
+                    nextItem.sets.none { it.plannedSetId == set.id }
+                }
+                ?: return false
+        if (restEndsAt > now()) {
+            pendingCardio =
+                CardioContinuation(workout.id, VoiceTimerTarget(item.id, completedSet.id))
             return false
-        startHold(item, nextSet)
-        preferredExerciseId = item.id
+        }
+        startHold(nextItem, nextSet)
+        preferredExerciseId = nextItem.id
         save()
         return true
     }
@@ -168,7 +209,7 @@ internal class WorkoutVoiceSession(
     fun tick(): Boolean {
         var cue = false
         if (restEndsAt > 0 && restEndsAt <= now()) {
-            restEndsAt = 0
+            finishRest()
             cue = true
         }
         val target = activeTarget() ?: return cue
