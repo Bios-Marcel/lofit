@@ -7,9 +7,11 @@ import android.view.View
 import android.widget.ScrollView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.UiController
 import androidx.test.espresso.ViewAction
 import androidx.test.espresso.action.ViewActions.click
+import androidx.test.espresso.action.ViewActions.scrollTo
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.*
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -18,6 +20,7 @@ import org.hamcrest.Matchers.allOf
 import org.hamcrest.Matchers.equalTo
 import org.hamcrest.Matchers.not
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -96,6 +99,35 @@ class WorkoutSetScrollTest {
     private fun assertNextVisible() {
         row(11).perform(waitUntilMatches(isCompletelyDisplayed()))
         row(11).check(matches(isCompletelyDisplayed()))
+    }
+
+    private fun assertFinishCancellationRestoresScroll(cancel: () -> Unit) {
+        seed()
+        ActivityScenario.launch(MainActivity::class.java).use {
+            val finish = onView(withText("Finish workout"))
+            var before = 0
+            finish.perform(scrollTo(), waitForStableLayout()).check { view, _ ->
+                before = scroll(view).scrollY
+                assertTrue("Workout must be scrolled", before > 0)
+            }
+            finish.perform(click())
+            onView(withText("Finish workout?")).check(matches(isDisplayed()))
+            cancel()
+            finish.perform(waitForStableLayout()).check { view, _ ->
+                assertEquals(before, scroll(view).scrollY)
+            }
+            finish.check(matches(isCompletelyDisplayed()))
+        }
+    }
+
+    @Test
+    fun finishWorkout_cancelRestoresScroll() {
+        assertFinishCancellationRestoresScroll { onView(withText("Cancel")).perform(click()) }
+    }
+
+    @Test
+    fun finishWorkout_backRestoresScroll() {
+        assertFinishCancellationRestoresScroll { pressBack() }
     }
 
     @Test

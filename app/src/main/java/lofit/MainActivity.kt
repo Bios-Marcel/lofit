@@ -145,7 +145,11 @@ class MainActivity : AppCompatActivity() {
 
         data class BodyMeasurementDetail(val bodyPart: BodyPart) : Route()
 
-        data class Confirm(val action: ConfirmAction, val targetId: String? = null) : Route()
+        data class Confirm(
+            val action: ConfirmAction,
+            val targetId: String? = null,
+            val returnScrollY: Int? = null,
+        ) : Route()
     }
 
     private lateinit var repository: LofitRepository
@@ -1170,7 +1174,11 @@ class MainActivity : AppCompatActivity() {
         val finishButton =
             ui.actionButton("Finish workout") {
                 if (workout.setCount() > 0) {
-                    route = Route.Confirm(ConfirmAction.FINISH_WORKOUT)
+                    route =
+                        Route.Confirm(
+                            ConfirmAction.FINISH_WORKOUT,
+                            returnScrollY = (content.getChildAt(0) as? ScrollView)?.scrollY,
+                        )
                     render()
                 }
             }
@@ -3674,6 +3682,7 @@ class MainActivity : AppCompatActivity() {
         render(
             restoreScrollY =
                 when (previousRoute) {
+                    is Route.Confirm -> previousRoute.returnScrollY
                     is Route.ExercisePicker -> previousRoute.returnScrollY
                     is Route.WorkoutHistory -> previousRoute.returnScrollY
                     is Route.ExerciseTrend -> previousRoute.returnScrollY
