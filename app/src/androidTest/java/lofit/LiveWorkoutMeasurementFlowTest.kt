@@ -585,7 +585,7 @@ class LiveWorkoutMeasurementFlowTest {
             onView(withContentDescription("Scale Pull scale status"))
                 .check(matches(withText("Scale unavailable")))
             openScaleOption(checked = true)
-            onView(withText("Use scale")).perform(click())
+            onView(withText("Use crane scale")).perform(click())
             assertTrue(
                 LofitRepository(context).data.activeWorkout!!.exercises.single().manualMeasurement
             )
@@ -617,14 +617,14 @@ class LiveWorkoutMeasurementFlowTest {
             onView(withText("Edit")).perform(scrollTo(), click())
             onView(withContentDescription("Scale Pull measurement mode")).check(doesNotExist())
             openScaleOption(checked = true)
-            onView(withText("Use scale")).perform(click())
+            onView(withText("Use crane scale")).perform(click())
             openScaleOption(checked = false)
             androidx.test.espresso.Espresso.pressBack()
             onView(withText("Save routine")).perform(scrollTo(), click())
             onView(withText("Start")).perform(scrollTo(), click())
             onView(withContentDescription("Scale Pull live weight graph")).check(doesNotExist())
             openScaleOption(checked = false)
-            onView(withText("Use scale")).perform(click())
+            onView(withText("Use crane scale")).perform(click())
             onView(withContentDescription("Scale Pull live weight graph"))
                 .check(matches(isDisplayed()))
             assertFalse(
@@ -640,35 +640,85 @@ class LiveWorkoutMeasurementFlowTest {
     }
 
     @Test
+    fun forgettingScaleHidesWorkoutGraphAndWorkoutAndRoutineScaleOptions() {
+        LofitRepository(context).apply {
+            data.routines.clear()
+            data.routines.add(
+                Routine(
+                    name = "Scale routine",
+                    exercises = mutableListOf(RoutineExercise(exerciseId = movement.id)),
+                )
+            )
+            save()
+        }
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            lateinit var scanner: FakeScanner
+            scenario.onActivity { scanner = fakeScanner(it) }
+            onView(withContentDescription("Scale Pull live weight graph"))
+                .check(matches(isDisplayed()))
+            openScaleOption(checked = true)
+            androidx.test.espresso.Espresso.pressBack()
+            navigate(scenario, R.string.nav_settings)
+            onView(withText("Forget scale")).perform(scrollTo(), click())
+            assertNull(LofitRepository(context).data.craneScale)
+            assertFalse(scanner.running)
+            navigate(scenario, R.string.nav_workout)
+            onView(withText("Resume workout")).perform(scrollTo(), click())
+            onView(withContentDescription("Scale Pull live weight graph")).check(doesNotExist())
+            onView(withContentDescription("Set 1 weight")).check(matches(isEnabled()))
+            onView(withContentDescription("Start set 1 hold"))
+                .perform(scrollTo())
+                .check(matches(isDisplayed()))
+            onView(withContentDescription("Options for Scale Pull")).perform(scrollTo(), click())
+            onView(withText("Use crane scale")).check(doesNotExist())
+            androidx.test.espresso.Espresso.pressBack()
+            scenario.recreate()
+            onView(withContentDescription("Scale Pull live weight graph")).check(doesNotExist())
+            onView(withContentDescription("Set 1 weight")).check(matches(isEnabled()))
+            onView(withContentDescription("Options for Scale Pull")).perform(scrollTo(), click())
+            onView(withText("Use crane scale")).check(doesNotExist())
+            androidx.test.espresso.Espresso.pressBack()
+            navigate(scenario, R.string.nav_routines)
+            onView(withText("Edit")).perform(scrollTo(), click())
+            onView(withContentDescription("Options for Scale Pull")).perform(scrollTo(), click())
+            onView(withText("Use crane scale")).check(doesNotExist())
+            androidx.test.espresso.Espresso.pressBack()
+            val data = LofitRepository(context).data
+            assertFalse(data.activeWorkout!!.exercises.single().manualMeasurement)
+            assertFalse(data.routines.single().exercises.single().manualMeasurement)
+        }
+    }
+
+    @Test
     fun liveMeasurementRestoresRequiredOptionsWhenEditingExercise() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             navigate(scenario, R.string.nav_exercises)
             onView(withText("Custom")).perform(scrollTo(), click())
             onView(withHint("Search name or muscle")).perform(replaceText("Scale Pull"))
             onView(withText("Edit")).perform(scrollTo(), click())
-            onView(withText("Live measurement"))
+            onView(withText("Use crane scale"))
                 .check(matches(isChecked()))
                 .check(matches(isEnabled()))
             onView(withText("Weighted")).perform(scrollTo(), click())
-            onView(withText("Live measurement"))
+            onView(withText("Use crane scale"))
                 .check(matches(not(isChecked())))
                 .check(matches(isEnabled()))
-            onView(withText("Live measurement")).perform(click())
+            onView(withText("Use crane scale")).perform(click())
             onView(withText("Weighted")).check(matches(isChecked()))
-            onView(withText("Live measurement")).check(matches(isChecked()))
+            onView(withText("Use crane scale")).check(matches(isChecked()))
             onView(withText("Repetitions")).perform(scrollTo(), click())
-            onView(withText("Live measurement"))
+            onView(withText("Use crane scale"))
                 .check(matches(not(isChecked())))
                 .check(matches(isEnabled()))
             onView(withText("Weighted")).perform(click())
-            onView(withText("Live measurement")).perform(click())
+            onView(withText("Use crane scale")).perform(click())
             onView(withText("Weighted")).check(matches(isChecked()))
             onView(withText("Timed")).check(matches(isChecked()))
-            onView(withText("Live measurement")).check(matches(isChecked()))
+            onView(withText("Use crane scale")).check(matches(isChecked()))
             scenario.recreate()
             onView(withText("Weighted")).check(matches(isChecked()))
             onView(withText("Timed")).check(matches(isChecked()))
-            onView(withText("Live measurement")).check(matches(isChecked()))
+            onView(withText("Use crane scale")).check(matches(isChecked()))
             onView(withText("Save exercise")).perform(scrollTo(), click())
             assertTrue(
                 LofitRepository(context)
@@ -689,16 +739,16 @@ class LiveWorkoutMeasurementFlowTest {
             onView(withHint("Search primary muscle")).perform(scrollTo(), replaceText("Forearms"))
             onView(withText("Repetitions")).check(matches(isChecked()))
             onView(withText("Weighted")).check(matches(not(isChecked())))
-            onView(withText("Live measurement")).perform(scrollTo(), click())
+            onView(withText("Use crane scale")).perform(scrollTo(), click())
             onView(withText("Weighted")).check(matches(isChecked()))
             onView(withText("Timed")).check(matches(isChecked()))
-            onView(withText("Live measurement")).check(matches(isChecked()))
-            onView(withText("Live measurement")).perform(click())
+            onView(withText("Use crane scale")).check(matches(isChecked()))
+            onView(withText("Use crane scale")).perform(click())
             onView(withText("Weighted")).check(matches(isChecked()))
             onView(withText("Timed")).check(matches(isChecked()))
-            onView(withText("Live measurement")).perform(click())
+            onView(withText("Use crane scale")).perform(click())
             scenario.recreate()
-            onView(withText("Live measurement")).check(matches(isChecked()))
+            onView(withText("Use crane scale")).check(matches(isChecked()))
             onView(withText("Weighted")).check(matches(isChecked()))
             onView(withText("Timed")).check(matches(isChecked()))
             onView(withText("Save exercise")).perform(scrollTo(), click())
@@ -714,7 +764,7 @@ class LiveWorkoutMeasurementFlowTest {
 
     private fun openScaleOption(checked: Boolean) {
         onView(withContentDescription("Options for Scale Pull")).perform(scrollTo(), click())
-        onView(withText("Use scale"))
+        onView(withText("Use crane scale"))
             .check(
                 matches(
                     isDescendantOfA(

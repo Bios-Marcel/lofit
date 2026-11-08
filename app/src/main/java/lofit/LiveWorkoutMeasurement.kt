@@ -55,7 +55,8 @@ internal class LiveWorkoutMeasurement(private val data: () -> AppData) {
     }
 
     fun isLive(item: WorkoutExercise): Boolean =
-        !item.manualMeasurement &&
+        data().craneScale != null &&
+            !item.manualMeasurement &&
             data().exercises.firstOrNull { it.id == item.exerciseId }?.supportsLiveMeasurement ==
                 true
 

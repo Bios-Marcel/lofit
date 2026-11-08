@@ -124,7 +124,10 @@ internal class RoutineScreens(
                                             onSelectExercise(item.id, placement)
                                         },
                                         useScale =
-                                            if (movement.supportsLiveMeasurement)
+                                            if (
+                                                data().craneScale != null &&
+                                                    movement.supportsLiveMeasurement
+                                            )
                                                 ({ !item.manualMeasurement })
                                             else null,
                                         onUseScaleChange = { item.manualMeasurement = !it },

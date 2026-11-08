@@ -19,11 +19,13 @@ class VoiceTimerTargetTest {
         items: List<WorkoutExercise>,
         visible: Set<String> = items.map { it.id }.toSet(),
         active: VoiceTimerTarget? = null,
+        scaleAvailable: Boolean = true,
     ) =
         voiceTimerTarget(
             WorkoutSession(name = "Test", exercises = items.toMutableList()),
             exercises,
             visible,
+            scaleAvailable,
             active,
         )
 
@@ -35,15 +37,22 @@ class VoiceTimerTargetTest {
         val visible = setOf(repetition.id, live.id)
         assertEquals(
             VoiceTimerTarget(repetition.id, repetition.plannedSets[0].id),
-            voiceTimerTarget(workout, exercises, visible, timersOnly = false),
+            voiceTimerTarget(workout, exercises, visible, true, timersOnly = false),
         )
         val active = VoiceTimerTarget(live.id, live.plannedSets[1].id)
         assertEquals(
             active,
-            voiceTimerTarget(workout, exercises, visible, active, timersOnly = false),
+            voiceTimerTarget(workout, exercises, visible, true, active, timersOnly = false),
         )
         assertNull(
-            voiceTimerTarget(workout, exercises, setOf(repetition.id), active, timersOnly = false)
+            voiceTimerTarget(
+                workout,
+                exercises,
+                setOf(repetition.id),
+                true,
+                active,
+                timersOnly = false,
+            )
         )
     }
 
@@ -83,6 +92,16 @@ class VoiceTimerTargetTest {
     }
 
     @Test
+    fun scaleExerciseUsesManualTimerWhenNoScaleIsConfigured() {
+        val live = item(scale)
+        assertEquals(
+            VoiceTimerTarget(live.id, live.plannedSets[0].id),
+            target(listOf(live), scaleAvailable = false),
+        )
+        assertFalse(live.manualMeasurement)
+    }
+
+    @Test
     fun completedAndEmptyExercisesAreSkipped() {
         val done = item()
         done.plannedSets.forEach {
@@ -105,7 +124,7 @@ class VoiceTimerTargetTest {
 
     @Test
     fun missingWorkoutOrExerciseIsIneligible() {
-        assertNull(voiceTimerTarget(null, exercises, emptySet()))
+        assertNull(voiceTimerTarget(null, exercises, emptySet(), true))
         assertNull(target(listOf(item().copy(exerciseId = "removed"))))
     }
 

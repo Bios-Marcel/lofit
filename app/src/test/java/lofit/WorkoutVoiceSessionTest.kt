@@ -382,6 +382,7 @@ class WorkoutVoiceSessionTest {
 
     @Test
     fun cardioDoesNotStartScaleMeasurementButCanStartManualMode() {
+        data.craneScale = CraneScaleDevice("AA:BB:CC:DD:EE:01", "Scale")
         addFollowingCardio()
         hold.plannedSets.add(PlannedSet(holdSeconds = 20))
         timed.weighted = true
@@ -398,6 +399,7 @@ class WorkoutVoiceSessionTest {
 
     @Test
     fun nextCardioDoesNotStartScaleMeasurementButCanStartManualMode() {
+        data.craneScale = CraneScaleDevice("AA:BB:CC:DD:EE:01", "Scale")
         val next = addFollowingCardio()
         data.exercises
             .single { it.id == next.exerciseId }
@@ -413,6 +415,21 @@ class WorkoutVoiceSessionTest {
         assertTrue(session.startFollowingCardio(hold, hold.plannedSets.single()))
         assertEquals(next.id, session.activeHoldWorkoutExerciseId)
         assertEquals(next.plannedSets.single().id, session.activeHoldPlannedSetId)
+    }
+
+    @Test
+    fun scaleExerciseUsesManualTimerUntilAScaleIsConfigured() {
+        timed.weighted = true
+        timed.liveMeasurement = true
+        session.preferredExerciseId = hold.id
+        val target = session.backgroundTarget()!!
+        assertEquals(VoiceTimerTarget(hold.id, hold.plannedSets[0].id), target.timer)
+        data.craneScale = CraneScaleDevice("AA:BB:CC:DD:EE:01", "Scale")
+        assertNull(session.backgroundTarget()!!.timer)
+        data.craneScale = null
+        assertNotNull(session.apply(VoiceCommand.TIME, target))
+        assertEquals(hold.plannedSets[0].id, session.activeHoldPlannedSetId)
+        assertFalse(hold.manualMeasurement)
     }
 
     @Test

@@ -291,7 +291,7 @@ internal class LofitViews(
                                     true
                                 }
                                 useScale?.let { checked ->
-                                    menu.add("Use scale").apply {
+                                    menu.add("Use crane scale").apply {
                                         isCheckable = true
                                         isChecked = checked()
                                         setOnMenuItemClickListener {

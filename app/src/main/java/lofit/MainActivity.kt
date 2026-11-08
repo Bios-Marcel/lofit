@@ -1410,7 +1410,11 @@ class MainActivity : AppCompatActivity() {
                                 saveChanges()
                             },
                             useScale =
-                                if (!editingHistory && exercise.supportsLiveMeasurement)
+                                if (
+                                    !editingHistory &&
+                                        repository.data.craneScale != null &&
+                                        exercise.supportsLiveMeasurement
+                                )
                                     ({ !item.manualMeasurement })
                                 else null,
                             onUseScaleChange = { useScale ->
@@ -3875,7 +3879,13 @@ class MainActivity : AppCompatActivity() {
         }
         val workout = repository.data.activeWorkout ?: return null
         val timer =
-            voiceTimerTarget(workout, repository.data.exercises, visible, active)
+            voiceTimerTarget(
+                    workout,
+                    repository.data.exercises,
+                    visible,
+                    repository.data.craneScale != null,
+                    active,
+                )
                 ?.takeIf { liveWorkoutMeasurement.active == null }
                 ?.takeIf { voiceTimerButtons[it.setId]?.isAttachedToWindow == true }
         val doneActive =
@@ -3885,6 +3895,7 @@ class MainActivity : AppCompatActivity() {
                     workout,
                     repository.data.exercises,
                     visible,
+                    repository.data.craneScale != null,
                     doneActive,
                     timersOnly = false,
                 )

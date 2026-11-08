@@ -706,6 +706,7 @@ class VoiceTimerFlowTest {
     @Test
     fun scaleModeListensForDoneAndManualModeCanStartTimer() {
         LofitRepository(context).apply {
+            data.craneScale = CraneScaleDevice("AA:BB:CC:DD:EE:01", "Scale")
             val scale =
                 Exercise(
                     "voice-scale",
@@ -732,7 +733,7 @@ class VoiceTimerFlowTest {
                 it.onTimerVoiceCommand(item.plannedSets[0].id)
             }
             onView(withContentDescription("Options for Voice Scale")).perform(scrollTo(), click())
-            onView(withText("Use scale")).perform(click())
+            onView(withText("Use crane scale")).perform(click())
             ready()
             scenario.onActivity { it.onTimerVoiceCommand(item.plannedSets[0].id) }
             onView(withContentDescription("Stop set 1 hold")).check(matches(isDisplayed()))

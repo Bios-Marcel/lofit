@@ -21,8 +21,32 @@ class LiveWorkoutMeasurementTest {
     private val item =
         WorkoutExercise(exerciseId = movement.id, plannedSets = mutableListOf(first, second))
     private val workout = WorkoutSession(name = "Live", exercises = mutableListOf(item))
-    private val data = AppData(exercises = mutableListOf(movement), activeWorkout = workout)
+    private val data =
+        AppData(
+            exercises = mutableListOf(movement),
+            activeWorkout = workout,
+            craneScale = CraneScaleDevice("AA:BB:CC:DD:EE:01", "Scale"),
+        )
     private val measurement = LiveWorkoutMeasurement { data }
+
+    @Test
+    fun missingScalePreventsReadingsAndForgettingScaleDropsActivePull() {
+        val selected = data.craneScale
+        data.craneScale = null
+        assertFalse(measurement.isLive(item))
+        assertNull(measurement.read(0, 20.0))
+        assertTrue(measurement.seriesFor(item.id).samples.isEmpty())
+        data.craneScale = selected
+        assertTrue(measurement.isLive(item))
+        assertTrue(measurement.read(100, 20.0)!!.started)
+        data.craneScale = null
+        measurement.reconcile()
+        assertFalse(measurement.isLive(item))
+        assertNull(measurement.active)
+        assertNull(measurement.read(2_100, 0.0))
+        assertTrue(item.sets.isEmpty())
+        assertFalse(item.manualMeasurement)
+    }
 
     @Test
     fun requiresTimedWeightedExercise() {

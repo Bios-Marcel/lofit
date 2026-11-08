@@ -41,25 +41,26 @@ internal class CraneScaleScreens(
         val selected = data().craneScale
         addView(ui.metaText(selected?.name ?: "No scale selected"))
         selected?.let { addView(ui.metaText(it.address)) }
-        addView(
+        val selectScale =
             ui.actionButton(
                 if (selected == null) "Select scale" else "Change scale",
                 secondary = true,
             ) {
                 chooseScale()
-            },
+            }
+        addView(
+            if (selected == null) selectScale
+            else
+                ui.horizontalActions(
+                    selectScale,
+                    ui.actionButton("Forget scale", secondary = true) {
+                        data().craneScale = null
+                        save()
+                        onRefresh()
+                    },
+                ),
             buttonLayout(),
         )
-        if (selected != null) {
-            addView(
-                ui.actionButton("Forget scale", secondary = true) {
-                    data().craneScale = null
-                    save()
-                    onRefresh()
-                },
-                buttonLayout(),
-            )
-        }
     }
 
     fun liveScreen(): View =
@@ -101,10 +102,6 @@ internal class CraneScaleScreens(
                         stopScan()
                         startLive()
                     },
-                    buttonLayout(),
-                )
-                body.addView(
-                    ui.actionButton("Change scale", secondary = true) { chooseScale() },
                     buttonLayout(),
                 )
             }

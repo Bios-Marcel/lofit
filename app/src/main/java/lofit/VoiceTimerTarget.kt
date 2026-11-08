@@ -7,6 +7,7 @@ internal fun voiceTimerTarget(
     workout: WorkoutSession?,
     exercises: List<Exercise>,
     visibleExerciseIds: Set<String>,
+    scaleAvailable: Boolean,
     active: VoiceTimerTarget? = null,
     timersOnly: Boolean = true,
 ): VoiceTimerTarget? {
@@ -16,7 +17,13 @@ internal fun voiceTimerTarget(
         val exercise = exercises.firstOrNull { it.id == item.exerciseId } ?: continue
         // LEGACY: “time” requires a manual timer; “done” also accepts repetition and live sets.
         if (timersOnly && !exercise.type.tracksDuration) continue
-        if (timersOnly && exercise.supportsLiveMeasurement && !item.manualMeasurement) continue
+        if (
+            timersOnly &&
+                scaleAvailable &&
+                exercise.supportsLiveMeasurement &&
+                !item.manualMeasurement
+        )
+            continue
         val set =
             item.plannedSets.firstOrNull { planned ->
                 if (active != null) planned.id == active.setId

@@ -170,7 +170,7 @@ internal class ExerciseScreens(
                 }
             val weighted = exerciseOption("Weighted", draft.getInt("weight") == 1)
             val liveMeasurement =
-                exerciseOption("Live measurement", draft.getBoolean("liveMeasurement"))
+                exerciseOption("Use crane scale", draft.getBoolean("liveMeasurement"))
             var enablingLiveMeasurement = false
             liveMeasurement.setOnCheckedChangeListener { _, checked ->
                 if (checked) {
@@ -332,8 +332,26 @@ internal class ExerciseScreens(
                     )
                 }
             )
-            body.addView(liveMeasurement)
-            body.addView(cardio)
+            body.addView(
+                LinearLayout(activityContext).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    addView(
+                        liveMeasurement,
+                        LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ),
+                    )
+                    addView(
+                        cardio,
+                        LinearLayout.LayoutParams(
+                                ViewGroup.LayoutParams.WRAP_CONTENT,
+                                ViewGroup.LayoutParams.WRAP_CONTENT,
+                            )
+                            .apply { marginStart = ui.dp(16) },
+                    )
+                }
+            )
             body.addView(primaryLabel)
             body.addView(primary)
             body.addView(ui.fieldLabel("Secondary muscles"))

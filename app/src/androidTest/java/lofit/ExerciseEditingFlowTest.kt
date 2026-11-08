@@ -114,7 +114,7 @@ class ExerciseEditingFlowTest {
             onView(withText("Repetitions")).check(matches(isChecked()))
             onView(withText("Weighted")).check(matches(not(isChecked())))
             onView(withText("Asymmetrical")).check(matches(not(isChecked())))
-            onView(withText("Live measurement")).check(matches(not(isChecked())))
+            onView(withText("Use crane scale")).check(matches(not(isChecked())))
             onView(withText("Primary muscle (optional)"))
                 .perform(scrollTo())
                 .check(matches(isDisplayed()))

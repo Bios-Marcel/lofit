@@ -30,6 +30,7 @@ class LiveMeasurementPersistenceTest {
     fun modifierAndOverridesSurviveRestartFinishAndResumeWithoutGraphData() {
         val repository = LofitRepository(context)
         val exercise = movement()
+        repository.data.craneScale = CraneScaleDevice("AA:BB:CC:DD:EE:01", "Scale")
         repository.data.exercises.add(exercise)
         val routine =
             Routine(
@@ -111,6 +112,10 @@ class LiveMeasurementPersistenceTest {
         assertFalse(loaded.activeWorkout!!.exercises.single().manualMeasurement)
         assertFalse(loaded.routines.single().exercises.single().manualMeasurement)
         loaded.exercises.first { it.id == "live" }.liveMeasurement = true
+        assertFalse(
+            LiveWorkoutMeasurement { loaded }.isLive(loaded.activeWorkout!!.exercises.single())
+        )
+        loaded.craneScale = CraneScaleDevice("AA:BB:CC:DD:EE:01", "Scale")
         assertTrue(
             LiveWorkoutMeasurement { loaded }.isLive(loaded.activeWorkout!!.exercises.single())
         )

@@ -65,7 +65,7 @@ internal class WorkoutVoiceSession(
             val item = resolve(it)?.first ?: return@takeIf false
             val exercise = data().exercises.firstOrNull { e -> e.id == item.exerciseId }
             exercise?.type?.tracksDuration == true &&
-                (!exercise.supportsLiveMeasurement || item.manualMeasurement) &&
+                !liveMeasurement.isLive(item) &&
                 liveMeasurement.active == null
         }
         val rest = restEndsAt.takeIf { it > now() }
@@ -150,7 +150,7 @@ internal class WorkoutVoiceSession(
         if (completedSet.type == SetType.FAILURE || liveMeasurement.active != null) return false
         val exercise = data().exercises.firstOrNull { it.id == item.exerciseId } ?: return false
         if (!exercise.cardio || !exercise.type.tracksDuration) return false
-        if (exercise.supportsLiveMeasurement && !item.manualMeasurement) return false
+        if (liveMeasurement.isLive(item)) return false
         val index = workout.exercises.indexOfFirst { it.id == item.id }
         if (index < 0) return false
         val remainingSet =
@@ -169,7 +169,7 @@ internal class WorkoutVoiceSession(
             data().exercises.firstOrNull { it.id == nextItem.exerciseId } ?: return false
         // LEGACY: Non-cardio timers and automatic scale measurements still require a manual start.
         if (!nextExercise.cardio || !nextExercise.type.tracksDuration) return false
-        if (nextExercise.supportsLiveMeasurement && !nextItem.manualMeasurement) return false
+        if (liveMeasurement.isLive(nextItem)) return false
         val nextSet =
             remainingSet
                 ?: nextItem.plannedSets.firstOrNull { set ->
