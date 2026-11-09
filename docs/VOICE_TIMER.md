@@ -1,7 +1,8 @@
 # Voice timer
 
-Enable “Voice commands” during onboarding or in Settings. It defaults to off,
-including existing installations. When disabled, no model is prepared and no
+Enable “Voice commands” in the active workout's options menu. It defaults to off
+for each new workout and stays enabled only for that workout, including after
+reopening it. When disabled, no model is prepared and no
 microphone access is requested.
 
 Say “time” while an unfinished timed exercise is visible in an active workout.

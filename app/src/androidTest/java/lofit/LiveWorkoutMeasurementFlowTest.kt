@@ -68,7 +68,6 @@ class LiveWorkoutMeasurementFlowTest {
             runCatching { AtomicFile(context.repositoryHistoryFile).readFully() }.getOrNull()
         LofitRepository(context).apply {
             data.onboardingComplete = true
-            data.voiceCommandsEnabled = false
             data.bodyMetricsEnabled = false
             data.mcpEnabled = false
             data.craneScale = selected
@@ -178,7 +177,7 @@ class LiveWorkoutMeasurementFlowTest {
     @Test
     fun voiceDoneCompletesActiveScaleSetAndKeepsItsMeasurement() {
         LofitRepository(context).apply {
-            data.voiceCommandsEnabled = true
+            data.activeWorkout!!.voiceCommandsEnabled = true
             data.activeWorkout!!.exercises.single().plannedSets.single().holdSeconds = 60
             save()
         }

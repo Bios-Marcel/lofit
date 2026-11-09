@@ -216,45 +216,54 @@ class RepositoryPersistenceTest {
     }
 
     @Test
-    fun workoutVoiceChoicePersistsIndependentlyAndDefaultsOnForOlderWorkouts() {
+    fun workoutVoiceChoicePersistsAndNewWorkoutsDefaultOff() {
         val repository = LofitRepository(context)
-        repository.data.voiceCommandsEnabled = true
-        repository.data.activeWorkout =
-            WorkoutSession(name = "Quiet workout", voiceCommandsEnabled = false)
-        repository.save()
-        val loaded = LofitRepository(context).data
-        assertTrue(loaded.voiceCommandsEnabled)
-        assertFalse(loaded.activeWorkout!!.voiceCommandsEnabled)
-        assertTrue(
-            loaded.workoutFromRoutine(loaded.activeWorkout!!.toRoutine()).voiceCommandsEnabled
-        )
-
-        val root = JSONObject(stored())
-        root.getJSONObject("activeWorkout").remove("voiceCommandsEnabled")
-        store(root.toString())
-        val legacy = LofitRepository(context).data
-        assertTrue(legacy.voiceCommandsEnabled)
-        assertTrue(legacy.activeWorkout!!.voiceCommandsEnabled)
+        repository.data.activeWorkout = WorkoutSession(name = "Workout")
+        assertFalse(repository.data.activeWorkout!!.voiceCommandsEnabled)
+        for (enabled in listOf(true, false, true)) {
+            repository.data.activeWorkout!!.voiceCommandsEnabled = enabled
+            repository.save()
+            val loaded = LofitRepository(context).data
+            assertEquals(enabled, loaded.activeWorkout!!.voiceCommandsEnabled)
+            assertFalse(
+                loaded.workoutFromRoutine(loaded.activeWorkout!!.toRoutine()).voiceCommandsEnabled
+            )
+            assertFalse(JSONObject(stored()).has("voiceCommandsEnabled"))
+        }
     }
 
     @Test
-    fun voiceConsentDefaultsOffForNewAndExistingInstallsAndPersistsChoices() {
-        assertFalse(LofitRepository(context).data.voiceCommandsEnabled)
+    fun legacyVoiceSettingsKeepMutedWorkoutsOffAndAreRemovedOnSave() {
         val repository = LofitRepository(context)
         repository.data.onboardingComplete = true
         repository.data.activeWorkout = WorkoutSession(name = "Existing workout")
-        for (enabled in listOf(true, false, true)) {
-            repository.data.voiceCommandsEnabled = enabled
-            repository.save()
-            assertEquals(enabled, LofitRepository(context).data.voiceCommandsEnabled)
+        repository.save()
+        val saved = stored()
+        for (globalEnabled in listOf(false, true)) {
+            for (workoutEnabled in listOf(null, false, true)) {
+                val root = JSONObject(saved).apply { put("voiceCommandsEnabled", globalEnabled) }
+                root.getJSONObject("activeWorkout").apply {
+                    if (workoutEnabled == null) remove("voiceCommandsEnabled")
+                    else put("voiceCommandsEnabled", workoutEnabled)
+                }
+                store(root.toString())
+                val loaded = LofitRepository(context)
+                val expected = globalEnabled && workoutEnabled == true
+                assertEquals(expected, loaded.data.activeWorkout!!.voiceCommandsEnabled)
+                assertTrue(loaded.data.onboardingComplete)
+                assertEquals("Existing workout", loaded.data.activeWorkout!!.name)
+                loaded.save()
+                assertFalse(JSONObject(stored()).has("voiceCommandsEnabled"))
+                assertEquals(
+                    expected,
+                    LofitRepository(context).data.activeWorkout!!.voiceCommandsEnabled,
+                )
+            }
         }
-        store(JSONObject(stored()).apply { remove("voiceCommandsEnabled") }.toString())
-        val loaded = LofitRepository(context)
-        assertFalse(loaded.data.voiceCommandsEnabled)
-        assertTrue(loaded.data.onboardingComplete)
-        assertEquals("Existing workout", loaded.data.activeWorkout!!.name)
-        loaded.save()
-        assertFalse(LofitRepository(context).data.voiceCommandsEnabled)
+        val root = JSONObject(saved)
+        root.getJSONObject("activeWorkout").remove("voiceCommandsEnabled")
+        store(root.toString())
+        assertFalse(LofitRepository(context).data.activeWorkout!!.voiceCommandsEnabled)
     }
 
     @Test

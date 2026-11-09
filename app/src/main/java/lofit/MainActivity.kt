@@ -257,7 +257,6 @@ class MainActivity : AppCompatActivity() {
     private var healthPermissionPending = false
     private var onboardingGender = BiologicalGender.MALE
     private var onboardingHealthEnabled = false
-    private var onboardingVoiceEnabled = false
     private var onboardingRecordCelebrationsEnabled = false
     private var bodyMetricsReadGeneration = 0
     private lateinit var content: FrameLayout
@@ -526,9 +525,6 @@ class MainActivity : AppCompatActivity() {
         onboardingHealthEnabled =
             savedInstanceState?.getBoolean("onboardingHealthEnabled")
                 ?: (repository.data.bodyMetricsEnabled == true)
-        onboardingVoiceEnabled =
-            savedInstanceState?.getBoolean("onboardingVoiceEnabled")
-                ?: repository.data.voiceCommandsEnabled
         onboardingRecordCelebrationsEnabled =
             savedInstanceState?.getBoolean("onboardingRecordCelebrationsEnabled")
                 ?: repository.data.recordCelebrationsEnabled
@@ -664,7 +660,6 @@ class MainActivity : AppCompatActivity() {
         outState.putBoolean("healthPermissionPending", healthPermissionPending)
         outState.putString("onboardingGender", onboardingGender.name)
         outState.putBoolean("onboardingHealthEnabled", onboardingHealthEnabled)
-        outState.putBoolean("onboardingVoiceEnabled", onboardingVoiceEnabled)
         outState.putBoolean(
             "onboardingRecordCelebrationsEnabled",
             onboardingRecordCelebrationsEnabled,
@@ -1001,9 +996,6 @@ class MainActivity : AppCompatActivity() {
                 }
             )
             body.addView(
-                settings.voiceCommandsChoice(onboardingVoiceEnabled) { onboardingVoiceEnabled = it }
-            )
-            body.addView(
                 settings.recordCelebrationsChoice(onboardingRecordCelebrationsEnabled) {
                     onboardingRecordCelebrationsEnabled = it
                 }
@@ -1011,7 +1003,6 @@ class MainActivity : AppCompatActivity() {
             body.addView(
                 ui.actionButton("Get started") {
                     repository.data.biologicalGender = onboardingGender
-                    repository.data.voiceCommandsEnabled = onboardingVoiceEnabled
                     repository.data.recordCelebrationsEnabled = onboardingRecordCelebrationsEnabled
                     repository.data.onboardingComplete = true
                     repository.save()
@@ -3030,16 +3021,14 @@ class MainActivity : AppCompatActivity() {
                 contentDescription = "Workout options"
                 setOnClickListener {
                     PopupMenu(this@MainActivity, this, Gravity.END).apply {
-                        if (repository.data.voiceCommandsEnabled) {
-                            menu.add("Voice commands").apply {
-                                isCheckable = true
-                                isChecked = workout.voiceCommandsEnabled
-                                setOnMenuItemClickListener {
-                                    workout.voiceCommandsEnabled = !isChecked
-                                    repository.save()
-                                    updateTimerVoice()
-                                    true
-                                }
+                        menu.add("Voice commands").apply {
+                            isCheckable = true
+                            isChecked = workout.voiceCommandsEnabled
+                            setOnMenuItemClickListener {
+                                workout.voiceCommandsEnabled = !isChecked
+                                repository.save()
+                                updateTimerVoice()
+                                true
                             }
                         }
                         menu.add("Auto-start cardio").apply {

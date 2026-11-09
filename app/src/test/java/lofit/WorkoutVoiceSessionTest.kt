@@ -18,11 +18,11 @@ class WorkoutVoiceSessionTest {
         )
     private val data =
         AppData().apply {
-            voiceCommandsEnabled = true
             exercises.addAll(listOf(reps, timed))
             activeWorkout =
                 WorkoutSession(
                     name = "Test",
+                    voiceCommandsEnabled = true,
                     defaultRestSeconds = 30,
                     exercises = mutableListOf(first, hold),
                 )
@@ -181,7 +181,7 @@ class WorkoutVoiceSessionTest {
         hold.restSecondsOverride = null
         data.activeWorkout!!.defaultRestSeconds = 0
         session.apply(VoiceCommand.TIME, session.backgroundTarget()!!)
-        data.voiceCommandsEnabled = false
+        data.activeWorkout!!.voiceCommandsEnabled = false
         now += 10_000
         assertTrue(session.tick())
         assertEquals(hold.id, session.activeHoldWorkoutExerciseId)
@@ -488,7 +488,6 @@ class WorkoutVoiceSessionTest {
         val workout = data.activeWorkout!!
         workout.voiceCommandsEnabled = false
         assertFalse(session.enabled)
-        assertTrue(data.voiceCommandsEnabled)
         assertNull(session.backgroundTarget())
         listOf(
                 VoiceCommand.TIME,
@@ -506,10 +505,10 @@ class WorkoutVoiceSessionTest {
         workout.voiceCommandsEnabled = true
         assertTrue(session.enabled)
         assertNotNull(session.backgroundTarget())
-        workout.voiceCommandsEnabled = false
         data.activeWorkout = data.workoutFromRoutine(workout.toRoutine())
-        assertTrue(session.enabled)
-        assertNotNull(session.backgroundTarget())
+        assertFalse(data.activeWorkout!!.voiceCommandsEnabled)
+        assertFalse(session.enabled)
+        assertNull(session.backgroundTarget())
     }
 
     @Test
@@ -525,12 +524,36 @@ class WorkoutVoiceSessionTest {
     }
 
     @Test
+    fun newWorkoutsRejectVoiceCommandsUntilEnabled() {
+        val target = session.backgroundTarget()!!
+        val original = data.activeWorkout!!
+        val defaults =
+            listOf(
+                WorkoutSession(name = "Empty"),
+                WorkoutSession(name = "Intervals", intervals = mutableListOf(WorkoutInterval())),
+                data.workoutFromRoutine(original.toRoutine()),
+            )
+        defaults.forEach { workout ->
+            data.activeWorkout = workout
+            assertFalse(workout.voiceCommandsEnabled)
+            assertFalse(session.enabled)
+            assertNull(session.backgroundTarget())
+            assertNull(session.apply(VoiceCommand.DONE, target))
+        }
+        assertEquals(0, saves)
+    }
+
+    @Test
     fun disablingVoiceOrEndingWorkoutRejectsCommands() {
         val target = session.backgroundTarget()!!
-        data.voiceCommandsEnabled = false
+        val workout = data.activeWorkout!!
+        workout.voiceCommandsEnabled = false
         assertNull(session.apply(VoiceCommand.DONE, target))
         assertNull(session.backgroundTarget())
-        data.voiceCommandsEnabled = true
+        workout.voiceCommandsEnabled = true
+        workout.finish()
+        assertFalse(session.enabled)
+        assertNull(session.apply(VoiceCommand.DONE, target))
         data.activeWorkout = null
         assertNull(session.apply(VoiceCommand.DONE, target))
         assertEquals(0, saves)

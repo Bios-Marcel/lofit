@@ -135,7 +135,7 @@ data class WorkoutSession(
     val sourceRoutine: Routine? = null,
     var averageHeartRateBpm: Double? = null,
     var autoStartCardio: Boolean = true,
-    var voiceCommandsEnabled: Boolean = true,
+    var voiceCommandsEnabled: Boolean = false,
 ) {
     constructor(
         id: String = UUID.randomUUID().toString(),
@@ -148,7 +148,7 @@ data class WorkoutSession(
         sourceRoutine: Routine? = null,
         averageHeartRateBpm: Double? = null,
         autoStartCardio: Boolean = true,
-        voiceCommandsEnabled: Boolean = true,
+        voiceCommandsEnabled: Boolean = false,
     ) : this(
         id,
         name,
@@ -301,7 +301,6 @@ data class AppData(
     val history: MutableList<WorkoutSession> = mutableListOf(),
     var activeWorkout: WorkoutSession? = null,
     var soundCuesEnabled: Boolean = true,
-    var voiceCommandsEnabled: Boolean = false,
     var bodyMetricsEnabled: Boolean? = null,
     var biologicalGender: BiologicalGender = BiologicalGender.MALE,
     var onboardingComplete: Boolean = false,

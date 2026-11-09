@@ -278,7 +278,6 @@ class LofitRepository(context: Context) {
             put("activeWorkout", data.activeWorkout?.let(::encodeWorkout) ?: JSONObject.NULL)
             put("soundCuesEnabled", data.soundCuesEnabled)
             put("recordCelebrationsEnabled", data.recordCelebrationsEnabled)
-            put("voiceCommandsEnabled", data.voiceCommandsEnabled)
             put("mcpEnabled", data.mcpEnabled)
             put("mcpPort", data.mcpPort)
             put(
@@ -487,12 +486,20 @@ class LofitRepository(context: Context) {
             history = history,
             activeWorkout =
                 if (root.isNull("activeWorkout")) null
-                else decodeWorkout(root.getJSONObject("activeWorkout")),
+                else
+                    decodeWorkout(root.getJSONObject("activeWorkout")).apply {
+                        // LEGACY: Removing the global switch must not enable a previously muted
+                        // workout.
+                        if (
+                            root.has("voiceCommandsEnabled") &&
+                                !root.optBoolean("voiceCommandsEnabled", false)
+                        ) {
+                            voiceCommandsEnabled = false
+                        }
+                    },
             soundCuesEnabled = root.getBoolean("soundCuesEnabled"),
             // LEGACY: Saved installs without a record celebration choice remain opted out.
             recordCelebrationsEnabled = root.optBoolean("recordCelebrationsEnabled", false),
-            // LEGACY: Installs saved before voice consent was added remain opted out.
-            voiceCommandsEnabled = root.optBoolean("voiceCommandsEnabled", false),
             mcpEnabled = root.optBoolean("mcpEnabled", false),
             mcpPort =
                 root.optInt("mcpPort", BuildConfig.MCP_PORT).takeIf { it in 1..65535 }
@@ -627,8 +634,8 @@ class LofitRepository(context: Context) {
             defaultRestSeconds = value.getInt("defaultRestSeconds"),
             // LEGACY: Workouts saved before this switch keep automatic cardio transitions enabled.
             autoStartCardio = value.optBoolean("autoStartCardio", true),
-            // LEGACY: Existing workouts continue to follow the app's voice consent setting.
-            voiceCommandsEnabled = value.optBoolean("voiceCommandsEnabled", true),
+            // LEGACY: Workouts without a saved voice choice remain opted out.
+            voiceCommandsEnabled = value.optBoolean("voiceCommandsEnabled", false),
             exercises =
                 value
                     .getJSONArray("exercises")

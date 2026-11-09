@@ -51,7 +51,6 @@ class CardioTimerFlowTest {
         LofitRepository(context).apply {
             data.onboardingComplete = true
             data.bodyMetricsEnabled = false
-            data.voiceCommandsEnabled = voice
             data.mcpEnabled = false
             val run =
                 Exercise("cardio-run", "Run", ExerciseType.TIMED, false, "", "", cardio = true)
@@ -60,6 +59,7 @@ class CardioTimerFlowTest {
             data.activeWorkout =
                 WorkoutSession(
                     name = "Cardio sequence",
+                    voiceCommandsEnabled = voice,
                     exercises =
                         mutableListOf(
                             WorkoutExercise(

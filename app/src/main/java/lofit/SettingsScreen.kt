@@ -71,43 +71,6 @@ internal class SettingsScreen(
         addView(ui.metaText("Save weight and average heart rate with workouts."))
     }
 
-    fun voiceCommandsChoice(enabled: Boolean, onChange: (Boolean) -> Unit): View = ui.card {
-        addView(
-            LinearLayout(activityContext).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                addView(
-                    ui.titleText("Voice commands"),
-                    LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
-                        marginEnd = ui.dp(12)
-                    },
-                )
-                addView(
-                    Switch(activityContext).apply {
-                        isChecked = enabled
-                        showText = false
-                        minWidth = ui.dp(72)
-                        minHeight = ui.dp(48)
-                        thumbTintList = ColorStateList.valueOf(ui.color(R.color.cream))
-                        trackDrawable =
-                            ContextCompat.getDrawable(
-                                activityContext,
-                                R.drawable.switch_track,
-                            )
-                        trackTintList = ui.toggleTint()
-                        contentDescription = "Voice commands"
-                        setOnCheckedChangeListener { _, checked -> onChange(checked) }
-                    }
-                )
-            }
-        )
-        addView(
-            ui.metaText(
-                "Say “time” for timers, “skip” to skip rest, or “done” to finish the current set. Say “set fifty times eight” for 50 kg and 8 reps or seconds. Without weight, say “set eight”. Works offline, including with the screen locked."
-            )
-        )
-    }
-
     fun recordCelebrationsChoice(enabled: Boolean, onChange: (Boolean) -> Unit): View = ui.card {
         addView(
             LinearLayout(activityContext).apply {
@@ -203,12 +166,6 @@ internal class SettingsScreen(
             body.addView(
                 recordCelebrationsChoice(data().recordCelebrationsEnabled) {
                     data().recordCelebrationsEnabled = it
-                    save()
-                }
-            )
-            body.addView(
-                voiceCommandsChoice(data().voiceCommandsEnabled) {
-                    data().voiceCommandsEnabled = it
                     save()
                 }
             )

@@ -29,10 +29,7 @@ internal class WorkoutVoiceSession(
 
     val enabled: Boolean
         get() =
-            data().voiceCommandsEnabled &&
-                data().activeWorkout?.let {
-                    it.voiceCommandsEnabled && it.completedAt == null
-                } == true
+            data().activeWorkout?.let { it.voiceCommandsEnabled && it.completedAt == null } == true
 
     private fun resolve(target: VoiceTimerTarget?): Pair<WorkoutExercise, PlannedSet>? {
         target ?: return null

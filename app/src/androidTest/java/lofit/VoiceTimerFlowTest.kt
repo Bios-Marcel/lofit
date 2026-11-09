@@ -12,6 +12,7 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.scrollTo
+import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.*
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -55,11 +56,14 @@ class VoiceTimerFlowTest {
             )
         LofitRepository(context).apply {
             data.onboardingComplete = true
-            data.voiceCommandsEnabled = true
             data.bodyMetricsEnabled = false
             data.mcpEnabled = false
             data.activeWorkout =
-                WorkoutSession(name = "Voice test", exercises = mutableListOf(item))
+                WorkoutSession(
+                    name = "Voice test",
+                    exercises = mutableListOf(item),
+                    voiceCommandsEnabled = true,
+                )
             save()
         }
     }
@@ -374,24 +378,22 @@ class VoiceTimerFlowTest {
     }
 
     @Test
-    fun onboardingVoiceChoiceSurvivesRecreationAndEnablesListening() {
+    fun onboardingHasNoVoiceChoiceAndWorkoutCanEnableVoiceAfterward() {
         LofitRepository(context).apply {
             data.onboardingComplete = false
-            data.voiceCommandsEnabled = false
+            data.activeWorkout!!.voiceCommandsEnabled = false
             save()
         }
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-            onView(withContentDescription("Voice commands"))
-                .perform(scrollTo())
-                .check(matches(org.hamcrest.Matchers.not(isChecked())))
-                .perform(click())
-            assertFalse(LofitRepository(context).data.voiceCommandsEnabled)
+            onView(withText("Voice commands")).check(doesNotExist())
+            onView(withContentDescription("Voice commands")).check(doesNotExist())
             scenario.recreate()
-            onView(withContentDescription("Voice commands"))
-                .perform(scrollTo())
-                .check(matches(isChecked()))
+            onView(withText("Voice commands")).check(doesNotExist())
             onView(withText("Get started")).perform(scrollTo(), click())
-            assertTrue(LofitRepository(context).data.voiceCommandsEnabled)
+            assertFalse(LofitRepository(context).data.activeWorkout!!.voiceCommandsEnabled)
+            assertFalse(microphoneRunning())
+            onView(withContentDescription("Workout options")).perform(scrollTo(), click())
+            onView(withText("Voice commands")).perform(click())
             ready()
             scenario.recreate()
             ready()
@@ -399,21 +401,17 @@ class VoiceTimerFlowTest {
     }
 
     @Test
-    fun decliningVoiceKeepsMicrophoneOffAndManualTimersWorking() {
+    fun defaultWorkoutKeepsMicrophoneOffAndManualTimersWorking() {
         LofitRepository(context).apply {
-            data.onboardingComplete = false
-            data.voiceCommandsEnabled = false
+            data.activeWorkout =
+                WorkoutSession(name = "Quiet workout", exercises = mutableListOf(item))
             save()
         }
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-            onView(withContentDescription("Voice commands"))
-                .perform(scrollTo())
-                .check(matches(org.hamcrest.Matchers.not(isChecked())))
-            onView(withText("Get started")).perform(scrollTo(), click())
             scenario.recreate()
             onView(withContentDescription("Start set 1 hold"))
                 .perform(scrollTo(), waitForStableLayout())
-            assertFalse(LofitRepository(context).data.voiceCommandsEnabled)
+            assertFalse(LofitRepository(context).data.activeWorkout!!.voiceCommandsEnabled)
             assertFalse(microphoneRunning())
             scenario.onActivity { it.onTimerVoiceCommand(item.plannedSets[0].id) }
             onView(withContentDescription("Start set 1 hold")).perform(click())
@@ -435,7 +433,6 @@ class VoiceTimerFlowTest {
             onView(withContentDescription("Workout options")).perform(scrollTo(), click())
             onView(withText("Voice commands")).perform(click())
             awaitMicrophone(false)
-            assertTrue(LofitRepository(context).data.voiceCommandsEnabled)
             assertFalse(LofitRepository(context).data.activeWorkout!!.voiceCommandsEnabled)
             scenario.onActivity {
                 assertNull(it.visibleWorkoutVoiceTarget())
@@ -481,21 +478,24 @@ class VoiceTimerFlowTest {
         ActivityScenario.launch(MainActivity::class.java).use {
             ready()
             val previousId = LofitRepository(context).data.activeWorkout!!.id
-            onView(withContentDescription("Workout options")).perform(scrollTo(), click())
-            onView(withText("Voice commands")).perform(click())
-            awaitMicrophone(false)
             onView(withText("Discard workout")).perform(scrollTo(), click())
+            awaitMicrophone(false)
             assertNull(LofitRepository(context).data.activeWorkout)
             onView(withText("Start routine")).perform(scrollTo(), click())
-            ready()
+            onView(withContentDescription("Start set 1 hold"))
+                .perform(scrollTo(), waitForStableLayout())
             val next = LofitRepository(context).data.activeWorkout!!
             assertNotEquals(previousId, next.id)
-            assertTrue(next.voiceCommandsEnabled)
+            assertFalse(next.voiceCommandsEnabled)
+            assertFalse(microphoneRunning())
+            onView(withContentDescription("Workout options")).perform(scrollTo(), click())
+            onView(withText("Voice commands")).perform(click())
+            ready()
         }
     }
 
     @Test
-    fun settingsCanDisableAndReenableVoiceForExistingWorkout() {
+    fun settingsHasNoVoiceChoiceAndWorkoutOptionRemainsAvailable() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             fun navigate(label: String) {
                 scenario.onActivity { activity ->
@@ -516,19 +516,17 @@ class VoiceTimerFlowTest {
             }
             ready()
             navigate("Settings")
-            onView(withContentDescription("Voice commands")).perform(scrollTo(), click())
-            assertFalse(LofitRepository(context).data.voiceCommandsEnabled)
+            onView(withText("Voice commands")).check(doesNotExist())
+            onView(withContentDescription("Voice commands")).check(doesNotExist())
             scenario.recreate()
-            navigate(context.getString(R.string.nav_workout))
-            onView(withContentDescription("Start set 1 hold"))
-                .perform(scrollTo(), waitForStableLayout())
-            assertFalse(microphoneRunning())
-            scenario.onActivity { it.onTimerVoiceCommand(item.plannedSets[0].id) }
-            onView(withContentDescription("Start set 1 hold")).check(matches(isDisplayed()))
             navigate("Settings")
-            onView(withContentDescription("Voice commands")).perform(scrollTo(), click())
+            onView(withText("Voice commands")).check(doesNotExist())
             navigate(context.getString(R.string.nav_workout))
             ready()
+            onView(withContentDescription("Workout options")).perform(scrollTo(), click())
+            onView(withText("Voice commands")).perform(click())
+            awaitMicrophone(false)
+            assertFalse(LofitRepository(context).data.activeWorkout!!.voiceCommandsEnabled)
         }
     }
 

@@ -42,10 +42,10 @@ class LockedWorkoutVoiceTest {
             }
         LofitRepository(context).apply {
             data.onboardingComplete = true
-            data.voiceCommandsEnabled = true
             data.bodyMetricsEnabled = false
             data.activeWorkout =
                 WorkoutSession(
+                    voiceCommandsEnabled = true,
                     name = "Locked workout",
                     defaultRestSeconds = 60,
                     exercises =

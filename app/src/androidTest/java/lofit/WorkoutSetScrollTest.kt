@@ -42,11 +42,11 @@ class WorkoutSetScrollTest {
         LofitRepository(context).apply {
             data.onboardingComplete = true
             data.bodyMetricsEnabled = false
-            data.voiceCommandsEnabled = true
             val movement = data.exercises.first { it.id == if (timed) "plank" else "bench-press" }
             val sets = MutableList(count) { PlannedSet(holdSeconds = 1) }
             data.activeWorkout =
                 WorkoutSession(
+                    voiceCommandsEnabled = true,
                     name = "Scroll workout",
                     defaultRestSeconds = rest,
                     exercises =
