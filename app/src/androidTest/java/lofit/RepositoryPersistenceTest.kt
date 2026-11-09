@@ -11,7 +11,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class RepositoryPersistenceTest {
     private val context = RepositoryTestContext("repository-persistence")
-    private val backupKey = "state-before-migration-v3"
+    private val backupKey = "state-before-migration-v4"
 
     @Before
     fun clearData() {

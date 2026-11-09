@@ -23,7 +23,6 @@ internal fun Context.clearRepositoryTestData() {
     assertTrue(getSharedPreferences("lofit-data", 0).edit().clear().commit())
     AtomicFile(repositoryStateFile).delete()
     AtomicFile(repositoryHistoryFile).delete()
-    AtomicFile(File(filesDir, "state-before-migration-v3.json")).delete()
     AtomicFile(File(filesDir, "state-before-migration-v4.json")).delete()
     AtomicFile(File(filesDir, "history-before-migration-v4.json")).delete()
 }

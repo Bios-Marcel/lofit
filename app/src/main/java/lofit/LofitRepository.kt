@@ -99,11 +99,6 @@ class LofitRepository(context: Context) {
                     }
         val root = JSONObject(raw)
         return when (val version = root.optInt("schemaVersion", 0)) {
-            // LEGACY: Schema 2 embeds history in the state file; move it to its own file.
-            2 -> {
-                migrateLegacyExerciseIds(root, root.getJSONArray("history"))
-                persistMigration(raw, decode(root), "state-before-migration-v3")
-            }
             // LEGACY: Schema 3 uses the old exercise IDs in state and separate history.
             3 -> {
                 val historyRaw = historyFile.readFully().toString(Charsets.UTF_8)
@@ -112,7 +107,6 @@ class LofitRepository(context: Context) {
                 persistMigration(
                     raw,
                     decode(root, history.mapObjects(::decodeWorkout).toMutableList()),
-                    "state-before-migration-v4",
                     historyRaw,
                 )
             }
@@ -130,21 +124,19 @@ class LofitRepository(context: Context) {
     private fun persistMigration(
         raw: String,
         data: AppData,
-        backupKey: String,
-        historyBackupRaw: String? = null,
+        historyBackupRaw: String,
     ): AppData {
         val migrated = encode(data)
         val history = encodeHistory(data.history).toString()
         // Validate before changing stored data, and keep the original for recovery.
         val loaded =
             decode(migrated, JSONArray(history).mapObjects(::decodeWorkout).toMutableList())
-        val backup = AtomicFile(File(stateFile.baseFile.parentFile, "$backupKey.json"))
+        val backup =
+            AtomicFile(File(stateFile.baseFile.parentFile, "state-before-migration-v4.json"))
         if (!exists(backup)) write(raw, backup)
-        if (historyBackupRaw != null) {
-            val historyBackup =
-                AtomicFile(File(stateFile.baseFile.parentFile, "history-before-migration-v4.json"))
-            if (!exists(historyBackup)) write(historyBackupRaw, historyBackup)
-        }
+        val historyBackup =
+            AtomicFile(File(stateFile.baseFile.parentFile, "history-before-migration-v4.json"))
+        if (!exists(historyBackup)) write(historyBackupRaw, historyBackup)
         write(history, historyFile)
         write(migrated.toString())
         return loaded
@@ -450,8 +442,7 @@ class LofitRepository(context: Context) {
 
     private fun decode(
         root: JSONObject,
-        history: MutableList<WorkoutSession> =
-            root.getJSONArray("history").mapObjects(::decodeWorkout).toMutableList(),
+        history: MutableList<WorkoutSession>,
     ): AppData {
         val savedExercises = root.getJSONArray("exercises").mapObjects(::decodeExercise)
         val defaults = DefaultData.exercises()
