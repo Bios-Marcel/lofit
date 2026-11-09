@@ -22,6 +22,7 @@ import org.hamcrest.Description
 import org.hamcrest.Matchers.allOf
 import org.hamcrest.Matchers.not
 import org.hamcrest.TypeSafeMatcher
+import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -142,6 +143,13 @@ class LiveWorkoutMeasurementFlowTest {
         reader.update(selected, true)
         return scanner
     }
+
+    // AtomicFile reads through a new repository can delete an in-flight deferred write's .new file.
+    private fun savedWorkoutExercise(): JSONObject =
+        JSONObject(context.repositoryStateFile.readText())
+            .getJSONObject("activeWorkout")
+            .getJSONArray("exercises")
+            .getJSONObject(0)
 
     @Test
     fun scaleCompletion_revealsNextRowAfterRender() {
@@ -385,14 +393,10 @@ class LiveWorkoutMeasurementFlowTest {
                 .perform(
                     replaceText("7"),
                     waitUntil("edited active time saved") {
-                        LofitRepository(context)
-                            .data
-                            .activeWorkout!!
-                            .exercises
-                            .single()
-                            .plannedSets
-                            .single()
-                            .actualHoldSeconds == 7
+                        savedWorkoutExercise()
+                            .getJSONArray("plannedSets")
+                            .getJSONObject(0)
+                            .optInt("actualHoldSeconds", -1) == 7
                     },
                 )
             onView(withContentDescription("Set 1 weight"))
@@ -400,14 +404,10 @@ class LiveWorkoutMeasurementFlowTest {
                 .perform(replaceText("20.5"))
                 .perform(
                     waitUntil("edited target weight saved") {
-                        LofitRepository(context)
-                            .data
-                            .activeWorkout!!
-                            .exercises
-                            .single()
-                            .plannedSets
-                            .single()
-                            .weightKg == 20.5
+                        savedWorkoutExercise()
+                            .getJSONArray("plannedSets")
+                            .getJSONObject(0)
+                            .getDouble("weightKg") == 20.5
                     }
                 )
             assertEquals(
@@ -452,10 +452,11 @@ class LiveWorkoutMeasurementFlowTest {
                 .perform(
                     replaceText("3"),
                     waitUntil("edited measured time saved") {
-                        val item = LofitRepository(context).data.activeWorkout!!.exercises.single()
-                        item.plannedSets.single().actualHoldSeconds == 3 &&
-                            item.plannedSets.single().holdSeconds == 1 &&
-                            item.sets.single().holdSeconds == 3
+                        val item = savedWorkoutExercise()
+                        val planned = item.getJSONArray("plannedSets").getJSONObject(0)
+                        planned.optInt("actualHoldSeconds", -1) == 3 &&
+                            planned.getInt("holdSeconds") == 1 &&
+                            item.getJSONArray("sets").getJSONObject(0).getInt("holdSeconds") == 3
                     },
                 )
             onView(withContentDescription("Scale Pull live weight graph")).check { view, _ ->
