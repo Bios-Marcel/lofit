@@ -42,7 +42,6 @@ internal class PlannedSetViews(
         activeHoldAction: View? = null,
         activeHoldRunning: Boolean = false,
         readOnly: Boolean = false,
-        measured: Boolean = false,
         onWeightReady: (EditText) -> Unit = {},
         onAmountReady: (EditText) -> Unit = {},
         onActiveAmountReady: (EditText) -> Unit = {},
@@ -172,9 +171,8 @@ internal class PlannedSetViews(
                                 contentDescription =
                                     "Set ${currentSetIndex + 1} Active time in seconds"
                                 setPadding(ui.dp(6), 0, ui.dp(6), 0)
-                                // LEGACY: Active time stays read-only while a timer or scale
-                                // controls it.
-                                isEnabled = !activeHoldRunning && !measured
+                                // LEGACY: Running timers keep active time read-only.
+                                isEnabled = !activeHoldRunning
                                 doAfterTextChanged { value ->
                                     if (updatingValues || isUpdatingHoldTimer())
                                         return@doAfterTextChanged

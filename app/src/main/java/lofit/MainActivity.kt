@@ -1640,8 +1640,10 @@ class MainActivity : AppCompatActivity() {
                         onValuesUpdaterReady = { updateRowValues[plannedSet.id] = it },
                         showActiveHold = exercise.type.tracksDuration,
                         activeHoldAction = holdButton,
-                        activeHoldRunning = isActiveHold(item, plannedSet),
-                        measured = liveMeasurement,
+                        activeHoldRunning =
+                            isActiveHold(item, plannedSet) ||
+                                (liveMeasurement &&
+                                    liveWorkoutMeasurement.active?.set?.id == plannedSet.id),
                         onWeightReady = {
                             if (liveMeasurement) liveWeightViews[plannedSet.id] = it
                         },
@@ -3958,6 +3960,7 @@ class MainActivity : AppCompatActivity() {
             if (view.text.toString() != value) view.setText(value)
         }
         liveTimeViews[set.id]?.let { view ->
+            view.isEnabled = liveWorkoutMeasurement.active?.set?.id != set.id
             val value = (set.actualHoldSeconds ?: 0).toString()
             if (view.text.toString() != value) view.setText(value)
         }
