@@ -133,8 +133,7 @@ def create_emulators(sdk, count, template_name):
                 raise RuntimeError("Existing test AVDs use a different profile. Stop them and remove build/test-avds before changing templates.")
         print(f"Starting {name}…", flush=True)
         output = command([ROOT / "scripts/start-emulator.sh", name],
-                         env={**os.environ, "ANDROID_AVD_HOME": str(test_home),
-                              "LOFIT_EMULATOR_HEADLESS": "1"}, timeout=180)
+                         env={**os.environ, "ANDROID_AVD_HOME": str(test_home)}, timeout=180)
         match = re.search(r"Emulator ready: (emulator-\d+)", output)
         if not match:
             raise RuntimeError(f"Emulator startup did not report a serial:\n{output}")
