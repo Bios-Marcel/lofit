@@ -297,7 +297,6 @@ class MainActivity : AppCompatActivity() {
     private val voiceTimerCards = mutableMapOf<String, View>()
     private val voiceDoneButtons = mutableMapOf<String, CheckBox>()
     private val workoutSetRows = mutableMapOf<String, View>()
-    private val voiceSetValueActions = mutableMapOf<String, (VoiceCommand.SetValues) -> Unit>()
     private val voiceTimerButtons = mutableMapOf<String, ImageButton>()
     private var voiceResumed = false
     private var voicePermissionAsked = false
@@ -861,7 +860,6 @@ class MainActivity : AppCompatActivity() {
         voiceTimerButtons.clear()
         voiceDoneButtons.clear()
         workoutSetRows.clear()
-        voiceSetValueActions.clear()
         craneScaleScreens.clear()
         liveWorkoutMeasurement.reconcile()
         liveGraphs.clear()
@@ -1269,7 +1267,6 @@ class MainActivity : AppCompatActivity() {
                         voiceTimerButtons.remove(it.id)
                         voiceDoneButtons.remove(it.id)
                         workoutSetRows.remove(it.id)
-                        voiceSetValueActions.remove(it.id)
                         doneStateUpdaters.remove(it.id)
                     }
                     if (workout.exercises.isEmpty()) {
@@ -1517,7 +1514,6 @@ class MainActivity : AppCompatActivity() {
                     voiceTimerButtons.remove(removedSet.id)
                     voiceDoneButtons.remove(removedSet.id)
                     workoutSetRows.remove(removedSet.id)
-                    voiceSetValueActions.remove(removedSet.id)
                     rowViews.remove(removedSet.id)?.let(setRows::removeView)
                     updateRowIndices.remove(removedSet.id)
                     updateRowValues.remove(removedSet.id)
@@ -1674,17 +1670,6 @@ class MainActivity : AppCompatActivity() {
                             if (!editingHistory) updateWorkoutNotification(force = true)
                         },
                     )
-                if (!editingHistory) {
-                    voiceSetValueActions[plannedSet.id] = applyValues@{ command ->
-                        if (loggedSetFor(item, plannedSet) != null) return@applyValues
-                        if (!applyVoiceSetValues(command, exercise, plannedSet)) return@applyValues
-                        updateRowValues[plannedSet.id]?.invoke()
-                        saveChanges()
-                        onSetsChanged()
-                        updateWorkoutNotification(force = true)
-                        playCue()
-                    }
-                }
                 done.setOnCheckedChangeListener { _, checked ->
                     val currentIndex = item.plannedSets.indexOf(plannedSet)
                     if (currentIndex < 0) return@setOnCheckedChangeListener
@@ -3818,10 +3803,6 @@ class MainActivity : AppCompatActivity() {
         val current = visibleWorkoutVoiceTarget() ?: return
         if (!hasMicrophonePermission()) return
         when (command) {
-            is VoiceCommand.SetValues -> {
-                if (target.done == null || target.done != current.done) return
-                voiceSetValueActions[target.done.setId]?.invoke(command)
-            }
             VoiceCommand.TIME -> {
                 if (target.timer != null && target.timer == current.timer) {
                     onTimerVoiceCommand(target.timer.setId)

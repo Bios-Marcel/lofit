@@ -52,7 +52,11 @@ class LockedWorkoutVoiceTest {
                         mutableListOf(
                             WorkoutExercise(
                                 exerciseId = "back-squat",
-                                plannedSets = mutableListOf(PlannedSet(), PlannedSet()),
+                                plannedSets =
+                                    mutableListOf(
+                                        PlannedSet(weightKg = 50.0, reps = 8),
+                                        PlannedSet(),
+                                    ),
                             )
                         ),
                 )
@@ -125,8 +129,8 @@ class LockedWorkoutVoiceTest {
         }
     }
 
-    /** Keep real audio coverage for locked-screen values and timer commands. */
-    private fun speak(phrase: String, expected: VoiceCommand) {
+    /** Exercise the real recognizer while the service owns the locked workout. */
+    private fun speak(phrase: String, expected: VoiceCommand? = null) {
         lateinit var service: WorkoutVoiceService
         lateinit var target: WorkoutVoiceTarget
         instrumentation.runOnMainSync {
@@ -147,11 +151,11 @@ class LockedWorkoutVoiceTest {
                 }
             }
         }
-        assertEquals(listOf(expected), commands)
+        assertEquals(listOfNotNull(expected), commands)
     }
 
     @Test
-    fun weightedTimedGoalCanBeUpdatedWithScreenLocked() {
+    fun spokenSetValuesLeaveWeightedTimedGoalUnchangedWithScreenLocked() {
         LofitRepository(context).apply {
             val exercise =
                 data.exercises
@@ -164,7 +168,9 @@ class LockedWorkoutVoiceTest {
                     WorkoutExercise(
                         exerciseId = exercise.id,
                         plannedSets =
-                            mutableListOf(PlannedSet(holdSeconds = 60, actualHoldSeconds = 7)),
+                            mutableListOf(
+                                PlannedSet(weightKg = 20.0, holdSeconds = 60, actualHoldSeconds = 7)
+                            ),
                     )
                 )
             }
@@ -173,21 +179,21 @@ class LockedWorkoutVoiceTest {
         ActivityScenario.launch(MainActivity::class.java).use {
             ready()
             lock()
-            command(VoiceCommand.SetValues(12.5, 30))
+            speak("lessac-set-timed")
             val item = LofitRepository(context).data.activeWorkout!!.exercises.single()
-            assertEquals(12.5, item.plannedSets.single().weightKg, 0.0)
-            assertEquals(30, item.plannedSets.single().holdSeconds)
+            assertEquals(20.0, item.plannedSets.single().weightKg, 0.0)
+            assertEquals(60, item.plannedSets.single().holdSeconds)
             assertEquals(7, item.plannedSets.single().actualHoldSeconds)
             assertTrue(item.sets.isEmpty())
             wake()
             onView(withContentDescription("Set 1 Goal time in seconds"))
-                .check(matches(withText("30")))
-            onView(withContentDescription("Set 1 weight")).check(matches(withText("12.5")))
+                .check(matches(withText("60")))
+            onView(withContentDescription("Set 1 weight")).check(matches(withText("20")))
         }
     }
 
     @Test
-    fun unweightedTimedGoalAcceptsSingleValueWithScreenLocked() {
+    fun spokenSetValuesLeaveUnweightedTimedGoalUnchangedWithScreenLocked() {
         LofitRepository(context).apply {
             data.activeWorkout!!.exercises.apply {
                 clear()
@@ -203,9 +209,9 @@ class LockedWorkoutVoiceTest {
         ActivityScenario.launch(MainActivity::class.java).use {
             ready()
             lock()
-            command(VoiceCommand.SetValues(null, 30))
+            speak("lessac-set-seconds")
             assertEquals(
-                30,
+                60,
                 LofitRepository(context)
                     .data
                     .activeWorkout!!
@@ -218,26 +224,26 @@ class LockedWorkoutVoiceTest {
             assertEquals(0, LofitRepository(context).data.activeWorkout!!.setCount())
             wake()
             onView(withContentDescription("Set 1 Goal time in seconds"))
-                .check(matches(withText("30")))
+                .check(matches(withText("60")))
         }
     }
 
     @Test
-    fun lockedScreenAcceptsNumbersDoneAndSkipAndRefreshesOnUnlock() {
+    fun lockedScreenIgnoresSetValuesAndStillAcceptsDoneAndSkip() {
         ActivityScenario.launch(MainActivity::class.java).use {
             ready()
             lock()
-            speak("lessac-set-decimal", VoiceCommand.SetValues(12.5, 10))
-            command(VoiceCommand.DONE)
-            command(VoiceCommand.SKIP)
+            speak("lessac-set-decimal")
+            speak("lessac-done", VoiceCommand.DONE)
+            speak("lessac-skip", VoiceCommand.SKIP)
             val item = LofitRepository(context).data.activeWorkout!!.exercises.single()
-            assertEquals(12.5, item.sets.single().weightKg, 0.0)
-            assertEquals(10, item.sets.single().reps)
+            assertEquals(50.0, item.sets.single().weightKg, 0.0)
+            assertEquals(8, item.sets.single().reps)
             assertEquals(0.0, item.plannedSets[1].weightKg, 0.0)
             assertTrue(microphoneRunning())
             wake()
             onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
-            onView(withContentDescription("Set 1 weight")).check(matches(withText("12.5")))
+            onView(withContentDescription("Set 1 weight")).check(matches(withText("50")))
             onView(withContentDescription("Rest timer overlay"))
                 .check(matches(withEffectiveVisibility(Visibility.GONE)))
         }
@@ -247,7 +253,6 @@ class LockedWorkoutVoiceTest {
     fun serviceKeepsListeningAfterActivityDestructionAndNewScreenUsesSameWorkout() {
         ActivityScenario.launch(MainActivity::class.java).use { ready() }
         await { background() && microphoneRunning() }
-        command(VoiceCommand.SetValues(50.0, 8))
         command(VoiceCommand.DONE)
         ActivityScenario.launch(MainActivity::class.java).use {
             onView(withContentDescription("Set 1 done"))

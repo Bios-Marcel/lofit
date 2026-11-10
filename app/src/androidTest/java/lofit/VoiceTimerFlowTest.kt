@@ -96,7 +96,7 @@ class VoiceTimerFlowTest {
     private fun speak(
         scenario: ActivityScenario<MainActivity>,
         word: String,
-        expected: VoiceCommand,
+        expected: VoiceCommand? = null,
     ) {
         lateinit var target: WorkoutVoiceTarget
         scenario.onActivity { target = it.visibleWorkoutVoiceTarget()!! }
@@ -116,106 +116,37 @@ class VoiceTimerFlowTest {
                 }
             }
         }
-        assertEquals(listOf(expected), commands)
+        assertEquals(listOfNotNull(expected), commands)
     }
 
     @Test
-    fun spokenNumbersUpdateOnlyCurrentRepetitionSetAndPersistUntilDone() {
+    fun spokenSetValuesLeaveRepetitionSetUnchanged() {
         LofitRepository(context).apply {
             item = item.copy(exerciseId = "back-squat")
+            item.plannedSets[0].apply {
+                weightKg = 50.0
+                reps = 8
+            }
             data.activeWorkout!!.exercises[0] = item
             save()
         }
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             onView(withContentDescription("Set 1 done")).perform(scrollTo(), waitForStableLayout())
             awaitMicrophone(true)
-            lateinit var firstTarget: WorkoutVoiceTarget
-            scenario.onActivity { firstTarget = it.visibleWorkoutVoiceTarget()!! }
-            scenario.moveToState(Lifecycle.State.CREATED)
-            scenario.onActivity {
-                it.onWorkoutVoiceCommand(VoiceCommand.SetValues(99.0, 99), firstTarget)
-            }
-            assertEquals(
-                0.0,
-                LofitRepository(context)
-                    .data
-                    .activeWorkout!!
-                    .exercises
-                    .single()
-                    .plannedSets[0]
-                    .weightKg,
-                0.0,
-            )
-            scenario.moveToState(Lifecycle.State.RESUMED)
-            onView(withContentDescription("Set 1 done")).perform(scrollTo(), waitForStableLayout())
-            awaitMicrophone(true)
-            speak(scenario, "set-decimal", VoiceCommand.SetValues(12.5, 10))
-            onView(withContentDescription("Set 1 weight")).check(matches(withText("12.5")))
-            onView(withContentDescription("Set 1 Repetitions")).check(matches(withText("10")))
+            speak(scenario, "set-decimal")
+            onView(withContentDescription("Set 1 weight")).check(matches(withText("50")))
+            onView(withContentDescription("Set 1 Repetitions")).check(matches(withText("8")))
             onView(withContentDescription("Set 1 done")).check(matches(isNotChecked()))
             val saved = LofitRepository(context).data.activeWorkout!!.exercises.single()
-            assertEquals(12.5, saved.plannedSets[0].weightKg, 0.0)
-            assertEquals(10, saved.plannedSets[0].reps)
+            assertEquals(50.0, saved.plannedSets[0].weightKg, 0.0)
+            assertEquals(8, saved.plannedSets[0].reps)
             assertEquals(0.0, saved.plannedSets[1].weightKg, 0.0)
             assertTrue(saved.sets.isEmpty())
-            scenario.recreate()
-            onView(withContentDescription("Set 1 done")).perform(scrollTo(), waitForStableLayout())
-            awaitMicrophone(true)
-            onView(withContentDescription("Set 1 weight")).check(matches(withText("12.5")))
-            command(scenario, VoiceCommand.DONE)
-            scenario.onActivity {
-                it.onWorkoutVoiceCommand(VoiceCommand.SetValues(99.0, 99), firstTarget)
-            }
-            command(scenario, VoiceCommand.SetValues(50.0, 8))
-            val completed = LofitRepository(context).data.activeWorkout!!.exercises.single()
-            assertEquals(12.5, completed.sets.single().weightKg, 0.0)
-            assertEquals(10, completed.sets.single().reps)
-            assertEquals(50.0, completed.plannedSets[1].weightKg, 0.0)
-            assertEquals(8, completed.plannedSets[1].reps)
-            assertEquals(1, completed.sets.size)
         }
     }
 
     @Test
-    fun unweightedRepetitionSetsAcceptSingleValueOnly() {
-        LofitRepository(context).apply {
-            val exercise =
-                data.exercises
-                    .first { it.id == "back-squat" }
-                    .copy(id = "voice-unweighted", custom = true, weighted = false)
-            data.exercises.add(exercise)
-            item = item.copy(exerciseId = exercise.id)
-            data.activeWorkout!!.exercises[0] = item
-            save()
-        }
-        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-            onView(withContentDescription("Set 1 done")).perform(scrollTo(), waitForStableLayout())
-            awaitMicrophone(true)
-            scenario.onActivity {
-                val target = it.visibleWorkoutVoiceTarget()!!
-                it.onWorkoutVoiceCommand(VoiceCommand.SetValues(50.0, 12), target)
-            }
-            assertEquals(
-                8,
-                LofitRepository(context)
-                    .data
-                    .activeWorkout!!
-                    .exercises
-                    .single()
-                    .plannedSets[0]
-                    .reps,
-            )
-            command(scenario, VoiceCommand.SetValues(null, 15))
-            onView(withContentDescription("Set 1 Repetitions")).check(matches(withText("15")))
-            val saved = LofitRepository(context).data.activeWorkout!!.exercises.single()
-            assertEquals(0.0, saved.plannedSets[0].weightKg, 0.0)
-            assertEquals(15, saved.plannedSets[0].reps)
-            assertTrue(saved.sets.isEmpty())
-        }
-    }
-
-    @Test
-    fun weightedTimedSetUpdatesWeightAndGoalWithoutChangingElapsedTime() {
+    fun spokenSetValuesLeaveTimedGoalAndElapsedTimeUnchanged() {
         LofitRepository(context).apply {
             val exercise =
                 data.exercises
@@ -223,60 +154,28 @@ class VoiceTimerFlowTest {
                     .copy(id = "voice-weighted-hold", custom = true, weighted = true)
             data.exercises.add(exercise)
             item = item.copy(exerciseId = exercise.id)
-            item.plannedSets[0].actualHoldSeconds = 7
+            item.plannedSets[0].apply {
+                weightKg = 20.0
+                actualHoldSeconds = 7
+            }
             data.activeWorkout!!.exercises[0] = item
             save()
         }
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             ready()
-            command(scenario, VoiceCommand.SetValues(12.5, 30))
-            onView(withContentDescription("Set 1 weight")).check(matches(withText("12.5")))
+            speak(scenario, "set-timed")
+            speak(scenario, "set-seconds")
+            onView(withContentDescription("Set 1 weight")).check(matches(withText("20")))
             onView(withContentDescription("Set 1 Goal time in seconds"))
-                .check(matches(withText("30")))
+                .check(matches(withText("60")))
             onView(withContentDescription("Set 1 Active time in seconds"))
                 .check(matches(withText("7")))
             onView(withContentDescription("Set 1 done")).check(matches(isNotChecked()))
-            command(scenario, VoiceCommand.SetValues(null, 15))
             val saved = LofitRepository(context).data.activeWorkout!!.exercises.single()
-            assertEquals(12.5, saved.plannedSets[0].weightKg, 0.0)
-            assertEquals(30, saved.plannedSets[0].holdSeconds)
-            assertEquals(7, saved.plannedSets[0].actualHoldSeconds)
-            assertEquals(60, saved.plannedSets[1].holdSeconds)
-            assertTrue(saved.sets.isEmpty())
-            scenario.recreate()
-            ready()
-            onView(withContentDescription("Set 1 Goal time in seconds"))
-                .check(matches(withText("30")))
-            onView(withContentDescription("Set 1 weight")).check(matches(withText("12.5")))
-        }
-    }
-
-    @Test
-    fun unweightedTimedSetUsesSingleValueAsGoalSeconds() {
-        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-            ready()
-            command(scenario, VoiceCommand.SetValues(50.0, 8))
-            val saved = LofitRepository(context).data.activeWorkout!!.exercises.single()
-            assertEquals(0.0, saved.plannedSets[0].weightKg, 0.0)
+            assertEquals(20.0, saved.plannedSets[0].weightKg, 0.0)
             assertEquals(60, saved.plannedSets[0].holdSeconds)
+            assertEquals(7, saved.plannedSets[0].actualHoldSeconds)
             assertTrue(saved.sets.isEmpty())
-            command(scenario, VoiceCommand.SetValues(null, 30))
-            onView(withContentDescription("Set 1 Goal time in seconds"))
-                .check(matches(withText("30")))
-            onView(withContentDescription("Start set 1 hold")).check(matches(isDisplayed()))
-            assertEquals(
-                30,
-                LofitRepository(context)
-                    .data
-                    .activeWorkout!!
-                    .exercises
-                    .single()
-                    .plannedSets[0]
-                    .holdSeconds,
-            )
-            assertTrue(
-                LofitRepository(context).data.activeWorkout!!.exercises.single().sets.isEmpty()
-            )
         }
     }
 
@@ -342,7 +241,6 @@ class VoiceTimerFlowTest {
             scenario.onActivity {
                 it.onWorkoutVoiceCommand(VoiceCommand.DONE, target)
                 it.onWorkoutVoiceCommand(VoiceCommand.SKIP, target)
-                it.onWorkoutVoiceCommand(VoiceCommand.SetValues(50.0, 10), target)
             }
             scenario.moveToState(Lifecycle.State.RESUMED)
             onView(withContentDescription("Set 2 done")).check(matches(isNotChecked()))

@@ -13,7 +13,8 @@ SHA-256: 30f26242c4eb449f948e42cb302dd7a686cb29a3423a8367f99ff41780942498
 
 model.zip is the unmodified upstream model archive, renamed for packaging.
 It is bundled with the APK and unpacked locally on first use. No model download
-is needed at runtime. grammar.json limits recognition to "time", similar words
-and an unknown-word path. Only the exact result "time" starts or stops a timer.
+is needed at runtime. grammar.json limits recognition to "time", "done", "skip",
+competing words (including ignored numbers) and an unknown-word path.
+Only the exact controls trigger actions.
 
 See LICENSE for the Apache License 2.0 text.

@@ -47,24 +47,24 @@ class TimeKeywordDetectorTest {
     }
 
     @Test
-    fun recognizesFullNumberCommandsAndRejectsIncompletePhrases() {
+    fun removedSetCommandsDoNotTriggerWorkoutControls() {
         TimeKeywordDetector(instrumentation.targetContext).use { model ->
             for (voice in listOf("lessac", "amy")) {
-                for ((phrase, expected) in
+                for (phrase in
                     listOf(
-                        "set-values" to VoiceCommand.SetValues(50.0, 8),
-                        "set-decimal" to VoiceCommand.SetValues(12.5, 10),
-                        "set-hundred" to VoiceCommand.SetValues(125.0, 12),
-                        "set-zero" to VoiceCommand.SetValues(0.0, 15),
-                        "set-single" to VoiceCommand.SetValues(null, 15),
-                        "set-seconds" to VoiceCommand.SetValues(null, 30),
-                        "set-four" to VoiceCommand.SetValues(null, 4),
-                        "set-four-pair" to VoiceCommand.SetValues(4.0, 4),
-                        "set-timed" to VoiceCommand.SetValues(12.5, 30),
-                        "set-for" to null,
-                        "set-incomplete" to null,
-                        "set-reversed" to null,
-                        "set-negative" to null,
+                        "set-values",
+                        "set-decimal",
+                        "set-hundred",
+                        "set-zero",
+                        "set-single",
+                        "set-seconds",
+                        "set-four",
+                        "set-four-pair",
+                        "set-timed",
+                        "set-for",
+                        "set-incomplete",
+                        "set-reversed",
+                        "set-negative",
                     )) {
                     model.reset()
                     val audio = samples("$voice-$phrase")
@@ -74,7 +74,10 @@ class TimeKeywordDetectorTest {
                             .accept(audio.copyOfRange(offset, minOf(offset + 320, audio.size)))
                             ?.let(commands::add)
                     }
-                    assertEquals("$voice-$phrase", listOfNotNull(expected), commands)
+                    assertTrue(
+                        "Unexpected control for $voice-$phrase: $commands",
+                        commands.isEmpty(),
+                    )
                 }
             }
         }

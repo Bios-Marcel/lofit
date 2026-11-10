@@ -5,30 +5,39 @@ import org.junit.Test
 
 class VoiceCommandTest {
     @Test
-    fun parsesWeightsAndRepsIncludingDecimalsAndHundreds() {
+    fun parsesOnlyExactWorkoutControls() {
         for ((text, expected) in
             listOf(
-                "set fifteen" to VoiceCommand.SetValues(null, 15),
-                "set thirty" to VoiceCommand.SetValues(null, 30),
-                "set four" to VoiceCommand.SetValues(null, 4),
-                "set four times four" to VoiceCommand.SetValues(4.0, 4),
-                "set fifty four" to VoiceCommand.SetValues(null, 54),
-                "set twelve point five times thirty" to VoiceCommand.SetValues(12.5, 30),
-                "set fifty times eight" to VoiceCommand.SetValues(50.0, 8),
-                "set twelve point five times ten" to VoiceCommand.SetValues(12.5, 10),
-                "set one hundred and twenty five times twelve" to VoiceCommand.SetValues(125.0, 12),
-                "set two hundred times twenty one" to VoiceCommand.SetValues(200.0, 21),
-                "set zero times fifteen" to VoiceCommand.SetValues(0.0, 15),
-                "set two point two five times six" to VoiceCommand.SetValues(2.25, 6),
-                "set one thousand five hundred times one" to VoiceCommand.SetValues(1500.0, 1),
+                "time" to VoiceCommand.TIME,
+                "done" to VoiceCommand.DONE,
+                "skip" to VoiceCommand.SKIP,
             )) assertEquals(text, expected, parseVoiceCommand(text))
     }
 
     @Test
-    fun rejectsIncompleteExtraAndInvalidNumbers() {
+    fun rejectsRemovedSetCommandsAndExtraWords() {
         for (text in
             listOf(
                 "set",
+                "set fifteen",
+                "set thirty",
+                "set four",
+                "set four times four",
+                "set fifty four",
+                "set twelve point five times thirty",
+                "set fifty times eight",
+                "set twelve point five times ten",
+                "set one hundred and twenty five times twelve",
+                "set two hundred times twenty one",
+                "set zero times fifteen",
+                "set two point two five times six",
+                "set one thousand five hundred times one",
+                "",
+                "timer",
+                "times",
+                "done please",
+                "skip rest",
+                "time now",
                 "set fifty for eight",
                 "set zero",
                 "set minus five",
@@ -56,21 +65,36 @@ class VoiceCommandTest {
     }
 
     @Test
-    fun waitsForFinalNumbersAndDoesNotCompleteOrToggleTwice() {
+    fun ignoresSetCommandsInPartialAndFinalResults() {
         val gate = VoiceCommandGate()
-        assertNull(gate.accept("set fifty", false))
-        assertNull(gate.accept("set fifty times eight", false))
-        assertNull(gate.accept("set fifty times eighty", false))
-        assertEquals(VoiceCommand.SetValues(50.0, 80), gate.accept("set fifty times eighty", true))
-        assertNull(gate.accept("", true))
-        assertNull(gate.accept("set thirty", false))
-        assertEquals(VoiceCommand.SetValues(null, 30), gate.accept("set thirty", true))
-        assertEquals(VoiceCommand.DONE, gate.accept("done", false))
-        assertNull(gate.accept("done", true))
+        for (text in listOf("set fifty", "set fifty times eight", "set thirty")) {
+            assertNull(gate.accept(text, false))
+            assertNull(gate.accept(text, true))
+        }
+        assertEquals(VoiceCommand.TIME, gate.accept("time", false))
+    }
+
+    @Test
+    fun controlsRespondToPartialResultsOncePerUtterance() {
+        for ((text, expected) in
+            listOf(
+                "time" to VoiceCommand.TIME,
+                "done" to VoiceCommand.DONE,
+                "skip" to VoiceCommand.SKIP,
+            )) {
+            val gate = VoiceCommandGate()
+            assertEquals(expected, gate.accept(text, false))
+            assertNull(gate.accept(text, false))
+            assertNull(gate.accept(text, true))
+            assertEquals(expected, gate.accept(text, true))
+        }
+    }
+
+    @Test
+    fun resetAllowsAnotherCommandBeforeUtteranceEnds() {
+        val gate = VoiceCommandGate()
         assertEquals(VoiceCommand.TIME, gate.accept("time", false))
         gate.reset()
         assertEquals(VoiceCommand.TIME, gate.accept("time", false))
-        assertNull(gate.accept("time", true))
-        assertEquals(VoiceCommand.SKIP, gate.accept("skip", true))
     }
 }

@@ -5,6 +5,10 @@ for each new workout and stays enabled only for that workout, including after
 reopening it. When disabled, no model is prepared and no
 microphone access is requested.
 
+The commands are “time” to start or stop a manual timer, “done” to complete the
+current set, and “skip” to end rest. Edit weight, repetitions, and goal time in
+the set fields.
+
 Say “time” while an unfinished timed exercise is visible in an active workout.
 Lofit asks for microphone access the first time this applies. The command starts
 the first unfinished set in the first visible eligible exercise, in workout
@@ -24,7 +28,7 @@ Android speech services, accounts, runtime downloads, or network access. Audio
 is processed in memory and is not saved. The model stays warm during the
 workout's lifetime, uses 20 ms microphone reads and streaming partial results, and
 does not wait for a full dictation result. Similar words compete in the decoder;
-only “time” is an action. Source, license, and checksums are in
+only “time”, “done”, and “skip” are actions. Source, license, and checksums are in
 `app/src/main/assets/voice-time/NOTICE.txt`.
 
 Finishing or discarding the workout stops capture and releases the recognizer

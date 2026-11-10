@@ -32,59 +32,18 @@ class WorkoutVoiceSessionTest {
     private val session = WorkoutVoiceSession({ data }, { saves++ }, { now })
 
     @Test
-    fun updatesGoalsForAllFourExerciseKindsWithoutChangingElapsedTime() {
-        for (weighted in listOf(false, true)) {
-            for (exercise in listOf(reps, timed)) {
-                exercise.weighted = weighted
-                val item = if (exercise === reps) first else hold
-                val set = item.plannedSets[0]
-                set.actualHoldSeconds = 7
-                session.preferredExerciseId = item.id
-                val target = session.backgroundTarget()!!
-                val command = VoiceCommand.SetValues(if (weighted) 12.5 else null, 30)
-                assertNotNull(session.apply(command, target))
-                assertEquals(30, if (exercise.type.tracksDuration) set.holdSeconds else set.reps)
-                assertEquals(if (weighted) 12.5 else 0.0, set.weightKg, 0.0)
-                assertEquals(7, set.actualHoldSeconds)
-                assertNull(session.activeHoldPlannedSetId)
-                assertTrue(item.sets.isEmpty())
-                val wrongShape = command.copy(weightKg = if (weighted) null else 50.0, amount = 99)
-                assertNull(session.apply(wrongShape, target))
-                assertEquals(30, if (exercise.type.tracksDuration) set.holdSeconds else set.reps)
-            }
+    fun completesAndAdvancesSetsWithoutViewsAndRejectsStaleTargets() {
+        first.plannedSets[0].apply {
+            weightKg = 52.5
+            this.reps = 12
         }
-    }
-
-    @Test
-    fun changingRunningHoldGoalKeepsElapsedTimeAndUsesNewGoal() {
-        timed.weighted = true
-        session.preferredExerciseId = hold.id
-        session.apply(VoiceCommand.TIME, session.backgroundTarget()!!)
-        now += 5000
-        assertFalse(session.tick())
-        session.apply(VoiceCommand.SetValues(12.5, 30), session.backgroundTarget()!!)
-        assertEquals(5, hold.plannedSets[0].actualHoldSeconds)
-        now += 5000
-        assertFalse(session.tick())
-        assertTrue(hold.sets.isEmpty())
-        now += 20_000
-        assertTrue(session.tick())
-        assertEquals(30, hold.sets.single().holdSeconds)
-        assertEquals(12.5, hold.sets.single().weightKg, 0.0)
-    }
-
-    @Test
-    fun updatesCompletesAndAdvancesSetsWithoutViewsAndRejectsStaleTargets() {
         val target = session.backgroundTarget()!!
         assertNull(target.timer)
-        assertNotNull(session.apply(VoiceCommand.SetValues(52.5, 12), target))
         assertTrue(first.sets.isEmpty())
-        assertEquals(52.5, first.plannedSets[0].weightKg, 0.0)
         assertEquals(WorkoutVoiceSession.Cue.DONE, session.apply(VoiceCommand.DONE, target))
         assertEquals(12, first.sets.single().reps)
         assertEquals(52.5, first.sets.single().weightKg, 0.0)
         assertNull(session.apply(VoiceCommand.DONE, target))
-        assertNull(session.apply(VoiceCommand.SetValues(99.0, 99), target))
         val next = session.backgroundTarget()!!
         assertEquals(first.plannedSets[1].id, next.done!!.setId)
         assertEquals(31_000L, next.restEndsAt)
@@ -93,7 +52,7 @@ class WorkoutVoiceSessionTest {
         session.apply(VoiceCommand.DONE, session.backgroundTarget()!!)
         assertNull(session.apply(VoiceCommand.SKIP, next.copy(restEndsAt = 999)))
         assertEquals(hold.id, session.backgroundTarget()!!.done!!.exerciseId)
-        assertEquals(3, saves)
+        assertEquals(2, saves)
     }
 
     @Test
@@ -493,7 +452,6 @@ class WorkoutVoiceSessionTest {
                 VoiceCommand.TIME,
                 VoiceCommand.DONE,
                 VoiceCommand.SKIP,
-                VoiceCommand.SetValues(null, 99),
             )
             .forEach { assertNull(session.apply(it, target)) }
         assertNull(session.activeHoldPlannedSetId)

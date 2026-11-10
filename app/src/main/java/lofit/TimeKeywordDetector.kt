@@ -22,6 +22,7 @@ internal interface VoiceKeywordDetector : AutoCloseable {
 }
 
 internal class TimeKeywordDetector(context: Context) : VoiceKeywordDetector {
+    // LEGACY: Keep number words as ignored competitors to reduce false controls from set phrases.
     private val grammar =
         context.assets.open("voice-time/grammar.json").bufferedReader().use { it.readText() }
     private val model = Model(prepareModel(context).absolutePath)

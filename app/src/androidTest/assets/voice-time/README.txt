@@ -19,7 +19,8 @@ of leading silence and 1 second of trailing silence. Files are raw signed
 little-endian PCM16. These fixtures test streaming recognition and latency;
 they do not establish real-world accuracy across speakers or noisy gyms.
 
-Number-command fixtures (Piper lessac and amy, same resampling, 1.5 seconds trailing silence):
+Removed set-command fixtures, all rejected (Piper lessac and amy, same resampling,
+1.5 seconds trailing silence):
 set-values: set fifty times eight
 set-decimal: set twelve point five times ten
 set-hundred: set one hundred and twenty five times twelve

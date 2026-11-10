@@ -86,10 +86,6 @@ internal class WorkoutVoiceSession(
         val (item, set) = resolve(target) ?: return null
         val exercise = data().exercises.firstOrNull { it.id == item.exerciseId } ?: return null
         when (command) {
-            is VoiceCommand.SetValues -> {
-                if (item.sets.any { it.plannedSetId == set.id }) return null
-                if (!applyVoiceSetValues(command, exercise, set)) return null
-            }
             VoiceCommand.TIME -> {
                 if (activeTarget() == target) stopHold(item, set, exercise)
                 else startHold(item, set)
