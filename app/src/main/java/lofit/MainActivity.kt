@@ -1138,11 +1138,7 @@ class MainActivity : AppCompatActivity() {
                 body.addView(
                     ui.card {
                         addView(ui.titleText(routine.name))
-                        addView(
-                            ui.metaText(
-                                "${routine.exercises.size} exercises · ${routine.defaultRestSeconds}s default rest"
-                            )
-                        )
+                        addView(ui.metaText("${routine.exercises.size} exercises"))
                         addView(
                             exerciseMuscleMaps(
                                 routine.exercises.map { it.exerciseId to it.plannedSets.size }

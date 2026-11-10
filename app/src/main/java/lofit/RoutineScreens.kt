@@ -40,7 +40,6 @@ internal class RoutineScreens(
                 body.addView(
                     ui.card {
                         addView(ui.titleText(routine.name))
-                        addView(ui.metaText("Default rest ${routine.defaultRestSeconds}s"))
                         addView(
                             muscleMaps(
                                 routine.exercises.map { it.exerciseId to it.plannedSets.size }
