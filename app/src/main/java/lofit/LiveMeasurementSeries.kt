@@ -11,6 +11,7 @@ internal class LiveMeasurementSeries {
 
     private val buffer = ArrayDeque<Sample>()
     private var nextStartsSegment = true
+    var lastPullAverageKg: Double? = null
     val samples: List<Sample>
         get() = buffer.toList()
 

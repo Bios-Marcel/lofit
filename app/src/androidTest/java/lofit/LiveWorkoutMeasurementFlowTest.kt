@@ -80,7 +80,8 @@ class LiveWorkoutMeasurementFlowTest {
                         mutableListOf(
                             WorkoutExercise(
                                 exerciseId = movement.id,
-                                plannedSets = mutableListOf(PlannedSet(holdSeconds = 1)),
+                                plannedSets =
+                                    mutableListOf(PlannedSet(weightKg = 50.0, holdSeconds = 1)),
                             )
                         ),
                 )
@@ -183,7 +184,7 @@ class LiveWorkoutMeasurementFlowTest {
     }
 
     @Test
-    fun voiceDoneCompletesActiveScaleSetAndKeepsItsMeasurement() {
+    fun voiceDoneCompletesActiveScaleSetAndKeepsEnteredWeight() {
         LofitRepository(context).apply {
             data.activeWorkout!!.voiceCommandsEnabled = true
             data.activeWorkout!!.exercises.single().plannedSets.single().holdSeconds = 60
@@ -206,7 +207,11 @@ class LiveWorkoutMeasurementFlowTest {
             onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
             val saved = LofitRepository(context).data.activeWorkout!!.exercises.single()
             assertEquals(1, saved.sets.size)
-            assertEquals(20.0, saved.sets.single().weightKg, 0.01)
+            assertEquals(50.0, saved.plannedSets.single().weightKg, 0.0)
+            assertEquals(50.0, saved.sets.single().weightKg, 0.0)
+            onView(withContentDescription("Set 1 weight")).check(matches(withText("50")))
+            onView(withContentDescription("Scale Pull live weight graph"))
+                .perform(waitUntilMatches(withLastPullAverage(20.0)))
             assertEquals(2, saved.plannedSets.single().actualHoldSeconds)
         }
     }
@@ -380,7 +385,7 @@ class LiveWorkoutMeasurementFlowTest {
     }
 
     @Test
-    fun scaleDrivesTimerReleaseCompletesAndMeanAppearsInSet() {
+    fun nonFailureScaleTimerStopsAtGoalAndKeepsEnteredWeight() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             lateinit var scanner: FakeScanner
             scenario.onActivity { scanner = fakeScanner(it) }
@@ -426,6 +431,9 @@ class LiveWorkoutMeasurementFlowTest {
             onView(withContentDescription("Set 1 Active time in seconds"))
                 .check(matches(not(isEnabled())))
                 .check(matches(withText("0")))
+            onView(withContentDescription("Set 1 weight"))
+                .check(matches(withText("20.5")))
+                .perform(replaceText("21.75"))
             scenario.onActivity { scaleTimeMillis += 150 }
             scenario.onActivity {
                 scanner.reading(selected, 15.113)
@@ -434,18 +442,23 @@ class LiveWorkoutMeasurementFlowTest {
             scenario.onActivity { scaleTimeMillis += 1_100 }
             onView(withContentDescription("Set 1 Active time in seconds"))
                 .perform(waitUntilMatches(withText("1")))
-            onView(withContentDescription("Set 1 done")).check(matches(not(isChecked())))
+            onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
+            onView(withContentDescription("Set 1 Active time in seconds"))
+                .check(matches(isEnabled()))
+            scenario.onActivity { scaleTimeMillis += 2_000 }
+            onView(withContentDescription("Set 1 Active time in seconds"))
+                .check(matches(withText("1")))
             scenario.onActivity {
                 scanner.reading(CraneScaleDevice("AA:BB:CC:DD:EE:02", "Other"), 99.0)
                 scanner.reading(selected, 2.0)
                 scanner.reading(selected, 1.0)
             }
             onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
-            onView(withContentDescription("Set 1 weight")).check(matches(withText("15.12")))
+            onView(withContentDescription("Set 1 weight")).check(matches(withText("21.75")))
             onView(withContentDescription("Rest timer overlay")).check(matches(isDisplayed()))
             val saved =
                 LofitRepository(context).data.activeWorkout!!.exercises.single().sets.single()
-            assertEquals(15.12, saved.weightKg, 0.0)
+            assertEquals(21.75, saved.weightKg, 0.0)
             assertTrue(saved.holdSeconds >= 1)
             onView(withContentDescription("Set 1 Active time in seconds"))
                 .check(matches(isEnabled()))
@@ -464,11 +477,25 @@ class LiveWorkoutMeasurementFlowTest {
                     listOf(1.1, 15.113, 15.133, 2.0, 1.0),
                     (view as LiveMeasurementGraphView).series.samples.map { it.kilograms },
                 )
+                val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+                view.draw(Canvas(bitmap))
+                val headerBottom = (20 * view.resources.displayMetrics.density).toInt()
+                assertTrue(
+                    "Average label is drawn above the graph",
+                    (0 until headerBottom).any { y ->
+                        (view.width / 2 until view.width).any { x ->
+                            bitmap.getPixel(x, y) ushr 24 != 0
+                        }
+                    },
+                )
+                bitmap.recycle()
             }
+            onView(withContentDescription("Scale Pull live weight graph"))
+                .perform(waitUntilMatches(withLastPullAverage(15.12)))
             onView(withContentDescription("Set 1 weight"))
                 .perform(
                     replaceText("16.5"),
-                    waitUntil("edited measured weight saved") {
+                    waitUntil("edited weight saved") {
                         LofitRepository(context)
                             .data
                             .activeWorkout!!
@@ -494,12 +521,55 @@ class LiveWorkoutMeasurementFlowTest {
             scenario.recreate()
             onView(withContentDescription("Scale Pull live weight graph")).check { view, _ ->
                 assertTrue((view as LiveMeasurementGraphView).series.samples.isEmpty())
+                assertNull(view.series.lastPullAverageKg)
             }
             onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
             onView(withContentDescription("Set 1 weight")).check(matches(withText("16.5")))
             onView(withContentDescription("Set 1 Active time in seconds"))
                 .check(matches(isEnabled()))
                 .check(matches(withText("3")))
+        }
+    }
+
+    @Test
+    fun failureScaleTimerKeepsRunningPastGoalAndStopsAtOneKilo() {
+        LofitRepository(context).apply {
+            data.activeWorkout!!.exercises.single().plannedSets.single().type = SetType.FAILURE
+            save()
+        }
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            lateinit var scanner: FakeScanner
+            scenario.onActivity {
+                scanner = fakeScanner(it)
+                scanner.reading(selected, 20.0)
+                scaleTimeMillis += 2_000
+                scanner.reading(selected, 20.0)
+            }
+            onView(withContentDescription("Set 1 Active time in seconds"))
+                .perform(waitUntilMatches(withText("2")))
+                .check(matches(not(isEnabled())))
+            onView(withContentDescription("Set 1 done")).check(matches(not(isChecked())))
+            onView(withContentDescription("Rest timer overlay")).check(matches(not(isDisplayed())))
+            scenario.onActivity {
+                scaleTimeMillis += 1_000
+                scanner.reading(selected, 2.0)
+            }
+            onView(withContentDescription("Set 1 Active time in seconds"))
+                .perform(waitUntilMatches(withText("3")))
+            onView(withContentDescription("Set 1 done")).check(matches(not(isChecked())))
+            scenario.onActivity { scanner.reading(selected, 1.0) }
+            onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
+            onView(withContentDescription("Set 1 Active time in seconds"))
+                .check(matches(isEnabled()))
+            onView(withContentDescription("Set 1 weight")).check(matches(withText("50")))
+            onView(withContentDescription("Rest timer overlay")).check(matches(isDisplayed()))
+            val logged =
+                LofitRepository(context).data.activeWorkout!!.exercises.single().sets.single()
+            assertEquals(SetType.FAILURE, logged.type)
+            assertEquals(3, logged.holdSeconds)
+            assertEquals(50.0, logged.weightKg, 0.0)
+            onView(withContentDescription("Scale Pull live weight graph"))
+                .perform(waitUntilMatches(withLastPullAverage(20.0)))
         }
     }
 
@@ -528,7 +598,7 @@ class LiveWorkoutMeasurementFlowTest {
             onView(withContentDescription("Rest timer overlay")).check(matches(isDisplayed()))
             val logged =
                 LofitRepository(context).data.activeWorkout!!.exercises.single().sets.single()
-            assertEquals(12.0, logged.weightKg, 0.0)
+            assertEquals(50.0, logged.weightKg, 0.0)
             assertEquals(8, logged.holdSeconds)
             scenario.recreate()
             onView(withContentDescription("Set 1 Active time in seconds"))
@@ -549,7 +619,7 @@ class LiveWorkoutMeasurementFlowTest {
             data.activeWorkout!!.exercises.single().plannedSets.apply {
                 clear()
                 add(PlannedSet(weightKg = 50.0, holdSeconds = 30))
-                add(PlannedSet(holdSeconds = 1))
+                add(PlannedSet(weightKg = 60.0, holdSeconds = 1))
             }
             save()
         }
@@ -570,7 +640,9 @@ class LiveWorkoutMeasurementFlowTest {
                 .check(matches(isEnabled()))
             val first =
                 LofitRepository(context).data.activeWorkout!!.exercises.single().sets.single()
-            assertEquals(20.0, first.weightKg, 0.0)
+            assertEquals(50.0, first.weightKg, 0.0)
+            onView(withContentDescription("Scale Pull live weight graph"))
+                .perform(waitUntilMatches(withLastPullAverage(20.0)))
             assertTrue(first.holdSeconds in 1 until 30)
             scenario.onActivity { scanner.reading(selected, 40.0) }
             scenario.onActivity { scaleTimeMillis += 1_100 }
@@ -590,7 +662,9 @@ class LiveWorkoutMeasurementFlowTest {
             val sets = LofitRepository(context).data.activeWorkout!!.exercises.single().sets
             assertEquals(2, sets.size)
             assertEquals(first, sets.first())
-            assertEquals(30.0, sets.last().weightKg, 0.0)
+            assertEquals(60.0, sets.last().weightKg, 0.0)
+            onView(withContentDescription("Scale Pull live weight graph"))
+                .perform(waitUntilMatches(withLastPullAverage(30.0)))
         }
     }
 
@@ -608,7 +682,7 @@ class LiveWorkoutMeasurementFlowTest {
             scenario.onActivity { scanner.reading(selected, 0.0) }
             onView(withContentDescription("Set 1 done")).check(matches(not(isChecked())))
             assertEquals(
-                12.0,
+                50.0,
                 LofitRepository(context)
                     .data
                     .activeWorkout!!
@@ -807,6 +881,18 @@ class LiveWorkoutMeasurementFlowTest {
             )
         }
     }
+
+    private fun withLastPullAverage(kilograms: Double) =
+        object : TypeSafeMatcher<View>() {
+            override fun describeTo(description: Description) {
+                description.appendText("last pull average ${formatWeight(kilograms)} kg")
+            }
+
+            override fun matchesSafely(view: View): Boolean =
+                view.stateDescription?.contains(
+                    "Last pull average ${formatWeight(kilograms)} kg"
+                ) == true
+        }
 
     private fun openScaleOption(checked: Boolean) {
         onView(withContentDescription("Options for Scale Pull")).perform(scrollTo(), click())

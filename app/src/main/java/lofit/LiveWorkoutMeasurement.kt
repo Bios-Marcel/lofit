@@ -72,7 +72,11 @@ internal class LiveWorkoutMeasurement(private val data: () -> AppData) {
         active?.let { pull ->
             if (atMillis < pull.lastReadingAt) return null
             if (kilograms <= PULL_THRESHOLD_KG) {
-                return stop(atMillis, release = PullWeightReading(atMillis, kilograms))
+                return stop(
+                    atMillis,
+                    complete = true,
+                    release = PullWeightReading(atMillis, kilograms),
+                )
             }
             pull.lastReadingAt = atMillis
             pull.addReading(atMillis, kilograms)
@@ -93,15 +97,18 @@ internal class LiveWorkoutMeasurement(private val data: () -> AppData) {
         return Change(pull, started = true)
     }
 
-    /** Returns true once at the goal, without completing a set until the scale is released. */
-    fun tick(nowMillis: Long): Boolean {
-        val pull = active ?: return false
+    /** Cues once at the goal and stops non-failure sets without waiting for release. */
+    fun tick(nowMillis: Long): Change? {
+        val pull = active ?: return null
         pull.set.actualHoldSeconds = elapsed(pull, nowMillis)
         if (!pull.cuePlayed && pull.set.actualHoldSeconds!! >= pull.set.holdSeconds) {
             pull.cuePlayed = true
-            return true
+            // LEGACY: Failure sets keep running until release or manual completion.
+            if (pull.set.type == SetType.FAILURE) return Change(pull)
+            waitingForRelease = true
+            return stop(nowMillis, complete = true)
         }
-        return false
+        return null
     }
 
     fun interrupt(): Change? {
@@ -116,20 +123,23 @@ internal class LiveWorkoutMeasurement(private val data: () -> AppData) {
         return stop(atMillis)
     }
 
-    private fun stop(atMillis: Long, release: PullWeightReading? = null): Change {
+    private fun stop(
+        atMillis: Long,
+        complete: Boolean = false,
+        release: PullWeightReading? = null,
+    ): Change {
         val pull = requireNotNull(active)
         active = null
         val seconds = elapsed(pull, atMillis)
         pull.set.actualHoldSeconds = seconds
-        val averageKg = pull.average(release)
-        if (averageKg != null) pull.set.weightKg = averageKg
-        // LEGACY: Automatic completion still requires release after reaching the goal.
-        val completed = release != null && seconds >= pull.set.holdSeconds && averageKg != null
+        seriesFor(pull.item.id).lastPullAverageKg = pull.average(release)
+        // LEGACY: Early releases and interrupted pulls still leave the set unfinished.
+        val completed = complete && seconds >= pull.set.holdSeconds
         if (completed) {
             pull.item.sets.add(
                 LoggedSet(
                     type = pull.set.type,
-                    weightKg = requireNotNull(averageKg),
+                    weightKg = pull.set.weightKg,
                     holdSeconds = seconds,
                     side = pull.set.side,
                     plannedSetId = pull.set.id,

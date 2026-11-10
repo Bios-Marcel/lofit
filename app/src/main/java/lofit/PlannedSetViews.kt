@@ -42,7 +42,6 @@ internal class PlannedSetViews(
         activeHoldAction: View? = null,
         activeHoldRunning: Boolean = false,
         readOnly: Boolean = false,
-        onWeightReady: (EditText) -> Unit = {},
         onAmountReady: (EditText) -> Unit = {},
         onActiveAmountReady: (EditText) -> Unit = {},
         onIndexUpdaterReady: ((Int) -> Unit) -> Unit = {},
@@ -111,7 +110,6 @@ internal class PlannedSetViews(
                             setText(formatWeight(plannedSet.weightKg))
                             contentDescription = "Set ${currentSetIndex + 1} weight"
                             setPadding(ui.dp(6), 0, ui.dp(6), 0)
-                            onWeightReady(this)
                             doAfterTextChanged { value ->
                                 if (updatingValues || isUpdatingHoldTimer())
                                     return@doAfterTextChanged

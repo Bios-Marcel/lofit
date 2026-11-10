@@ -82,12 +82,12 @@ class LiveWorkoutMeasurementTest {
         assertTrue(measurement.read(2_100, 1.0)!!.completed)
         assertNull(measurement.active)
         assertEquals(2, first.actualHoldSeconds)
-        assertEquals(10.0, item.sets.single().weightKg, 0.0)
+        assertEquals(50.0, item.sets.single().weightKg, 0.0)
         assertEquals(first.id, item.sets.single().plannedSetId)
     }
 
     @Test
-    fun releaseLogsFullDurationAndMeanAfterTrimmingEdges() {
+    fun releaseLogsFullDurationAndKeepsEnteredWeight() {
         measurement.read(1_000, 1.1)
         measurement.read(1_200, 10.0)
         measurement.read(1_400, 20.0)
@@ -96,10 +96,11 @@ class LiveWorkoutMeasurementTest {
         measurement.read(4_500, 5.0)
         val result = measurement.read(4_900, 0.0)!!
         assertTrue(result.completed)
-        assertEquals(20.0, first.weightKg, 0.00001)
+        assertEquals(50.0, first.weightKg, 0.0)
+        assertEquals(20.0, measurement.seriesFor(item.id).lastPullAverageKg!!, 0.0)
         assertEquals(3, first.actualHoldSeconds)
         val logged = item.sets.single()
-        assertEquals(20.0, logged.weightKg, 0.00001)
+        assertEquals(50.0, logged.weightKg, 0.0)
         assertEquals(3, logged.holdSeconds)
         assertEquals(first.id, logged.plannedSetId)
         assertEquals(0, logged.reps)
@@ -107,42 +108,84 @@ class LiveWorkoutMeasurementTest {
     }
 
     @Test
-    fun reachingGoalOnlyCuesAndReleaseCompletes() {
+    fun reachingGoalCompletesAndWaitsForReleaseBeforeStartingNextSet() {
         measurement.read(0, 10.0)
         measurement.read(100, 10.0)
-        assertFalse(measurement.tick(1_999))
-        assertTrue(measurement.tick(2_000))
-        assertFalse(measurement.tick(3_000))
+        assertNull(measurement.tick(1_999))
         assertTrue(item.sets.isEmpty())
-        assertNotNull(measurement.active)
-        assertTrue(measurement.read(3_000, 0.0)!!.completed)
+        val result = measurement.tick(2_000)!!
+        assertTrue(result.completed)
+        assertEquals(50.0, first.weightKg, 0.0)
+        assertEquals(first.id, result.pull.set.id)
+        assertNull(measurement.active)
+        assertEquals(2, item.sets.single().holdSeconds)
+        assertEquals(50.0, item.sets.single().weightKg, 0.0)
+        assertEquals(10.0, measurement.seriesFor(item.id).lastPullAverageKg!!, 0.0)
+        assertNull(measurement.tick(3_000))
+        assertNull(measurement.read(3_000, 20.0))
+        assertNull(measurement.read(3_100, 1.01))
+        assertNull(measurement.read(3_200, 1.0))
+        assertEquals(1, item.sets.size)
+        assertEquals(second.id, measurement.read(4_000, 20.0)!!.pull.set.id)
     }
 
     @Test
-    fun shortPullWritesResultButRetryStartsFreshOnSameSet() {
+    fun warmupAlsoStopsAtGoal() {
+        first.type = SetType.WARMUP
+        measurement.read(0, 20.0)
+        assertTrue(measurement.tick(2_000)!!.completed)
+        assertNull(measurement.active)
+        assertEquals(SetType.WARMUP, item.sets.single().type)
+    }
+
+    @Test
+    fun failureGoalOnlyCuesAndOneKiloReleaseCompletesFullDuration() {
+        first.type = SetType.FAILURE
+        measurement.read(0, 10.0)
+        measurement.read(100, 10.0)
+        assertNull(measurement.tick(1_999))
+        assertFalse(measurement.tick(2_000)!!.completed)
+        assertNull(measurement.tick(3_000))
+        assertTrue(item.sets.isEmpty())
+        assertNotNull(measurement.active)
+        assertEquals(3, first.actualHoldSeconds)
+        assertNull(measurement.read(3_000, 1.01))
+        assertTrue(measurement.read(4_000, 1.0)!!.completed)
+        assertNull(measurement.active)
+        assertEquals(50.0, first.weightKg, 0.0)
+        assertEquals(50.0, item.sets.single().weightKg, 0.0)
+        assertEquals(4, item.sets.single().holdSeconds)
+        assertEquals(SetType.FAILURE, item.sets.single().type)
+    }
+
+    @Test
+    fun shortPullKeepsEnteredWeightAndRetryStartsFreshOnSameSet() {
         measurement.read(0, 10.0)
         measurement.read(100, 10.0)
         assertFalse(measurement.read(1_999, 0.0)!!.completed)
         assertEquals(1, first.actualHoldSeconds)
-        assertEquals(10.0, first.weightKg, 0.0)
+        assertEquals(50.0, first.weightKg, 0.0)
+        assertEquals(10.0, measurement.seriesFor(item.id).lastPullAverageKg!!, 0.0)
         assertTrue(item.sets.isEmpty())
         assertTrue(measurement.read(3_000, 30.0)!!.started)
         measurement.read(3_100, 30.0)
         assertEquals(0, first.actualHoldSeconds)
         assertTrue(measurement.read(5_000, 0.0)!!.completed)
-        assertEquals(30.0, item.sets.single().weightKg, 0.0)
+        assertEquals(50.0, item.sets.single().weightKg, 0.0)
+        assertEquals(30.0, measurement.seriesFor(item.id).lastPullAverageKg!!, 0.0)
         assertEquals(2, item.sets.single().holdSeconds)
     }
 
     @Test
-    fun manualCompletionKeepsMeasuredValuesAndWaitsForReleaseBeforeNextSet() {
+    fun manualCompletionKeepsEnteredWeightAndWaitsForReleaseBeforeNextSet() {
         measurement.read(1_000, 20.0)
         measurement.read(1_100, 20.0)
         measurement.read(2_100, 20.0)
         assertNotNull(measurement.stopForManualCompletion(first, 2_500))
         assertNull(measurement.active)
         assertEquals(1, first.actualHoldSeconds)
-        assertEquals(20.0, first.weightKg, 0.0)
+        assertEquals(50.0, first.weightKg, 0.0)
+        assertEquals(20.0, measurement.seriesFor(item.id).lastPullAverageKg!!, 0.0)
         assertTrue(item.sets.isEmpty())
         item.sets.add(
             LoggedSet(
@@ -153,7 +196,7 @@ class LiveWorkoutMeasurementTest {
             )
         )
         assertNull(measurement.read(2_600, 30.0))
-        assertFalse(measurement.tick(5_000))
+        assertNull(measurement.tick(5_000))
         assertNull(measurement.active)
         assertEquals(1, first.actualHoldSeconds)
         assertNull(measurement.read(5_000, 0.0))
@@ -162,7 +205,7 @@ class LiveWorkoutMeasurementTest {
         assertTrue(measurement.read(9_000, 0.0)!!.completed)
         assertEquals(2, item.sets.size)
         assertEquals(1, item.sets.first().holdSeconds)
-        assertEquals(20.0, item.sets.first().weightKg, 0.0)
+        assertEquals(50.0, item.sets.first().weightKg, 0.0)
     }
 
     @Test
@@ -186,11 +229,16 @@ class LiveWorkoutMeasurementTest {
         measurement.read(100, 10.0)
         measurement.read(2_000, 0.0)
         assertEquals(second.id, measurement.read(3_000, 20.0)!!.pull.set.id)
+        assertEquals(10.0, measurement.seriesFor(item.id).lastPullAverageKg!!, 0.0)
         measurement.read(3_100, 20.0)
         measurement.read(6_000, 0.0)
+        assertEquals(20.0, measurement.seriesFor(item.id).lastPullAverageKg!!, 0.0)
         assertEquals(next.id, measurement.read(7_000, 30.0)!!.pull.item.id)
+        assertNull(measurement.seriesFor(next.id).lastPullAverageKg)
         measurement.read(7_100, 30.0)
         measurement.read(8_000, 0.0)
+        assertEquals(30.0, measurement.seriesFor(next.id).lastPullAverageKg!!, 0.0)
+        assertEquals(20.0, measurement.seriesFor(item.id).lastPullAverageKg!!, 0.0)
         assertEquals(2, item.sets.size)
         assertEquals(1, next.sets.size)
         assertNull(measurement.read(9_000, 50.0))
@@ -226,6 +274,7 @@ class LiveWorkoutMeasurementTest {
 
     @Test
     fun interruptionNeverCompletesAndUsesOnlyObservedTime() {
+        first.type = SetType.FAILURE
         measurement.read(1_000, 1.1)
         measurement.read(1_100, 15.0)
         measurement.read(1_500, 15.0)
@@ -233,7 +282,8 @@ class LiveWorkoutMeasurementTest {
         measurement.tick(9_000)
         assertFalse(measurement.interrupt()!!.completed)
         assertEquals(1, first.actualHoldSeconds)
-        assertEquals(15.0, first.weightKg, 0.0)
+        assertEquals(50.0, first.weightKg, 0.0)
+        assertEquals(15.0, measurement.seriesFor(item.id).lastPullAverageKg!!, 0.0)
         assertTrue(item.sets.isEmpty())
         assertNull(measurement.active)
         measurement.read(10_000, 30.0)
@@ -250,11 +300,20 @@ class LiveWorkoutMeasurementTest {
         assertNull(measurement.read(500, 0.0))
         assertNull(measurement.read(500, 100.0))
         assertTrue(measurement.read(3_000, 0.0)!!.completed)
-        assertEquals(10.0, first.weightKg, 0.0)
+        assertEquals(50.0, first.weightKg, 0.0)
     }
 
     @Test
-    fun trimsDetectedRampsAndRoundsOnlyTheFinalMean() {
+    fun instantPullKeepsEnteredWeight() {
+        measurement.read(0, 10.0)
+        assertTrue(measurement.read(2_000, 0.0)!!.completed)
+        assertEquals(50.0, first.weightKg, 0.0)
+        assertEquals(2, first.actualHoldSeconds)
+        assertEquals(50.0, item.sets.single().weightKg, 0.0)
+    }
+
+    @Test
+    fun lastPullAverageTrimsBothRampsWithoutChangingEnteredWeight() {
         first.holdSeconds = 1
         measurement.read(1_000, 1.1)
         measurement.read(1_100, 8.0)
@@ -264,47 +323,29 @@ class LiveWorkoutMeasurementTest {
         measurement.read(2_200, 7.0)
         measurement.read(2_400, 2.0)
         assertTrue(measurement.read(2_500, 0.0)!!.completed)
-        assertEquals(20.12, first.weightKg, 0.0)
-        assertEquals(20.12, item.sets.single().weightKg, 0.0)
-        assertEquals(1, item.sets.single().holdSeconds)
+        assertEquals(20.12, measurement.seriesFor(item.id).lastPullAverageKg!!, 0.0)
+        assertEquals(50.0, first.weightKg, 0.0)
+        assertEquals(50.0, item.sets.single().weightKg, 0.0)
     }
 
     @Test
-    fun roundsHalfUpToTwoDecimalPlaces() {
-        measurement.read(0, 1.1)
-        measurement.read(100, 10.005)
-        measurement.read(2_000, 10.005)
-        assertTrue(measurement.read(2_100, 0.0)!!.completed)
-        assertEquals(10.01, first.weightKg, 0.0)
-        assertEquals(10.01, item.sets.single().weightKg, 0.0)
-    }
-
-    @Test
-    fun instantPullKeepsItsFullLoadReadingInsteadOfApplyingATimeTrim() {
-        measurement.read(0, 10.0)
-        assertTrue(measurement.read(2_000, 0.0)!!.completed)
-        assertEquals(10.0, first.weightKg, 0.0)
-        assertEquals(2, first.actualHoldSeconds)
-        assertEquals(10.0, item.sets.single().weightKg, 0.0)
-    }
-
-    @Test
-    fun shortFlatPullKeepsAllReadingsButStaysUnfinished() {
+    fun shortFlatPullKeepsEnteredWeightAndStaysUnfinished() {
         measurement.read(0, 10.0)
         measurement.read(100, 10.0)
         assertFalse(measurement.read(150, 0.0)!!.completed)
-        assertEquals(10.0, first.weightKg, 0.0)
+        assertEquals(50.0, first.weightKg, 0.0)
         assertTrue(item.sets.isEmpty())
     }
 
     @Test
-    fun averageIncludesInteriorReadingsEvenAfterTheyAgeOutOfTheGraph() {
+    fun oldGraphReadingsDoNotChangeEnteredWeightOrCompletion() {
         measurement.read(0, 1.1)
         measurement.read(100, 15.0)
         measurement.read(30_000, 15.0)
         measurement.read(70_000, 15.0)
         assertTrue(measurement.read(70_050, 0.0)!!.completed)
-        assertEquals(15.0, first.weightKg, 0.0)
+        assertEquals(50.0, first.weightKg, 0.0)
+        assertEquals(15.0, measurement.seriesFor(item.id).lastPullAverageKg!!, 0.0)
         assertEquals(70, item.sets.single().holdSeconds)
         assertFalse(measurement.seriesFor(item.id).samples.any { it.atMillis == 100L })
     }
@@ -322,6 +363,7 @@ class LiveWorkoutMeasurementTest {
         measurement.reconcile()
         assertNull(measurement.active)
         assertTrue(measurement.seriesFor(item.id).samples.isEmpty())
+        assertNull(measurement.seriesFor(item.id).lastPullAverageKg)
     }
 
     @Test

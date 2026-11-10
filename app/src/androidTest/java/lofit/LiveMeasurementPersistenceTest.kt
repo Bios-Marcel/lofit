@@ -46,21 +46,31 @@ class LiveMeasurementPersistenceTest {
         val item = workout.exercises.single()
         assertTrue(item.manualMeasurement)
         item.manualMeasurement = false
+        item.plannedSets.first().weightKg = 50.0
         val runtime = LiveWorkoutMeasurement { repository.data }
         runtime.read(0, 1.1)
         runtime.read(1_000, 15.113)
         runtime.read(30_000, 15.133)
         runtime.read(30_950, 2.0)
+        assertTrue(runtime.tick(31_000)!!.completed)
+        assertEquals(15.12, runtime.seriesFor(item.id).lastPullAverageKg!!, 0.0)
         runtime.read(31_000, 0.0)
         assertEquals(5, runtime.seriesFor(item.id).samples.size)
         repository.save()
+        assertFalse(context.repositoryStateFile.readText().contains("lastPullAverage"))
         val restarted = LofitRepository(context)
         assertTrue(restarted.data.exercises.first { it.id == exercise.id }.supportsLiveMeasurement)
         assertTrue(restarted.data.routines.single().exercises.single().manualMeasurement)
         assertFalse(restarted.data.activeWorkout!!.exercises.single().manualMeasurement)
         assertTrue(LiveWorkoutMeasurement { restarted.data }.seriesFor(item.id).samples.isEmpty())
+        assertNull(LiveWorkoutMeasurement { restarted.data }.seriesFor(item.id).lastPullAverageKg)
         assertEquals(
-            15.12,
+            50.0,
+            restarted.data.activeWorkout!!.exercises.single().plannedSets.first().weightKg,
+            0.0,
+        )
+        assertEquals(
+            50.0,
             restarted.data.activeWorkout!!.exercises.single().sets.single().weightKg,
             0.0,
         )
@@ -72,11 +82,13 @@ class LiveMeasurementPersistenceTest {
         val historyJson = context.repositoryHistoryFile.readText()
         assertFalse(historyJson.contains("samples"))
         assertFalse(historyJson.contains("kilograms"))
+        assertFalse(historyJson.contains("lastPullAverage"))
         val saved = LofitRepository(context)
         val history = saved.data.history.single()
         assertFalse(history.exercises.single().manualMeasurement)
         assertEquals(31, history.exercises.single().sets.single().holdSeconds)
-        assertEquals(15.12, history.exercises.single().sets.single().weightKg, 0.0)
+        assertEquals(50.0, history.exercises.single().plannedSets.first().weightKg, 0.0)
+        assertEquals(50.0, history.exercises.single().sets.single().weightKg, 0.0)
         assertFalse(saved.data.resumeWorkout(history.id)!!.exercises.single().manualMeasurement)
     }
 

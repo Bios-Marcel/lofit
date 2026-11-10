@@ -385,7 +385,6 @@ class MainActivity : AppCompatActivity() {
     internal var liveMeasurementNow: () -> Long = SystemClock::elapsedRealtime
     private val liveGraphs = mutableListOf<LiveMeasurementGraphView>()
     private val liveStatusViews = mutableListOf<TextView>()
-    private val liveWeightViews = mutableMapOf<String, EditText>()
     private val liveTimeViews = mutableMapOf<String, EditText>()
     private var workoutForeground = false
     private var workoutScaleStatus: String? = "Waiting for scale…"
@@ -396,7 +395,7 @@ class MainActivity : AppCompatActivity() {
             onReading = { onWorkoutScaleReading(liveMeasurementNow(), it) },
             onInterrupted = {
                 liveWorkoutMeasurement.interrupt()?.let {
-                    refreshLiveSetValues(it.pull.set)
+                    refreshLiveSetTime(it.pull.set)
                     repository.save()
                     updateWorkoutNotification(force = true)
                 }
@@ -864,7 +863,6 @@ class MainActivity : AppCompatActivity() {
         liveWorkoutMeasurement.reconcile()
         liveGraphs.clear()
         liveStatusViews.clear()
-        liveWeightViews.clear()
         liveTimeViews.clear()
         val selectedScreen = if (currentScreen == Screen.WORKOUT) Screen.HOME else currentScreen
         drawerMenuItems.forEach { (screen, item) ->
@@ -1413,7 +1411,7 @@ class MainActivity : AppCompatActivity() {
                                 if (activeHoldWorkoutExerciseId == item.id) stopActiveHold()
                                 if (liveWorkoutMeasurement.active?.item?.id == item.id) {
                                     liveWorkoutMeasurement.interrupt()?.let {
-                                        refreshLiveSetValues(it.pull.set)
+                                        refreshLiveSetTime(it.pull.set)
                                     }
                                 }
                                 item.manualMeasurement = !useScale
@@ -1636,9 +1634,6 @@ class MainActivity : AppCompatActivity() {
                             isActiveHold(item, plannedSet) ||
                                 (liveMeasurement &&
                                     liveWorkoutMeasurement.active?.set?.id == plannedSet.id),
-                        onWeightReady = {
-                            if (liveMeasurement) liveWeightViews[plannedSet.id] = it
-                        },
                         onActiveAmountReady = { amount ->
                             activeHoldAmount = amount
                             if (liveMeasurement) liveTimeViews[plannedSet.id] = amount
@@ -3916,7 +3911,11 @@ class MainActivity : AppCompatActivity() {
             )
         liveGraphs.forEach { it.showReading(kilograms) }
         if (change == null) return
-        refreshLiveSetValues(change.pull.set)
+        applyLiveMeasurementChange(change)
+    }
+
+    private fun applyLiveMeasurementChange(change: LiveWorkoutMeasurement.Change) {
+        refreshLiveSetTime(change.pull.set)
         if (change.started) {
             restEndsAt = 0L
             updateRestBar()
@@ -3930,12 +3929,8 @@ class MainActivity : AppCompatActivity() {
         updateWorkoutNotification(force = true)
     }
 
-    private fun refreshLiveSetValues(set: PlannedSet) {
+    private fun refreshLiveSetTime(set: PlannedSet) {
         updatingHoldTimer = true
-        liveWeightViews[set.id]?.let { view ->
-            val value = formatWeight(set.weightKg)
-            if (view.text.toString() != value) view.setText(value)
-        }
         liveTimeViews[set.id]?.let { view ->
             view.isEnabled = liveWorkoutMeasurement.active?.set?.id != set.id
             val value = (set.actualHoldSeconds ?: 0).toString()
@@ -3954,7 +3949,7 @@ class MainActivity : AppCompatActivity() {
         button: ImageButton,
         done: CheckBox,
     ) {
-        liveWorkoutMeasurement.interrupt()?.let { refreshLiveSetValues(it.pull.set) }
+        liveWorkoutMeasurement.interrupt()?.let { refreshLiveSetTime(it.pull.set) }
         stopActiveHold()
         restEndsAt = 0L
         updateRestBar()
@@ -4036,9 +4031,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateHoldTimer() {
         liveWorkoutMeasurement.reconcile()
-        if (liveWorkoutMeasurement.tick(liveMeasurementNow())) playCue()
+        liveWorkoutMeasurement.tick(liveMeasurementNow())?.let { change ->
+            playCue()
+            if (change.completed) applyLiveMeasurementChange(change)
+        }
         liveWorkoutMeasurement.active?.let { pull ->
-            refreshLiveSetValues(pull.set)
+            refreshLiveSetTime(pull.set)
             updateWorkoutNotification()
         }
         val itemId = activeHoldWorkoutExerciseId ?: return
@@ -4119,7 +4117,7 @@ class MainActivity : AppCompatActivity() {
     ) {
         if (!editingHistory && liveWorkoutMeasurement.isLive(item)) {
             liveWorkoutMeasurement.stopForManualCompletion(plannedSet, liveMeasurementNow())?.let {
-                refreshLiveSetValues(it.pull.set)
+                refreshLiveSetTime(it.pull.set)
             }
         }
         if (isActiveHold(item, plannedSet) && !completingHoldAutomatically) stopActiveHold()

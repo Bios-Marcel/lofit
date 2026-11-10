@@ -26,6 +26,7 @@ internal class LiveMeasurementGraphView(
     private val redraw =
         object : Runnable {
             override fun run() {
+                updateStateDescription()
                 invalidate()
                 postDelayed(this, 250)
             }
@@ -34,6 +35,7 @@ internal class LiveMeasurementGraphView(
     init {
         contentDescription = "Live weight graph"
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
+        updateStateDescription()
     }
 
     fun addReading(kilograms: Double) {
@@ -42,8 +44,21 @@ internal class LiveMeasurementGraphView(
     }
 
     fun showReading(kilograms: Double) {
-        stateDescription = "${formatBodyWeight(kilograms)} kg · last 60 seconds"
+        updateStateDescription(kilograms)
         postInvalidateOnAnimation()
+    }
+
+    private fun updateStateDescription(
+        kilograms: Double? = series.samples.lastOrNull()?.kilograms
+    ) {
+        stateDescription =
+            buildList {
+                    kilograms?.let { add("${formatBodyWeight(it)} kg · last 60 seconds") }
+                    series.lastPullAverageKg?.let {
+                        add("Last pull average ${formatWeight(it)} kg")
+                    }
+                }
+                .joinToString(" · ")
     }
 
     fun endSegment() {
@@ -104,6 +119,10 @@ internal class LiveMeasurementGraphView(
 
         paint.textAlign = Paint.Align.LEFT
         canvas.drawText("kg", left, dp(14), paint)
+        series.lastPullAverageKg?.let { kilograms ->
+            paint.textAlign = Paint.Align.RIGHT
+            canvas.drawText("Last pull avg · ${formatWeight(kilograms)} kg", right, dp(14), paint)
+        }
         ticks.forEach { kilograms ->
             paint.alpha = 50
             paint.strokeWidth = dp(1)
