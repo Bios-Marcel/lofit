@@ -2,6 +2,25 @@ package lofit
 
 import java.util.UUID
 
+internal fun Routine.estimatedWorkoutSeconds(exercisesById: Map<String, Exercise>): Long {
+    var totalSeconds = 0L
+    var hasFollowingSet = false
+    for (item in exercises.asReversed()) {
+        val exercise = exercisesById[item.exerciseId] ?: continue
+        if (item.plannedSets.isEmpty()) continue
+        val setsBeforeFinish =
+            if (hasFollowingSet) item.plannedSets.size else item.plannedSets.lastIndex
+        val restCount = setsBeforeFinish / exercise.restSetInterval(item.pauseEverySecondSet)
+        totalSeconds += (item.restSecondsOverride ?: defaultRestSeconds).toLong() * restCount
+        totalSeconds +=
+            item.plannedSets.sumOf { set ->
+                5L + if (exercise.type.tracksDuration) set.holdSeconds.toLong() else 5L * set.reps
+            }
+        hasFollowingSet = true
+    }
+    return totalSeconds
+}
+
 /** Keep the routine's count and set kinds; refresh loads only from this routine's history. */
 fun AppData.workoutFromRoutine(routine: Routine): WorkoutSession {
     val items =

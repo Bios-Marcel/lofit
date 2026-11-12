@@ -60,6 +60,36 @@ class RoutineWorkoutsTest {
         )
 
     @Test
+    fun estimatedWorkoutTimeIncludesPlannedWorkAndRestBetweenSets() {
+        val reps = Exercise("bench", "Bench", ExerciseType.REPETITIONS, true, "Chest", "")
+        val timed = Exercise("plank", "Plank", ExerciseType.TIMED, false, "Core", "")
+        val routine =
+            routine().apply {
+                defaultRestSeconds = 90
+                exercises.single().apply {
+                    pauseEverySecondSet = true
+                    restSecondsOverride = 45
+                    plannedSets.removeAt(2)
+                }
+                exercises.add(
+                    RoutineExercise(
+                        exerciseId = timed.id,
+                        plannedSets =
+                            mutableListOf(
+                                PlannedSet(holdSeconds = 40),
+                                PlannedSet(holdSeconds = 60),
+                            ),
+                    )
+                )
+                exercises.add(RoutineExercise(exerciseId = timed.id, plannedSets = mutableListOf()))
+            }
+        val catalog = listOf(reps, timed).associateBy(Exercise::id)
+        assertEquals(305L, routine.estimatedWorkoutSeconds(catalog))
+        routine.exercises.first().restSecondsOverride = 0
+        assertEquals(260L, routine.estimatedWorkoutSeconds(catalog))
+    }
+
+    @Test
     fun cardioAutoStartIsInheritedWithoutWorkoutChangesAlteringTheRoutine() {
         val routine = routine().apply { autoStartCardio = false }
         val workout = data(routine).workoutFromRoutine(routine)

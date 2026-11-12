@@ -49,6 +49,9 @@ data class Exercise(
 
     val supportsLiveMeasurement: Boolean
         get() = liveMeasurement && type.tracksDuration && weighted
+
+    internal fun restSetInterval(pauseEverySecondSet: Boolean): Int =
+        if (asymmetric && pauseEverySecondSet) 2 else 1
 }
 
 data class LoggedSet(
@@ -109,7 +112,7 @@ data class WorkoutExercise(
     fun restSeconds(defaultRestSeconds: Int): Int = restSecondsOverride ?: defaultRestSeconds
 
     fun restSecondsAfterSet(defaultRestSeconds: Int, exercise: Exercise): Int {
-        if (exercise.asymmetric && pauseEverySecondSet && sets.size % 2 != 0) return 0
+        if (sets.size % exercise.restSetInterval(pauseEverySecondSet) != 0) return 0
         // LEGACY: Exercises without paired rest keep resting after each completed set.
         return restSeconds(defaultRestSeconds)
     }

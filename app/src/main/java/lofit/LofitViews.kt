@@ -527,6 +527,11 @@ internal class LofitViews(
 
     fun fieldLabel(value: String): TextView = metaText(value).apply { setPadding(0, dp(8), 0, 0) }
 
+    fun estimatedWorkoutTime(seconds: Long): TextView =
+        metaText(
+            activityContext.getString(R.string.estimated_workout_time, formatWorkoutTime(seconds))
+        )
+
     fun metaText(value: String): TextView =
         TextView(activityContext).apply {
             text = value

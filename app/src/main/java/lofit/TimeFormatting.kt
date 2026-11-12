@@ -2,7 +2,9 @@ package lofit
 
 import java.util.Locale
 
-fun formatWorkoutTime(totalSeconds: Int): String {
+fun formatWorkoutTime(totalSeconds: Int): String = formatWorkoutTime(totalSeconds.toLong())
+
+internal fun formatWorkoutTime(totalSeconds: Long): String {
     val seconds = totalSeconds.coerceAtLeast(0)
     return if (seconds >= 3_600) {
         "${seconds / 3_600}h ${(seconds % 3_600) / 60}m"

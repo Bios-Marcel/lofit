@@ -105,12 +105,16 @@ class RoutineWorkoutFlowTest {
             )
         )
 
-    private fun editRoutine(scenario: ActivityScenario<MainActivity>) {
+    private fun openRoutines(scenario: ActivityScenario<MainActivity>) {
         scenario.onActivity { activity ->
             val root = activity.findViewById<android.view.ViewGroup>(android.R.id.content)
             (root.getChildAt(0) as DrawerLayout).openDrawer(GravityCompat.START, false)
         }
         onView(allOf(withText(R.string.nav_routines), isClickable())).perform(click())
+    }
+
+    private fun editRoutine(scenario: ActivityScenario<MainActivity>) {
+        openRoutines(scenario)
         onView(withText("Edit")).perform(scrollTo(), click())
     }
 
@@ -158,6 +162,17 @@ class RoutineWorkoutFlowTest {
                 )
             }
             save()
+        }
+    }
+
+    @Test
+    fun routineCardsShowTheEstimateOnHomeAndRoutines() {
+        launch().use { scenario ->
+            val duration = context.getString(R.string.estimated_workout_time, "0:30")
+            val estimate = onView(allOf(withText(duration), inCard("Strength")))
+            estimate.perform(scrollTo()).check(matches(isDisplayed()))
+            openRoutines(scenario)
+            estimate.perform(scrollTo()).check(matches(isDisplayed()))
         }
     }
 

@@ -1130,11 +1130,15 @@ class MainActivity : AppCompatActivity() {
                     )
                 )
             }
+            val exercisesById = repository.data.exercises.associateBy(Exercise::id)
             repository.data.routines.forEach { routine ->
                 body.addView(
                     ui.card {
                         addView(ui.titleText(routine.name))
                         addView(ui.metaText("${routine.exercises.size} exercises"))
+                        addView(
+                            ui.estimatedWorkoutTime(routine.estimatedWorkoutSeconds(exercisesById))
+                        )
                         addView(
                             exerciseMuscleMaps(
                                 routine.exercises.map { it.exerciseId to it.plannedSets.size }

@@ -35,11 +35,16 @@ internal class RoutineScreens(
                         bottomMargin = ui.dp(16)
                     },
             )
-            if (data().routines.isEmpty()) body.addView(ui.emptyText("No routines saved."))
-            data().routines.forEach { routine ->
+            val appData = data()
+            val exercisesById = appData.exercises.associateBy(Exercise::id)
+            if (appData.routines.isEmpty()) body.addView(ui.emptyText("No routines saved."))
+            appData.routines.forEach { routine ->
                 body.addView(
                     ui.card {
                         addView(ui.titleText(routine.name))
+                        addView(
+                            ui.estimatedWorkoutTime(routine.estimatedWorkoutSeconds(exercisesById))
+                        )
                         addView(
                             muscleMaps(
                                 routine.exercises.map { it.exerciseId to it.plannedSets.size }
