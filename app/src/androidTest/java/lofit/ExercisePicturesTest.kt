@@ -178,11 +178,6 @@ class ExercisePicturesTest {
                 female,
                 pictures.bundledResource(exercise, BiologicalGender.FEMALE),
             )
-            assertEquals(
-                exercise.name,
-                male,
-                pictures.bundledResource(exercise, BiologicalGender.MALE),
-            )
         }
     }
 

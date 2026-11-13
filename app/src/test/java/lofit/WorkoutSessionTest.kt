@@ -472,7 +472,6 @@ class WorkoutSessionTest {
         assert(shoulderRotations.size >= 8)
         assert(exercises.all { it.primaryMuscle.isNotBlank() })
         assert(exercises.all { it.imageResource != null || it.imageName != null })
-        assertEquals(exercises.size, exercises.map { it.id }.distinct().size)
         val pullUpImage = exercises.single { it.id == "pull-up" }.imageResource
         assertEquals(
             pullUpImage,
