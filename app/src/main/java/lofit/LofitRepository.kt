@@ -19,9 +19,6 @@ class LofitRepository(context: Context) {
 
     private val stateFile = AtomicFile(File(context.filesDir, "lofit-data.json"))
     private val historyFile = AtomicFile(File(context.filesDir, "lofit-history.json"))
-    private val preferences by lazy {
-        context.getSharedPreferences("lofit-data", Context.MODE_PRIVATE)
-    }
     var data: AppData = load()
         private set
 
@@ -89,135 +86,19 @@ class LofitRepository(context: Context) {
     }
 
     private fun load(): AppData {
-        val hasJson = exists(stateFile)
-        val raw =
-            if (hasJson) stateFile.readFully().toString(Charsets.UTF_8)
-            else
-                preferences.getString("state", null)
-                    ?: return AppData().also {
-                        write("[]", historyFile)
-                    }
+        if (!exists(stateFile)) {
+            return AppData().also {
+                write("[]", historyFile)
+            }
+        }
+        val raw = stateFile.readFully().toString(Charsets.UTF_8)
         val root = JSONObject(raw)
         return when (val version = root.optInt("schemaVersion", 0)) {
-            // LEGACY: Schema 3 uses the old exercise IDs in state and separate history.
-            3 -> {
-                val historyRaw = historyFile.readFully().toString(Charsets.UTF_8)
-                val history = JSONArray(historyRaw)
-                migrateLegacyExerciseIds(root, history)
-                persistMigration(
-                    raw,
-                    decode(root, history.mapObjects(::decodeWorkout).toMutableList()),
-                    historyRaw,
-                )
-            }
             SCHEMA_VERSION -> {
                 val history = historyFile.readFully().toString(Charsets.UTF_8)
-                decode(root, JSONArray(history).mapObjects(::decodeWorkout).toMutableList()).also {
-                    // Copy only after validation. Keep the original XML and its backups untouched.
-                    if (!hasJson) write(raw)
-                }
+                decode(root, JSONArray(history).mapObjects(::decodeWorkout).toMutableList())
             }
             else -> error("Unsupported data schema: $version")
-        }
-    }
-
-    private fun persistMigration(
-        raw: String,
-        data: AppData,
-        historyBackupRaw: String,
-    ): AppData {
-        val migrated = encode(data)
-        val history = encodeHistory(data.history).toString()
-        // Validate before changing stored data, and keep the original for recovery.
-        val loaded =
-            decode(migrated, JSONArray(history).mapObjects(::decodeWorkout).toMutableList())
-        val backup =
-            AtomicFile(File(stateFile.baseFile.parentFile, "state-before-migration-v4.json"))
-        if (!exists(backup)) write(raw, backup)
-        val historyBackup =
-            AtomicFile(File(stateFile.baseFile.parentFile, "history-before-migration-v4.json"))
-        if (!exists(historyBackup)) write(historyBackupRaw, historyBackup)
-        write(history, historyFile)
-        write(migrated.toString())
-        return loaded
-    }
-
-    private fun migrateLegacyExerciseIds(root: JSONObject, history: JSONArray) {
-        val defaultIds = DefaultData.exercises().mapTo(mutableSetOf()) { it.id }
-
-        // LEGACY: Previous built-in IDs used this prefix, including weighted copies.
-        fun candidateId(id: String): String =
-            when {
-                id.startsWith("weighted-fedb-") -> "weighted-" + id.removePrefix("weighted-fedb-")
-                id.startsWith("fedb-") -> id.removePrefix("fedb-")
-                else -> id
-            }
-
-        val exercises = root.getJSONArray("exercises")
-        val legacyDefaultIds =
-            (0 until exercises.length())
-                .map { exercises.getJSONObject(it) }
-                .filter { !it.getBoolean("custom") }
-                .map { it.getString("id") }
-                .filter { candidateId(it) != it && candidateId(it) in defaultIds }
-                .toSet()
-        fun currentId(id: String): String = if (id in legacyDefaultIds) candidateId(id) else id
-
-        fun migrateRoutine(routine: JSONObject) {
-            val exercises = routine.getJSONArray("exercises")
-            for (index in 0 until exercises.length()) {
-                val item = exercises.getJSONObject(index)
-                item.put("exerciseId", currentId(item.getString("exerciseId")))
-            }
-        }
-
-        fun migrateWorkout(workout: JSONObject) {
-            if (!workout.isNull("sourceRoutine"))
-                migrateRoutine(workout.getJSONObject("sourceRoutine"))
-            val exercises = workout.getJSONArray("exercises")
-            for (index in 0 until exercises.length()) {
-                val item = exercises.getJSONObject(index)
-                item.put("exerciseId", currentId(item.getString("exerciseId")))
-            }
-        }
-
-        for (index in 0 until exercises.length()) {
-            val item = exercises.getJSONObject(index)
-            if (!item.getBoolean("custom")) item.put("id", currentId(item.getString("id")))
-        }
-        val routines = root.getJSONArray("routines")
-        for (index in 0 until routines.length()) migrateRoutine(routines.getJSONObject(index))
-        if (!root.isNull("activeWorkout")) migrateWorkout(root.getJSONObject("activeWorkout"))
-        for (index in 0 until history.length()) migrateWorkout(history.getJSONObject(index))
-
-        root.optJSONObject("exerciseRecords")?.let { records ->
-            records.keys().asSequence().toList().forEach { oldId ->
-                val newId = currentId(oldId)
-                if (newId != oldId) {
-                    val oldEntries = records.getJSONArray(oldId)
-                    val newEntries = records.optJSONArray(newId)
-                    if (newEntries == null) records.put(newId, oldEntries)
-                    else
-                        for (index in 0 until oldEntries.length()) newEntries.put(
-                            oldEntries.get(index)
-                        )
-                    records.remove(oldId)
-                }
-            }
-        }
-        root.optJSONObject("exerciseLastSelectedAt")?.let { timestamps ->
-            timestamps.keys().asSequence().toList().forEach { oldId ->
-                val newId = currentId(oldId)
-                if (newId != oldId) {
-                    val timestamp = timestamps.getLong(oldId)
-                    timestamps.put(
-                        newId,
-                        if (timestamps.has(newId)) maxOf(timestamp, timestamps.getLong(newId))
-                        else timestamp,
-                    )
-                    timestamps.remove(oldId)
-                }
-            }
         }
     }
 

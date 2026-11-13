@@ -14,11 +14,17 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
-class JsonStorageMigrationTest {
+class JsonStorageTest {
     private val context = RepositoryTestContext("json-storage")
     private val preferences = context.getSharedPreferences("lofit-data", 0)
     private val stateFile
         get() = context.repositoryStateFile
+
+    private val jsonOnlyContext =
+        object : ContextWrapper(context) {
+            override fun getSharedPreferences(name: String, mode: Int): SharedPreferences =
+                error("Repository must not access XML preferences")
+        }
 
     @Before
     fun clearTestData() {
@@ -26,30 +32,23 @@ class JsonStorageMigrationTest {
     }
 
     @Test
-    fun xmlMigration_copiesExactJsonAndPreservesEveryXmlByteAndAllData() {
+    fun currentJson_loadsWithoutReadingPreferencesOrRewritingFiles() {
         val raw = sampleJson()
-        val xml = seedXml(raw)
-
-        val migrated = LofitRepository(context)
+        val history = context.repositoryHistoryFile.readText()
+        val xml = seedXml("stale XML data")
+        val loaded = LofitRepository(jsonOnlyContext)
 
         assertEquals(raw, stateFile.readText())
+        assertEquals(history, context.repositoryHistoryFile.readText())
         assertArrayEquals(xml, context.legacyXmlFile.readBytes())
-        val jsonOnlyContext =
-            object : ContextWrapper(context) {
-                override fun getSharedPreferences(name: String, mode: Int): SharedPreferences =
-                    error("JSON loads must not access XML preferences")
-            }
-        assertEquals(migrated.data, LofitRepository(jsonOnlyContext).data)
-        assertEquals("custom.webp", migrated.data.exercises.single { it.id == "custom" }.imageFile)
-        assertEquals(123L, migrated.data.exerciseLastSelectedAt["custom"])
-        assertFalse(migrated.data.exerciseRecords.isEmpty())
+        assertEquals(loaded.data, LofitRepository(jsonOnlyContext).data)
+        assertEquals("custom.webp", loaded.data.exercises.single { it.id == "custom" }.imageFile)
+        assertEquals(123L, loaded.data.exerciseLastSelectedAt["custom"])
+        assertFalse(loaded.data.exerciseRecords.isEmpty())
 
-        migrated.data.routines.single().name = "Edited after migration"
-        migrated.save()
-        assertEquals(
-            "Edited after migration",
-            LofitRepository(jsonOnlyContext).data.routines.single().name,
-        )
+        loaded.data.routines.single().name = "Edited JSON"
+        loaded.save()
+        assertEquals("Edited JSON", LofitRepository(jsonOnlyContext).data.routines.single().name)
         assertArrayEquals(xml, context.legacyXmlFile.readBytes())
     }
 
@@ -67,8 +66,8 @@ class JsonStorageMigrationTest {
     }
 
     @Test
-    fun newInstall_savesAndRestartsUsingJsonWithoutCreatingXml() {
-        val repository = LofitRepository(context)
+    fun newInstall_savesAndRestartsWithoutReadingXml() {
+        val repository = LofitRepository(jsonOnlyContext)
         assertEquals(AppData(), repository.data)
         assertFalse(repository.data.recordCelebrationsEnabled)
         val xml = context.legacyXmlFile.readBytes()
@@ -78,9 +77,9 @@ class JsonStorageMigrationTest {
         repository.save()
 
         assertFalse(JSONObject(stateFile.readText()).getBoolean("soundCuesEnabled"))
-        assertFalse(LofitRepository(context).data.soundCuesEnabled)
+        assertFalse(LofitRepository(jsonOnlyContext).data.soundCuesEnabled)
         assertTrue(JSONObject(stateFile.readText()).getBoolean("recordCelebrationsEnabled"))
-        assertTrue(LofitRepository(context).data.recordCelebrationsEnabled)
+        assertTrue(LofitRepository(jsonOnlyContext).data.recordCelebrationsEnabled)
         assertArrayEquals(xml, context.legacyXmlFile.readBytes())
         assertFalse(preferences.contains("state"))
     }
@@ -143,97 +142,6 @@ class JsonStorageMigrationTest {
     }
 
     @Test
-    fun versionThreeMigration_rewritesLegacyExerciseIdsAcrossStateAndHistory() {
-        val repository = LofitRepository(context)
-        val ids = listOf("barbell-curl", "weighted-crunches")
-        val routine =
-            Routine(
-                name = "Old routine",
-                exercises = ids.map { RoutineExercise(exerciseId = it) }.toMutableList(),
-            )
-        repository.data.routines.add(routine)
-        repository.data.activeWorkout =
-            WorkoutSession(
-                name = "Active",
-                sourceRoutine = routine,
-                exercises = ids.map { WorkoutExercise(exerciseId = it) }.toMutableList(),
-            )
-        repository.data.history.add(
-            WorkoutSession(
-                name = "Past",
-                completedAt = 200,
-                sourceRoutine = routine,
-                exercises = ids.map { WorkoutExercise(exerciseId = it) }.toMutableList(),
-            )
-        )
-        val exercise = repository.data.exercises.first { it.id == "barbell-curl" }
-        val set = LoggedSet(type = SetType.NORMAL, weightKg = 12.0, reps = 8)
-        repository.data.exerciseRecords[exercise.id] =
-            mutableListOf(ExerciseRecord(exercise, set, set))
-        repository.data.exerciseLastSelectedAt[exercise.id] = 123L
-        repository.saveHistory()
-        repository.save()
-
-        val legacyIds =
-            mapOf(
-                "barbell-curl" to "fedb-barbell-curl",
-                "weighted-crunches" to "weighted-fedb-crunches",
-            )
-        fun oldId(id: String) = legacyIds[id] ?: id
-        fun changeRoutine(value: JSONObject) {
-            val items = value.getJSONArray("exercises")
-            for (index in 0 until items.length()) {
-                val item = items.getJSONObject(index)
-                item.put("exerciseId", oldId(item.getString("exerciseId")))
-            }
-        }
-        fun changeWorkout(value: JSONObject) {
-            changeRoutine(value.getJSONObject("sourceRoutine"))
-            val items = value.getJSONArray("exercises")
-            for (index in 0 until items.length()) {
-                val item = items.getJSONObject(index)
-                item.put("exerciseId", oldId(item.getString("exerciseId")))
-            }
-        }
-        val root = JSONObject(stateFile.readText()).put("schemaVersion", 3)
-        val exercises = root.getJSONArray("exercises")
-        for (index in 0 until exercises.length()) {
-            val item = exercises.getJSONObject(index)
-            item.put("id", oldId(item.getString("id")))
-        }
-        changeRoutine(root.getJSONArray("routines").getJSONObject(0))
-        changeWorkout(root.getJSONObject("activeWorkout"))
-        val records = root.getJSONObject("exerciseRecords")
-        records.put(oldId(exercise.id), records.remove(exercise.id))
-        val selected = root.getJSONObject("exerciseLastSelectedAt")
-        selected.put(oldId(exercise.id), selected.remove(exercise.id))
-        val history = JSONArray(context.repositoryHistoryFile.readText())
-        changeWorkout(history.getJSONObject(0))
-        val oldState = root.toString()
-        val oldHistory = history.toString()
-        stateFile.writeText(oldState)
-        context.repositoryHistoryFile.writeText(oldHistory)
-
-        val migrated = LofitRepository(context).data
-
-        assertEquals(4, JSONObject(stateFile.readText()).getInt("schemaVersion"))
-        assertEquals(ids, migrated.routines.single().exercises.map { it.exerciseId })
-        assertEquals(ids, migrated.activeWorkout!!.exercises.map { it.exerciseId })
-        assertEquals(ids, migrated.activeWorkout!!.sourceRoutine!!.exercises.map { it.exerciseId })
-        assertEquals(ids, migrated.history.single().exercises.map { it.exerciseId })
-        assertEquals(ids, migrated.history.single().sourceRoutine!!.exercises.map { it.exerciseId })
-        assertEquals(1, migrated.exerciseRecords.getValue(exercise.id).size)
-        assertEquals(123L, migrated.exerciseLastSelectedAt[exercise.id])
-        assertFalse(migrated.exercises.any { it.id in legacyIds.values })
-        assertEquals(oldState, File(context.filesDir, "state-before-migration-v4.json").readText())
-        assertEquals(
-            oldHistory,
-            File(context.filesDir, "history-before-migration-v4.json").readText(),
-        )
-        assertEquals(migrated, LofitRepository(context).data)
-    }
-
-    @Test
     fun missingHistory_rejectsCurrentState() {
         val repository = LofitRepository(context)
         repository.data.history.add(WorkoutSession(name = "Past"))
@@ -260,10 +168,10 @@ class JsonStorageMigrationTest {
     }
 
     @Test
-    fun unsupportedOldSchemas_leaveStateUntouched() {
+    fun unsupportedOldSchemas_leaveStateAndHistoryUntouched() {
         val current = sampleJson()
         val history = context.repositoryHistoryFile.readText()
-        listOf(null, 0, 1, 2).forEach { version ->
+        listOf(null, 0, 1, 2, 3).forEach { version ->
             val raw =
                 JSONObject(current)
                     .apply {
@@ -272,15 +180,10 @@ class JsonStorageMigrationTest {
                         put("history", JSONArray(history))
                     }
                     .toString()
-            val xml = seedXml(raw)
-            AtomicFile(stateFile).delete()
-
-            assertThrows(IllegalStateException::class.java) { LofitRepository(context) }
-
-            assertFalse(stateFile.exists())
+            val xml = seedXml(current)
             stateFile.writeText(raw)
 
-            assertThrows(IllegalStateException::class.java) { LofitRepository(context) }
+            assertThrows(IllegalStateException::class.java) { LofitRepository(jsonOnlyContext) }
 
             assertEquals(raw, stateFile.readText())
             assertEquals(history, context.repositoryHistoryFile.readText())
@@ -291,41 +194,47 @@ class JsonStorageMigrationTest {
     }
 
     @Test
-    fun invalidXmlState_doesNotCreateJsonAndCanRetryAfterCorrection() {
-        val valid = sampleJson()
+    fun xmlWithoutJson_isIgnoredRegardlessOfContents() {
+        val current = sampleJson()
         listOf(
+                current,
+                JSONObject(current).put("schemaVersion", 3).toString(),
                 "broken JSON",
                 """{"schemaVersion":5}""",
-                """{"exercises":[{"id":"bad","name":"Bad","type":"UNKNOWN"}]}""",
             )
             .forEach { raw ->
                 val xml = seedXml(raw)
+                AtomicFile(stateFile).delete()
 
-                assertThrows(Exception::class.java) { LofitRepository(context) }
+                val repository = LofitRepository(jsonOnlyContext)
 
+                assertEquals(AppData(), repository.data)
                 assertFalse(stateFile.exists())
+                assertEquals("[]", context.repositoryHistoryFile.readText())
+                assertArrayEquals(xml, context.legacyXmlFile.readBytes())
+                repository.save()
+                assertEquals(4, JSONObject(stateFile.readText()).getInt("schemaVersion"))
+                assertEquals(AppData(), LofitRepository(jsonOnlyContext).data)
                 assertArrayEquals(xml, context.legacyXmlFile.readBytes())
             }
-        val xml = seedXml(valid)
-        LofitRepository(context)
-        assertEquals(valid, stateFile.readText())
-        assertArrayEquals(xml, context.legacyXmlFile.readBytes())
     }
 
     @Test
-    fun failedMigrationWrite_preservesXmlAndRetriesOnNextLoad() {
-        val raw = sampleJson()
-        val xml = seedXml(raw)
+    fun failedFirstSave_preservesXmlAndCanRetry() {
+        val xml = seedXml(sampleJson())
+        AtomicFile(stateFile).delete()
+        val repository = LofitRepository(jsonOnlyContext)
+        repository.data.routines.add(Routine(name = "Fresh routine"))
         val pending = File("${stateFile.path}.new")
         assertTrue(pending.mkdir())
 
-        assertThrows(IOException::class.java) { LofitRepository(context) }
+        assertThrows(IOException::class.java) { repository.save() }
 
         assertFalse(stateFile.exists())
         assertArrayEquals(xml, context.legacyXmlFile.readBytes())
         assertTrue(pending.delete())
-        LofitRepository(context)
-        assertEquals(raw, stateFile.readText())
+        repository.save()
+        assertEquals("Fresh routine", LofitRepository(jsonOnlyContext).data.routines.single().name)
         assertArrayEquals(xml, context.legacyXmlFile.readBytes())
     }
 
@@ -350,14 +259,18 @@ class JsonStorageMigrationTest {
     }
 
     @Test
-    fun interruptedFirstWrite_retriesMigrationFromIntactXml() {
-        val raw = sampleJson()
-        val xml = seedXml(raw)
+    fun interruptedFirstWrite_startsFreshWithoutImportingXml() {
+        val xml = seedXml(sampleJson())
+        AtomicFile(stateFile).delete()
         File("${stateFile.path}.new").writeText("partial JSON")
 
-        LofitRepository(context)
+        val repository = LofitRepository(jsonOnlyContext)
 
-        assertEquals(raw, stateFile.readText())
+        assertEquals(AppData(), repository.data)
+        assertFalse(stateFile.exists())
+        assertArrayEquals(xml, context.legacyXmlFile.readBytes())
+        repository.save()
+        assertEquals(AppData(), LofitRepository(jsonOnlyContext).data)
         assertArrayEquals(xml, context.legacyXmlFile.readBytes())
     }
 
@@ -379,19 +292,21 @@ class JsonStorageMigrationTest {
     }
 
     @Test
-    fun schemaMigration_keepsAnExistingJsonBackup() {
+    fun unsupportedSchema_keepsExistingBackups() {
         val raw = JSONObject(sampleJson()).put("schemaVersion", 3).toString()
         stateFile.writeText(raw)
+        val history = context.repositoryHistoryFile.readText()
         val backup = File(context.filesDir, "state-before-migration-v4.json")
         backup.writeText("original backup")
         val historyBackup = File(context.filesDir, "history-before-migration-v4.json")
         historyBackup.writeText("original history backup")
 
-        LofitRepository(context)
+        assertThrows(IllegalStateException::class.java) { LofitRepository(jsonOnlyContext) }
 
+        assertEquals(raw, stateFile.readText())
+        assertEquals(history, context.repositoryHistoryFile.readText())
         assertEquals("original backup", backup.readText())
         assertEquals("original history backup", historyBackup.readText())
-        assertEquals(4, JSONObject(stateFile.readText()).getInt("schemaVersion"))
     }
 
     private fun seedXml(raw: String): ByteArray {
@@ -470,8 +385,6 @@ class JsonStorageMigrationTest {
         }
         repository.saveHistory()
         repository.save()
-        val raw = stateFile.readText()
-        AtomicFile(stateFile).delete()
-        return raw
+        return stateFile.readText()
     }
 }
