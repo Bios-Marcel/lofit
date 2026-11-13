@@ -2520,6 +2520,11 @@ class MainActivity : AppCompatActivity() {
             )
             workout.bodyWeightKg?.let { body.addView(bodyWeightText(it)) }
             if (editing) {
+                body.addView(ui.workoutNote(workout.note) { workout.note = it })
+            } else if (workout.note.isNotBlank()) {
+                body.addView(ui.workoutNote(workout.note, readOnly = true))
+            }
+            if (editing) {
                 body.addView(
                     ui.restInput(workout.defaultRestSeconds) { seconds ->
                         workout.defaultRestSeconds = seconds
@@ -2709,6 +2714,16 @@ class MainActivity : AppCompatActivity() {
                     )
             }
         return ui.page(title, message) { body ->
+            if (confirm.action == ConfirmAction.FINISH_WORKOUT) {
+                repository.data.activeWorkout?.let { workout ->
+                    body.addView(
+                        ui.workoutNote(workout.note) {
+                            workout.note = it
+                            repository.saveDeferred()
+                        }
+                    )
+                }
+            }
             val routineChanges =
                 if (confirm.action == ConfirmAction.FINISH_WORKOUT)
                     repository.data.activeWorkout?.routineChanges(repository.data.routines)

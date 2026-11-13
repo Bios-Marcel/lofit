@@ -19,6 +19,33 @@ class RepositoryPersistenceTest {
     }
 
     @Test
+    fun workoutNotesPersistInActiveWorkoutAndHistoryAndDefaultEmptyForOlderData() {
+        val repository = LofitRepository(context)
+        val note = "Felt strong\nRest more next time"
+        val workout = WorkoutSession(name = "Strength", note = note)
+        repository.data.activeWorkout = workout
+        repository.data.history.add(
+            workout.copy(intervals = mutableListOf(WorkoutInterval(100, 200)))
+        )
+        repository.save()
+        repository.saveHistory()
+
+        val loaded = LofitRepository(context).data
+        assertEquals(note, loaded.activeWorkout!!.note)
+        assertEquals(note, loaded.history.single().note)
+
+        val root = JSONObject(stored())
+        root.getJSONObject("activeWorkout").remove("note")
+        store(root.toString())
+        val history = org.json.JSONArray(context.repositoryHistoryFile.readText())
+        history.getJSONObject(0).remove("note")
+        context.repositoryHistoryFile.writeText(history.toString())
+        val legacy = LofitRepository(context).data
+        assertEquals("", legacy.activeWorkout!!.note)
+        assertEquals("", legacy.history.single().note)
+    }
+
+    @Test
     fun cardioPersistsAndDefaultsOffForExistingExercises() {
         val repository = LofitRepository(context)
         assertTrue(repository.data.exercises.all { !it.cardio })

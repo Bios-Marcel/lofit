@@ -248,6 +248,7 @@ class LofitRepository(context: Context) {
         JSONObject().apply {
             put("id", workout.id)
             put("name", workout.name)
+            put("note", workout.note)
             put("bodyWeightKg", workout.bodyWeightKg?.let(::roundBodyWeight) ?: JSONObject.NULL)
             put("averageHeartRateBpm", workout.averageHeartRateBpm ?: JSONObject.NULL)
             put(
@@ -481,6 +482,8 @@ class LofitRepository(context: Context) {
         WorkoutSession(
             id = value.getString("id"),
             name = value.getString("name"),
+            // LEGACY: Workouts saved before workout notes have no note.
+            note = value.optString("note", ""),
             bodyWeightKg =
                 if (value.isNull("bodyWeightKg")) null
                 else roundBodyWeight(value.getDouble("bodyWeightKg")),

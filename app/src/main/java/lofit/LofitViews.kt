@@ -569,6 +569,37 @@ internal class LofitViews(
             setOnFocusChangeListener { view, focused -> view.background = fieldBackground(focused) }
         }
 
+    fun workoutNote(
+        value: String,
+        readOnly: Boolean = false,
+        onChange: (String) -> Unit = {},
+    ): TextView =
+        (if (readOnly) metaText(value) else textField("Workout note")).apply {
+            contentDescription = "Workout note"
+            setTextColor(color(R.color.cream))
+            layoutParams =
+                LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    )
+                    .apply {
+                        topMargin = dp(8)
+                        bottomMargin = dp(12)
+                    }
+            if (this is EditText) {
+                inputType =
+                    InputType.TYPE_CLASS_TEXT or
+                        InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+                        InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+                isSingleLine = false
+                minLines = 3
+                gravity = Gravity.TOP or Gravity.START
+                setPadding(dp(12), dp(12), dp(12), dp(12))
+                setText(value)
+                doAfterTextChanged { onChange(it.toString()) }
+            }
+        }
+
     fun exerciseNote(
         value: String,
         exercise: Exercise,

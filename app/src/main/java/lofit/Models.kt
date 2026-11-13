@@ -139,6 +139,7 @@ data class WorkoutSession(
     var averageHeartRateBpm: Double? = null,
     var autoStartCardio: Boolean = true,
     var voiceCommandsEnabled: Boolean = false,
+    var note: String = "",
 ) {
     constructor(
         id: String = UUID.randomUUID().toString(),
@@ -152,6 +153,7 @@ data class WorkoutSession(
         averageHeartRateBpm: Double? = null,
         autoStartCardio: Boolean = true,
         voiceCommandsEnabled: Boolean = false,
+        note: String = "",
     ) : this(
         id,
         name,
@@ -163,6 +165,7 @@ data class WorkoutSession(
         averageHeartRateBpm,
         autoStartCardio,
         voiceCommandsEnabled,
+        note,
     )
 
     init {
