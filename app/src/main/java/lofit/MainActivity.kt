@@ -3707,6 +3707,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(ui.dp(14), ui.dp(10), ui.dp(10), ui.dp(10))
             setBackgroundColor(ui.color(R.color.coral_dark))
             contentDescription = "Rest timer overlay"
+            setOnClickListener { openActiveWorkout() }
             visibility = View.GONE
             restTimeText =
                 TextView(this@MainActivity).apply {
