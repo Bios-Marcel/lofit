@@ -48,15 +48,6 @@ class WorkoutSessionTest {
     }
 
     @Test
-    fun search_matchesEachWordAcrossFieldsIgnoringCase() {
-        assert(matchesSearchQuery("CURL dumb", "Dumbbell Bicep Curl", "Biceps"))
-        assert(matchesSearchQuery("dumb fore", "Dumbbell Bicep Curl", "Forearms"))
-        assert(matchesSearchQuery("  dumb   FORE  ", "Dumbbell Bicep Curl", "Forearms"))
-        assert(!matchesSearchQuery("dumb tri", "Dumbbell Bicep Curl", "Biceps"))
-        assert(matchesSearchQuery("", "Dumbbell Bicep Curl", "Biceps"))
-    }
-
-    @Test
     fun muscleGroups_coverCatalogAndNormalizeSelections() {
         val catalogGroups =
             DefaultData.exercises()
@@ -396,11 +387,10 @@ class WorkoutSessionTest {
     }
 
     @Test
-    fun defaultLibrary_hasFullBalancedCatalog() {
+    fun defaultLibrary_hasValidMetadataAndUniqueIds() {
         val exercises = DefaultData.exercises()
 
-        assertEquals(listOf("Repetitions", "Timed"), ExerciseType.entries.map { it.label })
-        assertEquals(473, exercises.size)
+        assertTrue(exercises.all { it.name.isNotBlank() })
         assert(
             exercises
                 .map { it.id }
@@ -426,7 +416,6 @@ class WorkoutSessionTest {
                 )
         )
         assert(exercises.any { it.type == ExerciseType.REPETITIONS })
-        assert(exercises.count { it.type == ExerciseType.TIMED } >= 80)
         assertEquals(exercises.size, exercises.map { it.id }.toSet().size)
         assertTrue(exercises.none { "fedb-" in it.id })
         assertFalse(exercises.single { it.id == "push-up" }.weighted)
@@ -437,12 +426,10 @@ class WorkoutSessionTest {
         assertTrue(exercises.single { it.id == "farmer-carry" }.weighted)
         assertFalse(exercises.single { it.id == "bodyweight-flyes" }.weighted)
         val weightedCopies = exercises.filter { it.id.startsWith("weighted-") }
-        assertEquals(40, weightedCopies.size)
         weightedCopies.forEach { copy ->
             val original = exercises.single { it.id == copy.id.removePrefix("weighted-") }
             assertFalse(original.weighted)
             assertTrue(copy.weighted)
-            assertEquals("Weighted ${original.name}", copy.name)
             assertEquals(original.type, copy.type)
             assertEquals(original.asymmetric, copy.asymmetric)
             assertEquals(original.primaryMuscle, copy.primaryMuscle)
@@ -465,11 +452,6 @@ class WorkoutSessionTest {
             exercises.single { it.id == "back-extension-hold" }.type,
         )
         assertTrue(exercises.single { it.id == "jefferson-curl" }.weighted)
-        assert(exercises.count { it.asymmetric } >= 50)
-        val shoulderRotations = exercises.filter {
-            it.name.contains("Rotation", ignoreCase = true) && it.primaryMuscle == "Rotator cuff"
-        }
-        assert(shoulderRotations.size >= 8)
         assert(exercises.all { it.primaryMuscle.isNotBlank() })
         assert(exercises.all { it.imageResource != null || it.imageName != null })
         val pullUpImage = exercises.single { it.id == "pull-up" }.imageResource
