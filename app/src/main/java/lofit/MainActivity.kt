@@ -2387,6 +2387,10 @@ class MainActivity : AppCompatActivity() {
                             render()
                             true
                         }
+                        menu.add("Start new workout").setOnMenuItemClickListener {
+                            startWorkout(workout.freshWorkout())
+                            true
+                        }
                         val hevyWorkoutId = hevySettings.remoteWorkoutId(workout.id)
                         if (
                             workout.setCount() > 0 &&

@@ -224,6 +224,26 @@ data class WorkoutSession(
             Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
     }
 
+    fun freshWorkout(): WorkoutSession =
+        WorkoutSession(
+            name = name,
+            defaultRestSeconds = defaultRestSeconds,
+            autoStartCardio = autoStartCardio,
+            exercises =
+                exercises
+                    .map { item ->
+                        WorkoutExercise(
+                            exerciseId = item.exerciseId,
+                            restSecondsOverride = item.restSecondsOverride,
+                            plannedSets = item.freshPlannedSets(),
+                            previousNote = item.effectiveNote,
+                            manualMeasurement = item.manualMeasurement,
+                            pauseEverySecondSet = item.pauseEverySecondSet,
+                        )
+                    }
+                    .toMutableList(),
+        )
+
     fun toRoutine(): Routine =
         Routine(
             name = name,
@@ -232,37 +252,10 @@ data class WorkoutSession(
             exercises =
                 exercises
                     .map { item ->
-                        val plannedSetOrder =
-                            item.plannedSets.mapIndexed { index, set -> set.id to index }.toMap()
-                        val sets =
-                            item.sets.sortedBy { plannedSetOrder[it.plannedSetId] ?: Int.MAX_VALUE }
-                        val plannedSets =
-                            if (sets.isNotEmpty()) {
-                                sets
-                                    .map { set ->
-                                        PlannedSet(
-                                            type = set.type,
-                                            weightKg = set.weightKg,
-                                            reps = set.reps,
-                                            holdSeconds = set.holdSeconds,
-                                            side = set.side,
-                                        )
-                                    }
-                                    .toMutableList()
-                            } else {
-                                item.plannedSets
-                                    .map { set ->
-                                        set.copy(
-                                            id = UUID.randomUUID().toString(),
-                                            actualHoldSeconds = null,
-                                        )
-                                    }
-                                    .toMutableList()
-                            }
                         RoutineExercise(
                             exerciseId = item.exerciseId,
                             restSecondsOverride = item.restSecondsOverride,
-                            plannedSets = plannedSets,
+                            plannedSets = item.freshPlannedSets(),
                             note = item.effectiveNote,
                             manualMeasurement = item.manualMeasurement,
                             pauseEverySecondSet = item.pauseEverySecondSet,
@@ -270,6 +263,30 @@ data class WorkoutSession(
                     }
                     .toMutableList(),
         )
+}
+
+private fun WorkoutExercise.freshPlannedSets(): MutableList<PlannedSet> {
+    val plannedSetOrder = plannedSets.mapIndexed { index, set -> set.id to index }.toMap()
+    val completedSets = sets.sortedBy { plannedSetOrder[it.plannedSetId] ?: Int.MAX_VALUE }
+    return if (completedSets.isNotEmpty()) {
+        completedSets
+            .map { set ->
+                PlannedSet(
+                    type = set.type,
+                    weightKg = set.weightKg,
+                    reps = set.reps,
+                    holdSeconds = set.holdSeconds,
+                    side = set.side,
+                )
+            }
+            .toMutableList()
+    } else {
+        plannedSets
+            .map { set ->
+                set.copy(id = UUID.randomUUID().toString(), actualHoldSeconds = null)
+            }
+            .toMutableList()
+    }
 }
 
 data class Routine(
