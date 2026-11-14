@@ -520,8 +520,12 @@ class LiveWorkoutMeasurementFlowTest {
             )
             scenario.recreate()
             onView(withContentDescription("Scale Pull live weight graph")).check { view, _ ->
-                assertTrue((view as LiveMeasurementGraphView).series.samples.isEmpty())
-                assertNull(view.series.lastPullAverageKg)
+                // The workout service keeps the in-memory trace across activity recreation.
+                assertEquals(
+                    listOf(1.1, 15.113, 15.133, 2.0, 1.0),
+                    (view as LiveMeasurementGraphView).series.samples.map { it.kilograms },
+                )
+                assertEquals(15.12, view.series.lastPullAverageKg!!, 0.0)
             }
             onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
             onView(withContentDescription("Set 1 weight")).check(matches(withText("16.5")))

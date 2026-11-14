@@ -32,6 +32,7 @@ class CraneScaleScreensTest {
     private val selected = CraneScaleDevice("AA:BB:CC:DD:EE:01", "IF_B7")
     private val other = CraneScaleDevice("AA:BB:CC:DD:EE:02", "WH-C06")
     private var savedState: ByteArray? = null
+    private lateinit var activityScanner: FakeScanner
     private val fakeActivityScanner = ActivityLifecycleCallback { activity, stage ->
         if (activity is MainActivity && stage == Stage.CREATED) {
             // Replace the radio before onStart, including after activity recreation.
@@ -42,11 +43,12 @@ class CraneScaleScreensTest {
                     .apply { isAccessible = true }
                     .get(activity) as Lazy<*>
             val screens = delegate.value as CraneScaleScreens
+            activityScanner = FakeScanner()
             CraneScaleScreens::class
                 .java
                 .getDeclaredField("scanner")
                 .apply { isAccessible = true }
-                .set(screens, FakeScanner())
+                .set(screens, activityScanner)
             val withBluetooth: (() -> Unit) -> Unit = { it() }
             CraneScaleScreens::class
                 .java
@@ -58,6 +60,8 @@ class CraneScaleScreensTest {
 
     @Before
     fun setup() {
+        instrumentation.runOnMainSync { WorkoutVoiceService.stop() }
+        instrumentation.waitForIdleSync()
         listOf(
                 Manifest.permission.BLUETOOTH_SCAN,
                 Manifest.permission.BLUETOOTH_CONNECT,
@@ -72,6 +76,7 @@ class CraneScaleScreensTest {
             data.bodyMetricsEnabled = false
             data.mcpEnabled = false
             data.craneScale = null
+            data.activeWorkout = null
             save()
         }
         instrumentation.runOnMainSync {
@@ -81,6 +86,8 @@ class CraneScaleScreensTest {
 
     @After
     fun restore() {
+        instrumentation.runOnMainSync { WorkoutVoiceService.stop() }
+        instrumentation.waitForIdleSync()
         instrumentation.runOnMainSync {
             ActivityLifecycleMonitorRegistry.getInstance()
                 .removeLifecycleCallback(fakeActivityScanner)
@@ -117,42 +124,21 @@ class CraneScaleScreensTest {
 
     @Test
     fun selectedScaleControlsLiveMenuAcrossRecreationAndForgetting() {
-        val scanner = FakeScanner()
-        val repository = LofitRepository(context)
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             openDrawer(scenario)
             onView(withText(R.string.nav_live_measurement)).check(matches(not(isDisplayed())))
             pressBack()
-            lateinit var screens: CraneScaleScreens
-            scenario.onActivity { activity ->
-                val ui = LofitViews(activity, ExercisePictures(activity)) { BiologicalGender.MALE }
-                fun showSettings() {
-                    screens.clear()
-                    activity.setContentView(screens.settingsCard())
-                }
-                screens =
-                    CraneScaleScreens(
-                        activity,
-                        ui,
-                        { repository.data },
-                        repository::save,
-                        { it() },
-                        { showSettings() },
-                        scanner,
-                    )
-                showSettings()
-                screens.onStart()
-            }
-            onView(withText("Select scale")).perform(click())
+            navigate(scenario, R.string.nav_settings)
+            onView(withText("Select scale")).perform(scrollTo(), click())
             scenario.onActivity {
-                assertNull(scanner.address)
-                scanner.reading(selected, 5.0)
-                scanner.reading(selected, 6.0)
-                scanner.reading(other, 7.0)
+                assertNull(activityScanner.address)
+                activityScanner.reading(selected, 5.0)
+                activityScanner.reading(selected, 6.0)
+                activityScanner.reading(other, 7.0)
             }
             onView(withText("${other.name}\n${other.address}"))
                 .perform(waitForStableLayout(), click())
-            assertFalse(scanner.running)
+            assertFalse(activityScanner.running)
             assertEquals(other, LofitRepository(context).data.craneScale)
             scenario.recreate()
             navigate(scenario, R.string.nav_settings)
