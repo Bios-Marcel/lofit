@@ -2,6 +2,9 @@ package lofit
 
 import java.util.Locale
 
+internal fun formatSeconds(total: Int): String =
+    String.format(Locale.getDefault(), "%d:%02d", total / 60, total % 60)
+
 fun formatWorkoutTime(totalSeconds: Int): String = formatWorkoutTime(totalSeconds.toLong())
 
 internal fun formatWorkoutTime(totalSeconds: Long): String {

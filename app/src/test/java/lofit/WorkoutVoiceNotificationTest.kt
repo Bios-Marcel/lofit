@@ -61,4 +61,17 @@ class WorkoutVoiceNotificationTest {
         assertEquals(first.detail, changed.detail)
         assertNotEquals(first, changed)
     }
+
+    @Test
+    fun manualRestNotificationKeepsSetDetailsWithoutClaimingVoiceIsOn() {
+        val rest = target.copy(restEndsAt = 121_000)
+        val state = session.notificationState(data, rest, 1000)
+        assertFalse(state.voiceEnabled)
+        assertEquals("Set 1 of 1 · 20 kg × 8 reps · Rest 2:00", state.detail)
+        assertEquals(121_000L, state.restEndsAt)
+        assertTrue(state.canComplete)
+        val voice = session.notificationState(data, rest, 1000, voiceEnabled = true)
+        assertTrue(voice.detail.startsWith("Voice on"))
+        assertNotEquals(state, voice)
+    }
 }

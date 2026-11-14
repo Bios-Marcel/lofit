@@ -35,9 +35,10 @@ internal class WorkoutVoiceRuntime(val repository: LofitRepository) {
     var onChanged: (() -> Unit)? = null
     var revision = 0
     var failed = false
+    var serviceFailed = false
 }
 
-/** Owns microphone capture and workout commands independently of the activity lifetime. */
+/** Owns workout timers, cues and optional microphone capture independently of the activity. */
 class WorkoutVoiceService : Service() {
     companion object {
         private const val CHANNEL = "active-workout"
@@ -55,7 +56,7 @@ class WorkoutVoiceService : Service() {
             get() = current?.takeUnless { it.closed }?.runtime ?: pending
 
         internal fun start(context: Context, runtime: WorkoutVoiceRuntime) {
-            if (current != null || pending != null || runtime.failed) return
+            if (current != null || pending != null || runtime.serviceFailed) return
             stopRequested = false
             pending = runtime
             try {
@@ -65,11 +66,11 @@ class WorkoutVoiceService : Service() {
                 )
             } catch (error: RuntimeException) {
                 pending = null
-                runtime.failed = true
-                Log.w("WorkoutVoice", "Cannot start microphone service", error)
+                runtime.serviceFailed = true
+                Log.w("WorkoutVoice", "Cannot start workout service", error)
                 Toast.makeText(
                         context,
-                        "Open the workout to resume voice commands.",
+                        "Open the workout to resume timers.",
                         Toast.LENGTH_LONG,
                     )
                     .show()
@@ -102,6 +103,7 @@ class WorkoutVoiceService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private var closed = false
     private var foregroundStarted = false
+    private var foregroundType = 0
     private var wakeRenewedAt = 0L
     private var notificationAt = 0L
     private var lastNotification: WorkoutVoiceNotificationState? = null
@@ -153,8 +155,8 @@ class WorkoutVoiceService : Service() {
                             Toast.LENGTH_LONG,
                         )
                         .show()
-                    shutdown()
-                    stopSelf()
+                    voice.unload()
+                    refresh()
                 },
             )
         getSystemService(NotificationManager::class.java)
@@ -167,8 +169,9 @@ class WorkoutVoiceService : Service() {
             )
     }
 
-    private fun eligible(): Boolean =
+    private fun voiceEligible(): Boolean =
         runtime.session.enabled &&
+            !runtime.failed &&
             ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
                 PackageManager.PERMISSION_GRANTED
 
@@ -182,33 +185,34 @@ class WorkoutVoiceService : Service() {
                 val state =
                     runtime.session.notificationState(
                         runtime.repository.data,
-                        runtime.session.backgroundTarget(),
+                        runtime.session.backgroundTarget(includeManual = true),
                         SystemClock.elapsedRealtime(),
+                        voiceEnabled = voiceEligible(),
                     )
                 startForeground(
                     NOTIFICATION_ID,
                     notification(state),
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE,
+                    serviceType(),
                 )
+                foregroundType = serviceType()
                 foregroundStarted = true
                 lastNotification = state
                 notificationAt = SystemClock.elapsedRealtime()
             } catch (error: RuntimeException) {
-                runtime.failed = true
-                Log.w("WorkoutVoice", "Microphone foreground service unavailable", error)
+                runtime.serviceFailed = true
+                Log.w("WorkoutVoice", "Workout foreground service unavailable", error)
                 shutdown()
                 stopSelf()
                 return START_NOT_STICKY
             }
-            voice.prepare()
             handler.post(tick)
         }
-        if (stopRequested || !eligible()) {
+        if (stopRequested || runtime.repository.data.activeWorkout == null) {
             shutdown()
             stopSelf()
             return START_NOT_STICKY
         }
-        val target = runtime.session.backgroundTarget()
+        val target = runtime.session.backgroundTarget(includeManual = true)
         when (intent?.action) {
             COMPLETE ->
                 if (
@@ -243,14 +247,14 @@ class WorkoutVoiceService : Service() {
     }
 
     internal fun onVoiceCommand(command: VoiceCommand, target: WorkoutVoiceTarget) {
-        if (closed || !eligible()) return
+        if (closed || !voiceEligible()) return
         if (runtime.foreground) runtime.onCommand?.invoke(command, target)
         else applyBackground(command, target)
         refresh()
     }
 
     private fun applyBackground(command: VoiceCommand, target: WorkoutVoiceTarget) {
-        val result = runtime.session.apply(command, target) ?: return
+        val result = runtime.session.apply(command, target, includeManual = true) ?: return
         runtime.revision++
         cue(result)
         runtime.onChanged?.invoke()
@@ -258,30 +262,37 @@ class WorkoutVoiceService : Service() {
 
     internal fun refresh() {
         if (closed || !foregroundStarted) return
-        if (!eligible()) {
+        if (runtime.repository.data.activeWorkout == null) {
             shutdown()
             stopSelf()
             return
         }
-        val target =
-            if (runtime.foreground) runtime.foregroundTarget else runtime.session.backgroundTarget()
-        voice.update(target)
+        val voiceTarget =
+            if (!voiceEligible()) null
+            else if (runtime.foreground) runtime.foregroundTarget
+            else runtime.session.backgroundTarget()
+        val type = serviceType()
+        if (type != foregroundType) {
+            // Microphone access can be enabled while this timer-only service is already running.
+            // Android requires the microphone service type before starting capture.
+            startForeground(NOTIFICATION_ID, notification(notificationState()), type)
+            foregroundType = type
+        }
+        if (voiceEligible()) voice.prepare() else voice.unload()
+        voice.update(voiceTarget)
         val now = SystemClock.elapsedRealtime()
-        if (target == null) {
+        val timerRunning =
+            runtime.session.restEndsAt > now || runtime.session.activeHoldPlannedSetId != null
+        if (voiceTarget == null && !timerRunning) {
             if (wakeLock.isHeld) wakeLock.release()
         } else if (!wakeLock.isHeld || now - wakeRenewedAt > 60_000) {
-            // Renew a bounded CPU lock only while capturing; never keep the display awake.
+            // Keep timers and cues running with the screen off, without keeping the display awake.
             wakeLock.acquire(10 * 60_000L)
             wakeRenewedAt = now
         }
         if (now - notificationAt >= 500) {
             notificationAt = now
-            val state =
-                runtime.session.notificationState(
-                    runtime.repository.data,
-                    if (runtime.foreground) runtime.session.backgroundTarget() else target,
-                    now,
-                )
+            val state = notificationState()
             if (state != lastNotification) {
                 getSystemService(NotificationManager::class.java)
                     .notify(NOTIFICATION_ID, notification(state))
@@ -289,6 +300,18 @@ class WorkoutVoiceService : Service() {
             }
         }
     }
+
+    private fun serviceType(): Int =
+        ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or
+            if (voiceEligible()) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0
+
+    private fun notificationState() =
+        runtime.session.notificationState(
+            runtime.repository.data,
+            runtime.session.backgroundTarget(includeManual = true),
+            SystemClock.elapsedRealtime(),
+            voiceEnabled = voiceEligible(),
+        )
 
     private fun notification(state: WorkoutVoiceNotificationState): Notification {
         val open =
@@ -311,10 +334,17 @@ class WorkoutVoiceService : Service() {
                 .setOnlyAlertOnce(true)
                 .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setWhen(
+                    System.currentTimeMillis() -
+                        (runtime.repository.data.activeWorkout?.durationMillis() ?: 0)
+                )
+                .setUsesChronometer(!state.voiceEnabled && state.restEndsAt == null)
         fun action(name: String, label: String, code: Int) {
             val intent =
                 Intent(this, WorkoutVoiceService::class.java)
                     .setAction(name)
+                    // Keep old notification actions tied to their original set and rest deadline.
+                    .setIdentifier("${state.workoutId}:$name:${state.setId}:${state.restEndsAt}")
                     .putExtra("workoutId", state.workoutId)
                     .putExtra("setId", state.setId)
                     .putExtra("restEndsAt", state.restEndsAt ?: -1)

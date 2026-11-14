@@ -44,9 +44,9 @@ internal class WorkoutVoiceSession(
         activeHoldPlannedSetId?.let { VoiceTimerTarget(item, it) }
     }
 
-    fun backgroundTarget(): WorkoutVoiceTarget? {
+    fun backgroundTarget(includeManual: Boolean = false): WorkoutVoiceTarget? {
         val workout = data().activeWorkout ?: return null
-        if (!enabled) return null
+        if (workout.completedAt != null || (!includeManual && !enabled)) return null
         val active =
             liveMeasurement.active?.let { VoiceTimerTarget(it.item.id, it.set.id) }
                 ?: activeTarget()
@@ -69,8 +69,12 @@ internal class WorkoutVoiceSession(
         return WorkoutVoiceTarget(timer, next, rest).takeIf { next != null || rest != null }
     }
 
-    fun apply(command: VoiceCommand, expected: WorkoutVoiceTarget): Cue? {
-        val current = backgroundTarget() ?: return null
+    fun apply(
+        command: VoiceCommand,
+        expected: WorkoutVoiceTarget,
+        includeManual: Boolean = false,
+    ): Cue? {
+        val current = backgroundTarget(includeManual) ?: return null
         if (command == VoiceCommand.SKIP) {
             if (expected.restEndsAt == null || expected.restEndsAt != current.restEndsAt)
                 return null

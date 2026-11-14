@@ -68,7 +68,6 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.snackbar.Snackbar
 import java.text.DateFormat
 import java.util.Date
-import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
@@ -608,6 +607,7 @@ class MainActivity : AppCompatActivity() {
         voiceResumed = true
         workoutVoice.foreground = true
         workoutVoice.failed = false
+        workoutVoice.serviceFailed = false
         workoutVoice.onCommand = ::onWorkoutVoiceCommand
         workoutVoice.onChanged = {
             voiceRevision = workoutVoice.revision
@@ -3899,12 +3899,19 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateTimerVoice() {
         if (isDestroyed || !voiceResumed || !::workoutVoice.isInitialized) return
-        if (!workoutVoice.session.enabled || !hasMicrophonePermission()) {
+        if (
+            repository.data.activeWorkout?.completedAt != null ||
+                repository.data.activeWorkout == null
+        ) {
             WorkoutVoiceService.stop()
+            return
         }
         val target = visibleWorkoutVoiceTarget()
         workoutVoice.foregroundTarget = target
         target?.done?.let { workoutVoice.session.preferredExerciseId = it.exerciseId }
+        // Timers need a foreground service even when voice is off or microphone access is denied.
+        WorkoutVoiceService.start(this, workoutVoice)
+        WorkoutVoiceService.current?.refresh()
         if (target != null && !hasMicrophonePermission()) {
             if (
                 !voicePermissionAsked &&
@@ -3914,10 +3921,6 @@ class MainActivity : AppCompatActivity() {
                 microphonePermission.launch(Manifest.permission.RECORD_AUDIO)
             }
             return
-        }
-        if (target != null && workoutVoice.session.enabled && hasMicrophonePermission()) {
-            WorkoutVoiceService.start(this, workoutVoice)
-            WorkoutVoiceService.current?.refresh()
         }
     }
 
@@ -4234,6 +4237,7 @@ class MainActivity : AppCompatActivity() {
             WorkoutVoiceService.current?.refresh()
             return
         }
+        // LEGACY: Keep activity-owned notifications for paused workouts or service start failures.
         val manager = getSystemService(NotificationManager::class.java)
         val workout = repository.data.activeWorkout
         if (workout == null) {
@@ -4383,9 +4387,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun loggedSetFor(item: WorkoutExercise, plannedSet: PlannedSet): LoggedSet? =
         item.sets.firstOrNull { it.plannedSetId == plannedSet.id }
-
-    private fun formatSeconds(total: Int): String =
-        String.format(Locale.getDefault(), "%d:%02d", total / 60, total % 60)
 
     private fun formatDuration(milliseconds: Long): String =
         formatWorkoutTime((milliseconds / 1_000).toInt())

@@ -482,6 +482,26 @@ class WorkoutVoiceSessionTest {
     }
 
     @Test
+    fun manualNotificationActionsAndRestRemainAvailableWithVoiceDisabled() {
+        data.activeWorkout!!.voiceCommandsEnabled = false
+        assertNull(session.backgroundTarget())
+        val target = session.backgroundTarget(includeManual = true)!!
+        assertNull(session.apply(VoiceCommand.DONE, target))
+        assertEquals(
+            WorkoutVoiceSession.Cue.DONE,
+            session.apply(VoiceCommand.DONE, target, includeManual = true),
+        )
+        assertEquals(now + 30_000, session.restEndsAt)
+        assertNull(session.apply(VoiceCommand.DONE, target, includeManual = true))
+        now += 30_000
+        assertTrue(session.tick())
+        assertEquals(0L, session.restEndsAt)
+        assertFalse(session.tick())
+        data.activeWorkout!!.finish()
+        assertNull(session.backgroundTarget(includeManual = true))
+    }
+
+    @Test
     fun newWorkoutsRejectVoiceCommandsUntilEnabled() {
         val target = session.backgroundTarget()!!
         val original = data.activeWorkout!!

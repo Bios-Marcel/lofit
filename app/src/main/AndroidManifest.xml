@@ -8,6 +8,7 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
@@ -29,7 +30,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Lofit">
         <service android:name=".WorkoutVoiceService" android:exported="false"
-            android:foregroundServiceType="microphone" />
+            android:foregroundServiceType="microphone|specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Active workout timers, rest countdowns and completion sounds" />
+        </service>
         <activity
             android:name=".MainActivity"
             android:exported="true"
