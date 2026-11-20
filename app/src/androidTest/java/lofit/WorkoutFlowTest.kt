@@ -2832,6 +2832,25 @@ class WorkoutFlowTest {
             )
         )
         repository.data.activeWorkout = WorkoutSession(name = "Live workout")
+        repository.data.recordWorkout(
+            WorkoutSession(
+                name = "Previous bench workout",
+                exercises =
+                    mutableListOf(
+                        loggedWorkoutExercise(
+                            "bench-press",
+                            mutableListOf(
+                                LoggedSet(
+                                    type = SetType.NORMAL,
+                                    weightKg = 60.0,
+                                    reps = 5,
+                                    completedAt = 90_000,
+                                )
+                            ),
+                        )
+                    ),
+            )
+        )
         val workout =
             WorkoutSession(
                 name = "Past workout",
@@ -2854,6 +2873,7 @@ class WorkoutFlowTest {
                                         type = SetType.WARMUP,
                                         weightKg = 67.5,
                                         reps = 6,
+                                        completedAt = 160_000,
                                         plannedSetId = benchSet.id,
                                     )
                                 ),
@@ -2887,6 +2907,7 @@ class WorkoutFlowTest {
                     ),
             )
         repository.data.history.add(workout)
+        repository.data.recordWorkout(workout)
         repository.saveHistory()
         repository.save()
         val storedState = context.repositoryStateFile.readText()
@@ -2923,8 +2944,10 @@ class WorkoutFlowTest {
         onView(benchField("Set 1 Repetitions")).check(matches(withText("6")))
         onView(benchField("Set 1 type: Warm-up")).perform(click()).check(matches(withText("W")))
         onView(benchField("Set 1 done")).check(doesNotExist())
+        onView(benchField("Set 1 record")).check(matches(isDisplayed()))
         onView(benchField("Set 2 type: Failure")).check(matches(withText("F")))
         onView(benchField("Set 2 done")).check(doesNotExist())
+        onView(benchField("Set 2 record")).check(doesNotExist())
         onView(benchField("Set 2 weight")).check(matches(withText("50")))
         onView(withText("Set Rest: 75s")).perform(scrollTo()).check(matches(isDisplayed()))
         onView(holdField("Set 1 Goal time in seconds"))

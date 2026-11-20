@@ -30,7 +30,10 @@ internal fun AppData.workoutRecords(workout: WorkoutSession): List<WorkoutRecord
         .groupBy({ it.first }, { it.second })
         .flatMap { (exerciseId, loggedSets) ->
             val exercise = exercisesById[exerciseId] ?: return@flatMap emptyList()
-            val previous = exerciseRecords[exerciseId]?.lastOrNull() ?: return@flatMap emptyList()
+            val previous =
+                exerciseRecords[exerciseId]?.lastOrNull { record ->
+                    workout.completedAt == null || record.recordedAt < workout.startedAt
+                } ?: return@flatMap emptyList()
             val sets = loggedSets.filter { it.isRecordEligible(exercise) }
             val metrics =
                 when {

@@ -50,6 +50,31 @@ class WorkoutRecordsTest {
     }
 
     @Test
+    fun historyKeepsTheWinningSetsAfterLaterWorkouts() {
+        fun session(start: Long, vararg sets: LoggedSet) =
+            WorkoutSession(
+                name = "Bench",
+                startedAt = start,
+                completedAt = start + 9,
+                exercises =
+                    mutableListOf(
+                        WorkoutExercise(exerciseId = bench.id, sets = sets.toMutableList())
+                    ),
+            )
+
+        val data = AppData(exercises = mutableListOf(bench))
+        val baseline = session(10, set.copy(weightKg = 80.0, reps = 5, completedAt = 12))
+        val volume = set.copy(id = "volume", completedAt = 21)
+        val weight = set.copy(id = "weight", weightKg = 90.0, reps = 3, completedAt = 22)
+        val past = session(20, volume, weight, weight.copy(id = "tie", completedAt = 23))
+        val later = session(30, set.copy(id = "later", weightKg = 100.0, completedAt = 31))
+        listOf(baseline, past, later).forEach(data::recordWorkout)
+
+        assertEquals(emptySet<String>(), data.recordSetIds(baseline))
+        assertEquals(setOf(volume.id, weight.id), data.recordSetIds(past))
+    }
+
+    @Test
     fun records_ignorePlannedSetsTiesAndExercisesWithoutPreviousRecords() {
         set.weightKg = 80.0
         set.reps = 5

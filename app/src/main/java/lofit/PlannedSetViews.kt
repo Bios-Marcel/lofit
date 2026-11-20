@@ -9,7 +9,9 @@ import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.GridLayout
 import android.widget.HorizontalScrollView
+import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.Space
 import android.widget.TextView
 import androidx.core.widget.doAfterTextChanged
 import com.google.android.material.button.MaterialButton
@@ -421,6 +423,15 @@ internal class PlannedSetViews(
             }
         }
     }
+
+    fun recordMarker(setIndex: Int, isRecord: Boolean): View =
+        if (isRecord)
+            ImageView(activityContext).apply {
+                setImageResource(R.drawable.ic_crown)
+                scaleType = ImageView.ScaleType.CENTER
+                contentDescription = "Set ${setIndex + 1} record"
+            }
+        else Space(activityContext)
 
     private fun readOnlySetField(value: String, description: String): TextView =
         TextView(activityContext).apply {

@@ -314,7 +314,10 @@ data class ExerciseRecord(
     val exercise: Exercise,
     val set: LoggedSet,
     val volumeSet: LoggedSet?,
-)
+) {
+    val recordedAt: Long
+        get() = maxOf(set.completedAt, volumeSet?.completedAt ?: set.completedAt)
+}
 
 enum class BiologicalGender(val label: String) {
     MALE("Male"),

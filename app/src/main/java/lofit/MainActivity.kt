@@ -2553,9 +2553,9 @@ class MainActivity : AppCompatActivity() {
                 ExerciseReorderController(exerciseCards) { from, to ->
                     workout.moveExercise(from, to)
                 }
+            val initialRecordSetIds = repository.data.recordSetIds(workout)
             val doneStateUpdaters = mutableMapOf<String, (Set<String>) -> Unit>()
-            fun updateDoneStates() {
-                val recordSetIds = repository.data.recordSetIds(workout)
+            fun updateDoneStates(recordSetIds: Set<String>) {
                 doneStateUpdaters.values.forEach { it(recordSetIds) }
             }
             workout.exercises.forEach { item ->
@@ -2575,7 +2575,9 @@ class MainActivity : AppCompatActivity() {
                                 onDoneStateUpdaterReady = { setId, update ->
                                     doneStateUpdaters[setId] = update
                                 },
-                                onSetsChanged = ::updateDoneStates,
+                                onSetsChanged = {
+                                    updateDoneStates(repository.data.recordSetIds(workout))
+                                },
                                 editingHistory = true,
                             )
                         exerciseCards.addView(card)
@@ -2601,9 +2603,11 @@ class MainActivity : AppCompatActivity() {
                                         },
                                     )
                                 }
+                                val showRecords = item.sets.any { it.id in initialRecordSetIds }
                                 addView(
                                     setViews.plannedSetHeader(
                                         movement,
+                                        showDone = showRecords,
                                         showActiveHold = movement.type.tracksDuration,
                                     )
                                 )
@@ -2627,6 +2631,13 @@ class MainActivity : AppCompatActivity() {
                                             exercise = movement,
                                             plannedSet = displaySet,
                                             setIndex = index,
+                                            endAction =
+                                                if (showRecords)
+                                                    setViews.recordMarker(
+                                                        index,
+                                                        loggedSet?.id in initialRecordSetIds,
+                                                    )
+                                                else null,
                                             completed = loggedSet != null,
                                             showActiveHold = movement.type.tracksDuration,
                                             readOnly = true,
@@ -2648,7 +2659,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             if (editing) {
-                updateDoneStates()
+                updateDoneStates(initialRecordSetIds)
                 body.addView(exerciseCards)
                 body.addView(
                     ui.actionButton("Add exercise") {
