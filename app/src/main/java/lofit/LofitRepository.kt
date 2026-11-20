@@ -250,6 +250,7 @@ class LofitRepository(context: Context) {
             put("id", workout.id)
             put("name", workout.name)
             put("note", workout.note)
+            workout.startWifiName?.let { put("startWifiName", it) }
             workout.startLocation?.let {
                 put("latitude", it.latitude)
                 put("longitude", it.longitude)
@@ -492,6 +493,9 @@ class LofitRepository(context: Context) {
             startLocation =
                 if (value.isNull("latitude") || value.isNull("longitude")) null
                 else WorkoutLocation(value.getDouble("latitude"), value.getDouble("longitude")),
+            // LEGACY: Workouts recorded before Wi-Fi matching can still match by GPS.
+            startWifiName =
+                if (value.isNull("startWifiName")) null else value.getString("startWifiName"),
             // LEGACY: Workouts saved before workout notes have no note.
             note = value.optString("note", ""),
             bodyWeightKg =

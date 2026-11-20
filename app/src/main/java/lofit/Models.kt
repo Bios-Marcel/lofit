@@ -143,6 +143,7 @@ data class WorkoutSession(
     var voiceCommandsEnabled: Boolean = false,
     var note: String = "",
     var startLocation: WorkoutLocation? = null,
+    var startWifiName: String? = null,
 ) {
     constructor(
         id: String = UUID.randomUUID().toString(),

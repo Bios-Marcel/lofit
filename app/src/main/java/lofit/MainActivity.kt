@@ -24,6 +24,7 @@ import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.SoundPool
 import android.net.Uri
+import android.net.wifi.WifiManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -1101,9 +1102,8 @@ class MainActivity : AppCompatActivity() {
                         getString(R.string.start_workout),
                         { startWorkout(WorkoutSession(name = "Open workout")) },
                         "Start suggested workout",
-                    ) {
-                        requestStartLocation(null)
-                    },
+                        ::startSuggestedWorkout,
+                    ),
                     LinearLayout.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -2399,8 +2399,8 @@ class MainActivity : AppCompatActivity() {
                             true
                         }
                         if (repository.data.debugMode) {
-                            menu.add("Set to current location").setOnMenuItemClickListener {
-                                setHistoryLocation(workout.id)
+                            menu.add("Set current Wi-Fi and location").setOnMenuItemClickListener {
+                                recordWorkoutPlace(workout.id, debugHistory = true)
                                 true
                             }
                         }
@@ -3399,66 +3399,85 @@ class MainActivity : AppCompatActivity() {
         startWorkout(repository.data.workoutFromRoutine(routine))
     }
 
-    private var locationRequest: ((WorkoutLocation?) -> Unit)? = null
+    private var locationRequest: ((String?) -> Unit)? = null
     private var locationSignal: android.os.CancellationSignal? = null
     private val locationPermission =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-            readStartLocation()
+            readWorkoutWifi()
             ensureWorkoutNotification()
         }
 
-    private fun setHistoryLocation(workoutId: String) {
-        requestCurrentLocation { point ->
-            val entry = repository.data.history.find { it.id == workoutId }
-            if (entry == null || !repository.data.debugMode) return@requestCurrentLocation
-            if (point != null) {
-                entry.startLocation = point
-                repository.saveHistory()
+    private fun startSuggestedWorkout() {
+        withWorkoutWifi { wifiName ->
+            val wifiWorkout = wifiName?.let { repository.data.suggestWorkoutOnWifi(it) }
+            if (wifiWorkout != null) {
+                startWorkout(wifiWorkout)
+                return@withWorkoutWifi
             }
-            Toast.makeText(
-                    this,
-                    if (point == null) "Precise GPS location unavailable"
-                    else "Workout location updated",
-                    Toast.LENGTH_SHORT,
-                )
-                .show()
-        }
-    }
-
-    private fun requestStartLocation(workout: WorkoutSession?) {
-        requestCurrentLocation { point ->
-            if (workout == null) {
-                val suggestion = point?.let { repository.data.suggestWorkout(it) }
-                if (suggestion != null) startWorkout(suggestion)
-                else
-                    Toast.makeText(
-                            this,
-                            if (point == null) "Precise GPS location unavailable"
-                            else "No eligible exercises within 100 m",
-                            Toast.LENGTH_LONG,
-                        )
-                        .show()
-            } else if (point != null) {
-                val saved =
-                    repository.data.activeWorkout?.takeIf { it.id == workout.id }
-                        ?: repository.data.history.find { it.id == workout.id }
-                if (saved != null) {
-                    saved.startLocation = point
-                    if (saved === repository.data.activeWorkout) repository.save()
-                    else repository.saveHistory()
+            requestGps { point ->
+                val workout = point?.let { repository.data.suggestWorkout(it) }
+                if (workout != null) {
+                    workout.startWifiName = wifiName
+                    startWorkout(workout)
+                } else {
+                    val message =
+                        when {
+                            point != null -> "No eligible exercises within 100 m"
+                            wifiName != null ->
+                                "No eligible exercises on this Wi-Fi. GPS unavailable."
+                            else -> "Wi-Fi and precise GPS location unavailable"
+                        }
+                    Toast.makeText(this, message, Toast.LENGTH_LONG).show()
                 }
             }
         }
     }
 
-    private fun requestCurrentLocation(callback: (WorkoutLocation?) -> Unit) {
+    private fun recordWorkoutPlace(workoutId: String, debugHistory: Boolean = false) {
+        fun target(): WorkoutSession? {
+            if (debugHistory && !repository.data.debugMode) return null
+            val active = repository.data.activeWorkout
+            if (!debugHistory && active?.id == workoutId) return active
+            return repository.data.history.find { it.id == workoutId }
+        }
+        fun save(workout: WorkoutSession) {
+            if (workout === repository.data.activeWorkout) repository.save()
+            else repository.saveHistory()
+        }
+
+        withWorkoutWifi { wifiName ->
+            val workout = target() ?: return@withWorkoutWifi
+            if (wifiName != null && workout.startWifiName != wifiName) {
+                workout.startWifiName = wifiName
+                save(workout)
+            }
+            if (debugHistory && wifiName != null)
+                Toast.makeText(this, "Workout Wi-Fi set to $wifiName", Toast.LENGTH_SHORT).show()
+
+            requestGps { point ->
+                val saved = target() ?: return@requestGps
+                if (point != null) {
+                    saved.startLocation = point
+                    save(saved)
+                }
+                if (debugHistory && wifiName == null) {
+                    val message =
+                        if (point == null) "Wi-Fi and precise GPS location unavailable"
+                        else "Workout location updated"
+                    Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    private fun withWorkoutWifi(callback: (String?) -> Unit) {
         locationSignal?.cancel()
         locationRequest = callback
         if (
             checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) ==
                 PackageManager.PERMISSION_GRANTED
         )
-            readStartLocation()
+            readWorkoutWifi()
         else
             locationPermission.launch(
                 arrayOf(
@@ -3468,10 +3487,28 @@ class MainActivity : AppCompatActivity() {
             )
     }
 
-    @android.annotation.SuppressLint("MissingPermission")
-    private fun readStartLocation() {
+    @Suppress("DEPRECATION")
+    private fun readWorkoutWifi() {
         val callback = locationRequest ?: return
         locationRequest = null
+        // This one-shot read returns the connected network even when a VPN is active.
+        val ssid =
+            if (
+                checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
+                    PackageManager.PERMISSION_GRANTED
+            )
+                applicationContext.getSystemService(WifiManager::class.java)?.connectionInfo?.ssid
+            else null
+        callback(
+            ssid
+                ?.takeUnless { it == WifiManager.UNKNOWN_SSID }
+                ?.removeSurrounding("\"")
+                ?.takeIf { it.isNotEmpty() }
+        )
+    }
+
+    @android.annotation.SuppressLint("MissingPermission")
+    private fun requestGps(callback: (WorkoutLocation?) -> Unit) {
         val manager = getSystemService(android.location.LocationManager::class.java)
         val gps = android.location.LocationManager.GPS_PROVIDER
         if (
@@ -3506,7 +3543,7 @@ class MainActivity : AppCompatActivity() {
         repository.save()
         openActiveWorkout()
         queryWorkoutWeight(workout)
-        if (workout.startLocation == null) requestStartLocation(workout)
+        if (workout.startLocation == null) recordWorkoutPlace(workout.id)
         if (locationRequest == null) ensureWorkoutNotification()
     }
 

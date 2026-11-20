@@ -16,6 +16,19 @@ private fun WorkoutLocation.within100Meters(other: WorkoutLocation): Boolean {
 internal fun AppData.suggestWorkout(
     point: WorkoutLocation,
     now: Long = System.currentTimeMillis(),
+): WorkoutSession? =
+    suggestWorkout(now) { it.startLocation?.within100Meters(point) == true }
+        ?.apply { startLocation = point }
+
+internal fun AppData.suggestWorkoutOnWifi(
+    wifiName: String,
+    now: Long = System.currentTimeMillis(),
+): WorkoutSession? =
+    suggestWorkout(now) { it.startWifiName == wifiName }?.apply { startWifiName = wifiName }
+
+private fun AppData.suggestWorkout(
+    now: Long,
+    matchesPlace: (WorkoutSession) -> Boolean,
 ): WorkoutSession? {
     val catalog = exercises.associateBy { it.id }
     val windowMillis = 28L * 86400000
@@ -29,7 +42,7 @@ internal fun AppData.suggestWorkout(
             .mapNotNull(MuscleGroups::canonical)
             .toSet()
     for (session in history.sortedByDescending { it.startedAt }) {
-        val local = session.startLocation?.within100Meters(point) == true
+        val local = matchesPlace(session)
         for (entry in session.exercises) {
             val exercise = catalog[entry.exerciseId] ?: continue
             if (entry.sets.isEmpty()) continue
@@ -57,7 +70,6 @@ internal fun AppData.suggestWorkout(
             .sortedBy { credits[MuscleGroups.canonical(it.primaryMuscle)] ?: 0.0 }
             .toMutableList()
     val workout = WorkoutSession(name = "Suggested workout")
-    workout.startLocation = point
     var remaining = 30
     var previous = emptySet<String>()
     while (ranked.isNotEmpty() && remaining > 0) {

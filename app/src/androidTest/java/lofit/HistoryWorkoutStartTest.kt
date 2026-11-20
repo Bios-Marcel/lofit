@@ -1,5 +1,6 @@
 package lofit
 
+import android.net.wifi.WifiManager
 import android.view.ViewGroup
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
@@ -16,6 +17,7 @@ import com.google.android.material.card.MaterialCardView
 import org.hamcrest.Matchers.allOf
 import org.hamcrest.Matchers.not
 import org.junit.Assert.*
+import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -129,6 +131,44 @@ class HistoryWorkoutStartTest {
     @Test fun historyMenuStartsFreshWorkout() = startFreshWorkout(fromDetails = false)
 
     @Test fun historyDetailMenuStartsFreshWorkout() = startFreshWorkout(fromDetails = true)
+
+    @Test
+    @Suppress("DEPRECATION")
+    fun debugHistoryWifiStartsSuggestedWorkoutWithoutSavedCoordinates() {
+        LofitRepository(context).apply {
+            data.debugMode = true
+            val sets = data.history.single().exercises.first().sets
+            sets[0] = sets.single().copy(completedAt = 100)
+            saveHistory()
+            save()
+        }
+        lateinit var wifiName: String
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            val ssid = context.getSystemService(WifiManager::class.java)?.connectionInfo?.ssid
+            assumeTrue(
+                "Requires a connected Wi-Fi network",
+                !ssid.isNullOrEmpty() && ssid != WifiManager.UNKNOWN_SSID,
+            )
+            wifiName = ssid!!.removeSurrounding("\"")
+            openHistory(scenario)
+            onView(withContentDescription("Options for Push day")).perform(scrollTo(), click())
+            onView(withText("Set current Wi-Fi and location")).perform(click())
+            assertEquals(wifiName, LofitRepository(context).data.history.single().startWifiName)
+        }
+        LofitRepository(context).apply {
+            data.history.single().startLocation = null
+            saveHistory()
+        }
+        ActivityScenario.launch(MainActivity::class.java).use {
+            onView(withContentDescription("${context.getString(R.string.start_workout)} options"))
+                .perform(scrollTo(), click())
+            onView(withText("Start suggested workout")).perform(click())
+            onView(withContentDescription("Workout timer")).check(matches(isDisplayed()))
+            val active = LofitRepository(context).data.activeWorkout!!
+            assertEquals(wifiName, active.startWifiName)
+            assertEquals(listOf("bench-press"), active.exercises.map { it.exerciseId })
+        }
+    }
 
     @Test
     fun startingFromHistoryKeepsAnExistingActiveWorkout() {

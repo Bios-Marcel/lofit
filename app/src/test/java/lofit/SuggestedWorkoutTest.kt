@@ -1,9 +1,47 @@
 package lofit
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class SuggestedWorkoutTest {
+    @Test
+    fun wifiMatchesExactNetworkWithoutCoordinatesAndGpsStillMatchesOlderHistory() {
+        val now = 40L * 86400000
+        val here = WorkoutLocation(0.0, 0.0)
+        val data = AppData(exercises = mutableListOf())
+        fun log(group: String, wifi: String?, point: WorkoutLocation?) {
+            data.exercises.add(Exercise(group, group, ExerciseType.REPETITIONS, false, group, ""))
+            val set = LoggedSet(type = SetType.NORMAL, weightKg = 5.0, completedAt = 1)
+            data.history.add(
+                WorkoutSession(
+                        name = group,
+                        exercises =
+                            mutableListOf(
+                                WorkoutExercise(exerciseId = group, sets = mutableListOf(set))
+                            ),
+                    )
+                    .apply {
+                        startWifiName = wifi
+                        startLocation = point
+                    }
+            )
+        }
+        log("Chest", "Gym", null)
+        log("Back", "gym", null)
+        log("Glutes", null, here)
+
+        val wifiWorkout = data.suggestWorkoutOnWifi("Gym", now)!!
+        assertEquals("Gym", wifiWorkout.startWifiName)
+        assertNull(wifiWorkout.startLocation)
+        assertEquals(listOf("Chest"), wifiWorkout.exercises.map { it.exerciseId })
+        assertNull(data.suggestWorkoutOnWifi("Unknown gym", now))
+        assertEquals(
+            listOf("Glutes"),
+            data.suggestWorkout(here, now)!!.exercises.map { it.exerciseId },
+        )
+    }
+
     @Test
     fun excludesRecentlyTargetedMusclesEvenWithUnfilledSlots() {
         val day = 86400000L
