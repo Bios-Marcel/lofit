@@ -1,6 +1,5 @@
 package lofit
 
-import android.Manifest
 import android.view.ViewGroup
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
@@ -28,10 +27,7 @@ class HistoryWorkoutStartTest {
 
     @Before
     fun prepare() {
-        instrumentation.uiAutomation.grantRuntimePermission(
-            context.packageName,
-            Manifest.permission.POST_NOTIFICATIONS,
-        )
+        instrumentation.grantWorkoutStartPermissions()
         context.clearRepositoryTestData()
         LofitRepository(context).apply {
             data.onboardingComplete = true

@@ -1,6 +1,5 @@
 package lofit
 
-import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.health.connect.HealthConnectException
@@ -44,10 +43,7 @@ class HealthConnectWeightReaderTest {
             data.onboardingComplete = true
             save()
         }
-        instrumentation.uiAutomation.grantRuntimePermission(
-            context.packageName,
-            Manifest.permission.POST_NOTIFICATIONS,
-        )
+        instrumentation.grantWorkoutStartPermissions()
         instrumentation.uiAutomation.grantRuntimePermission(
             context.packageName,
             HealthPermissions.READ_WEIGHT,

@@ -1,6 +1,5 @@
 package lofit
 
-import android.Manifest
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
@@ -31,10 +30,7 @@ class ExerciseRecencyTest {
 
     @Before
     fun resetData() {
-        instrumentation.uiAutomation.grantRuntimePermission(
-            context.packageName,
-            Manifest.permission.POST_NOTIFICATIONS,
-        )
+        instrumentation.grantWorkoutStartPermissions()
         context.clearRepositoryTestData()
         LofitRepository(context).apply {
             data.onboardingComplete = true

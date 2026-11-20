@@ -41,10 +41,7 @@ class RoutineWorkoutFlowTest {
             context.packageName,
             Manifest.permission.RECORD_AUDIO,
         )
-        instrumentation.uiAutomation.grantRuntimePermission(
-            context.packageName,
-            Manifest.permission.POST_NOTIFICATIONS,
-        )
+        instrumentation.grantWorkoutStartPermissions()
         context.getSystemService(NotificationManager::class.java).cancelAll()
         context.clearRepositoryTestData()
         LofitRepository(context).apply {

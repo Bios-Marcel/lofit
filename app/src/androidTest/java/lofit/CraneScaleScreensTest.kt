@@ -7,7 +7,6 @@ import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
-import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.scrollTo
 import androidx.test.espresso.assertion.ViewAssertions.matches
@@ -127,8 +126,7 @@ class CraneScaleScreensTest {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             openDrawer(scenario)
             onView(withText(R.string.nav_live_measurement)).check(matches(not(isDisplayed())))
-            pressBack()
-            navigate(scenario, R.string.nav_settings)
+            onView(allOf(withText(R.string.nav_settings), isClickable())).perform(click())
             onView(withText("Select scale")).perform(scrollTo(), click())
             scenario.onActivity {
                 assertNull(activityScanner.address)

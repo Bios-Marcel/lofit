@@ -37,9 +37,9 @@ class VoiceTimerFlowTest {
 
     @Before
     fun setup() {
+        instrumentation.grantWorkoutStartPermissions()
         listOf(
                 Manifest.permission.RECORD_AUDIO,
-                Manifest.permission.POST_NOTIFICATIONS,
                 Manifest.permission.BLUETOOTH_SCAN,
                 Manifest.permission.BLUETOOTH_CONNECT,
                 Manifest.permission.BLUETOOTH_ADVERTISE,
@@ -255,7 +255,8 @@ class VoiceTimerFlowTest {
             scenario.moveToState(Lifecycle.State.CREATED)
             awaitMicrophone(false)
             scenario.moveToState(Lifecycle.State.RESUMED)
-            onView(withContentDescription("Start set 1 hold")).perform(scrollTo(), click())
+            onView(withContentDescription("Start set 1 hold"))
+                .perform(scrollTo(), waitForStableLayout(), click())
             onView(withContentDescription("Stop set 1 hold")).check(matches(isDisplayed()))
             assertFalse(microphoneRunning())
             onView(withContentDescription("Stop set 1 hold")).perform(click())

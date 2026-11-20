@@ -82,10 +82,7 @@ class WorkoutFlowTest {
             context.packageName,
             Manifest.permission.RECORD_AUDIO,
         )
-        instrumentation.uiAutomation.grantRuntimePermission(
-            context.packageName,
-            Manifest.permission.POST_NOTIFICATIONS,
-        )
+        instrumentation.grantWorkoutStartPermissions()
         instrumentation.uiAutomation.grantRuntimePermission(
             context.packageName,
             HealthPermissions.READ_WEIGHT,

@@ -52,6 +52,7 @@ class LiveWorkoutMeasurementFlowTest {
 
     @Before
     fun setup() {
+        instrumentation.grantWorkoutStartPermissions()
         instrumentation.runOnMainSync { WorkoutVoiceService.stop() }
         instrumentation.waitForIdleSync()
         listOf(
@@ -59,7 +60,6 @@ class LiveWorkoutMeasurementFlowTest {
                 Manifest.permission.BLUETOOTH_SCAN,
                 Manifest.permission.BLUETOOTH_CONNECT,
                 Manifest.permission.BLUETOOTH_ADVERTISE,
-                Manifest.permission.POST_NOTIFICATIONS,
             )
             .forEach {
                 instrumentation.uiAutomation.grantRuntimePermission(context.packageName, it)

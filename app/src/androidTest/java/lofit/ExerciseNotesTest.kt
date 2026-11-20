@@ -1,6 +1,5 @@
 package lofit
 
-import android.Manifest
 import android.content.Intent
 import android.widget.EditText
 import androidx.core.view.GravityCompat
@@ -29,10 +28,7 @@ class ExerciseNotesTest {
 
     @Before
     fun resetData() {
-        instrumentation.uiAutomation.grantRuntimePermission(
-            context.packageName,
-            Manifest.permission.POST_NOTIFICATIONS,
-        )
+        instrumentation.grantWorkoutStartPermissions()
         context.clearRepositoryTestData()
         LofitRepository(context).apply {
             data.bodyMetricsEnabled = false
