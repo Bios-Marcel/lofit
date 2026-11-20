@@ -128,6 +128,8 @@ data class WorkoutInterval(
     fun durationMillis(now: Long): Long = ((endedAt ?: now) - startedAt).coerceAtLeast(0)
 }
 
+data class WorkoutLocation(val latitude: Double, val longitude: Double)
+
 data class WorkoutSession(
     val id: String = UUID.randomUUID().toString(),
     var name: String,
@@ -140,6 +142,7 @@ data class WorkoutSession(
     var autoStartCardio: Boolean = true,
     var voiceCommandsEnabled: Boolean = false,
     var note: String = "",
+    var startLocation: WorkoutLocation? = null,
 ) {
     constructor(
         id: String = UUID.randomUUID().toString(),
@@ -265,7 +268,7 @@ data class WorkoutSession(
         )
 }
 
-private fun WorkoutExercise.freshPlannedSets(): MutableList<PlannedSet> {
+internal fun WorkoutExercise.freshPlannedSets(): MutableList<PlannedSet> {
     val plannedSetOrder = plannedSets.mapIndexed { index, set -> set.id to index }.toMap()
     val completedSets = sets.sortedBy { plannedSetOrder[it.plannedSetId] ?: Int.MAX_VALUE }
     return if (completedSets.isNotEmpty()) {
@@ -334,6 +337,7 @@ data class AppData(
     var craneScale: CraneScaleDevice? = null,
     val bodyMeasurements: MutableList<BodyMeasurement> = mutableListOf(),
     var recordCelebrationsEnabled: Boolean = false,
+    var debugMode: Boolean = false,
 ) {
     fun resumeWorkout(
         workoutId: String,

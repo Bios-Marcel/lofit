@@ -151,6 +151,7 @@ class LofitRepository(context: Context) {
             put("activeWorkout", data.activeWorkout?.let(::encodeWorkout) ?: JSONObject.NULL)
             put("soundCuesEnabled", data.soundCuesEnabled)
             put("recordCelebrationsEnabled", data.recordCelebrationsEnabled)
+            put("debugMode", data.debugMode)
             put("mcpEnabled", data.mcpEnabled)
             put("mcpPort", data.mcpPort)
             put(
@@ -249,6 +250,10 @@ class LofitRepository(context: Context) {
             put("id", workout.id)
             put("name", workout.name)
             put("note", workout.note)
+            workout.startLocation?.let {
+                put("latitude", it.latitude)
+                put("longitude", it.longitude)
+            }
             put("bodyWeightKg", workout.bodyWeightKg?.let(::roundBodyWeight) ?: JSONObject.NULL)
             put("averageHeartRateBpm", workout.averageHeartRateBpm ?: JSONObject.NULL)
             put(
@@ -373,6 +378,7 @@ class LofitRepository(context: Context) {
             soundCuesEnabled = root.getBoolean("soundCuesEnabled"),
             // LEGACY: Saved installs without a record celebration choice remain opted out.
             recordCelebrationsEnabled = root.optBoolean("recordCelebrationsEnabled", false),
+            debugMode = root.optBoolean("debugMode", false),
             mcpEnabled = root.optBoolean("mcpEnabled", false),
             mcpPort =
                 root.optInt("mcpPort", BuildConfig.MCP_PORT).takeIf { it in 1..65535 }
@@ -482,6 +488,10 @@ class LofitRepository(context: Context) {
         WorkoutSession(
             id = value.getString("id"),
             name = value.getString("name"),
+            // LEGACY: Older workouts have no recorded start location.
+            startLocation =
+                if (value.isNull("latitude") || value.isNull("longitude")) null
+                else WorkoutLocation(value.getDouble("latitude"), value.getDouble("longitude")),
             // LEGACY: Workouts saved before workout notes have no note.
             note = value.optString("note", ""),
             bodyWeightKg =

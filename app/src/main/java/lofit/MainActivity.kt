@@ -676,6 +676,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        locationSignal?.cancel()
         workoutVoice.onCommand = null
         workoutVoice.onChanged = null
         craneScaleScreens.clear()
@@ -1095,8 +1096,13 @@ class MainActivity : AppCompatActivity() {
             body.addView(ui.sectionTitle("Routines"))
             if (repository.data.activeWorkout == null) {
                 body.addView(
-                    ui.actionButton(getString(R.string.start_workout)) {
-                        startWorkout(WorkoutSession(name = "Open workout"))
+                    splitMenuButton(
+                        getString(R.string.start_workout),
+                        getString(R.string.start_workout),
+                        { startWorkout(WorkoutSession(name = "Open workout")) },
+                        "Start suggested workout",
+                    ) {
+                        requestStartLocation(null)
                     },
                     LinearLayout.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
@@ -1108,8 +1114,9 @@ class MainActivity : AppCompatActivity() {
                 )
             }
             body.addView(
-                togetherMenuButton(
+                splitMenuButton(
                     "Workout Together",
+                    "Bluetooth",
                     ::scanTogetherWorkouts,
                     "Open .lofit file",
                 ) {
@@ -2391,6 +2398,12 @@ class MainActivity : AppCompatActivity() {
                             startWorkout(workout.freshWorkout())
                             true
                         }
+                        if (repository.data.debugMode) {
+                            menu.add("Set to current location").setOnMenuItemClickListener {
+                                setHistoryLocation(workout.id)
+                                true
+                            }
+                        }
                         val hevyWorkoutId = hevySettings.remoteWorkoutId(workout.id)
                         if (
                             workout.setCount() > 0 &&
@@ -3054,11 +3067,12 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-    private fun togetherMenuButton(
+    private fun splitMenuButton(
         label: String,
-        bluetooth: () -> Unit,
-        fileLabel: String,
-        file: () -> Unit,
+        primaryLabel: String,
+        primary: () -> Unit,
+        alternateLabel: String,
+        alternate: () -> Unit,
     ): View =
         LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -3070,7 +3084,7 @@ class MainActivity : AppCompatActivity() {
                 }
             clipToOutline = true
             addView(
-                ui.actionButton(label, secondary = true, action = bluetooth).apply {
+                ui.actionButton(label, secondary = true, action = primary).apply {
                     cornerRadius = 0
                 },
                 LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
@@ -3098,12 +3112,12 @@ class MainActivity : AppCompatActivity() {
                         iconTint = ColorStateList.valueOf(ui.color(R.color.cream))
                         setOnClickListener {
                             PopupMenu(this@MainActivity, this, Gravity.END).apply {
-                                menu.add("Bluetooth").setOnMenuItemClickListener {
-                                    bluetooth()
+                                menu.add(primaryLabel).setOnMenuItemClickListener {
+                                    primary()
                                     true
                                 }
-                                menu.add(fileLabel).setOnMenuItemClickListener {
-                                    file()
+                                menu.add(alternateLabel).setOnMenuItemClickListener {
+                                    alternate()
                                     true
                                 }
                                 show()
@@ -3374,6 +3388,104 @@ class MainActivity : AppCompatActivity() {
         startWorkout(repository.data.workoutFromRoutine(routine))
     }
 
+    private var locationRequest: ((WorkoutLocation?) -> Unit)? = null
+    private var locationSignal: android.os.CancellationSignal? = null
+    private val locationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+            readStartLocation()
+            ensureWorkoutNotification()
+        }
+
+    private fun setHistoryLocation(workoutId: String) {
+        requestCurrentLocation { point ->
+            val entry = repository.data.history.find { it.id == workoutId }
+            if (entry == null || !repository.data.debugMode) return@requestCurrentLocation
+            if (point != null) {
+                entry.startLocation = point
+                repository.saveHistory()
+            }
+            Toast.makeText(
+                    this,
+                    if (point == null) "Precise GPS location unavailable"
+                    else "Workout location updated",
+                    Toast.LENGTH_SHORT,
+                )
+                .show()
+        }
+    }
+
+    private fun requestStartLocation(workout: WorkoutSession?) {
+        requestCurrentLocation { point ->
+            if (workout == null) {
+                val suggestion = point?.let { repository.data.suggestWorkout(it) }
+                if (suggestion != null) startWorkout(suggestion)
+                else
+                    Toast.makeText(
+                            this,
+                            if (point == null) "Precise GPS location unavailable"
+                            else "No eligible exercises within 100 m",
+                            Toast.LENGTH_LONG,
+                        )
+                        .show()
+            } else if (point != null) {
+                val saved =
+                    repository.data.activeWorkout?.takeIf { it.id == workout.id }
+                        ?: repository.data.history.find { it.id == workout.id }
+                if (saved != null) {
+                    saved.startLocation = point
+                    if (saved === repository.data.activeWorkout) repository.save()
+                    else repository.saveHistory()
+                }
+            }
+        }
+    }
+
+    private fun requestCurrentLocation(callback: (WorkoutLocation?) -> Unit) {
+        locationSignal?.cancel()
+        locationRequest = callback
+        if (
+            checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED
+        )
+            readStartLocation()
+        else
+            locationPermission.launch(
+                arrayOf(
+                    android.Manifest.permission.ACCESS_COARSE_LOCATION,
+                    android.Manifest.permission.ACCESS_FINE_LOCATION,
+                )
+            )
+    }
+
+    @android.annotation.SuppressLint("MissingPermission")
+    private fun readStartLocation() {
+        val callback = locationRequest ?: return
+        locationRequest = null
+        val manager = getSystemService(android.location.LocationManager::class.java)
+        val gps = android.location.LocationManager.GPS_PROVIDER
+        if (
+            checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) !=
+                PackageManager.PERMISSION_GRANTED || !manager.isProviderEnabled(gps)
+        ) {
+            callback(null)
+            return
+        }
+        val signal = android.os.CancellationSignal()
+        locationSignal = signal
+        manager.getCurrentLocation(
+            gps,
+            android.location.LocationRequest.Builder(0L).setDurationMillis(15000L).build(),
+            signal,
+            mainExecutor,
+        ) { fix ->
+            if (!signal.isCanceled && !isDestroyed)
+                callback(
+                    fix?.takeIf { it.hasAccuracy() && it.accuracy <= 100f }
+                        ?.let { WorkoutLocation(it.latitude, it.longitude) }
+                )
+        }
+    }
+
     private fun startWorkout(workout: WorkoutSession) {
         if (repository.data.activeWorkout != null) {
             openActiveWorkout()
@@ -3383,7 +3495,8 @@ class MainActivity : AppCompatActivity() {
         repository.save()
         openActiveWorkout()
         queryWorkoutWeight(workout)
-        ensureWorkoutNotification()
+        if (workout.startLocation == null) requestStartLocation(workout)
+        if (locationRequest == null) ensureWorkoutNotification()
     }
 
     private fun setBodyMetricsEnabled(enabled: Boolean) {

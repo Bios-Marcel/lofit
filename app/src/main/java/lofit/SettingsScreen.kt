@@ -171,6 +171,23 @@ internal class SettingsScreen(
             )
             body.addView(craneScaleSettings())
             body.addView(mcpSettings())
+            body.addView(
+                ui.card {
+                    addView(
+                        Switch(activityContext).apply {
+                            text = "Debug mode"
+                            setTextColor(ui.color(R.color.cream))
+                            minHeight = ui.dp(48)
+                            trackTintList = ui.toggleTint()
+                            isChecked = data().debugMode
+                            setOnCheckedChangeListener { _, enabled ->
+                                data().debugMode = enabled
+                                save()
+                            }
+                        }
+                    )
+                }
+            )
             body.addView(hevySettingsCard())
             body.addView(ui.sectionTitle("Android health integration"))
             body.addView(
