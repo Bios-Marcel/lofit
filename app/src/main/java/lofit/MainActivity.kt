@@ -2399,8 +2399,14 @@ class MainActivity : AppCompatActivity() {
                             true
                         }
                         if (repository.data.debugMode) {
-                            menu.add("Set current Wi-Fi and location").setOnMenuItemClickListener {
-                                recordWorkoutPlace(workout.id, debugHistory = true)
+                            val hasPlace =
+                                workout.startWifiName != null || workout.startLocation != null
+                            val label =
+                                if (hasPlace) "Clear Wi-Fi and location"
+                                else "Set current Wi-Fi and location"
+                            menu.add(label).setOnMenuItemClickListener {
+                                if (hasPlace) clearWorkoutPlace(workout)
+                                else recordWorkoutPlace(workout.id, debugHistory = true)
                                 true
                             }
                         }
@@ -3401,6 +3407,7 @@ class MainActivity : AppCompatActivity() {
 
     private var locationRequest: ((String?) -> Unit)? = null
     private var locationSignal: android.os.CancellationSignal? = null
+    private var locationWorkoutId: String? = null
     private val locationPermission =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
             readWorkoutWifi()
@@ -3433,6 +3440,17 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun clearWorkoutPlace(workout: WorkoutSession) {
+        if (locationWorkoutId == workout.id) {
+            locationSignal?.cancel()
+            locationRequest = null
+            locationWorkoutId = null
+        }
+        workout.startWifiName = null
+        workout.startLocation = null
+        repository.saveHistory()
+    }
+
     private fun recordWorkoutPlace(workoutId: String, debugHistory: Boolean = false) {
         fun target(): WorkoutSession? {
             if (debugHistory && !repository.data.debugMode) return null
@@ -3445,7 +3463,7 @@ class MainActivity : AppCompatActivity() {
             else repository.saveHistory()
         }
 
-        withWorkoutWifi { wifiName ->
+        withWorkoutWifi(workoutId) { wifiName ->
             val workout = target() ?: return@withWorkoutWifi
             if (wifiName != null && workout.startWifiName != wifiName) {
                 workout.startWifiName = wifiName
@@ -3470,8 +3488,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun withWorkoutWifi(callback: (String?) -> Unit) {
+    private fun withWorkoutWifi(workoutId: String? = null, callback: (String?) -> Unit) {
         locationSignal?.cancel()
+        locationWorkoutId = workoutId
         locationRequest = callback
         if (
             checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) ==

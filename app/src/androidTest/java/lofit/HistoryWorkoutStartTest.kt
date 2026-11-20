@@ -132,6 +132,44 @@ class HistoryWorkoutStartTest {
 
     @Test fun historyDetailMenuStartsFreshWorkout() = startFreshWorkout(fromDetails = true)
 
+    private fun checkClearPlace(
+        wifi: String?,
+        location: WorkoutLocation?,
+        fromDetails: Boolean = false,
+    ) {
+        LofitRepository(context).apply {
+            data.debugMode = true
+            data.history.single().apply {
+                startWifiName = wifi
+                startLocation = location
+            }
+            saveHistory()
+            save()
+        }
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            openHistory(scenario)
+            if (fromDetails)
+                onView(withContentDescription("View Push day")).perform(scrollTo(), click())
+            val options = onView(withContentDescription("Options for Push day"))
+            options.perform(scrollTo(), click())
+            onView(withText("Clear Wi-Fi and location")).perform(click())
+            val saved = LofitRepository(context).data.history.single()
+            assertNull(saved.startWifiName)
+            assertNull(saved.startLocation)
+            options.perform(scrollTo(), click())
+            onView(withText("Set current Wi-Fi and location")).check(matches(isDisplayed()))
+        }
+    }
+
+    @Test fun debugHistoryClearsWifiOnly() = checkClearPlace("Gym", null)
+
+    @Test
+    fun debugHistoryClearsLocationOnly() =
+        checkClearPlace(null, WorkoutLocation(1.0, 2.0), fromDetails = true)
+
+    @Test
+    fun debugHistoryClearsWifiAndLocation() = checkClearPlace("Gym", WorkoutLocation(1.0, 2.0))
+
     @Test
     @Suppress("DEPRECATION")
     fun debugHistoryWifiStartsSuggestedWorkoutWithoutSavedCoordinates() {
