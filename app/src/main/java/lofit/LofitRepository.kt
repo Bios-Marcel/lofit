@@ -152,6 +152,7 @@ class LofitRepository(context: Context) {
             put("soundCuesEnabled", data.soundCuesEnabled)
             put("recordCelebrationsEnabled", data.recordCelebrationsEnabled)
             put("suggestedWorkoutLookback", data.suggestedWorkoutLookback)
+            put("suggestedWorkoutSets", data.suggestedWorkoutSets)
             put("debugMode", data.debugMode)
             put("mcpEnabled", data.mcpEnabled)
             put("mcpPort", data.mcpPort)
@@ -386,6 +387,10 @@ class LofitRepository(context: Context) {
                     .optString("suggestedWorkoutLookback")
                     .takeIf(suggestedWorkoutLookbackPattern::matches)
                     ?: DEFAULT_SUGGESTED_WORKOUT_LOOKBACK,
+            // LEGACY: Older saves used a fixed target of 30 sets.
+            suggestedWorkoutSets =
+                root.optString("suggestedWorkoutSets").toIntOrNull()?.takeIf { it > 0 }
+                    ?: DEFAULT_SUGGESTED_WORKOUT_SETS,
             debugMode = root.optBoolean("debugMode", false),
             mcpEnabled = root.optBoolean("mcpEnabled", false),
             mcpPort =

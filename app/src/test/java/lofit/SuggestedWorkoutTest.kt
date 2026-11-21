@@ -219,5 +219,15 @@ class SuggestedWorkoutTest {
         val plan = data.suggestWorkout(here, now)!!
         assertEquals(listOf("Chest", "Glutes", "Shoulders"), plan.exercises.map { it.exerciseId })
         assertEquals(listOf(12, 12, 6), plan.exercises.map { it.plannedSets.size })
+        data.suggestedWorkoutSets = 15
+        assertEquals(
+            listOf(12, 3),
+            data.suggestWorkout(here, now)!!.exercises.map { it.plannedSets.size },
+        )
+        data.suggestedWorkoutSets = 36
+        assertEquals(
+            listOf(12, 12, 12),
+            data.suggestWorkout(here, now)!!.exercises.map { it.plannedSets.size },
+        )
     }
 }

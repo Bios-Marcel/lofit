@@ -312,6 +312,21 @@ class WorkoutFlowTest {
     }
 
     @Test
+    fun settings_suggestedWorkoutSetsKeepsLastPositiveCount() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        ActivityScenario.launch(MainActivity::class.java).use {
+            onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+            onView(withText(R.string.nav_settings)).perform(click())
+            val field = onView(withContentDescription("Suggested workout sets"))
+            field.perform(scrollTo()).check(matches(withText("30")))
+            field.perform(replaceText("18"))
+            field.perform(replaceText(""))
+            field.perform(replaceText("0"))
+            assertEquals(18, LofitRepository(context).data.suggestedWorkoutSets)
+        }
+    }
+
+    @Test
     fun settings_genderHealthAndSoundPersistAcrossRestart() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext

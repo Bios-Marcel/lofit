@@ -343,6 +343,7 @@ data class AppData(
     var recordCelebrationsEnabled: Boolean = false,
     var debugMode: Boolean = false,
     var suggestedWorkoutLookback: String = DEFAULT_SUGGESTED_WORKOUT_LOOKBACK,
+    var suggestedWorkoutSets: Int = DEFAULT_SUGGESTED_WORKOUT_SETS,
 ) {
     fun resumeWorkout(
         workoutId: String,

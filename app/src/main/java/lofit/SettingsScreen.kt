@@ -174,6 +174,30 @@ internal class SettingsScreen(
             body.addView(mcpSettings())
             body.addView(
                 ui.card {
+                    val label = "Suggested workout sets"
+                    addView(ui.titleText(label))
+                    addView(
+                        ui.numberField(DEFAULT_SUGGESTED_WORKOUT_SETS.toString()).apply {
+                            contentDescription = label
+                            setText(data().suggestedWorkoutSets.toString())
+                            doAfterTextChanged {
+                                val sets = it.toString().toIntOrNull()
+                                if (sets == null || sets < 1) {
+                                    error = "Enter a positive whole number"
+                                } else {
+                                    error = null
+                                    if (sets != data().suggestedWorkoutSets) {
+                                        data().suggestedWorkoutSets = sets
+                                        save()
+                                    }
+                                }
+                            }
+                        }
+                    )
+                }
+            )
+            body.addView(
+                ui.card {
                     val label = "Suggested workout lookback"
                     addView(ui.titleText(label))
                     addView(ui.metaText("d = days, w = weeks, m = months"))

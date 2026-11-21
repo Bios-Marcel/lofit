@@ -6,6 +6,7 @@ import java.time.temporal.ChronoUnit
 import kotlin.math.*
 
 internal const val DEFAULT_SUGGESTED_WORKOUT_LOOKBACK = "4w"
+internal const val DEFAULT_SUGGESTED_WORKOUT_SETS = 30
 internal val suggestedWorkoutLookbackPattern = Regex("""\d+[dwm]""")
 
 private fun lookbackStart(lookback: String, now: Long): Long {
@@ -95,7 +96,7 @@ private fun AppData.suggestWorkout(
             .sortedBy { credits[MuscleGroups.canonical(it.primaryMuscle)] ?: 0.0 }
             .toMutableList()
     val workout = WorkoutSession(name = "Suggested workout")
-    var remaining = 30
+    var remaining = suggestedWorkoutSets
     var previous = emptySet<String>()
     while (ranked.isNotEmpty() && remaining > 0) {
         val next = ranked.firstOrNull { muscles(it).none(previous::contains) } ?: break
