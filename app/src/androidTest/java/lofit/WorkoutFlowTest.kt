@@ -1480,7 +1480,7 @@ class WorkoutFlowTest {
             val (scrollY, bottom) = firstPosition.get()
             assertTrue("Workout must exceed the viewport", bottom > 0)
             assertEquals("First frame must already show the bottom", bottom, scrollY)
-            onView(isAssignableFrom(ScrollView::class.java)).check { view, _ ->
+            onView(displayedScrollView()).check { view, _ ->
                 val scroll = view as ScrollView
                 assertEquals(scroll.getChildAt(0).height - scroll.height, scroll.scrollY)
             }
@@ -1878,14 +1878,14 @@ class WorkoutFlowTest {
         assertWorkoutTotals("4/4 sets · 1200 kg volume")
         val page = arrayOfNulls<View>(1)
         val survivingRow = arrayOfNulls<View>(1)
-        onView(isAssignableFrom(ScrollView::class.java)).check { view, _ -> page[0] = view }
+        onView(displayedScrollView()).check { view, _ -> page[0] = view }
         onView(withContentDescription("Set 2 row")).check { view, _ -> survivingRow[0] = view }
         onView(withContentDescription("Set 1 row")).perform(swipeLeft())
         onView(withContentDescription("Delete set 1"))
             .check(matches(isDisplayed()))
             .perform(click())
         assertWorkoutTotals("3/3 sets · 900 kg volume")
-        onView(isAssignableFrom(ScrollView::class.java)).check { view, _ ->
+        onView(displayedScrollView()).check { view, _ ->
             assertSame(page[0], view)
         }
         onView(withContentDescription("Set 1 row")).check { view, _ ->
@@ -1955,12 +1955,12 @@ class WorkoutFlowTest {
         onView(withText("Edit")).perform(click())
         val page = arrayOfNulls<View>(1)
         val survivingRow = arrayOfNulls<View>(1)
-        onView(isAssignableFrom(ScrollView::class.java)).check { view, _ -> page[0] = view }
+        onView(displayedScrollView()).check { view, _ -> page[0] = view }
         onView(withContentDescription("Set 2 row")).check { view, _ -> survivingRow[0] = view }
         onView(withContentDescription("Set 1 row")).perform(swipeLeft())
         onView(withContentDescription("Delete set 1")).perform(click())
 
-        onView(isAssignableFrom(ScrollView::class.java)).check { view, _ ->
+        onView(displayedScrollView()).check { view, _ ->
             assertSame(page[0], view)
         }
         onView(withContentDescription("Set 1 row")).check { view, _ ->
@@ -1995,7 +1995,7 @@ class WorkoutFlowTest {
 
         val page = arrayOfNulls<View>(1)
         val survivingHeading = arrayOfNulls<View>(1)
-        onView(isAssignableFrom(ScrollView::class.java)).check { view, _ -> page[0] = view }
+        onView(displayedScrollView()).check { view, _ -> page[0] = view }
         onView(withText("Plank")).check { view, _ -> survivingHeading[0] = view }
         onView(withContentDescription("Reorder Plank"))
             .perform(scrollTo(), dragExercise(-1, longPress = false))
@@ -2020,7 +2020,7 @@ class WorkoutFlowTest {
                 it.exerciseId
             },
         )
-        onView(isAssignableFrom(ScrollView::class.java)).check { view, _ ->
+        onView(displayedScrollView()).check { view, _ ->
             assertSame(page[0], view)
         }
         onView(withText("Plank")).check { view, _ -> assertSame(survivingHeading[0], view) }
@@ -2035,7 +2035,7 @@ class WorkoutFlowTest {
         onView(withContentDescription("Options for Bench press")).perform(scrollTo(), click())
         onView(withText("Remove exercise")).perform(click())
 
-        onView(isAssignableFrom(ScrollView::class.java)).check { view, _ ->
+        onView(displayedScrollView()).check { view, _ ->
             assertSame(page[0], view)
         }
         onView(withText("Plank")).check { view, _ -> assertSame(survivingHeading[0], view) }
@@ -2114,10 +2114,10 @@ class WorkoutFlowTest {
         onView(withText("Edit")).perform(click())
         val page = arrayOfNulls<View>(1)
         val survivingHeading = arrayOfNulls<View>(1)
-        onView(isAssignableFrom(ScrollView::class.java)).check { view, _ -> page[0] = view }
+        onView(displayedScrollView()).check { view, _ -> page[0] = view }
         onView(withText("Plank")).check { view, _ -> survivingHeading[0] = view }
         onView(withContentDescription("Reorder Plank")).perform(scrollTo(), dragExercise(-1))
-        onView(isAssignableFrom(ScrollView::class.java)).check { view, _ ->
+        onView(displayedScrollView()).check { view, _ ->
             assertSame(page[0], view)
         }
         onView(withText("Plank")).check { view, _ -> assertSame(survivingHeading[0], view) }
@@ -2126,7 +2126,7 @@ class WorkoutFlowTest {
         onView(withContentDescription("Options for Bench press")).perform(scrollTo(), click())
         onView(withText("Remove exercise")).perform(click())
 
-        onView(isAssignableFrom(ScrollView::class.java)).check { view, _ ->
+        onView(displayedScrollView()).check { view, _ ->
             assertSame(page[0], view)
         }
         onView(withText("Plank")).check { view, _ -> assertSame(survivingHeading[0], view) }

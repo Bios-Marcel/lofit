@@ -233,7 +233,7 @@ class ExerciseRecencyTest {
                     }
             val headerTop = headerPositions()
             val top = buttonTop()
-            onView(isAssignableFrom(ScrollView::class.java))
+            onView(displayedScrollView())
                 .perform(
                     object : androidx.test.espresso.ViewAction {
                         override fun getDescription() = "scroll exercise list to bottom"

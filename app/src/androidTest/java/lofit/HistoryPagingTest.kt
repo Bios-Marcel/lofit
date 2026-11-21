@@ -111,7 +111,7 @@ class HistoryPagingTest {
             else emptyList()
 
     private fun checkWorkouts(expected: IntProgression, continuable: Int = 0) {
-        onView(isAssignableFrom(ScrollView::class.java)).check { view, _ ->
+        onView(displayedScrollView()).check { view, _ ->
             val descriptions = descendants(view).mapNotNull { it.contentDescription?.toString() }
             assertEquals(
                 expected.map { "View Paged workout $it" },
@@ -150,7 +150,7 @@ class HistoryPagingTest {
             checkWorkouts(13 downTo 4)
             onView(withContentDescription("History page 2 of 3")).check(matches(isDisplayed()))
             onView(withContentDescription("View Paged workout 13")).check(matches(isDisplayed()))
-            onView(isAssignableFrom(ScrollView::class.java)).check { view, _ ->
+            onView(displayedScrollView()).check { view, _ ->
                 assertEquals(0, (view as ScrollView).scrollY)
             }
             onView(withContentDescription("Older workouts")).perform(click())
@@ -165,7 +165,7 @@ class HistoryPagingTest {
             onView(withContentDescription("Older workouts")).perform(click())
             onView(withContentDescription("View Paged workout 8")).perform(scrollTo())
             var scrollY = 0
-            onView(isAssignableFrom(ScrollView::class.java)).check { view, _ ->
+            onView(displayedScrollView()).check { view, _ ->
                 scrollY = (view as ScrollView).scrollY
             }
             assertTrue(scrollY > 0)
@@ -174,7 +174,7 @@ class HistoryPagingTest {
             pressBack()
             onView(withContentDescription("History page 2 of 3")).check(matches(isDisplayed()))
             onView(withContentDescription("View Paged workout 8")).check(matches(isDisplayed()))
-            onView(isAssignableFrom(ScrollView::class.java)).check { view, _ ->
+            onView(displayedScrollView()).check { view, _ ->
                 assertEquals(scrollY, (view as ScrollView).scrollY)
             }
             onView(withContentDescription("View Paged workout 8")).perform(click())
@@ -184,7 +184,7 @@ class HistoryPagingTest {
             onView(withText("Save changes")).perform(scrollTo(), click())
             onView(withContentDescription("History page 2 of 3")).check(matches(isDisplayed()))
             checkWorkouts(13 downTo 4)
-            onView(isAssignableFrom(ScrollView::class.java)).check { view, _ ->
+            onView(displayedScrollView()).check { view, _ ->
                 assertEquals(scrollY, (view as ScrollView).scrollY)
             }
             onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
