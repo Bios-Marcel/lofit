@@ -8,6 +8,40 @@ import org.junit.Test
 
 class SuggestedWorkoutTest {
     @Test
+    fun ignoresCardioEvenWhenItTargetsTheSameMusclesAsStrengthWork() {
+        val day = 86400000L
+        val now = 40 * day
+        val bike =
+            Exercise("bike", "Bike", ExerciseType.TIMED, false, "Quadriceps", "", cardio = true)
+        val squat = Exercise("squat", "Squat", ExerciseType.REPETITIONS, false, "Quadriceps", "")
+        val data = AppData(exercises = mutableListOf(bike, squat))
+        fun log(exercise: Exercise, daysAgo: Int) {
+            val time = now - daysAgo * day
+            val set = LoggedSet(type = SetType.NORMAL, weightKg = 0.0, completedAt = time)
+            data.history.add(
+                WorkoutSession(
+                    name = exercise.name,
+                    intervals = mutableListOf(WorkoutInterval(time, time)),
+                    startWifiName = "Gym",
+                    exercises =
+                        mutableListOf(
+                            WorkoutExercise(exerciseId = exercise.id, sets = mutableListOf(set))
+                        ),
+                )
+            )
+        }
+        log(bike, 7)
+        assertNull(data.suggestWorkoutOnWifi("Gym", now))
+
+        log(squat, 7)
+        log(bike, 1)
+        assertEquals(
+            listOf(squat.id),
+            data.suggestWorkoutOnWifi("Gym", now)?.exercises?.map { it.exerciseId },
+        )
+    }
+
+    @Test
     fun wifiMatchesExactNetworkWithoutCoordinatesAndGpsStillMatchesOlderHistory() {
         val now = 40L * 86400000
         val here = WorkoutLocation(0.0, 0.0)

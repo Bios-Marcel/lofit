@@ -73,6 +73,7 @@ private fun AppData.suggestWorkout(
         val local = matchesPlace(session)
         for (entry in session.exercises) {
             val exercise = catalog[entry.exerciseId] ?: continue
+            if (exercise.cardio) continue
             val primary = MuscleGroups.canonical(exercise.primaryMuscle)
             if (primary != null && entry.sets.any { it.completedAt in recoveryWindow })
                 recovering.add(primary)
