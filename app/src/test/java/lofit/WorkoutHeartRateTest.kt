@@ -101,11 +101,11 @@ class WorkoutHeartRateTest {
         val boundary = workout(2).apply { averageHeartRateBpm = 100.0 }
         val newer = workout(3)
         val newest = workout(4)
-        val pending = workoutsMissingHeartRate(listOf(newer, oldest, newest, boundary))
+        val pending = HistoryHealthUpdate(listOf(newer, oldest, newest, boundary)).heartRates
         assertEquals(listOf(newest, newer), pending)
         newest.averageHeartRateBpm = 120.0
         assertEquals(listOf(newest, newer), pending)
-        assertTrue(workoutsMissingHeartRate(listOf(oldest, boundary, newest)).isEmpty())
+        assertTrue(HistoryHealthUpdate(listOf(oldest, boundary, newest)).heartRates.isEmpty())
     }
 
     @Test
@@ -113,9 +113,9 @@ class WorkoutHeartRateTest {
         val history = (1L..25L).map(::workout)
         assertEquals(
             history.reversed(),
-            workoutsMissingHeartRate(history + WorkoutSession(name = "Active")),
+            HistoryHealthUpdate(history + WorkoutSession(name = "Active")).heartRates,
         )
-        assertTrue(workoutsMissingHeartRate(emptyList()).isEmpty())
+        assertTrue(HistoryHealthUpdate(emptyList()).heartRates.isEmpty())
     }
 
     @Test

@@ -47,9 +47,3 @@ internal class WorkoutHeartRateAverage(intervals: List<WorkoutInterval>) {
         } / activeDuration
     }
 }
-
-fun workoutsMissingHeartRate(history: List<WorkoutSession>): List<WorkoutSession> =
-    history
-        .filter { it.completedAt != null }
-        .sortedByDescending { it.completedAt }
-        .takeWhile { it.averageHeartRateBpm == null }

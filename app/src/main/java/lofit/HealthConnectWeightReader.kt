@@ -37,7 +37,7 @@ class HealthConnectWeightReader(private val context: Context) {
             before.fold(
                 onSuccess = { previous ->
                     if (previous?.time == time) {
-                        callback(Result.success(previous.kilograms))
+                        callback(Result.success(roundBodyWeight(previous.kilograms)))
                     } else {
                         readNearest(
                             split,

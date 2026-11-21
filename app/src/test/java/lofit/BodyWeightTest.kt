@@ -13,6 +13,22 @@ class BodyWeightTest {
         )
 
     @Test
+    fun historyWithMissingLatestWeightsStopsAtFirstSavedWeight() {
+        val history =
+            listOf(50.0, null, null).mapIndexed { index, kg ->
+                WorkoutSession(
+                    name = "Workout",
+                    startedAt = 0,
+                    completedAt = index.toLong(),
+                    bodyWeightKg = kg,
+                )
+            }
+        val batch = HistoryHealthUpdate(history + WorkoutSession(name = "Active"))
+        history.last().bodyWeightKg = 51.0
+        assertEquals(history.drop(1).reversed(), batch.weights)
+    }
+
+    @Test
     fun betweenMeasurements_usesArithmeticMeanOfNearestNeighbors() {
         // Deliberately off-center: this must be an average, not linear interpolation.
         assertEquals(75.0, bodyWeightAt(120, measurements)!!, 0.0)

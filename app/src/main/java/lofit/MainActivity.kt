@@ -258,7 +258,7 @@ class MainActivity : AppCompatActivity() {
     private val previousScreens = mutableListOf<PreviousScreen>()
     private val healthWeightReader by lazy { HealthConnectWeightReader(this) }
     private val healthHeartRateReader by lazy { HealthConnectHeartRateReader(this) }
-    private var historyHeartRateReadPending = false
+    private var historyHealthReadPending = false
     private var healthPermissionPending = false
     private var onboardingGender = BiologicalGender.MALE
     private var onboardingHealthEnabled = false
@@ -453,13 +453,14 @@ class MainActivity : AppCompatActivity() {
             if (currentScreen == Screen.SETTINGS) render()
             ensureWorkoutNotification()
         }
-    private val heartRatePermission =
+    private val historyHealthPermission =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-            if (healthHeartRateReader.canReadHeartRate) requestHistoryHeartRates()
+            if (healthWeightReader.canReadWeight || healthHeartRateReader.canReadHeartRate)
+                updateHistoryHealthData()
             else
                 Toast.makeText(
                         this,
-                        "Allow heart rate access in Health Connect",
+                        "Allow weight or heart rate access in Health Connect",
                         Toast.LENGTH_SHORT,
                     )
                     .show()
@@ -2369,12 +2370,12 @@ class MainActivity : AppCompatActivity() {
                 textSize = 20f
                 minimumWidth = ui.dp(48)
                 contentDescription = "History options"
-                isEnabled = !historyHeartRateReadPending
-                stateDescription = if (historyHeartRateReadPending) "Reading heart rates…" else null
+                isEnabled = !historyHealthReadPending
+                stateDescription = if (historyHealthReadPending) "Reading health data…" else null
                 setOnClickListener {
                     PopupMenu(this@MainActivity, this, Gravity.END).apply {
-                        menu.add("Request heart rates").setOnMenuItemClickListener {
-                            requestHistoryHeartRates()
+                        menu.add("Update health data").setOnMenuItemClickListener {
+                            updateHistoryHealthData()
                             true
                         }
                         show()
@@ -2516,6 +2517,7 @@ class MainActivity : AppCompatActivity() {
                 repository.data.history[index] =
                     draft.copy(
                         intervals = original.intervals.toMutableList(),
+                        bodyWeightKg = original.bodyWeightKg,
                         averageHeartRateBpm = original.averageHeartRateBpm,
                     )
                 repository.saveHistory()
@@ -3657,33 +3659,53 @@ class MainActivity : AppCompatActivity() {
         ensureWorkoutNotification()
     }
 
-    private fun queryWorkoutWeight(workout: WorkoutSession) {
-        if (repository.data.bodyMetricsEnabled != true || !healthWeightReader.canReadWeight) return
+    private fun queryWorkoutWeight(
+        workout: WorkoutSession,
+        refreshHistory: Boolean = false,
+        onFinished: (Result<Boolean>) -> Unit = { result ->
+            result.onFailure {
+                Toast.makeText(this, "Body weight unavailable", Toast.LENGTH_SHORT).show()
+            }
+        },
+    ) {
+        if (repository.data.bodyMetricsEnabled != true || !healthWeightReader.canReadWeight) {
+            onFinished(Result.success(false))
+            return
+        }
         val generation = bodyMetricsReadGeneration
-        healthWeightReader.readAt(workout.startedAt) { result ->
+        val startedAt = workout.startedAt
+        healthWeightReader.readAt(startedAt) { result ->
+            val activeWorkout = repository.data.activeWorkout
+            val savedWorkout =
+                activeWorkout?.takeIf { !refreshHistory && it.id == workout.id }
+                    ?: repository.data.history.firstOrNull { it.id == workout.id }
             if (
                 isDestroyed ||
                     repository.data.bodyMetricsEnabled != true ||
-                    generation != bodyMetricsReadGeneration
-            )
+                    generation != bodyMetricsReadGeneration ||
+                    savedWorkout == null ||
+                    savedWorkout.startedAt != startedAt
+            ) {
+                onFinished(Result.success(false))
                 return@readAt
-            val savedWorkout =
-                repository.data.activeWorkout?.takeIf { it.id == workout.id }
-                    ?: repository.data.history.firstOrNull { it.id == workout.id }
-                    ?: return@readAt
-            result
-                .onSuccess { weight ->
-                    if (weight != null && savedWorkout.bodyWeightKg == null) {
+            }
+            onFinished(
+                result.map { weight ->
+                    if (
+                        weight == null ||
+                            savedWorkout.bodyWeightKg == weight ||
+                            (!refreshHistory && savedWorkout.bodyWeightKg != null)
+                    )
+                        false
+                    else {
                         savedWorkout.bodyWeightKg = weight
-                        if (savedWorkout === repository.data.activeWorkout) repository.save()
+                        if (savedWorkout === activeWorkout) repository.save()
                         else repository.saveHistory()
-                        if (currentScreen == Screen.HISTORY || route is Route.WorkoutHistory)
-                            render()
+                        refreshHealthHistory()
+                        true
                     }
                 }
-                .onFailure {
-                    Toast.makeText(this, "Body weight unavailable", Toast.LENGTH_SHORT).show()
-                }
+            )
         }
     }
 
@@ -3697,7 +3719,7 @@ class MainActivity : AppCompatActivity() {
             contentDescription = "Average heart rate: ${average.roundToInt()} beats per minute"
         }
 
-    private fun refreshHeartRateHistory() {
+    private fun refreshHealthHistory() {
         if (isDestroyed || (route as? Route.WorkoutHistory)?.editing == true) return
         if (currentScreen == Screen.HISTORY || route is Route.WorkoutHistory) {
             render((content.getChildAt(0) as? ScrollView)?.scrollY)
@@ -3734,7 +3756,7 @@ class MainActivity : AppCompatActivity() {
                         historyEditDraft?.takeIf { it.id == savedWorkout.id }?.averageHeartRateBpm =
                             average
                         repository.saveHistory()
-                        refreshHeartRateHistory()
+                        refreshHealthHistory()
                         true
                     }
                 }
@@ -3742,8 +3764,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun requestHistoryHeartRates() {
-        if (historyHeartRateReadPending) return
+    private fun updateHistoryHealthData() {
+        if (historyHealthReadPending) return
         if (repository.data.bodyMetricsEnabled != true) {
             Toast.makeText(
                     this,
@@ -3757,55 +3779,62 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Health Connect unavailable", Toast.LENGTH_SHORT).show()
             return
         }
-        if (!healthHeartRateReader.canReadHeartRate) {
-            heartRatePermission.launch(
+        val canReadWeight = healthWeightReader.canReadWeight
+        val canReadHeartRate = healthHeartRateReader.canReadHeartRate
+        if (!canReadWeight && !canReadHeartRate) {
+            historyHealthPermission.launch(
                 arrayOf(
+                    HealthPermissions.READ_WEIGHT,
                     HealthPermissions.READ_HEART_RATE,
                     HealthPermissions.READ_HEALTH_DATA_HISTORY,
                 )
             )
             return
         }
-        // Snapshot the boundary before fetching: newly found data must not stop this batch.
-        val workouts = workoutsMissingHeartRate(repository.data.history)
-        if (workouts.isEmpty()) {
-            Toast.makeText(this, "Heart rates are up to date", Toast.LENGTH_SHORT).show()
-            return
-        }
+        val batch = HistoryHealthUpdate(repository.data.history)
+        val weights = batch.weights.iterator()
+        val heartRates = batch.heartRates.iterator()
         val generation = bodyMetricsReadGeneration
-        var updated = 0
-        historyHeartRateReadPending = true
-        refreshHeartRateHistory()
-        fun finish(message: String) {
-            historyHeartRateReadPending = false
-            if (isDestroyed) return
-            refreshHeartRateHistory()
-            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-        }
-        fun readNext(index: Int) {
+        var weightFailed = false
+        var heartRateFailed = false
+        var updated = false
+        historyHealthReadPending = true
+        refreshHealthHistory()
+        fun readNext() {
             if (
                 isDestroyed ||
                     generation != bodyMetricsReadGeneration ||
                     repository.data.bodyMetricsEnabled != true
             ) {
-                historyHeartRateReadPending = false
+                historyHealthReadPending = false
+                refreshHealthHistory()
                 return
             }
-            if (index == workouts.size) {
-                finish(if (updated == 0) "No new heart rate data" else "Heart rates updated")
+            val readWeight = canReadWeight && !weightFailed && weights.hasNext()
+            if (!readWeight && !(canReadHeartRate && !heartRateFailed && heartRates.hasNext())) {
+                historyHealthReadPending = false
+                refreshHealthHistory()
+                val message =
+                    when {
+                        weightFailed || heartRateFailed ->
+                            "Some health data unavailable. Try again later."
+                        updated -> "Health data updated"
+                        else -> "No new health data"
+                    }
+                Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
                 return
             }
-            queryWorkoutHeartRate(workouts[index]) { result ->
-                result.fold(
-                    onSuccess = { saved ->
-                        if (saved) updated++
-                        handler.post { readNext(index + 1) }
-                    },
-                    onFailure = { finish("Heart rate data unavailable. Try again later.") },
-                )
+            fun onFinished(result: Result<Boolean>) {
+                if (result.isFailure) {
+                    if (readWeight) weightFailed = true else heartRateFailed = true
+                } else if (result.getOrNull() == true) updated = true
+                handler.post { readNext() }
             }
+            if (readWeight)
+                queryWorkoutWeight(weights.next(), refreshHistory = true, onFinished = ::onFinished)
+            else queryWorkoutHeartRate(heartRates.next(), ::onFinished)
         }
-        readNext(0)
+        readNext()
     }
 
     private fun continueHistoryWorkout(workout: WorkoutSession) {

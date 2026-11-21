@@ -10,6 +10,9 @@ import android.health.connect.InsertRecordsResponse
 import android.health.connect.RecordIdFilter
 import android.health.connect.datatypes.HeartRateRecord
 import android.health.connect.datatypes.Metadata
+import android.health.connect.datatypes.Record
+import android.health.connect.datatypes.WeightRecord
+import android.health.connect.datatypes.units.Mass
 import android.os.OutcomeReceiver
 import android.view.ViewGroup
 import androidx.core.view.GravityCompat
@@ -57,6 +60,7 @@ class HealthConnectHeartRateReaderTest {
                 HealthPermissions.READ_HEART_RATE,
                 HealthPermissions.READ_HEALTH_DATA_HISTORY,
                 HealthPermissions.WRITE_HEART_RATE,
+                HealthPermissions.WRITE_WEIGHT,
             )
             .forEach {
                 instrumentation.uiAutomation.grantRuntimePermission(context.packageName, it)
@@ -88,28 +92,30 @@ class HealthConnectHeartRateReaderTest {
     @Test
     fun hindsightSkipsEmptyWorkoutsFillsNewDataAndStopsAtSavedBoundary() {
         val start = Instant.now().minusSeconds(3_600)
-        fun workout(name: String, offset: Long, average: Double? = null) =
+        fun workout(name: String, offset: Long, weight: Double, average: Double? = null) =
             WorkoutSession(
                 name = name,
                 startedAt = start.plusSeconds(offset).toEpochMilli(),
                 completedAt = start.plusSeconds(offset + 60).toEpochMilli(),
                 averageHeartRateBpm = average,
+                bodyWeightKg = weight,
             )
         LofitRepository(context).apply {
             data.history.addAll(
                 listOf(
-                    workout("Older", 0),
-                    workout("Boundary", 120, 90.0),
-                    workout("Delayed one", 240),
-                    workout("Delayed two", 360),
-                    workout("Still missing", 900),
+                    workout("Oldest", -120, 50.0),
+                    workout("Older", 0, 50.0),
+                    workout("Boundary", 120, 51.0, 90.0),
+                    workout("Delayed one", 240, 51.0),
+                    workout("Delayed two", 360, 51.0),
+                    workout("Still missing", 900, 51.0),
                 )
             )
             saveHistory()
         }
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             openHistory(scenario)
-            requestHistoryHeartRates()
+            updateHistoryHealthData()
             awaitRequestFinished()
             assertEquals(
                 1,
@@ -118,16 +124,25 @@ class HealthConnectHeartRateReaderTest {
             withRecords(
                 listOf(0L, 120L, 240L, 360L).map { offset ->
                     record(start.plusSeconds(offset), listOf(10L to 110L, 20L to 130L))
-                }
+                } +
+                    WeightRecord.Builder(
+                            Metadata.Builder().build(),
+                            start,
+                            Mass.fromGrams(52_000.0),
+                        )
+                        .build()
             ) {
-                requestHistoryHeartRates()
+                updateHistoryHealthData()
                 awaitRequestFinished()
                 val history = LofitRepository(context).data.history
-                assertNull(history[0].averageHeartRateBpm)
-                assertEquals(90.0, history[1].averageHeartRateBpm!!, 0.0)
-                assertEquals(120.0, history[2].averageHeartRateBpm!!, 0.0)
-                assertEquals(120.0, history[3].averageHeartRateBpm!!, 0.0)
-                assertNull(history[4].averageHeartRateBpm)
+                assertEquals(
+                    listOf(null, null, 90.0, 120.0, 120.0, null),
+                    history.map { it.averageHeartRateBpm },
+                )
+                assertEquals(
+                    listOf(50.0, 50.0, 52.0, 52.0, 52.0, 52.0),
+                    history.map { it.bodyWeightKg },
+                )
             }
         }
     }
@@ -204,7 +219,7 @@ class HealthConnectHeartRateReaderTest {
                 val expected = 80.0 + 80.0 * 60.0 / 210.0
                 assertEquals(expected, read(listOf(interval)).getOrThrow()!!, 0.000001)
                 openHistory(scenario)
-                requestHistoryHeartRates()
+                updateHistoryHealthData()
                 awaitRequestFinished()
                 assertEquals(
                     expected,
@@ -251,7 +266,7 @@ class HealthConnectHeartRateReaderTest {
                 finishWorkout()
                 openHistory(scenario)
                 onView(withContentDescription("History options")).check(doesNotExist())
-                onView(withText("Request heart rates")).check(doesNotExist())
+                onView(withText("Update health data")).check(doesNotExist())
                 val workout = LofitRepository(context).data.history.single()
                 assertEquals(120.0, read(workout.intervals).getOrThrow()!!, 0.0)
                 assertNull(LofitRepository(context).data.history.single().averageHeartRateBpm)
@@ -319,16 +334,16 @@ class HealthConnectHeartRateReaderTest {
             )
     }
 
-    private fun requestHistoryHeartRates() {
-        onView(withText("Request heart rates")).check(doesNotExist())
+    private fun updateHistoryHealthData() {
+        onView(withText("Update health data")).check(doesNotExist())
         onView(withContentDescription("History options")).perform(scrollTo(), click())
-        onView(withText("Request heart rates")).perform(click())
+        onView(withText("Update health data")).perform(click())
     }
 
     private fun awaitRequestFinished() {
         onView(isRoot())
             .perform(
-                waitUntil("heart rate request finished") { root ->
+                waitUntil("health data update finished") { root ->
                     val views = ArrayList<android.view.View>()
                     root.findViewsWithText(
                         views,
@@ -352,8 +367,8 @@ class HealthConnectHeartRateReaderTest {
             )
             .build()
 
-    private fun withRecords(records: List<HeartRateRecord>, action: () -> Unit) {
-        val inserted = mutableListOf<HeartRateRecord>()
+    private fun withRecords(records: List<Record>, action: () -> Unit) {
+        val inserted = mutableListOf<Record>()
         try {
             records.chunked(500).forEach { batch ->
                 inserted.addAll(
@@ -361,7 +376,6 @@ class HealthConnectHeartRateReaderTest {
                             manager.insertRecords(batch, context.mainExecutor, it)
                         }
                         .records
-                        .map { it as HeartRateRecord }
                 )
             }
             action()
@@ -370,7 +384,7 @@ class HealthConnectHeartRateReaderTest {
                 awaitHealthResult<Void> { callback ->
                     manager.deleteRecords(
                         batch.map {
-                            RecordIdFilter.fromId(HeartRateRecord::class.java, it.metadata.id)
+                            RecordIdFilter.fromId(it.javaClass, it.metadata.id)
                         },
                         context.mainExecutor,
                         callback,
