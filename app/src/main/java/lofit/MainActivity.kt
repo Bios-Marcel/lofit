@@ -3086,6 +3086,15 @@ class MainActivity : AppCompatActivity() {
                                 true
                             }
                         }
+                        if (
+                            workout.exercises.isNotEmpty() &&
+                                workout.exercises.all { exercise(it.exerciseId)?.cardio == true }
+                        ) {
+                            menu.add("Set duration").setOnMenuItemClickListener {
+                                showCardioDurationDialog(workout)
+                                true
+                            }
+                        }
                         menu.add("Share via Bluetooth").setOnMenuItemClickListener {
                             shareTogetherWorkout(workout)
                             true
@@ -3098,6 +3107,39 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             }
+
+    private fun showCardioDurationDialog(workout: WorkoutSession) {
+        val minutes = ui.numberField("Minutes")
+        val catalog = repository.data.exercises.associateBy { it.id }
+        val prompt = "How many minutes of cardio would you like to do?"
+        val usesReps =
+            workout.exercises.any { catalog[it.exerciseId]?.type == ExerciseType.REPETITIONS }
+        val dialog =
+            AlertDialog.Builder(this)
+                .setTitle("Set duration")
+                .setMessage(
+                    if (usesReps)
+                        "$prompt Rep-based sets count as $ESTIMATED_SECONDS_PER_REP seconds per rep."
+                    else prompt
+                )
+                .setView(dialogBody().apply { addView(minutes) })
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Set duration", null)
+                .show()
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val error =
+                workout.setCardioDuration(minutes.text.toString().toIntOrNull() ?: 0, catalog)
+            if (error != null) {
+                minutes.error = error
+                minutes.requestFocus()
+            } else {
+                repository.save()
+                dialog.dismiss()
+                render()
+                updateWorkoutNotification(force = true)
+            }
+        }
+    }
 
     private fun splitMenuButton(
         label: String,
@@ -3264,7 +3306,7 @@ class MainActivity : AppCompatActivity() {
             }
     }
 
-    private fun togetherBody(): LinearLayout =
+    private fun dialogBody(): LinearLayout =
         LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(ui.dp(24), ui.dp(8), ui.dp(24), ui.dp(8))
@@ -3281,7 +3323,7 @@ class MainActivity : AppCompatActivity() {
             }
         val status = ui.metaText("Starting Bluetooth broadcast…")
         val body =
-            togetherBody().apply {
+            dialogBody().apply {
                 addView(ui.titleText(workout.name))
                 addView(status)
             }
@@ -3307,7 +3349,7 @@ class MainActivity : AppCompatActivity() {
             val status = ui.metaText("Scanning for nearby workouts…")
             val hosts = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
             val body =
-                togetherBody().apply {
+                dialogBody().apply {
                     addView(status)
                     addView(
                         ScrollView(this@MainActivity).apply { addView(hosts) },
@@ -3366,7 +3408,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun previewTogetherWorkout(plan: SharedWorkoutPlan) {
         val body =
-            togetherBody().apply {
+            dialogBody().apply {
                 addView(ui.titleText(plan.routine.name))
                 addView(
                     ui.metaText(

@@ -7,7 +7,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
+import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.action.ViewActions.scrollTo
+import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.*
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -113,6 +115,47 @@ class CardioTimerFlowTest {
             assertEquals(1, items[0].sets.single().holdSeconds)
             assertTrue(items[1].plannedSets.single().actualHoldSeconds!! >= 1)
             assertTrue(items[1].sets.isEmpty())
+        }
+    }
+
+    @Test
+    fun setDurationRepeatsCardioInOrderAndSavesPartialLastSet() {
+        seed(firstSeconds = 40)
+        LofitRepository(context).apply {
+            data.activeWorkout!!.exercises.first().plannedSets.add(PlannedSet(holdSeconds = 25))
+            save()
+        }
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            onView(withContentDescription("Workout options")).perform(click())
+            onView(withText("Set duration")).perform(click())
+            onView(withHint("Minutes")).perform(replaceText("3"))
+            onView(withId(android.R.id.button1)).perform(click())
+            scenario.recreate()
+            onView(withContentDescription("Workout totals"))
+                .check(matches(withText("0/5 sets · 0 kg volume · 0 records")))
+            val items = LofitRepository(context).data.activeWorkout!!.exercises
+            assertEquals(
+                listOf("cardio-run", "cardio-cycle", "cardio-run"),
+                items.map { it.exerciseId },
+            )
+            assertEquals(
+                listOf(listOf(40, 25), listOf(60), listOf(40, 15)),
+                items.map { row -> row.plannedSets.map { it.holdSeconds } },
+            )
+        }
+    }
+
+    @Test
+    fun mixedWorkoutHidesSetDuration() {
+        seed()
+        LofitRepository(context).apply {
+            data.exercises.first { it.id == "cardio-cycle" }.cardio = false
+            save()
+        }
+        ActivityScenario.launch(MainActivity::class.java).use {
+            onView(withContentDescription("Workout options")).perform(click())
+            onView(withText("Auto-start cardio")).check(matches(isDisplayed()))
+            onView(withText("Set duration")).check(doesNotExist())
         }
     }
 

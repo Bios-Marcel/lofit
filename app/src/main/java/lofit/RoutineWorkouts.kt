@@ -2,6 +2,11 @@ package lofit
 
 import java.util.UUID
 
+internal const val ESTIMATED_SECONDS_PER_REP = 5L
+
+internal fun PlannedSet.activeSeconds(exercise: Exercise): Long =
+    if (exercise.type.tracksDuration) holdSeconds.toLong() else ESTIMATED_SECONDS_PER_REP * reps
+
 internal fun Routine.estimatedWorkoutSeconds(exercisesById: Map<String, Exercise>): Long {
     var totalSeconds = 0L
     var hasFollowingSet = false
@@ -12,10 +17,7 @@ internal fun Routine.estimatedWorkoutSeconds(exercisesById: Map<String, Exercise
             if (hasFollowingSet) item.plannedSets.size else item.plannedSets.lastIndex
         val restCount = setsBeforeFinish / exercise.restSetInterval(item.pauseEverySecondSet)
         totalSeconds += (item.restSecondsOverride ?: defaultRestSeconds).toLong() * restCount
-        totalSeconds +=
-            item.plannedSets.sumOf { set ->
-                5L + if (exercise.type.tracksDuration) set.holdSeconds.toLong() else 5L * set.reps
-            }
+        totalSeconds += item.plannedSets.sumOf { set -> 5L + set.activeSeconds(exercise) }
         hasFollowingSet = true
     }
     return totalSeconds
@@ -103,7 +105,7 @@ fun WorkoutSession.captureRoutineBaseline(): Routine? =
                 .toMutableList()
     )
 
-private fun PlannedSet.freshCopy() =
+internal fun PlannedSet.freshCopy() =
     copy(id = UUID.randomUUID().toString(), actualHoldSeconds = null)
 
 private fun List<PlannedSet>.prescription() = map {
