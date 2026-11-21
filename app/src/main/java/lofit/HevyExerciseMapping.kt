@@ -169,10 +169,12 @@ internal object HevyExerciseMapping {
             "dumbbell-bench-press" to "3601968B", // Bench Press (Dumbbell)
             "dumbbell-bench-press-with-neutral-grip" to "3601968B", // Bench Press (Dumbbell)
             "dumbbell-bicep-curl" to "37FCC2BB", // Bicep Curl (Dumbbell)
+            "dumbbell-bulgarian-split-squat" to "B5D3A742", // Bulgarian Split Squat (Dumbbell)
             "dumbbell-clean" to "ABB00838", // Clean
             "dumbbell-floor-press" to "756EE329", // Floor Press (Dumbbell)
             "dumbbell-flyes" to "12017185", // Chest Fly (Dumbbell)
             "dumbbell-incline-row" to "914F3A96", // Chest Supported Incline Row (Dumbbell)
+            "dumbbell-lateral-raises" to "422B08F1", // Lateral Raise (Dumbbell)
             "dumbbell-lunges" to "B537D09F", // Lunge (Dumbbell)
             "dumbbell-lying-one-arm-rear-lateral-raise" to
                 "E5988A0A", // Rear Delt Reverse Fly (Dumbbell)
@@ -184,6 +186,7 @@ internal object HevyExerciseMapping {
             "dumbbell-prone-incline-curl" to "8BAB2735", // Seated Incline Curl (Dumbbell)
             "dumbbell-raise" to "8293E554", // Front Raise (Dumbbell)
             "dumbbell-rear-lunge" to "FFDA283B", // Reverse Lunge (Dumbbell)
+            "dumbbell-romanian-deadlift" to "72CFFAD5", // Romanian Deadlift (Dumbbell)
             "dumbbell-seated-one-leg-calf-raise" to "062AB91A", // Seated Calf Raise
             "dumbbell-shoulder-press" to "878CD1D0", // Shoulder Press (Dumbbell)
             "dumbbell-shrug" to "ABEC557F", // Shrug (Dumbbell)
@@ -223,6 +226,7 @@ internal object HevyExerciseMapping {
             "front-squats-with-two-kettlebells" to "A127DA73", // Kettlebell Goblet Squat
             "full-range-of-motion-lat-pulldown" to "6A6C31A5", // Lat Pulldown (Cable)
             "glute-kickback" to "987234AB", // Glute Kickback on Floor
+            "goblet-squat" to "3D0C7C75", // Goblet Squat
             "groin-and-back-stretch" to "527DA061", // Stretching
             "groiners" to "527DA061", // Stretching
             "hack-squat" to "AC5A4C58", // Hack Squat

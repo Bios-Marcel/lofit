@@ -84,11 +84,11 @@ class WorkoutRecordFeedbackTest {
     @Test
     fun recordPopup_fadesAndDoesNotReplayForTiesUndoOrRestart() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-            assertTotals("0 sets done · 0 kg volume · 0 records")
+            assertTotals("0/2 sets · 0 kg volume · 0 records")
             onView(withId(popupTextId)).check(doesNotExist())
             val completedAt = SystemClock.uptimeMillis()
             onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
-            assertTotals("1 set done · 560 kg volume · 1 record")
+            assertTotals("1/2 sets · 560 kg volume · 1 record")
             onView(withId(popupTextId))
                 .perform(waitUntilMatches(isDisplayed()))
                 .perform(waitUntil("record fanfare playing") { audioManager.isMusicActive })
@@ -103,22 +103,22 @@ class WorkoutRecordFeedbackTest {
                 SystemClock.uptimeMillis() - completedAt >= 6_000,
             )
             onView(withContentDescription("Set 2 done")).perform(scrollTo(), click())
-            assertTotals("2 sets done · 1120 kg volume · 1 record")
+            assertTotals("2/2 sets · 1120 kg volume · 1 record")
             onView(withId(popupTextId)).check(doesNotExist())
             onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
-            assertTotals("1 set done · 560 kg volume · 1 record")
+            assertTotals("1/2 sets · 560 kg volume · 1 record")
             onView(withId(popupTextId)).check(doesNotExist())
             scenario.recreate()
-            assertTotals("1 set done · 560 kg volume · 1 record")
+            assertTotals("1/2 sets · 560 kg volume · 1 record")
             onView(withId(popupTextId)).check(doesNotExist())
             onView(withContentDescription("Set 2 done")).perform(scrollTo(), click())
-            assertTotals("0 sets done · 0 kg volume · 0 records")
+            assertTotals("0/2 sets · 0 kg volume · 0 records")
             onView(withContentDescription("Set 2 done")).perform(scrollTo(), click())
-            assertTotals("1 set done · 560 kg volume · 1 record")
+            assertTotals("1/2 sets · 560 kg volume · 1 record")
             onView(withId(popupTextId)).check(doesNotExist())
             onView(withContentDescription("Options for Bench press")).perform(scrollTo(), click())
             onView(withText("Remove exercise")).perform(click())
-            assertTotals("0 sets done · 0 kg volume · 0 records")
+            assertTotals("0/0 sets · 0 kg volume · 0 records")
         }
     }
 
@@ -128,7 +128,7 @@ class WorkoutRecordFeedbackTest {
             onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
             awaitPopupGone()
             onView(withContentDescription("Set 1 weight")).perform(scrollTo(), replaceText("90"))
-            assertTotals("1 set done · 720 kg volume · 2 records")
+            assertTotals("1/2 sets · 720 kg volume · 2 records")
             onView(withId(popupTextId))
                 .perform(waitUntilMatches(isDisplayed()))
                 .check(matches(withText("Bench press\n90 kg weight\n720 kg set volume")))
@@ -147,7 +147,7 @@ class WorkoutRecordFeedbackTest {
                 )
             }
             scenario.recreate()
-            assertTotals("1 set done · 720 kg volume · 2 records")
+            assertTotals("1/2 sets · 720 kg volume · 2 records")
             onView(withId(popupTextId)).check(doesNotExist())
         }
     }
@@ -165,7 +165,7 @@ class WorkoutRecordFeedbackTest {
                 .perform(waitUntil("record fanfare playing") { audioManager.isMusicActive })
             onView(withContentDescription("Dismiss record popup")).perform(click())
             awaitPopupGone()
-            assertTotals("1 set done · 560 kg volume · 1 record")
+            assertTotals("1/2 sets · 560 kg volume · 1 record")
         }
     }
 
@@ -177,11 +177,11 @@ class WorkoutRecordFeedbackTest {
         }
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
-            assertTotals("1 set done · 560 kg volume · 1 record")
+            assertTotals("1/2 sets · 560 kg volume · 1 record")
             onView(withId(popupTextId)).check(doesNotExist())
             assertFalse("Disabled celebrations remain silent", audioManager.isMusicActive)
             scenario.recreate()
-            assertTotals("1 set done · 560 kg volume · 1 record")
+            assertTotals("1/2 sets · 560 kg volume · 1 record")
             onView(withId(popupTextId)).check(doesNotExist())
         }
     }

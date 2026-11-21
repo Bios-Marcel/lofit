@@ -1051,6 +1051,7 @@ class WorkoutFlowTest {
             assertEquals(cardLocation[0] + ancestor.width, buttonLocation[0] + view.width)
         }
         onView(withText("Add set")).perform(scrollTo(), click())
+        assertWorkoutTotals("0/1 sets · 0 kg volume")
         onView(withContentDescription("Set 1 row")).check { view, _ ->
             var ancestor = view.parent
             while (ancestor !is MaterialCardView) ancestor = ancestor.parent
@@ -1506,21 +1507,21 @@ class WorkoutFlowTest {
         ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)).use {
             scenario ->
             onView(withContentDescription("Workout totals")).check(matches(isDisplayed()))
-            assertWorkoutTotals("0 sets done · 0 kg volume")
+            assertWorkoutTotals("0/2 sets · 0 kg volume")
             onView(withText("Finish workout")).perform(scrollTo()).check(matches(not(isEnabled())))
             onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
-            assertWorkoutTotals("1 set done · 300 kg volume")
+            assertWorkoutTotals("1/2 sets · 300 kg volume")
             onView(withText("Finish workout")).perform(scrollTo()).check(matches(isEnabled()))
             onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
-            assertWorkoutTotals("0 sets done · 0 kg volume")
+            assertWorkoutTotals("0/2 sets · 0 kg volume")
             onView(withText("Finish workout")).perform(scrollTo()).check(matches(not(isEnabled())))
             onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
             scenario.recreate()
-            assertWorkoutTotals("1 set done · 300 kg volume")
+            assertWorkoutTotals("1/2 sets · 300 kg volume")
             onView(withText("Finish workout")).perform(scrollTo()).check(matches(isEnabled()))
             onView(withContentDescription("Options for Bench press")).perform(scrollTo(), click())
             onView(withText("Remove exercise")).perform(click())
-            assertWorkoutTotals("0 sets done · 0 kg volume")
+            assertWorkoutTotals("0/0 sets · 0 kg volume")
             onView(withText("Finish workout")).perform(scrollTo()).check(matches(not(isEnabled())))
             onView(withText("Discard workout")).perform(scrollTo(), click())
             assertEquals(null, LofitRepository(context).data.activeWorkout)
@@ -1874,7 +1875,7 @@ class WorkoutFlowTest {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         instrumentation.startActivitySync(intent)
 
-        assertWorkoutTotals("4 sets done · 1200 kg volume")
+        assertWorkoutTotals("4/4 sets · 1200 kg volume")
         val page = arrayOfNulls<View>(1)
         val survivingRow = arrayOfNulls<View>(1)
         onView(isAssignableFrom(ScrollView::class.java)).check { view, _ -> page[0] = view }
@@ -1883,7 +1884,7 @@ class WorkoutFlowTest {
         onView(withContentDescription("Delete set 1"))
             .check(matches(isDisplayed()))
             .perform(click())
-        assertWorkoutTotals("3 sets done · 900 kg volume")
+        assertWorkoutTotals("3/3 sets · 900 kg volume")
         onView(isAssignableFrom(ScrollView::class.java)).check { view, _ ->
             assertSame(page[0], view)
         }
@@ -1905,7 +1906,7 @@ class WorkoutFlowTest {
         onView(withContentDescription("Delete set 2 and all below"))
             .check(matches(isDisplayed()))
             .perform(click())
-        assertWorkoutTotals("1 set done · 300 kg volume")
+        assertWorkoutTotals("1/1 sets · 300 kg volume")
         onView(withContentDescription("Set 1 row")).check { view, _ ->
             assertSame(survivingRow[0], view)
         }
@@ -2541,13 +2542,13 @@ class WorkoutFlowTest {
         onView(withContentDescription("Set 2 done")).perform(scrollTo(), click())
         assertSetDoneState(1, "Done, record")
         assertSetDoneState(2, "Done")
-        assertWorkoutTotals("2 sets done · 610 kg volume", records = 2)
+        assertWorkoutTotals("2/2 sets · 610 kg volume", records = 2)
         onView(withContentDescription("Set 2 weight")).perform(replaceText("62"))
-        assertWorkoutTotals("2 sets done · 615 kg volume", records = 2)
+        assertWorkoutTotals("2/2 sets · 615 kg volume", records = 2)
         assertSetDoneState(1, "Done")
         assertSetDoneState(2, "Done, record")
         onView(withContentDescription("Set 2 done")).perform(click())
-        assertWorkoutTotals("1 set done · 305 kg volume", records = 2)
+        assertWorkoutTotals("1/2 sets · 305 kg volume", records = 2)
         assertSetDoneState(2, "Not done")
         assertSetDoneState(1, "Done, record")
         assertEquals(
@@ -2556,7 +2557,7 @@ class WorkoutFlowTest {
         )
         onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
         assertSetDoneState(1, "Not done")
-        assertWorkoutTotals("0 sets done · 0 kg volume")
+        assertWorkoutTotals("0/2 sets · 0 kg volume")
         assertEquals(
             0,
             LofitRepository(instrumentation.targetContext).data.activeWorkout!!.setCount(),
@@ -2653,10 +2654,10 @@ class WorkoutFlowTest {
                 )
             }
             onView(withContentDescription("Start set 1 hold")).check(matches(isDisplayed()))
-            assertWorkoutTotals("0 sets done · 0 kg volume")
+            assertWorkoutTotals("0/1 sets · 0 kg volume")
             onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
             assertSetDoneState(1, "Done, record")
-            assertWorkoutTotals("1 set done · 20 kg volume", records = 1)
+            assertWorkoutTotals("1/1 sets · 20 kg volume", records = 1)
             onView(withContentDescription("Set 1 done")).check { view, _ ->
                 val actions = view.parent as ViewGroup
                 assertEquals(1, actions.childCount)
@@ -2665,18 +2666,18 @@ class WorkoutFlowTest {
             onView(withContentDescription("Set 1 Active time in seconds"))
                 .perform(replaceText("20"))
             assertSetDoneState(1, "Done")
-            assertWorkoutTotals("1 set done · 20 kg volume")
+            assertWorkoutTotals("1/1 sets · 20 kg volume")
             onView(withContentDescription("Set 1 Active time in seconds"))
                 .perform(replaceText("46"))
             assertSetDoneState(1, "Done, record")
             onView(withContentDescription("Set 1 weight")).perform(replaceText("15"))
-            assertWorkoutTotals("1 set done · 30 kg volume", records = 1)
+            assertWorkoutTotals("1/1 sets · 30 kg volume", records = 1)
             scenario.recreate()
             assertSetDoneState(1, "Done, record")
-            assertWorkoutTotals("1 set done · 30 kg volume", records = 1)
+            assertWorkoutTotals("1/1 sets · 30 kg volume", records = 1)
             onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
             assertSetDoneState(1, "Not done")
-            assertWorkoutTotals("0 sets done · 0 kg volume")
+            assertWorkoutTotals("0/1 sets · 0 kg volume")
             assertEquals(
                 0,
                 LofitRepository(instrumentation.targetContext).data.activeWorkout!!.setCount(),

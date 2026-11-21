@@ -1,0 +1,544 @@
+diff --git a/app/src/main/java/lofit/MainActivity.kt b/app/src/main/java/lofit/MainActivity.kt
+index 8a1081d..5e00a1c 100644
+--- a/app/src/main/java/lofit/MainActivity.kt
++++ b/app/src/main/java/lofit/MainActivity.kt
+@@ -142,6 +142,7 @@ class MainActivity : AppCompatActivity() {
+     }
+ 
+     private lateinit var repository: LofitRepository
++    private val headsetControls by lazy { HeadsetSetControls(this, ::completeHeadsetSet) }
+     private val ui by lazy {
+         LofitViews(this, exercisePictures) { repository.data.biologicalGender }
+     }
+@@ -542,6 +543,7 @@ class MainActivity : AppCompatActivity() {
+         super.onStart()
+         craneScaleScreens.onStart()
+         workoutForeground = true
++        headsetControls.onActivityEntered()
+         updateWorkoutScaleScan()
+     }
+ 
+@@ -599,6 +601,7 @@ class MainActivity : AppCompatActivity() {
+     }
+ 
+     override fun onDestroy() {
++        headsetControls.close()
+         timerVoice.close()
+         craneScaleScreens.clear()
+         mcpServer?.close()
+@@ -3597,12 +3600,55 @@ class MainActivity : AppCompatActivity() {
+         if (!editingHistory && !completingHoldAutomatically) startRest(item, workout)
+     }
+ 
++    private fun currentWorkoutSet(
++        workout: WorkoutSession
++    ): Triple<WorkoutExercise?, PlannedSet?, Int> {
++        val livePull = liveWorkoutMeasurement.active
++        val active =
++            workout.exercises.firstNotNullOfOrNull { item ->
++                val index =
++                    item.plannedSets.indexOfFirst {
++                        isActiveHold(item, it) || livePull?.set?.id == it.id
++                    }
++                if (index >= 0) Triple(item, item.plannedSets[index], index) else null
++            }
++        val current =
++            workout.exercises.firstNotNullOfOrNull { item ->
++                val nextSet =
++                    item.plannedSets.indexOfFirst { set ->
++                        loggedSetFor(item, set) == null
++                    }
++                when {
++                    item.plannedSets.isEmpty() -> Triple(item, null, 0)
++                    nextSet >= 0 -> Triple(item, item.plannedSets[nextSet], nextSet)
++                    else -> null
++                }
++            }
++        val fallback = workout.exercises.lastOrNull()?.let { Triple(it, null, it.plannedSets.size) }
++        return active ?: current ?: fallback ?: Triple(null, null, 0)
++    }
++
++    private fun completeHeadsetSet() {
++        if (restEndsAt > SystemClock.elapsedRealtime()) return
++        val workout = repository.data.activeWorkout ?: return
++        val (item, plannedSet) = currentWorkoutSet(workout)
++        completeRemoteSet(workout, item ?: return, plannedSet ?: return)
++    }
++
+     private fun completeNotificationSet(intent: Intent) {
+         val ids = intent.data?.pathSegments ?: return
+         if (ids.size != 3) return
+         val workout = repository.data.activeWorkout?.takeIf { it.id == ids[0] } ?: return
+         val item = workout.exercises.firstOrNull { it.id == ids[1] } ?: return
+         val plannedSet = item.plannedSets.firstOrNull { it.id == ids[2] } ?: return
++        completeRemoteSet(workout, item, plannedSet)
++    }
++
++    private fun completeRemoteSet(
++        workout: WorkoutSession,
++        item: WorkoutExercise,
++        plannedSet: PlannedSet,
++    ) {
+         if (loggedSetFor(item, plannedSet) != null) return
+         val movement = exercise(item.exerciseId) ?: return
+         completeWorkoutSet(item, plannedSet, movement, workout)
+@@ -3655,28 +3701,7 @@ class MainActivity : AppCompatActivity() {
+             return
+ 
+         val livePull = liveWorkoutMeasurement.active
+-        val active =
+-            workout.exercises.firstNotNullOfOrNull { item ->
+-                val index =
+-                    item.plannedSets.indexOfFirst {
+-                        isActiveHold(item, it) || livePull?.set?.id == it.id
+-                    }
+-                if (index >= 0) Triple(item, item.plannedSets[index], index) else null
+-            }
+-        val current =
+-            workout.exercises.firstNotNullOfOrNull { item ->
+-                val nextSet =
+-                    item.plannedSets.indexOfFirst { set ->
+-                        loggedSetFor(item, set) == null
+-                    }
+-                when {
+-                    item.plannedSets.isEmpty() -> Triple(item, null, 0)
+-                    nextSet >= 0 -> Triple(item, item.plannedSets[nextSet], nextSet)
+-                    else -> null
+-                }
+-            }
+-        val fallback = workout.exercises.lastOrNull()?.let { Triple(it, null, it.plannedSets.size) }
+-        val (item, plannedSet, setIndex) = active ?: current ?: fallback ?: Triple(null, null, 0)
++        val (item, plannedSet, setIndex) = currentWorkoutSet(workout)
+         val movement = item?.let { exercise(it.exerciseId) }
+         val title = movement?.name ?: workout.name
+         val target =
+diff --git a/app/src/main/java/lofit/HeadsetSetControls.kt b/app/src/main/java/lofit/HeadsetSetControls.kt
+new file mode 100644
+index 0000000..91bdba1
+--- /dev/null
++++ b/app/src/main/java/lofit/HeadsetSetControls.kt
+@@ -0,0 +1,110 @@
++package lofit
++
++import android.content.Context
++import android.content.Intent
++import android.media.AudioManager
++import android.media.MediaPlayer
++import android.media.session.MediaSession
++import android.media.session.PlaybackState
++import android.os.Handler
++import android.os.Looper
++import android.view.KeyEvent
++
++/** Keeps headset routing after a single silent clip, until another app plays audio. */
++internal class HeadsetSetControls(
++    private val context: Context,
++    private val completeSet: () -> Unit,
++) : AutoCloseable {
++    private val audio = context.getSystemService(AudioManager::class.java)
++    private var session: MediaSession? = null
++    private var player: MediaPlayer? = null
++
++    fun onActivityEntered() {
++        if (audio.isMusicActive || player != null) return
++        val clip = MediaPlayer.create(context, R.raw.headset_silence) ?: return
++        // Preparation can take time; leave music alone if it started meanwhile.
++        if (audio.isMusicActive) {
++            clip.release()
++            return
++        }
++        val controls =
++            session
++                ?: MediaSession(context, "Lofit headset sets").also {
++                    it.setCallback(
++                        object : MediaSession.Callback() {
++                            override fun onSkipToNext() {
++                                completeSet()
++                            }
++
++                            // Some headsets send PLAY while our silent session is paused.
++                            override fun onPlay() {
++                                completeSet()
++                            }
++
++                            override fun onMediaButtonEvent(intent: Intent): Boolean {
++                                val key =
++                                    intent.getParcelableExtra(
++                                        Intent.EXTRA_KEY_EVENT,
++                                        KeyEvent::class.java,
++                                    )
++                                when (key?.keyCode) {
++                                    KeyEvent.KEYCODE_MEDIA_NEXT,
++                                    KeyEvent.KEYCODE_MEDIA_PLAY,
++                                    KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
++                                        if (
++                                            key.action == KeyEvent.ACTION_DOWN &&
++                                                key.repeatCount == 0
++                                        )
++                                            completeSet()
++                                        return true
++                                    }
++                                    else -> return super.onMediaButtonEvent(intent)
++                                }
++                            }
++                        },
++                        Handler(Looper.getMainLooper()),
++                    )
++                    session = it
++                }
++        player = clip
++        clip.setOnCompletionListener {
++            player = null
++            it.release()
++            setState(controls, PlaybackState.STATE_PAUSED)
++        }
++        clip.setOnErrorListener { _, _, _ ->
++            close()
++            true
++        }
++        controls.isActive = true
++        setState(controls, PlaybackState.STATE_PLAYING)
++        // Actual zero-valued samples, not a muted player. No audio focus or looping needed.
++        try {
++            clip.start()
++        } catch (_: IllegalStateException) {
++            close()
++        }
++    }
++
++    private fun setState(controls: MediaSession, state: Int) {
++        controls.setPlaybackState(
++            PlaybackState.Builder()
++                .setActions(
++                    PlaybackState.ACTION_SKIP_TO_NEXT or
++                        PlaybackState.ACTION_PLAY or
++                        PlaybackState.ACTION_PLAY_PAUSE
++                )
++                .setState(state, 0L, if (state == PlaybackState.STATE_PLAYING) 1f else 0f)
++                .build()
++        )
++    }
++
++    override fun close() {
++        player?.setOnCompletionListener(null)
++        player?.setOnErrorListener(null)
++        player?.release()
++        player = null
++        session?.release()
++        session = null
++    }
++}
+diff --git a/app/src/androidTest/java/lofit/HeadsetSetControlsTest.kt b/app/src/androidTest/java/lofit/HeadsetSetControlsTest.kt
+new file mode 100644
+index 0000000..e5d1632
+--- /dev/null
++++ b/app/src/androidTest/java/lofit/HeadsetSetControlsTest.kt
+@@ -0,0 +1,297 @@
++package lofit
++
++import android.Manifest
++import android.media.AudioManager
++import android.media.MediaPlayer
++import android.media.session.MediaController
++import android.media.session.MediaSession
++import android.media.session.MediaSessionManager
++import android.media.session.PlaybackState
++import android.os.SystemClock
++import android.view.KeyEvent
++import androidx.lifecycle.Lifecycle
++import androidx.test.core.app.ActivityScenario
++import androidx.test.espresso.Espresso.onView
++import androidx.test.espresso.action.ViewActions.click
++import androidx.test.espresso.action.ViewActions.scrollTo
++import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
++import androidx.test.ext.junit.runners.AndroidJUnit4
++import androidx.test.platform.app.InstrumentationRegistry
++import java.io.FileInputStream
++import org.junit.After
++import org.junit.Assert.*
++import org.junit.Before
++import org.junit.Test
++import org.junit.runner.RunWith
++
++@RunWith(AndroidJUnit4::class)
++class HeadsetSetControlsTest {
++    private val instrumentation = InstrumentationRegistry.getInstrumentation()
++    private val context = instrumentation.targetContext
++    private val audio = context.getSystemService(AudioManager::class.java)
++    private val sessions = context.getSystemService(MediaSessionManager::class.java)
++    private lateinit var item: WorkoutExercise
++
++    @Before
++    fun setup() {
++        instrumentation.uiAutomation.grantRuntimePermission(
++            context.packageName,
++            Manifest.permission.POST_NOTIFICATIONS,
++        )
++        instrumentation.uiAutomation.adoptShellPermissionIdentity(
++            Manifest.permission.MEDIA_CONTENT_CONTROL
++        )
++        context.clearRepositoryTestData()
++        item =
++            WorkoutExercise(
++                exerciseId = "bench-press",
++                plannedSets =
++                    mutableListOf(
++                        PlannedSet(weightKg = 62.5, reps = 6),
++                        PlannedSet(weightKg = 65.0),
++                    ),
++            )
++        LofitRepository(context).apply {
++            data.onboardingComplete = true
++            data.bodyMetricsEnabled = false
++            data.voiceCommandsEnabled = false
++            data.soundCuesEnabled = false
++            data.mcpEnabled = false
++            data.activeWorkout =
++                WorkoutSession(name = "Headset test", exercises = mutableListOf(item))
++            save()
++        }
++        await("no audio before test") { !audio.isMusicActive }
++    }
++
++    @After
++    fun cleanup() {
++        instrumentation.uiAutomation.dropShellPermissionIdentity()
++    }
++
++    private fun await(description: String, condition: () -> Boolean) {
++        val deadline = SystemClock.uptimeMillis() + 5_000
++        while (!condition()) {
++            check(SystemClock.uptimeMillis() < deadline) { "Timed out: $description" }
++            SystemClock.sleep(16)
++        }
++    }
++
++    private fun controls(): MediaController? =
++        sessions.getActiveSessions(null).singleOrNull {
++            it.packageName == context.packageName && it.tag == "Lofit headset sets"
++        }
++
++    private fun awaitSilentClipFinished(): MediaController {
++        await("silent clip finished with session retained") {
++            controls()?.playbackState?.state == PlaybackState.STATE_PAUSED && !audio.isMusicActive
++        }
++        return controls()!!
++    }
++
++    private fun dispatchMedia(command: String = "next") {
++        instrumentation.uiAutomation
++            .executeShellCommand("cmd media_session dispatch $command")
++            .use {
++                FileInputStream(it.fileDescriptor).use { stream -> stream.readBytes() }
++            }
++    }
++
++    private fun workout() = LofitRepository(context).data.activeWorkout!!
++
++    @Test
++    fun nextRoutesAfterSilenceAndCompletesInBackgroundWithRestGuard() {
++        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
++            awaitSilentClipFinished()
++            scenario.moveToState(Lifecycle.State.CREATED)
++            dispatchMedia()
++            await("first set saved") { workout().setCount() == 1 }
++            val logged = workout().exercises.single().sets.single()
++            assertEquals(item.plannedSets.first().id, logged.plannedSetId)
++            assertEquals(62.5, logged.weightKg, 0.0)
++            assertEquals(6, logged.reps)
++            dispatchMedia()
++            scenario.moveToState(Lifecycle.State.RESUMED)
++            instrumentation.waitForIdleSync()
++            assertEquals(1, workout().setCount())
++        }
++        await("session released on destroy") { controls() == null }
++    }
++
++    @Test
++    fun playFromHeadsetCompletesInBackgroundAndRespectsRest() {
++        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
++            awaitSilentClipFinished()
++            scenario.moveToState(Lifecycle.State.CREATED)
++            dispatchMedia("play")
++            await("headset play completes first set") { workout().setCount() == 1 }
++            dispatchMedia("play")
++            scenario.moveToState(Lifecycle.State.RESUMED)
++            instrumentation.waitForIdleSync()
++            assertEquals(
++                item.plannedSets.first().id,
++                workout().exercises.single().sets.single().plannedSetId,
++            )
++        }
++    }
++
++    @Test
++    fun playPauseAndTransportPlayCompleteSetsWithoutRest() {
++        LofitRepository(context).apply {
++            data.activeWorkout!!.defaultRestSeconds = 0
++            save()
++        }
++        ActivityScenario.launch(MainActivity::class.java).use {
++            val controller = awaitSilentClipFinished()
++            assertTrue(controller.playbackState!!.actions and PlaybackState.ACTION_PLAY != 0L)
++            dispatchMedia("play-pause")
++            await("play-pause completes first set") { workout().setCount() == 1 }
++            controller.transportControls.play()
++            await("transport play completes second set") { workout().setCount() == 2 }
++            dispatchMedia("play")
++            instrumentation.waitForIdleSync()
++            assertEquals(
++                item.plannedSets.map { it.id },
++                workout().exercises.single().sets.map { it.plannedSetId },
++            )
++        }
++    }
++
++    @Test
++    fun playingSessionWithoutLocalAudioDoesNotBlockHeadsetControls() {
++        // Spotify Connect can report PLAYING and LOCAL even when the desktop plays the audio.
++        val remote = MediaSession(context, "Desktop playback controls")
++        try {
++            remote.setPlaybackState(
++                PlaybackState.Builder().setState(PlaybackState.STATE_PLAYING, 0, 1f).build()
++            )
++            remote.isActive = true
++            assertFalse(audio.isMusicActive)
++            ActivityScenario.launch(MainActivity::class.java).use {
++                awaitSilentClipFinished()
++                dispatchMedia()
++                await("next reaches Lofit despite remote playing session") {
++                    workout().setCount() == 1
++                }
++                assertEquals(PlaybackState.STATE_PLAYING, remote.controller.playbackState!!.state)
++            }
++        } finally {
++            remote.release()
++        }
++    }
++
++    @Test
++    fun existingMusicIsUntouchedAndReentryClaimsOnlyWhenIdle() {
++        val other = MediaSession(context, "Other player")
++        val music = MediaPlayer.create(context, R.raw.headset_silence)
++        try {
++            other.setPlaybackState(
++                PlaybackState.Builder().setState(PlaybackState.STATE_PLAYING, 0, 1f).build()
++            )
++            other.isActive = true
++            music.isLooping = true
++            music.start()
++            await("existing music active") { audio.isMusicActive }
++            ActivityScenario.launch(MainActivity::class.java).use { scenario ->
++                assertNull(controls())
++                assertTrue(music.isPlaying)
++                assertEquals(0, workout().setCount())
++                scenario.moveToState(Lifecycle.State.CREATED)
++                music.stop()
++                other.release()
++                await("existing music stopped") { !audio.isMusicActive }
++                scenario.moveToState(Lifecycle.State.RESUMED)
++                awaitSilentClipFinished()
++                dispatchMedia()
++                await("next works after idle reentry") { workout().setCount() == 1 }
++            }
++        } finally {
++            music.release()
++            other.release()
++        }
++    }
++
++    @Test
++    fun runningHoldTakesPriorityOverEarlierUnfinishedSet() {
++        val timed =
++            WorkoutExercise(
++                exerciseId = "plank",
++                plannedSets = mutableListOf(PlannedSet(holdSeconds = 60)),
++            )
++        LofitRepository(context).apply {
++            data.activeWorkout!!.exercises.add(timed)
++            save()
++        }
++        ActivityScenario.launch(MainActivity::class.java).use {
++            awaitSilentClipFinished()
++            onView(withContentDescription("Start set 1 hold")).perform(scrollTo(), click())
++            dispatchMedia()
++            await("running hold completed") { workout().setCount() == 1 }
++            assertTrue(workout().exercises.first().sets.isEmpty())
++            assertEquals(
++                timed.plannedSets.single().id,
++                workout().exercises.last().sets.single().plannedSetId,
++            )
++        }
++    }
++
++    @Test
++    fun heldKeyAndKeyUpDoNotCompleteExtraSetsWithoutRest() {
++        LofitRepository(context).apply {
++            data.activeWorkout!!.defaultRestSeconds = 0
++            save()
++        }
++        ActivityScenario.launch(MainActivity::class.java).use {
++            val controller = awaitSilentClipFinished()
++            val now = SystemClock.uptimeMillis()
++            listOf(
++                    KeyEvent.KEYCODE_MEDIA_NEXT,
++                    KeyEvent.KEYCODE_MEDIA_PLAY,
++                    KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
++                )
++                .forEach { key ->
++                    controller.dispatchMediaButtonEvent(
++                        KeyEvent(now, now, KeyEvent.ACTION_DOWN, key, 1)
++                    )
++                    controller.dispatchMediaButtonEvent(KeyEvent(KeyEvent.ACTION_UP, key))
++                }
++            // A different media command must also leave sets alone.
++            controller.transportControls.pause()
++            controller.transportControls.skipToNext()
++            await("one deliberate next completed") { workout().setCount() == 1 }
++            instrumentation.waitForIdleSync()
++            assertEquals(
++                item.plannedSets.first().id,
++                workout().exercises.single().sets.single().plannedSetId,
++            )
++        }
++    }
++
++    @Test
++    fun noWorkoutOrNoPlannedSetsCanBeCompleted() {
++        LofitRepository(context).apply {
++            data.activeWorkout = null
++            save()
++        }
++        ActivityScenario.launch(MainActivity::class.java).use {
++            awaitSilentClipFinished()
++            dispatchMedia()
++            instrumentation.waitForIdleSync()
++            assertNull(LofitRepository(context).data.activeWorkout)
++        }
++        LofitRepository(context).apply {
++            data.activeWorkout =
++                WorkoutSession(
++                    name = "Empty sets",
++                    exercises = mutableListOf(WorkoutExercise(exerciseId = "bench-press")),
++                )
++            save()
++        }
++        ActivityScenario.launch(MainActivity::class.java).use {
++            awaitSilentClipFinished()
++            dispatchMedia()
++            instrumentation.waitForIdleSync()
++            assertEquals(0, workout().setCount())
++        }
++    }
++}
+diff --git a/app/src/main/res/raw/headset_silence.wav b/app/src/main/res/raw/headset_silence.wav
+new file mode 100644
+index 0000000000000000000000000000000000000000..811434971c58950e9b3eb7676d56d20c62911b3a
+GIT binary patch
+literal 29444
+zcmeIfF%5%200q#0C_n;MngB`H4yEfQgpGxq2*gxS#V}L|@4eS^p06WW9`9+}+t4Q|
+vDH*@X`6=nrXRWRNjsO4v0000000000000000000000000000000B}=(twRb4
+
+literal 0
+HcmV?d00001
+

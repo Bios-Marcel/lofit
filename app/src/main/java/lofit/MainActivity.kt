@@ -1186,12 +1186,12 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         fun updateWorkoutTotals(records: List<WorkoutRecord>) {
-            val count = workout.setCount()
-            val sets = if (count == 1) "set" else "sets"
+            val completedSets = workout.setCount()
+            val totalSets = workout.exercises.sumOf { it.plannedSets.size }
             val recordLabel = if (records.size == 1) "record" else "records"
             workoutTotals.text =
-                "$count $sets done · ${formatWeight(workout.totalVolume(repository.data.exercises))} kg volume · ${records.size} $recordLabel"
-            finishButton.isEnabled = count > 0
+                "$completedSets/$totalSets sets · ${formatWeight(workout.totalVolume(repository.data.exercises))} kg volume · ${records.size} $recordLabel"
+            finishButton.isEnabled = completedSets > 0
             finishButton.backgroundTintList =
                 ColorStateList.valueOf(
                     ui.color(
@@ -1726,6 +1726,7 @@ class MainActivity : AppCompatActivity() {
                     nextSets.forEachIndexed { index, next ->
                         addWorkoutSetRow(next, firstIndex + index)
                     }
+                    onSetsChanged()
                     if (!editingHistory) updateWorkoutNotification(force = true)
                 }
             )

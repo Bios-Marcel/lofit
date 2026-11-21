@@ -425,6 +425,9 @@ class WorkoutSessionTest {
         assertFalse(exercises.single { it.id == "plank" }.weighted)
         assertTrue(exercises.single { it.id == "farmer-carry" }.weighted)
         assertFalse(exercises.single { it.id == "bodyweight-flyes" }.weighted)
+        assertFalse(exercises.single { it.id == "bodyweight-squat" }.weighted)
+        assertTrue(exercises.none { it.id == "weighted-bodyweight-squat" })
+        assertTrue(exercises.single { it.id == "dumbbell-bulgarian-split-squat" }.asymmetric)
         val weightedCopies = exercises.filter { it.id.startsWith("weighted-") }
         weightedCopies.forEach { copy ->
             val original = exercises.single { it.id == copy.id.removePrefix("weighted-") }
