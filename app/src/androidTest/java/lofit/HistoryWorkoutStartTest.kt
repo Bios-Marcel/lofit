@@ -9,6 +9,7 @@ import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.action.ViewActions.scrollTo
+import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.*
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -152,12 +153,13 @@ class HistoryWorkoutStartTest {
                 onView(withContentDescription("View Push day")).perform(scrollTo(), click())
             val options = onView(withContentDescription("Options for Push day"))
             options.perform(scrollTo(), click())
-            onView(withText("Clear Wi-Fi and location")).perform(click())
+            val clearLabel = if (location == null) "Clear Wi-Fi" else "Clear Wi-Fi and location"
+            onView(withText(clearLabel)).perform(click())
             val saved = LofitRepository(context).data.history.single()
             assertNull(saved.startWifiName)
             assertNull(saved.startLocation)
             options.perform(scrollTo(), click())
-            onView(withText("Set current Wi-Fi and location")).check(matches(isDisplayed()))
+            onView(withText("Set current Wi-Fi")).check(matches(isDisplayed()))
         }
     }
 
@@ -170,8 +172,30 @@ class HistoryWorkoutStartTest {
     @Test
     fun debugHistoryClearsWifiAndLocation() = checkClearPlace("Gym", WorkoutLocation(1.0, 2.0))
 
-    @Test
     @Suppress("DEPRECATION")
+    private fun connectedWifiName(): String {
+        val ssid = context.getSystemService(WifiManager::class.java)?.connectionInfo?.ssid
+        assumeTrue(
+            "Requires a connected Wi-Fi network",
+            !ssid.isNullOrEmpty() && ssid != WifiManager.UNKNOWN_SSID,
+        )
+        return ssid!!.removeSurrounding("\"")
+    }
+
+    @Test
+    fun defaultWorkoutSavesOnlyWifi() {
+        val wifiName = connectedWifiName()
+        ActivityScenario.launch(MainActivity::class.java).use {
+            onView(withContentDescription("${context.getString(R.string.start_workout)} options"))
+                .check(doesNotExist())
+            onView(withText(R.string.start_workout)).perform(scrollTo(), click())
+            val active = LofitRepository(context).data.activeWorkout!!
+            assertEquals(wifiName, active.startWifiName)
+            assertNull(active.startLocation)
+        }
+    }
+
+    @Test
     fun debugHistoryWifiStartsSuggestedWorkoutWithoutSavedCoordinates() {
         LofitRepository(context).apply {
             data.debugMode = true
@@ -180,22 +204,18 @@ class HistoryWorkoutStartTest {
             saveHistory()
             save()
         }
-        lateinit var wifiName: String
+        val wifiName = connectedWifiName()
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-            val ssid = context.getSystemService(WifiManager::class.java)?.connectionInfo?.ssid
-            assumeTrue(
-                "Requires a connected Wi-Fi network",
-                !ssid.isNullOrEmpty() && ssid != WifiManager.UNKNOWN_SSID,
-            )
-            wifiName = ssid!!.removeSurrounding("\"")
             openHistory(scenario)
             onView(withContentDescription("Options for Push day")).perform(scrollTo(), click())
-            onView(withText("Set current Wi-Fi and location")).perform(click())
-            assertEquals(wifiName, LofitRepository(context).data.history.single().startWifiName)
+            onView(withText("Set current Wi-Fi")).perform(click())
+            val saved = LofitRepository(context).data.history.single()
+            assertEquals(wifiName, saved.startWifiName)
+            assertNull(saved.startLocation)
         }
         LofitRepository(context).apply {
-            data.history.single().startLocation = null
-            saveHistory()
+            data.suggestedWorkoutsEnabled = true
+            save()
         }
         ActivityScenario.launch(MainActivity::class.java).use {
             onView(withContentDescription("${context.getString(R.string.start_workout)} options"))

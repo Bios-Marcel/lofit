@@ -301,6 +301,8 @@ class WorkoutFlowTest {
             }
             openSettings()
             val field = onView(withContentDescription("Suggested workout lookback"))
+            field.check(matches(not(isDisplayed())))
+            onView(withText("Suggested workouts")).perform(scrollTo(), click())
             field.perform(scrollTo()).check(matches(withText("4w")))
             field.perform(replaceText("12m"))
             field.perform(replaceText("12months"))
@@ -308,12 +310,19 @@ class WorkoutFlowTest {
             scenario.recreate()
             openSettings()
             field.perform(scrollTo()).check(matches(withText("12m")))
+            onView(withText("Suggested workouts")).perform(scrollTo(), click())
+            field.check(matches(not(isDisplayed())))
+            assertFalse(LofitRepository(context).data.suggestedWorkoutsEnabled)
         }
     }
 
     @Test
     fun settings_suggestedWorkoutSetsKeepsLastPositiveCount() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
+        LofitRepository(context).apply {
+            data.suggestedWorkoutsEnabled = true
+            save()
+        }
         ActivityScenario.launch(MainActivity::class.java).use {
             onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
             onView(withText(R.string.nav_settings)).perform(click())

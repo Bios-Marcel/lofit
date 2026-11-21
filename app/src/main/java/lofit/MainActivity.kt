@@ -230,6 +230,11 @@ class MainActivity : AppCompatActivity() {
             data = { repository.data },
             save = repository::save,
             hevySettings = hevySettings,
+            onSuggestedWorkoutsChanged = { enabled ->
+                repository.data.suggestedWorkoutsEnabled = enabled
+                if (!enabled) locationSignal?.cancel()
+                repository.save()
+            },
             onHealthChanged = ::setBodyMetricsEnabled,
             onMcpChanged = ::updateMcpServer,
             onMcpPortChange = ::changeMcpPort,
@@ -1096,14 +1101,18 @@ class MainActivity : AppCompatActivity() {
             )
             body.addView(ui.sectionTitle("Routines"))
             if (repository.data.activeWorkout == null) {
+                val label = getString(R.string.start_workout)
+                val start = { startWorkout(WorkoutSession(name = "Open workout")) }
                 body.addView(
-                    splitMenuButton(
-                        getString(R.string.start_workout),
-                        getString(R.string.start_workout),
-                        { startWorkout(WorkoutSession(name = "Open workout")) },
-                        "Start suggested workout",
-                        ::startSuggestedWorkout,
-                    ),
+                    if (repository.data.suggestedWorkoutsEnabled)
+                        splitMenuButton(
+                            label,
+                            label,
+                            start,
+                            "Start suggested workout",
+                            ::startSuggestedWorkout,
+                        )
+                    else ui.actionButton(label, secondary = true, action = start),
                     LinearLayout.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -2401,9 +2410,14 @@ class MainActivity : AppCompatActivity() {
                         if (repository.data.debugMode) {
                             val hasPlace =
                                 workout.startWifiName != null || workout.startLocation != null
-                            val label =
-                                if (hasPlace) "Clear Wi-Fi and location"
-                                else "Set current Wi-Fi and location"
+                            val place =
+                                if (
+                                    repository.data.suggestedWorkoutsEnabled ||
+                                        workout.startLocation != null
+                                )
+                                    "Wi-Fi and location"
+                                else "Wi-Fi"
+                            val label = if (hasPlace) "Clear $place" else "Set current $place"
                             menu.add(label).setOnMenuItemClickListener {
                                 if (hasPlace) clearWorkoutPlace(workout)
                                 else recordWorkoutPlace(workout.id, debugHistory = true)
@@ -3416,6 +3430,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun startSuggestedWorkout() {
         withWorkoutWifi { wifiName ->
+            if (!repository.data.suggestedWorkoutsEnabled) return@withWorkoutWifi
             val wifiWorkout = wifiName?.let { repository.data.suggestWorkoutOnWifi(it) }
             if (wifiWorkout != null) {
                 startWorkout(wifiWorkout)
@@ -3472,6 +3487,11 @@ class MainActivity : AppCompatActivity() {
             if (debugHistory && wifiName != null)
                 Toast.makeText(this, "Workout Wi-Fi set to $wifiName", Toast.LENGTH_SHORT).show()
 
+            if (!repository.data.suggestedWorkoutsEnabled) {
+                if (debugHistory && wifiName == null)
+                    Toast.makeText(this, "Wi-Fi unavailable", Toast.LENGTH_SHORT).show()
+                return@withWorkoutWifi
+            }
             requestGps { point ->
                 val saved = target() ?: return@requestGps
                 if (point != null) {

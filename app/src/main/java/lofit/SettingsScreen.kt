@@ -20,6 +20,7 @@ internal class SettingsScreen(
     private val data: () -> AppData,
     private val save: () -> Unit,
     private val hevySettings: HevySettings,
+    private val onSuggestedWorkoutsChanged: (Boolean) -> Unit,
     private val onHealthChanged: (Boolean) -> Unit,
     private val onMcpChanged: () -> Unit,
     private val onMcpPortChange: (Int) -> Boolean,
@@ -172,56 +173,27 @@ internal class SettingsScreen(
             )
             body.addView(craneScaleSettings())
             body.addView(mcpSettings())
+            val suggestionOptions = suggestedWorkoutOptions()
             body.addView(
                 ui.card {
-                    val label = "Suggested workout sets"
-                    addView(ui.titleText(label))
                     addView(
-                        ui.numberField(DEFAULT_SUGGESTED_WORKOUT_SETS.toString()).apply {
-                            contentDescription = label
-                            setText(data().suggestedWorkoutSets.toString())
-                            doAfterTextChanged {
-                                val sets = it.toString().toIntOrNull()
-                                if (sets == null || sets < 1) {
-                                    error = "Enter a positive whole number"
-                                } else {
-                                    error = null
-                                    if (sets != data().suggestedWorkoutSets) {
-                                        data().suggestedWorkoutSets = sets
-                                        save()
-                                    }
-                                }
+                        Switch(activityContext).apply {
+                            text = "Suggested workouts"
+                            setTextColor(ui.color(R.color.cream))
+                            minHeight = ui.dp(48)
+                            trackTintList = ui.toggleTint()
+                            isChecked = data().suggestedWorkoutsEnabled
+                            setOnCheckedChangeListener { _, enabled ->
+                                onSuggestedWorkoutsChanged(enabled)
+                                suggestionOptions.visibility =
+                                    if (enabled) View.VISIBLE else View.GONE
                             }
                         }
                     )
+                    addView(ui.metaText("Save workout locations for nearby suggestions."))
                 }
             )
-            body.addView(
-                ui.card {
-                    val label = "Suggested workout lookback"
-                    addView(ui.titleText(label))
-                    addView(ui.metaText("d = days, w = weeks, m = months"))
-                    addView(
-                        ui.textField(DEFAULT_SUGGESTED_WORKOUT_LOOKBACK).apply {
-                            contentDescription = label
-                            setText(data().suggestedWorkoutLookback)
-                            setSelectAllOnFocus(true)
-                            doAfterTextChanged {
-                                val value = it.toString()
-                                if (suggestedWorkoutLookbackPattern.matches(value)) {
-                                    error = null
-                                    if (value != data().suggestedWorkoutLookback) {
-                                        data().suggestedWorkoutLookback = value
-                                        save()
-                                    }
-                                } else {
-                                    error = "Use a duration like 3d, 4w, or 1m"
-                                }
-                            }
-                        }
-                    )
-                }
-            )
+            body.addView(suggestionOptions)
             body.addView(
                 ui.card {
                     addView(
@@ -281,6 +253,62 @@ internal class SettingsScreen(
                 ui.actionButton("Health data privacy", secondary = true) {
                     activityContext.startActivity(
                         Intent(activityContext, HealthPrivacyActivity::class.java)
+                    )
+                }
+            )
+        }
+
+    private fun suggestedWorkoutOptions(): View =
+        LinearLayout(activityContext).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = if (data().suggestedWorkoutsEnabled) View.VISIBLE else View.GONE
+            addView(
+                ui.card {
+                    val label = "Suggested workout sets"
+                    addView(ui.titleText(label))
+                    addView(
+                        ui.numberField(DEFAULT_SUGGESTED_WORKOUT_SETS.toString()).apply {
+                            contentDescription = label
+                            setText(data().suggestedWorkoutSets.toString())
+                            doAfterTextChanged {
+                                val sets = it.toString().toIntOrNull()
+                                if (sets == null || sets < 1) {
+                                    error = "Enter a positive whole number"
+                                } else {
+                                    error = null
+                                    if (sets != data().suggestedWorkoutSets) {
+                                        data().suggestedWorkoutSets = sets
+                                        save()
+                                    }
+                                }
+                            }
+                        }
+                    )
+                }
+            )
+            addView(
+                ui.card {
+                    val label = "Suggested workout lookback"
+                    addView(ui.titleText(label))
+                    addView(ui.metaText("d = days, w = weeks, m = months"))
+                    addView(
+                        ui.textField(DEFAULT_SUGGESTED_WORKOUT_LOOKBACK).apply {
+                            contentDescription = label
+                            setText(data().suggestedWorkoutLookback)
+                            setSelectAllOnFocus(true)
+                            doAfterTextChanged {
+                                val value = it.toString()
+                                if (suggestedWorkoutLookbackPattern.matches(value)) {
+                                    error = null
+                                    if (value != data().suggestedWorkoutLookback) {
+                                        data().suggestedWorkoutLookback = value
+                                        save()
+                                    }
+                                } else {
+                                    error = "Use a duration like 3d, 4w, or 1m"
+                                }
+                            }
+                        }
                     )
                 }
             )
