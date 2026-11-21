@@ -12,6 +12,7 @@ import android.widget.LinearLayout
 import android.widget.Switch
 import android.widget.Toast
 import androidx.core.content.ContextCompat
+import androidx.core.widget.doAfterTextChanged
 
 internal class SettingsScreen(
     private val activityContext: Context,
@@ -171,6 +172,32 @@ internal class SettingsScreen(
             )
             body.addView(craneScaleSettings())
             body.addView(mcpSettings())
+            body.addView(
+                ui.card {
+                    val label = "Suggested workout lookback"
+                    addView(ui.titleText(label))
+                    addView(ui.metaText("d = days, w = weeks, m = months"))
+                    addView(
+                        ui.textField(DEFAULT_SUGGESTED_WORKOUT_LOOKBACK).apply {
+                            contentDescription = label
+                            setText(data().suggestedWorkoutLookback)
+                            setSelectAllOnFocus(true)
+                            doAfterTextChanged {
+                                val value = it.toString()
+                                if (suggestedWorkoutLookbackPattern.matches(value)) {
+                                    error = null
+                                    if (value != data().suggestedWorkoutLookback) {
+                                        data().suggestedWorkoutLookback = value
+                                        save()
+                                    }
+                                } else {
+                                    error = "Use a duration like 3d, 4w, or 1m"
+                                }
+                            }
+                        }
+                    )
+                }
+            )
             body.addView(
                 ui.card {
                     addView(

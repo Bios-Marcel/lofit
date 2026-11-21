@@ -1,5 +1,7 @@
 package lofit
 
+import java.time.LocalDateTime
+import java.time.ZoneId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -12,10 +14,12 @@ class SuggestedWorkoutTest {
         val data = AppData(exercises = mutableListOf())
         fun log(group: String, wifi: String?, point: WorkoutLocation?) {
             data.exercises.add(Exercise(group, group, ExerciseType.REPETITIONS, false, group, ""))
-            val set = LoggedSet(type = SetType.NORMAL, weightKg = 5.0, completedAt = 1)
+            val time = now - 7L * 86400000
+            val set = LoggedSet(type = SetType.NORMAL, weightKg = 5.0, completedAt = time)
             data.history.add(
                 WorkoutSession(
                         name = group,
+                        startedAt = time,
                         exercises =
                             mutableListOf(
                                 WorkoutExercise(exerciseId = group, sets = mutableListOf(set))
@@ -40,6 +44,58 @@ class SuggestedWorkoutTest {
             listOf("Glutes"),
             data.suggestWorkout(here, now)!!.exercises.map { it.exerciseId },
         )
+    }
+
+    @Test
+    fun lookbackUsesCompletedSetsAndIncludesTheCutoffForWifiAndGps() {
+        val zone = ZoneId.systemDefault()
+        val end = LocalDateTime.of(2024, 3, 31, 12, 0).atZone(zone)
+        val now = end.toInstant().toEpochMilli()
+        val cutoff = end.minusMonths(1).toInstant().toEpochMilli()
+        val here = WorkoutLocation(0.0, 0.0)
+        val data = AppData(exercises = mutableListOf())
+        fun log(group: String, time: Long) {
+            data.exercises.add(Exercise(group, group, ExerciseType.REPETITIONS, false, group, ""))
+            val set = LoggedSet(type = SetType.NORMAL, weightKg = 5.0, completedAt = time)
+            data.history.add(
+                WorkoutSession(
+                        name = group,
+                        startedAt = time - 1000,
+                        exercises =
+                            mutableListOf(
+                                WorkoutExercise(exerciseId = group, sets = mutableListOf(set))
+                            ),
+                    )
+                    .apply {
+                        startLocation = here
+                        startWifiName = "Gym"
+                    }
+            )
+        }
+        log("Back", cutoff - 1)
+        log("Chest", cutoff)
+        log("Glutes", end.minusDays(7).toInstant().toEpochMilli())
+        log("Shoulders", now + 1)
+
+        fun checkBoth(vararg groups: String) {
+            assertEquals(
+                groups.toList(),
+                data.suggestWorkoutOnWifi("Gym", now)?.exercises.orEmpty().map { it.exerciseId },
+            )
+            assertEquals(
+                groups.toList(),
+                data.suggestWorkout(here, now)?.exercises.orEmpty().map { it.exerciseId },
+            )
+        }
+        checkBoth("Glutes")
+        data.suggestedWorkoutLookback = "6d"
+        checkBoth()
+        data.suggestedWorkoutLookback = "1w"
+        checkBoth("Glutes")
+        data.suggestedWorkoutLookback = "1m"
+        checkBoth("Chest", "Glutes")
+        data.suggestedWorkoutLookback = "0m"
+        checkBoth()
     }
 
     @Test
@@ -75,7 +131,7 @@ class SuggestedWorkoutTest {
             )
         }
         log("Biceps", "Quadriceps", 1, 1, WorkoutLocation(1.0, 1.0))
-        log("Back", "Biceps", 5, 29, here)
+        log("Back", "Biceps", 5, 20, here)
         log("Quadriceps", "", 30, 3, here)
         fun plan() =
             data.suggestWorkout(here, now)!!.exercises.map { it.exerciseId to it.plannedSets.size }
@@ -152,9 +208,10 @@ class SuggestedWorkoutTest {
                     .apply { startLocation = WorkoutLocation(0.0, longitude) }
             )
         }
-        log("Chest", 0.0008, 1, 12)
-        log("Shoulders", 0.0, 1, 12)
-        log("Glutes", 0.0, 1, 12)
+        val threeWeeksAgo = now - 21L * 86400000
+        log("Chest", 0.0008, threeWeeksAgo, 12)
+        log("Shoulders", 0.0, threeWeeksAgo, 12)
+        log("Glutes", 0.0, threeWeeksAgo, 12)
         val threeDaysAgo = now - 3L * 86400000
         log("Shoulders", 0.001, threeDaysAgo, 1)
         log("Glutes", 0.001, threeDaysAgo, 2)

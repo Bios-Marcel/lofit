@@ -176,7 +176,7 @@ class HistoryWorkoutStartTest {
         LofitRepository(context).apply {
             data.debugMode = true
             val sets = data.history.single().exercises.first().sets
-            sets[0] = sets.single().copy(completedAt = 100)
+            sets[0] = sets.single().copy(completedAt = System.currentTimeMillis() - 7L * 86400000)
             saveHistory()
             save()
         }

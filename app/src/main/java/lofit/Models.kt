@@ -342,6 +342,7 @@ data class AppData(
     val bodyMeasurements: MutableList<BodyMeasurement> = mutableListOf(),
     var recordCelebrationsEnabled: Boolean = false,
     var debugMode: Boolean = false,
+    var suggestedWorkoutLookback: String = DEFAULT_SUGGESTED_WORKOUT_LOOKBACK,
 ) {
     fun resumeWorkout(
         workoutId: String,

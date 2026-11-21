@@ -151,6 +151,7 @@ class LofitRepository(context: Context) {
             put("activeWorkout", data.activeWorkout?.let(::encodeWorkout) ?: JSONObject.NULL)
             put("soundCuesEnabled", data.soundCuesEnabled)
             put("recordCelebrationsEnabled", data.recordCelebrationsEnabled)
+            put("suggestedWorkoutLookback", data.suggestedWorkoutLookback)
             put("debugMode", data.debugMode)
             put("mcpEnabled", data.mcpEnabled)
             put("mcpPort", data.mcpPort)
@@ -379,6 +380,12 @@ class LofitRepository(context: Context) {
             soundCuesEnabled = root.getBoolean("soundCuesEnabled"),
             // LEGACY: Saved installs without a record celebration choice remain opted out.
             recordCelebrationsEnabled = root.optBoolean("recordCelebrationsEnabled", false),
+            // LEGACY: Older saves have no suggested workout lookback.
+            suggestedWorkoutLookback =
+                root
+                    .optString("suggestedWorkoutLookback")
+                    .takeIf(suggestedWorkoutLookbackPattern::matches)
+                    ?: DEFAULT_SUGGESTED_WORKOUT_LOOKBACK,
             debugMode = root.optBoolean("debugMode", false),
             mcpEnabled = root.optBoolean("mcpEnabled", false),
             mcpPort =

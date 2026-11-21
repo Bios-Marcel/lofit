@@ -292,6 +292,26 @@ class WorkoutFlowTest {
     }
 
     @Test
+    fun settings_suggestedWorkoutLookbackKeepsLastValidDuration() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            fun openSettings() {
+                onView(isAssignableFrom(DrawerLayout::class.java)).perform(openDrawer())
+                onView(withText(R.string.nav_settings)).perform(click())
+            }
+            openSettings()
+            val field = onView(withContentDescription("Suggested workout lookback"))
+            field.perform(scrollTo()).check(matches(withText("4w")))
+            field.perform(replaceText("12m"))
+            field.perform(replaceText("12months"))
+            assertEquals("12m", LofitRepository(context).data.suggestedWorkoutLookback)
+            scenario.recreate()
+            openSettings()
+            field.perform(scrollTo()).check(matches(withText("12m")))
+        }
+    }
+
+    @Test
     fun settings_genderHealthAndSoundPersistAcrossRestart() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext

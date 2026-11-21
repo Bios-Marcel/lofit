@@ -1,6 +1,32 @@
 package lofit
 
+import java.time.Instant
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import kotlin.math.*
+
+internal const val DEFAULT_SUGGESTED_WORKOUT_LOOKBACK = "4w"
+internal val suggestedWorkoutLookbackPattern = Regex("""\d+[dwm]""")
+
+private fun lookbackStart(lookback: String, now: Long): Long {
+    val amount = lookback.dropLast(1).toLongOrNull() ?: return Long.MIN_VALUE
+    val unit =
+        when (lookback.last()) {
+            'd' -> ChronoUnit.DAYS
+            'w' -> ChronoUnit.WEEKS
+            'm' -> ChronoUnit.MONTHS
+            else -> error("Invalid lookback unit")
+        }
+    // A valid duration can reach further back than a timestamp can represent.
+    return runCatching {
+            Instant.ofEpochMilli(now)
+                .atZone(ZoneId.systemDefault())
+                .minus(amount, unit)
+                .toInstant()
+                .toEpochMilli()
+        }
+        .getOrDefault(Long.MIN_VALUE)
+}
 
 private fun WorkoutLocation.within100Meters(other: WorkoutLocation): Boolean {
     val halfLat = Math.toRadians(other.latitude - latitude) / 2
@@ -31,8 +57,9 @@ private fun AppData.suggestWorkout(
     matchesPlace: (WorkoutSession) -> Boolean,
 ): WorkoutSession? {
     val catalog = exercises.associateBy { it.id }
-    val windowMillis = 28L * 86400000
-    val recent = (now - windowMillis)..now
+    val recent = lookbackStart(suggestedWorkoutLookback, now)..now
+    if (recent.first == now) return null
+    val windowMillis = now.toDouble() - recent.first
     val recoveryWindow = (now - 2L * 86400000)..now
     val recovering = mutableSetOf<String>()
     val credits = mutableMapOf<String, Double>()
@@ -45,19 +72,17 @@ private fun AppData.suggestWorkout(
         val local = matchesPlace(session)
         for (entry in session.exercises) {
             val exercise = catalog[entry.exerciseId] ?: continue
-            if (entry.sets.isEmpty()) continue
-            if (local && !exercise.retired && muscles(exercise).isNotEmpty())
-                nearby.putIfAbsent(exercise, entry)
             val primary = MuscleGroups.canonical(exercise.primaryMuscle)
             if (primary != null && entry.sets.any { it.completedAt in recoveryWindow })
                 recovering.add(primary)
-            // Training credit fades linearly to zero over four weeks.
-            val weightedSets =
-                entry.sets.sumOf { set ->
-                    if (set.completedAt in recent)
-                        (set.completedAt - recent.first).toDouble() / windowMillis
-                    else 0.0
-                }
+            val recentSets = entry.sets.filter { it.completedAt in recent }
+            if (recentSets.isEmpty()) continue
+            if (local && !exercise.retired && muscles(exercise).isNotEmpty())
+                nearby.putIfAbsent(exercise, entry)
+            // Training credit fades linearly to zero at the lookback cutoff.
+            val weightedSets = recentSets.sumOf { set ->
+                (set.completedAt.toDouble() - recent.first) / windowMillis
+            }
             for (group in muscles(exercise)) {
                 val weight = if (group == primary) 1.0 else 0.25
                 credits[group] = credits.getOrDefault(group, 0.0) + weight * weightedSets
