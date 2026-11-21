@@ -1,9 +1,7 @@
 package lofit
 
 import android.content.Context
-import android.content.res.ColorStateList
 import android.os.Bundle
-import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.CheckBox
@@ -11,7 +9,6 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.core.widget.doAfterTextChanged
-import com.google.android.material.button.MaterialButton
 import java.util.UUID
 
 internal class ExerciseScreens(
@@ -214,40 +211,6 @@ internal class ExerciseScreens(
                 ui.actionButton("Add picture", secondary = true) {
                     onChoosePicture()
                 }
-            fun pictureButton(label: String, icon: Int, action: () -> Unit) =
-                ui.smallButton("", action).apply {
-                    contentDescription = label
-                    tooltipText = label
-                    setIconResource(icon)
-                    iconTint = ColorStateList.valueOf(ui.color(R.color.cream))
-                    iconSize = ui.dp(20)
-                    iconPadding = 0
-                    iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
-                    setPadding(ui.dp(14), 0, ui.dp(14), 0)
-                    cornerRadius = ui.dp(24)
-                    elevation = ui.dp(4).toFloat()
-                }
-            val editPicture =
-                pictureButton("Change picture", R.drawable.ic_edit) {
-                    onChoosePicture()
-                }
-            val removePicture =
-                pictureButton("Remove picture", R.drawable.ic_delete) {
-                    draft.getString("imageFile")?.let(onDeletePicture)
-                    draft.remove("imageFile")
-                    updatePicturePreview?.invoke()
-                }
-            val pictureActions =
-                LinearLayout(activityContext).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    addView(editPicture, LinearLayout.LayoutParams(ui.dp(48), ui.dp(48)))
-                    addView(
-                        removePicture,
-                        LinearLayout.LayoutParams(ui.dp(48), ui.dp(48)).apply {
-                            marginStart = ui.dp(8)
-                        },
-                    )
-                }
             updatePicturePreview = {
                 val picture = draft.getString("imageFile")
                 val loading = draft.containsKey("pendingPicture")
@@ -272,16 +235,11 @@ internal class ExerciseScreens(
                         ),
                     )
                     preview.addView(
-                        pictureActions,
-                        FrameLayout.LayoutParams(
-                                ViewGroup.LayoutParams.WRAP_CONTENT,
-                                ViewGroup.LayoutParams.WRAP_CONTENT,
-                                Gravity.TOP or Gravity.END,
-                            )
-                            .apply {
-                                topMargin = ui.dp(8)
-                                marginEnd = ui.dp(8)
-                            },
+                        ui.pictureActions(!loading, onChoosePicture) {
+                            draft.getString("imageFile")?.let(onDeletePicture)
+                            draft.remove("imageFile")
+                            updatePicturePreview?.invoke()
+                        }
                     )
                 }
                 preview.visibility = if (picture == null) View.GONE else View.VISIBLE
@@ -289,8 +247,6 @@ internal class ExerciseScreens(
                 choosePicture.text = if (loading) "Loading picture…" else "Add picture"
                 choosePicture.contentDescription = choosePicture.text
                 choosePicture.isEnabled = !loading
-                editPicture.isEnabled = !loading
-                removePicture.isEnabled = !loading
             }
             body.addView(
                 preview,

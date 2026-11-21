@@ -87,13 +87,17 @@ class MainActivity : AppCompatActivity() {
         const val HISTORY_PAGE_SIZE = 10
     }
 
-    private enum class Screen {
+    private enum class Screen(val food: FoodSection? = null) {
         HOME,
         WORKOUT,
         ROUTINES,
         EXERCISES,
         RECORDS,
         BODY_MEASUREMENTS,
+        INGREDIENTS(FoodSection.INGREDIENTS),
+        RECIPES(FoodSection.RECIPES),
+        MEALS(FoodSection.MEALS),
+        FOOD_STATISTICS(FoodSection.STATISTICS),
         HISTORY,
         LIVE_MEASUREMENT,
         SETTINGS,
@@ -188,6 +192,28 @@ class MainActivity : AppCompatActivity() {
                 render()
             },
             onCancel = ::navigateBack,
+        )
+    }
+    private var foodExpanded = false
+    private val foodStore = lazy { FoodStore(this) }
+    private val editFood =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            if (it.resultCode == RESULT_OK && currentScreen.food != null) render()
+        }
+    private val foodScreens by lazy {
+        FoodScreens(
+            this,
+            ui,
+            foodStore.value,
+            { section, id ->
+                editFood.launch(
+                    Intent(this, FoodEditorActivity::class.java).apply {
+                        putExtra("section", section.name)
+                        if (id != null) putExtra("id", id)
+                    }
+                )
+            },
+            { render() },
         )
     }
     private val records by lazy {
@@ -553,6 +579,12 @@ class MainActivity : AppCompatActivity() {
                         Route.BodyMeasurementDetail(it)
                     } ?: Route.Root
         }
+        foodExpanded = savedInstanceState?.getBoolean("foodExpanded") ?: false
+        savedInstanceState?.getString("foodScreen")?.let {
+            currentScreen = Screen.valueOf(it)
+            route = Route.Root
+        }
+        savedInstanceState?.getBundle("foodState")?.let(foodScreens::restoreState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         onBackPressedDispatcher.addCallback(
             this,
@@ -652,6 +684,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean("foodExpanded", foodExpanded)
+        if (currentScreen.food != null) {
+            outState.putString("foodScreen", currentScreen.name)
+            outState.putBundle("foodState", foodScreens.saveState())
+        }
         outState.putBoolean("voicePermissionAsked", voicePermissionAsked)
         outState.putBoolean("showActiveWorkout", currentScreen == Screen.WORKOUT)
         outState.putBoolean("showLiveMeasurement", currentScreen == Screen.LIVE_MEASUREMENT)
@@ -694,6 +731,7 @@ class MainActivity : AppCompatActivity() {
         hevyWorker.shutdown()
         pictureGeneration++
         pictureWorker.shutdown()
+        if (foodStore.isInitialized()) foodStore.value.close()
         if (isFinishing) {
             exerciseDraft?.getString("imageFile")?.let(::deleteUnsavedPicture)
             exerciseDraft?.getString("pendingPicture")?.let {
@@ -781,65 +819,86 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun drawerMenu(): View =
-        LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(ui.dp(18), ui.dp(18), ui.dp(18), ui.dp(18))
+        ScrollView(this).apply {
             setBackgroundColor(ui.color(R.color.charcoal_light))
             ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
                 val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-                view.setPadding(ui.dp(18), bars.top + ui.dp(18), ui.dp(18), bars.bottom + ui.dp(18))
+                view.setPadding(0, bars.top, 0, bars.bottom)
                 insets
             }
-            addView(
+            val menu =
+                LinearLayout(context).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(ui.dp(18), ui.dp(18), ui.dp(18), ui.dp(18))
+                }
+            addView(menu)
+            menu.addView(
                 ui.titleText("Lofit").apply {
                     textSize = 30f
                     setPadding(ui.dp(12), 0, 0, ui.dp(20))
                 }
             )
-            val itemStates = arrayOf(intArrayOf(android.R.attr.state_selected), intArrayOf())
-            listOf(
-                    Screen.HOME to getString(R.string.nav_workout),
-                    Screen.ROUTINES to getString(R.string.nav_routines),
-                    Screen.EXERCISES to getString(R.string.nav_exercises),
-                    Screen.RECORDS to getString(R.string.nav_records),
-                    Screen.HISTORY to getString(R.string.nav_history),
-                    Screen.BODY_MEASUREMENTS to getString(R.string.nav_body_measurements),
-                    Screen.LIVE_MEASUREMENT to getString(R.string.nav_live_measurement),
-                    Screen.SETTINGS to getString(R.string.nav_settings),
-                )
-                .forEach { (screen, label) ->
-                    addView(
-                        ui.actionButton(label, secondary = true) {
-                                drawerLayout.closeDrawer(GravityCompat.START, false)
-                                openScreen(screen)
-                            }
-                            .apply {
-                                gravity = Gravity.START or Gravity.CENTER_VERTICAL
-                                textAlignment = View.TEXT_ALIGNMENT_GRAVITY
-                                setPadding(ui.dp(12), 0, ui.dp(12), 0)
-                                backgroundTintList =
-                                    ColorStateList(
-                                        itemStates,
-                                        intArrayOf(
-                                            ui.color(R.color.charcoal_surface_high),
-                                            Color.TRANSPARENT,
-                                        ),
-                                    )
-                                setTextColor(
-                                    ColorStateList(
-                                        itemStates,
-                                        intArrayOf(
-                                            ui.color(R.color.coral),
-                                            ui.color(R.color.cream),
-                                        ),
-                                    )
-                                )
-                                drawerMenuItems[screen] = this
-                            },
-                        LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ui.dp(52))
-                            .apply { bottomMargin = ui.dp(6) },
+            val states = arrayOf(intArrayOf(android.R.attr.state_selected), intArrayOf())
+            fun button(label: String, nested: Boolean = false, action: () -> Unit) =
+                ui.actionButton(label, secondary = true, action = action).apply {
+                    gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                    textAlignment = View.TEXT_ALIGNMENT_GRAVITY
+                    setPadding(ui.dp(if (nested) 32 else 12), 0, ui.dp(12), 0)
+                    backgroundTintList =
+                        ColorStateList(
+                            states,
+                            intArrayOf(ui.color(R.color.charcoal_surface_high), Color.TRANSPARENT),
+                        )
+                    setTextColor(
+                        ColorStateList(
+                            states,
+                            intArrayOf(ui.color(R.color.coral), ui.color(R.color.cream)),
+                        )
                     )
+                    layoutParams =
+                        LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ui.dp(52))
+                            .apply { bottomMargin = ui.dp(6) }
                 }
+            fun item(screen: Screen, label: String, parent: LinearLayout = menu) {
+                val item =
+                    button(label, screen.food != null) {
+                        drawerLayout.closeDrawer(GravityCompat.START, false)
+                        openScreen(screen)
+                    }
+                drawerMenuItems[screen] = item
+                parent.addView(item)
+            }
+            item(Screen.HOME, getString(R.string.nav_workout))
+            item(Screen.ROUTINES, getString(R.string.nav_routines))
+            item(Screen.EXERCISES, getString(R.string.nav_exercises))
+            item(Screen.RECORDS, getString(R.string.nav_records))
+            item(Screen.HISTORY, getString(R.string.nav_history))
+            item(Screen.BODY_MEASUREMENTS, getString(R.string.nav_body_measurements))
+            val submenu = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+            val food = button("Food") {}
+            fun updateSubmenu() {
+                food.stateDescription = if (foodExpanded) "Expanded" else "Collapsed"
+                food.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                    0,
+                    0,
+                    if (foodExpanded) android.R.drawable.arrow_up_float
+                    else android.R.drawable.arrow_down_float,
+                    0,
+                )
+                submenu.visibility = if (foodExpanded) View.VISIBLE else View.GONE
+            }
+            food.setOnClickListener {
+                foodExpanded = !foodExpanded
+                updateSubmenu()
+            }
+            menu.addView(food)
+            menu.addView(submenu)
+            Screen.entries.forEach { screen ->
+                screen.food?.let { item(screen, it.label, submenu) }
+            }
+            updateSubmenu()
+            item(Screen.LIVE_MEASUREMENT, getString(R.string.nav_live_measurement))
+            item(Screen.SETTINGS, getString(R.string.nav_settings))
         }
 
     private fun render(
@@ -985,6 +1044,10 @@ class MainActivity : AppCompatActivity() {
             Screen.EXERCISES -> exerciseScreens.exercisesScreen()
             Screen.RECORDS -> records.recordsScreen()
             Screen.BODY_MEASUREMENTS -> bodyMeasurements.overview()
+            Screen.INGREDIENTS,
+            Screen.RECIPES,
+            Screen.MEALS,
+            Screen.FOOD_STATISTICS -> foodScreens.page(currentScreen.food!!)
             Screen.HISTORY -> historyScreen()
             Screen.LIVE_MEASUREMENT -> craneScaleScreens.liveScreen()
             Screen.SETTINGS -> settings.settingsScreen()

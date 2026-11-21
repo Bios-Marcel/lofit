@@ -3,6 +3,7 @@ package lofit
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
+import android.graphics.Rect
 import android.net.Uri
 import android.util.LruCache
 import java.io.File
@@ -12,8 +13,12 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /** Own the selected picture so moving or deleting the source does not break exercises. */
-class ExercisePictures(private val context: Context) {
-    private val directory = File(context.filesDir, "exercise-pictures")
+class ExercisePictures(private val context: Context, folder: String = "exercise-pictures") {
+    private companion object {
+        const val MAX_IMAGE_SIZE = 1024
+    }
+
+    private val directory = File(context.filesDir, folder)
     private val drawableIds = mutableMapOf<String, Int>()
     private val thumbnails =
         object : LruCache<String, Bitmap>(8 * 1024 * 1024) {
@@ -45,10 +50,14 @@ class ExercisePictures(private val context: Context) {
         val bitmap =
             ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
                 val longest = max(info.size.width, info.size.height)
-                if (longest > 1024)
+                if (longest > MAX_IMAGE_SIZE)
                     decoder.setTargetSize(
-                        (info.size.width * 1024L / longest).toInt().coerceAtLeast(1),
-                        (info.size.height * 1024L / longest).toInt().coerceAtLeast(1),
+                        (info.size.width * MAX_IMAGE_SIZE.toLong() / longest)
+                            .toInt()
+                            .coerceAtLeast(1),
+                        (info.size.height * MAX_IMAGE_SIZE.toLong() / longest)
+                            .toInt()
+                            .coerceAtLeast(1),
                     )
                 decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
             }
@@ -70,30 +79,56 @@ class ExercisePictures(private val context: Context) {
     fun thumbnail(name: String, width: Int, height: Int): Bitmap? =
         thumbnail(name, null, width, height)
 
-    internal fun cachedThumbnail(name: String?, resource: Int?, width: Int, height: Int): Bitmap? =
-        thumbnails.get("$name:$resource:$width:$height")
+    internal fun fullPicture(name: String) = thumbnail(name, MAX_IMAGE_SIZE, MAX_IMAGE_SIZE)
 
-    internal fun thumbnail(name: String?, resource: Int?, width: Int, height: Int): Bitmap? {
-        val key = "$name:$resource:$width:$height"
+    private fun thumbnailKey(name: String?, resource: Int?, width: Int, height: Int, crop: Rect?) =
+        "$name:$resource:$width:$height:${crop?.flattenToString()}"
+
+    internal fun cachedThumbnail(
+        name: String?,
+        resource: Int?,
+        width: Int,
+        height: Int,
+        crop: Rect? = null,
+    ): Bitmap? = thumbnails.get(thumbnailKey(name, resource, width, height, crop))
+
+    internal fun thumbnail(
+        name: String?,
+        resource: Int?,
+        width: Int,
+        height: Int,
+        crop: Rect? = null,
+    ): Bitmap? {
+        val key = thumbnailKey(name, resource, width, height, crop)
         thumbnails.get(key)?.let {
             return it
         }
-        fun decode(source: ImageDecoder.Source): Bitmap =
-            ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
-                val scale =
-                    minOf(
-                        1.0,
-                        max(
-                            width.coerceAtLeast(1).toDouble() / info.size.width,
-                            height.coerceAtLeast(1).toDouble() / info.size.height,
-                        ),
-                    )
-                decoder.setTargetSize(
-                    (info.size.width * scale).roundToInt().coerceAtLeast(1),
-                    (info.size.height * scale).roundToInt().coerceAtLeast(1),
-                )
-                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-            }
+        fun decode(source: ImageDecoder.Source): Bitmap {
+            val bitmap =
+                ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+                    decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                    if (crop != null) {
+                        decoder.crop = crop
+                    } else {
+                        val scale =
+                            minOf(
+                                1.0,
+                                max(
+                                    width.coerceAtLeast(1).toDouble() / info.size.width,
+                                    height.coerceAtLeast(1).toDouble() / info.size.height,
+                                ),
+                            )
+                        decoder.setTargetSize(
+                            (info.size.width * scale).roundToInt().coerceAtLeast(1),
+                            (info.size.height * scale).roundToInt().coerceAtLeast(1),
+                        )
+                    }
+                }
+            // Sample only pixels inside the selected source square, including at the photo edges.
+            val target = maxOf(width, height, 1)
+            if (crop == null || bitmap.width <= target) return bitmap
+            return Bitmap.createScaledBitmap(bitmap, target, target, true).also { bitmap.recycle() }
+        }
         val bitmap =
             name?.let { runCatching { decode(ImageDecoder.createSource(file(it))) }.getOrNull() }
                 ?: resource?.let {

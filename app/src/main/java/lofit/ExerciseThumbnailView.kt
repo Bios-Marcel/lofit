@@ -3,6 +3,7 @@ package lofit
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Rect
 import android.os.Handler
 import android.os.Looper
 import android.util.TypedValue
@@ -22,6 +23,7 @@ internal class ExerciseThumbnailView(
     private val resource: Int?,
     private val targetWidth: Int,
     private val targetHeight: Int,
+    private val crop: Rect? = null,
 ) : AppCompatImageView(context) {
     private companion object {
         val worker = Executors.newFixedThreadPool(2)
@@ -43,7 +45,7 @@ internal class ExerciseThumbnailView(
         contentDescription = "$exerciseName illustration"
         scaleType = ImageView.ScaleType.CENTER_CROP
         setBackgroundColor(ContextCompat.getColor(context, R.color.coral_dark))
-        pictures.cachedThumbnail(imageFile, resource, targetWidth, targetHeight)?.let {
+        pictures.cachedThumbnail(imageFile, resource, targetWidth, targetHeight, crop)?.let {
             setImageBitmap(it)
             background = null
         }
@@ -54,7 +56,7 @@ internal class ExerciseThumbnailView(
         if (drawable != null) return
         val request = ++generation
         load = worker.submit {
-            val bitmap = pictures.thumbnail(imageFile, resource, targetWidth, targetHeight)
+            val bitmap = pictures.thumbnail(imageFile, resource, targetWidth, targetHeight, crop)
             main.post {
                 if (generation == request && isAttachedToWindow) {
                     if (bitmap != null) {

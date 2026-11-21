@@ -17,6 +17,7 @@ import android.widget.AutoCompleteTextView
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.Filter
+import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -445,6 +446,80 @@ internal class LofitViews(
         }
 
     fun selectedChoice(group: RadioGroup): Int = (group.checkedRadioButtonId - 1).coerceAtLeast(0)
+
+    fun <T : GraphSpan> trendSpanSelector(
+        choices: List<T>,
+        span: T,
+        onSpanChange: (T) -> Unit,
+    ): View =
+        LinearLayout(activityContext).apply {
+            orientation = LinearLayout.HORIZONTAL
+            choices.forEachIndexed { index, choice ->
+                addView(
+                    smallButton(choice.label) {
+                            onSpanChange(choice)
+                        }
+                        .apply {
+                            isSelected = choice == span
+                            contentDescription = choice.description
+                            if (isSelected) {
+                                backgroundTintList = ColorStateList.valueOf(color(R.color.coral))
+                                setTextColor(color(R.color.white))
+                            }
+                        },
+                    LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                        if (index > 0) marginStart = dp(8)
+                    },
+                )
+            }
+            layoutParams =
+                LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    )
+                    .apply {
+                        topMargin = dp(12)
+                        bottomMargin = dp(16)
+                    }
+        }
+
+    fun pictureActions(enabled: Boolean, change: () -> Unit, remove: () -> Unit): View {
+        fun button(label: String, icon: Int, action: () -> Unit) =
+            smallButton("", action).apply {
+                contentDescription = label
+                tooltipText = label
+                setIconResource(icon)
+                iconTint = ColorStateList.valueOf(color(R.color.cream))
+                iconSize = dp(20)
+                iconPadding = 0
+                iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+                setPadding(dp(14), 0, dp(14), 0)
+                cornerRadius = dp(24)
+                elevation = dp(4).toFloat()
+                isEnabled = enabled
+            }
+        return LinearLayout(activityContext).apply {
+            orientation = LinearLayout.HORIZONTAL
+            addView(
+                button("Change picture", R.drawable.ic_edit, change),
+                LinearLayout.LayoutParams(dp(48), dp(48)),
+            )
+            addView(
+                button("Remove picture", R.drawable.ic_delete, remove),
+                LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginStart = dp(8) },
+            )
+            layoutParams =
+                FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        Gravity.TOP or Gravity.END,
+                    )
+                    .apply {
+                        topMargin = dp(8)
+                        marginEnd = dp(8)
+                    }
+        }
+    }
 
     fun horizontalActions(vararg views: View): View =
         LinearLayout(activityContext).apply {

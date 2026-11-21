@@ -4,12 +4,21 @@ import java.time.Instant
 import java.time.ZoneId
 import kotlin.math.max
 
-enum class TrendSpan(val label: String, val months: Long?) {
-    MONTH("1M", 1),
-    THREE_MONTHS("3M", 3),
-    SIX_MONTHS("6M", 6),
-    YEAR("1Y", 12),
-    ALL("All", null);
+interface GraphSpan {
+    val label: String
+    val description: String
+}
+
+enum class TrendSpan(
+    override val label: String,
+    override val description: String,
+    val months: Long?,
+) : GraphSpan {
+    MONTH("1M", "1 month", 1),
+    THREE_MONTHS("3M", "3 months", 3),
+    SIX_MONTHS("6M", "6 months", 6),
+    YEAR("1Y", "1 year", 12),
+    ALL("All", "All time", null);
 
     fun startedAt(now: Long, zone: ZoneId): Long? = months?.let {
         Instant.ofEpochMilli(now).atZone(zone).minusMonths(it).toInstant().toEpochMilli()

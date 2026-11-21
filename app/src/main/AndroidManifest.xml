@@ -80,6 +80,7 @@
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/workout_file_paths" />
         </provider>
+        <activity android:name=".FoodEditorActivity" android:exported="false" />
         <activity android:name=".HealthPrivacyActivity" android:exported="false" />
         <activity-alias
             android:name=".HealthPermissionUsage"
