@@ -60,8 +60,12 @@ android {
 
 dependencies {
     implementation(libs.vosk.android)
+    implementation(libs.mlkit.text)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
     implementation(libs.material)
     implementation(libs.androidx.drawerlayout)
     implementation(libs.androidx.viewpager)

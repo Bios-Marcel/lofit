@@ -8,8 +8,10 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.RectF
+import android.graphics.Typeface
 import android.net.Uri
-import android.provider.MediaStore
+import android.os.Bundle
 import android.util.AtomicFile
 import android.view.ViewGroup
 import android.widget.Button
@@ -21,6 +23,7 @@ import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.action.ViewActions.*
 import androidx.test.espresso.assertion.ViewAssertions.*
 import androidx.test.espresso.matcher.ViewMatchers.*
+import androidx.test.espresso.util.TreeIterables
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
@@ -28,6 +31,7 @@ import java.time.LocalDate
 import java.util.UUID
 import org.hamcrest.Matchers.allOf
 import org.hamcrest.Matchers.not
+import org.hamcrest.Matchers.startsWith
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -190,26 +194,27 @@ class FoodFlowTest {
 
     @Test
     fun cameraPhotoSurvivesRecreationAndCancelledRetake() {
-        val outputs = mutableListOf<Uri>()
+        val outputs = mutableListOf<File>()
         val camera =
             object : Instrumentation.ActivityMonitor() {
                 override fun onStartActivity(intent: Intent): Instrumentation.ActivityResult? {
-                    if (intent.action != MediaStore.ACTION_IMAGE_CAPTURE) return null
-                    val uri =
-                        requireNotNull(
-                            intent.getParcelableExtra(MediaStore.EXTRA_OUTPUT, Uri::class.java)
+                    if (intent.component?.className != IngredientCameraActivity::class.java.name)
+                        return null
+                    assertFalse(intent.getBooleanExtra(IngredientCameraActivity.SCAN_LABEL, true))
+                    val output =
+                        File(
+                            requireNotNull(
+                                intent.getStringExtra(IngredientCameraActivity.OUTPUT_PATH)
+                            )
                         )
-                    assertEquals("content", uri.scheme)
-                    assertEquals(uri, intent.clipData?.getItemAt(0)?.uri)
-                    assertTrue(intent.flags and Intent.FLAG_GRANT_WRITE_URI_PERMISSION != 0)
-                    outputs.add(uri)
+                    outputs.add(output)
                     if (outputs.size > 2)
                         return Instrumentation.ActivityResult(Activity.RESULT_CANCELED, null)
                     val photo = Bitmap.createBitmap(320, 240, Bitmap.Config.ARGB_8888)
                     photo.eraseColor(Color.RED)
                     Canvas(photo)
                         .drawRect(160f, 0f, 320f, 240f, Paint().apply { color = Color.BLUE })
-                    context.contentResolver.openOutputStream(uri)!!.use {
+                    output.outputStream().use {
                         assertTrue(photo.compress(Bitmap.CompressFormat.JPEG, 95, it))
                     }
                     photo.recycle()
@@ -257,11 +262,88 @@ class FoodFlowTest {
                 assertEquals(32, thumbnail.height)
                 assertTrue(Color.blue(thumbnail.getPixel(0, 0)) > 220)
                 assertEquals(3, outputs.distinct().size)
-                outputs.forEach { uri ->
-                    assertThrows(java.io.FileNotFoundException::class.java) {
-                        context.contentResolver.openInputStream(uri)?.close()
+                outputs.forEach { output -> assertFalse(output.exists()) }
+            }
+        } finally {
+            instrumentation.removeMonitor(camera)
+        }
+    }
+
+    @Test
+    fun capturesAndScansOnlyTheLabelFrame() {
+        lateinit var output: File
+        val camera =
+            object : Instrumentation.ActivityMonitor() {
+                override fun onStartActivity(intent: Intent): Instrumentation.ActivityResult? {
+                    if (intent.component?.className != IngredientCameraActivity::class.java.name)
+                        return null
+                    assertTrue(intent.getBooleanExtra(IngredientCameraActivity.SCAN_LABEL, false))
+                    output =
+                        File(
+                            requireNotNull(
+                                intent.getStringExtra(IngredientCameraActivity.OUTPUT_PATH)
+                            )
+                        )
+                    val bitmap = Bitmap.createBitmap(1100, 850, Bitmap.Config.ARGB_8888)
+                    bitmap.eraseColor(Color.WHITE)
+                    val paint =
+                        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                            color = Color.BLACK
+                            textSize = 42f
+                            typeface = Typeface.MONOSPACE
+                        }
+                    Canvas(bitmap).apply {
+                        drawText("Fett 99 g", 220f, 80f, paint)
+                        drawText("Nährwerte pro 100 g", 220f, 195f, paint)
+                        val rows =
+                            listOf(
+                                "Energie" to "178 kcal",
+                                "Fett" to "6 g",
+                                "Kohlenhydrate" to "21 g",
+                                "davon Zucker" to "4 g",
+                                "Ballaststoffe" to "4 g",
+                                "Eiweiß" to "8 g",
+                                "Salz" to "0,8 g",
+                            )
+                        rows.forEachIndexed { index, (label, amount) ->
+                            val y = 255f + index * 62f
+                            drawText(label, 220f, y, paint)
+                            drawText(amount, 680f, y, paint)
+                        }
                     }
+                    output.outputStream().use {
+                        assertTrue(bitmap.compress(Bitmap.CompressFormat.JPEG, 95, it))
+                    }
+                    bitmap.recycle()
+                    val frame =
+                        Bundle().apply {
+                            putParcelable("fraction", RectF(0.15f, 0.15f, 0.85f, 0.85f))
+                            putFloat("previewAspect", 1100f / 850)
+                        }
+                    val data = Intent().putExtra(IngredientCameraActivity.LABEL_FRAME, frame)
+                    return Instrumentation.ActivityResult(Activity.RESULT_OK, data)
                 }
+            }
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.addMonitor(camera)
+        try {
+            val editor =
+                Intent(context, FoodEditorActivity::class.java)
+                    .putExtra("section", FoodSection.INGREDIENTS.name)
+            ActivityScenario.launch<FoodEditorActivity>(editor).use {
+                onView(withText("Scan nutrition label")).perform(scrollTo(), click())
+                onView(isRoot())
+                    .perform(
+                        waitUntil("label scan finished", timeoutMillis = 15_000) { root ->
+                            TreeIterables.breadthFirstViewTraversal(root).any {
+                                withText("Scan nutrition label").matches(it)
+                            }
+                        }
+                    )
+                onView(withText(startsWith("178 kcal"))).check(matches(isEnabled()))
+                onView(allOf(withContentDescription(FoodMetric.FAT.ingredientLabel), withText("6")))
+                    .check(matches(isEnabled()))
+                assertFalse(output.exists())
             }
         } finally {
             instrumentation.removeMonitor(camera)

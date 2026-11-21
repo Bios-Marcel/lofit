@@ -1,12 +1,13 @@
 package lofit
 
 import android.app.DatePickerDialog
-import android.content.ClipData
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.ImageDecoder
 import android.graphics.Rect
+import android.graphics.RectF
 import android.net.Uri
 import android.os.Bundle
-import android.provider.MediaStore
 import android.view.View
 import android.widget.EditText
 import android.widget.FrameLayout
@@ -18,15 +19,19 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.FileProvider
+import androidx.core.text.buildSpannedString
+import androidx.core.text.color
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.widget.doAfterTextChanged
+import com.google.android.material.button.MaterialButton
 import java.io.File
 import java.time.LocalDate
 import java.util.UUID
 import java.util.concurrent.Executors
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 internal class FoodEditorActivity : AppCompatActivity() {
     private val section by lazy { FoodSection.valueOf(intent.getStringExtra("section")!!) }
@@ -49,8 +54,16 @@ internal class FoodEditorActivity : AppCompatActivity() {
     private val takePhoto =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             val file = captureFile ?: return@registerForActivityResult
-            if (result.resultCode == RESULT_OK) importImage(Uri.fromFile(file))
-            else discardCapture()
+            when {
+                result.resultCode != RESULT_OK -> discardCapture()
+                draft.getBoolean("captureLabel") ->
+                    openCrop(
+                        scanLabel = true,
+                        labelFrame =
+                            result.data?.getBundleExtra(IngredientCameraActivity.LABEL_FRAME),
+                    )
+                else -> importImage(Uri.fromFile(file))
+            }
         }
 
     private val captureDirectory
@@ -198,6 +211,14 @@ internal class FoodEditorActivity : AppCompatActivity() {
                 )
             }
             val name = field(body, "Ingredient name", "name")
+            body.addView(
+                ui.smallButton("Scan nutrition label") { openCamera(scanLabel = true) }
+                    .apply { isEnabled = !pending },
+                ui.foodSpacing(),
+            )
+            val labelCheck = ui.metaText(draft.getString("labelCheck").orEmpty())
+            if (labelCheck.text.isEmpty()) labelCheck.visibility = View.GONE
+            body.addView(labelCheck)
             val fields =
                 FoodMetric.inputs.associateWith {
                     field(body, it.ingredientLabel, it.name, decimal = true)
@@ -211,10 +232,28 @@ internal class FoodEditorActivity : AppCompatActivity() {
                     FoodMetric.energySources.associateWith {
                         fields.getValue(it).text.toString().foodNumber() ?: 0.0
                     }
-                calories.text = energy.format(energy.valueIn(macros))
+                val estimate = energy.format(energy.valueIn(macros))
+                val confirmed = draft.getBoolean("caloriesConfirmed")
+                calories.text =
+                    if (confirmed) {
+                        buildSpannedString {
+                            append(estimate)
+                            append('\u00A0')
+                            color(ui.color(R.color.target_green)) { append('✓') }
+                        }
+                    } else estimate
+                calories.contentDescription =
+                    if (confirmed) "$estimate. Matches scanned calories within 1 kcal." else null
             }
-            FoodMetric.energySources.forEach {
-                fields.getValue(it).doAfterTextChanged { updateCalories() }
+            fields.forEach { (metric, input) ->
+                input.doAfterTextChanged {
+                    if (metric != FoodMetric.WEIGHT && metric != FoodMetric.PRICE) {
+                        draft.remove("labelCheck")
+                        draft.remove("caloriesConfirmed")
+                        labelCheck.visibility = View.GONE
+                        updateCalories()
+                    }
+                }
             }
             updateCalories()
             body.addView(
@@ -275,7 +314,7 @@ internal class FoodEditorActivity : AppCompatActivity() {
         val actions =
             buildList<Pair<String, () -> Unit>> {
                 if (hasImage) add("Crop image" to { openCrop() })
-                add("Take photo" to ::openCamera)
+                add("Take photo" to { openCamera() })
                 add("Choose from gallery" to { chooseImage.launch("image/*") })
             }
         AlertDialog.Builder(this)
@@ -286,12 +325,21 @@ internal class FoodEditorActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun openCrop(candidate: String? = null) {
+    private fun openCrop(
+        candidate: String? = null,
+        scanLabel: Boolean = false,
+        labelFrame: Bundle? = null,
+    ) {
         draft.putBundle(
             "cropDraft",
             Bundle().apply {
                 putString("candidate", candidate)
-                if (candidate == null)
+                putBoolean("scanLabel", scanLabel)
+                if (labelFrame != null) {
+                    putBundle("labelFrame", labelFrame)
+                    putBoolean("scanning", true)
+                }
+                if (candidate == null && !scanLabel)
                     putParcelable("region", draft.getParcelable("crop", Rect::class.java))
             },
         )
@@ -302,7 +350,9 @@ internal class FoodEditorActivity : AppCompatActivity() {
     private fun closeCrop(apply: Boolean = false) {
         val state = draft.getBundle("cropDraft") ?: return
         val candidate = state.getString("candidate")
-        if (apply) {
+        if (state.getBoolean("scanLabel")) {
+            discardCapture()
+        } else if (apply) {
             val region = state.getParcelable("region", Rect::class.java) ?: return
             if (candidate != null) {
                 discardStagedImage()
@@ -317,23 +367,30 @@ internal class FoodEditorActivity : AppCompatActivity() {
     }
 
     private fun cropForm(state: Bundle): View {
-        val image = state.getString("candidate") ?: requireNotNull(draft.getString("image"))
+        val scanLabel = state.getBoolean("scanLabel")
+        val photo = captureFile
+        val image = state.getString("candidate") ?: draft.getString("image")
         val sizeLabel = ui.fieldLabel("Crop size")
         val size =
             SeekBar(this).apply {
                 contentDescription = "Crop size"
                 isEnabled = false
             }
-        val applyCrop =
-            ui.actionButton("Apply crop") { closeCrop(apply = true) }.apply { isEnabled = false }
         val preview =
-            IngredientCropView(this) { region, maxSide ->
+            IngredientCropView(this, square = !scanLabel) { region, maxSide ->
                 state.putParcelable("region", region)
                 size.max = maxSide - 1
                 size.progress = region.width() - 1
                 size.isEnabled = maxSide > 1
                 sizeLabel.text = "Crop size · ${region.width()} × ${region.height()} px"
             }
+        val applyCrop =
+            ui.actionButton(if (scanLabel) "Scan label" else "Apply crop") {
+                    closeCrop(apply = true)
+                }
+                .apply { isEnabled = false }
+        if (scanLabel)
+            applyCrop.setOnClickListener { scanNutritionLabel(state, preview, applyCrop) }
         size.setOnSeekBarChangeListener(
             object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(bar: SeekBar, value: Int, fromUser: Boolean) {
@@ -349,45 +406,176 @@ internal class FoodEditorActivity : AppCompatActivity() {
             LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(ui.dp(14), ui.dp(12), ui.dp(14), ui.dp(12))
-                addView(ui.titleText("Crop image"))
-                addView(ui.metaText("Drag the frame to move it. Drag a corner to resize it."))
+                addView(ui.titleText(if (scanLabel) "Crop nutrition label" else "Crop image"))
+                addView(
+                    ui.metaText(
+                        if (scanLabel) "Include the column headings. Drag a corner to resize."
+                        else "Drag the frame to move it. Drag a corner to resize it."
+                    )
+                )
                 addView(preview, LinearLayout.LayoutParams(-1, 0, 1f))
-                addView(sizeLabel)
-                addView(size, LinearLayout.LayoutParams(-1, ui.dp(48)))
+                if (!scanLabel) {
+                    addView(sizeLabel)
+                    addView(size, LinearLayout.LayoutParams(-1, ui.dp(48)))
+                }
                 addView(ui.horizontalActions(ui.smallButton("Cancel") { closeCrop() }, applyCrop))
             }
         pictureWorker.execute {
-            val bitmap = pictures.fullPicture(image)
+            val bitmap =
+                if (scanLabel) photo?.let(::labelPhoto) else image?.let(pictures::fullPicture)
             runOnUiThread {
-                if (isDestroyed || isFinishing || form.parent !== root) return@runOnUiThread
+                if (isDestroyed || isFinishing || form.parent !== root) {
+                    if (scanLabel) bitmap?.recycle()
+                    return@runOnUiThread
+                }
                 if (bitmap == null) {
                     toast("Could not open image")
                     closeCrop()
                 } else {
-                    preview.setImage(bitmap, state.getParcelable("region", Rect::class.java))
+                    val saved = state.getParcelable("region", Rect::class.java)
+                    preview.setImage(bitmap, saved ?: labelFrameRegion(state, bitmap))
                     applyCrop.isEnabled = true
+                    if (state.getBoolean("scanning")) applyCrop.performClick()
                 }
             }
         }
         return form
     }
 
-    private fun openCamera() {
+    private fun labelFrameRegion(state: Bundle, bitmap: Bitmap): Rect? {
+        val framing = state.getBundle("labelFrame") ?: return null
+        val frame = framing.getParcelable("fraction", RectF::class.java) ?: return null
+        val previewAspect = framing.getFloat("previewAspect")
+        val photoAspect = bitmap.width.toFloat() / bitmap.height
+        // A quarter turn in the JPEG metadata swaps the axes of the centered guide.
+        val crop =
+            if (abs(1f / photoAspect - previewAspect) < abs(photoAspect - previewAspect))
+                RectF(frame.top, frame.left, frame.bottom, frame.right)
+            else frame
+        return Rect(
+            (crop.left * bitmap.width).roundToInt(),
+            (crop.top * bitmap.height).roundToInt(),
+            (crop.right * bitmap.width).roundToInt(),
+            (crop.bottom * bitmap.height).roundToInt(),
+        )
+    }
+
+    private fun scanNutritionLabel(
+        state: Bundle,
+        preview: IngredientCropView,
+        button: MaterialButton,
+    ) {
+        val photo = captureFile ?: return
+        val crop = preview.cropFraction()
+        state.putBoolean("scanning", true)
+        preview.isEnabled = false
+        button.isEnabled = false
+        button.text = "Scanning…"
+
+        fun showResult(result: Result<NutritionLabel>) {
+            if (isDestroyed || isFinishing || draft.getBundle("cropDraft") !== state) return
+            state.remove("scanning")
+            preview.isEnabled = true
+            button.isEnabled = true
+            button.text = "Scan label"
+            val label = result.getOrNull()
+            when {
+                label == null -> toast("Could not scan label")
+                label.volumeOnly ->
+                    toast("This label gives values per 100 ml. Enter values per 100 g.")
+                label.amounts.keys.none { it != FoodMetric.CALORIES } ->
+                    toast("No nutrition values found. Crop to the table and try again.")
+                else -> {
+                    label.amounts.forEach { (metric, value) ->
+                        if (metric != FoodMetric.CALORIES)
+                            draft.putString(metric.name, formatWeight(value))
+                    }
+                    val energy = FoodMetric.CALORIES
+                    val macros =
+                        FoodMetric.energySources
+                            .mapNotNull { metric ->
+                                val raw = draft.getString(metric.name).orEmpty()
+                                val value = if (raw.isBlank()) 0.0 else raw.foodNumber()
+                                value?.takeIf(metric::validInput)?.let { metric to it }
+                            }
+                            .toMap()
+                    val estimated =
+                        if (macros.size == FoodMetric.energySources.size) {
+                            energy.valueIn(macros)
+                        } else {
+                            null
+                        }
+                    val matchesCalories = estimated?.let(label::caloriesMatch)
+                    draft.putBoolean("caloriesConfirmed", matchesCalories == true)
+                    val message =
+                        when (matchesCalories) {
+                            true -> ""
+                            false ->
+                                "Scanned calories differ by more than 1 kcal. Check the values."
+                            null -> "Check the scanned values. Calorie check incomplete."
+                        }
+                    draft.putString(
+                        "labelCheck",
+                        if (label.basisUnconfirmed)
+                            "Column heading unreadable. Verify values are per 100 g. $message"
+                                .trimEnd()
+                        else message,
+                    )
+                    closeCrop()
+                }
+            }
+        }
+
+        pictureWorker.execute {
+            val result = runCatching {
+                val cropped = requireNotNull(labelPhoto(photo, crop))
+                try {
+                    NutritionLabelScanner.scan(cropped)
+                } finally {
+                    cropped.recycle()
+                }
+            }
+            runOnUiThread { showResult(result) }
+        }
+    }
+
+    private fun labelPhoto(file: File, crop: RectF? = null): Bitmap? = runCatching {
+        ImageDecoder.decodeBitmap(ImageDecoder.createSource(file)) { decoder, info, _ ->
+            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+            val sourceWidth = info.size.width
+            val sourceHeight = info.size.height
+            val longest =
+                maxOf(
+                    sourceWidth * (crop?.width() ?: 1f),
+                    sourceHeight * (crop?.height() ?: 1f),
+                )
+            val scale = if (longest > 3072) 3072 / longest else 1f
+            val width = (sourceWidth * scale).roundToInt().coerceAtLeast(1)
+            val height = (sourceHeight * scale).roundToInt().coerceAtLeast(1)
+            if (scale < 1) decoder.setTargetSize(width, height)
+            if (crop != null) {
+                val left = (width * crop.left).roundToInt().coerceIn(0, width - 1)
+                val top = (height * crop.top).roundToInt().coerceIn(0, height - 1)
+                val right = (width * crop.right).roundToInt().coerceIn(left + 1, width)
+                val bottom = (height * crop.bottom).roundToInt().coerceIn(top + 1, height)
+                decoder.setCrop(Rect(left, top, right, bottom))
+            }
+        }
+    }
+        .getOrNull()
+
+    private fun openCamera(scanLabel: Boolean = false) {
         discardCapture()
+        WindowCompat.getInsetsController(window, root).hide(WindowInsetsCompat.Type.ime())
         try {
             val file =
                 File.createTempFile("ingredient-", ".jpg", captureDirectory.apply { mkdirs() })
             draft.putString("captureName", file.name)
-            val uri = FileProvider.getUriForFile(this, "${packageName}.workout-files", file)
+            draft.putBoolean("captureLabel", scanLabel)
             takePhoto.launch(
-                Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
-                    putExtra(MediaStore.EXTRA_OUTPUT, uri)
-                    clipData = ClipData.newRawUri("Ingredient photo", uri)
-                    addFlags(
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                            Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                    )
-                }
+                Intent(this, IngredientCameraActivity::class.java)
+                    .putExtra(IngredientCameraActivity.OUTPUT_PATH, file.path)
+                    .putExtra(IngredientCameraActivity.SCAN_LABEL, scanLabel)
             )
         } catch (error: Exception) {
             discardCapture()
@@ -398,6 +586,7 @@ internal class FoodEditorActivity : AppCompatActivity() {
     private fun discardCapture() {
         captureFile?.delete()
         draft.remove("captureName")
+        draft.remove("captureLabel")
     }
 
     private fun importImage(uri: Uri) {

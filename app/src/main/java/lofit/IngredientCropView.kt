@@ -17,6 +17,7 @@ import kotlin.math.roundToInt
 /** Selection is in source pixels. The entire photo stays fitted in the view. */
 internal class IngredientCropView(
     context: Context,
+    private val square: Boolean = true,
     private val changed: (Rect, Int) -> Unit,
 ) : View(context) {
     private var image: Bitmap? = null
@@ -65,11 +66,13 @@ internal class IngredientCropView(
     fun setImage(bitmap: Bitmap, saved: Rect?) {
         image = bitmap
         fitPhoto()
-        val size = saved?.width()?.coerceIn(1, maxSide) ?: maxSide
+        val width = saved?.width() ?: if (square) maxSide else bitmap.width
+        val height = saved?.height() ?: if (square) maxSide else bitmap.height
         select(
-            saved?.left ?: (bitmap.width - size) / 2,
-            saved?.top ?: (bitmap.height - size) / 2,
-            size,
+            saved?.left ?: (bitmap.width - width) / 2,
+            saved?.top ?: (bitmap.height - height) / 2,
+            width,
+            height,
         )
     }
 
@@ -78,11 +81,23 @@ internal class IngredientCropView(
         select(region.centerX() - side / 2, region.centerY() - side / 2, side)
     }
 
-    private fun select(x: Int, y: Int, side: Int) {
+    fun cropFraction(): RectF {
+        val bitmap = requireNotNull(image)
+        return RectF(
+            region.left.toFloat() / bitmap.width,
+            region.top.toFloat() / bitmap.height,
+            region.right.toFloat() / bitmap.width,
+            region.bottom.toFloat() / bitmap.height,
+        )
+    }
+
+    private fun select(x: Int, y: Int, width: Int, height: Int = width) {
         val bitmap = image ?: return
-        val left = x.coerceIn(0, bitmap.width - side)
-        val top = y.coerceIn(0, bitmap.height - side)
-        region.set(left, top, left + side, top + side)
+        val w = width.coerceIn(1, if (square) maxSide else bitmap.width)
+        val h = height.coerceIn(1, if (square) maxSide else bitmap.height)
+        val left = x.coerceIn(0, bitmap.width - w)
+        val top = y.coerceIn(0, bitmap.height - h)
+        region.set(left, top, left + w, top + h)
         updateFrame()
         changed(Rect(region), maxSide)
         invalidate()
@@ -126,11 +141,11 @@ internal class IngredientCropView(
         cornerY = if (corner) sy else 0
         if (allowCorner && !corner && !frame.contains(x, y)) {
             if (!photo.contains(x, y)) return false
-            val side = region.width()
             select(
-                ((x - photo.left) / scale - side / 2f).roundToInt(),
-                ((y - photo.top) / scale - side / 2f).roundToInt(),
-                side,
+                ((x - photo.left) / scale - region.width() / 2f).roundToInt(),
+                ((y - photo.top) / scale - region.height() / 2f).roundToInt(),
+                region.width(),
+                region.height(),
             )
         }
         downX = x
@@ -148,31 +163,37 @@ internal class IngredientCropView(
                 dragStart.left + dx.roundToInt(),
                 dragStart.top + dy.roundToInt(),
                 dragStart.width(),
+                dragStart.height(),
             )
             return
         }
         val anchorX = if (cornerX < 0) dragStart.right else dragStart.left
         val anchorY = if (cornerY < 0) dragStart.bottom else dragStart.top
-        val limit =
-            minOf(
-                if (cornerX < 0) anchorX else bitmap.width - anchorX,
-                if (cornerY < 0) anchorY else bitmap.height - anchorY,
-            )
-        // Project movement onto the square's diagonal, keeping the opposite corner fixed.
-        val side =
-            (dragStart.width() + (dx * cornerX + dy * cornerY) / 2).roundToInt().coerceIn(1, limit)
+        val maxWidth = if (cornerX < 0) anchorX else bitmap.width - anchorX
+        val maxHeight = if (cornerY < 0) anchorY else bitmap.height - anchorY
+        // LEGACY: Ingredient pictures keep a square crop projected along the diagonal.
+        val width =
+            if (square) {
+                (dragStart.width() + (dx * cornerX + dy * cornerY) / 2)
+                    .roundToInt()
+                    .coerceIn(1, minOf(maxWidth, maxHeight))
+            } else (dragStart.width() + dx * cornerX).roundToInt().coerceIn(1, maxWidth)
+        val height =
+            if (square) width
+            else (dragStart.height() + dy * cornerY).roundToInt().coerceIn(1, maxHeight)
         select(
-            if (cornerX < 0) anchorX - side else anchorX,
-            if (cornerY < 0) anchorY - side else anchorY,
-            side,
+            if (cornerX < 0) anchorX - width else anchorX,
+            if (cornerY < 0) anchorY - height else anchorY,
+            width,
+            height,
         )
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (photo.isEmpty || region.isEmpty) return false
+        if (!isEnabled || photo.isEmpty || region.isEmpty) return false
         if (event.actionMasked == MotionEvent.ACTION_DOWN && !startDrag(event.x, event.y, true))
             return false
-        pinch.onTouchEvent(event)
+        if (square) pinch.onTouchEvent(event)
         when (event.actionMasked) {
             MotionEvent.ACTION_MOVE,
             MotionEvent.ACTION_UP -> if (event.pointerCount == 1) dragTo(event.x, event.y)
@@ -189,10 +210,10 @@ internal class IngredientCropView(
         val x = region.left
         val y = region.top
         when (keyCode) {
-            KeyEvent.KEYCODE_DPAD_LEFT -> select(x - 1, y, region.width())
-            KeyEvent.KEYCODE_DPAD_RIGHT -> select(x + 1, y, region.width())
-            KeyEvent.KEYCODE_DPAD_UP -> select(x, y - 1, region.width())
-            KeyEvent.KEYCODE_DPAD_DOWN -> select(x, y + 1, region.width())
+            KeyEvent.KEYCODE_DPAD_LEFT -> select(x - 1, y, region.width(), region.height())
+            KeyEvent.KEYCODE_DPAD_RIGHT -> select(x + 1, y, region.width(), region.height())
+            KeyEvent.KEYCODE_DPAD_UP -> select(x, y - 1, region.width(), region.height())
+            KeyEvent.KEYCODE_DPAD_DOWN -> select(x, y + 1, region.width(), region.height())
             else -> return super.onKeyDown(keyCode, event)
         }
         return true
@@ -212,22 +233,29 @@ internal class IngredientCropView(
         paint.color = 0x99ffffff.toInt()
         paint.strokeWidth = density
         for (i in 1..2) {
-            val offset = frame.width() * i / 3
+            val offsetX = frame.width() * i / 3
+            val offsetY = frame.height() * i / 3
             canvas.drawLine(
-                frame.left + offset,
+                frame.left + offsetX,
                 frame.top,
-                frame.left + offset,
+                frame.left + offsetX,
                 frame.bottom,
                 paint,
             )
-            canvas.drawLine(frame.left, frame.top + offset, frame.right, frame.top + offset, paint)
+            canvas.drawLine(
+                frame.left,
+                frame.top + offsetY,
+                frame.right,
+                frame.top + offsetY,
+                paint,
+            )
         }
         paint.color = Color.WHITE
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 2 * density
         canvas.drawRect(frame, paint)
         paint.style = Paint.Style.FILL
-        val radius = minOf(6 * density, frame.width() / 4)
+        val radius = minOf(6 * density, minOf(frame.width(), frame.height()) / 4)
         for (i in 0..3) {
             val x = if (i % 2 == 0) frame.left else frame.right
             val y = if (i < 2) frame.top else frame.bottom
