@@ -72,8 +72,6 @@ internal object HevyExerciseMapping {
             "behind-head-chest-stretch" to "527DA061", // Stretching
             "bench-dips" to "CD6DC8E5", // Bench Dip
             "bench-jump" to "56092DD1", // Box Jump
-            "bench-press-powerlifting" to "79D0BB3A", // Bench Press (Barbell)
-            "bench-press-with-chains" to "79D0BB3A", // Bench Press (Barbell)
             "bent-arm-dumbbell-pullover" to "67280085", // Pullover (Dumbbell)
             "bent-knee-hip-raise" to "08590920", // Hanging Knee Raise
             "bent-over-barbell-row" to "55E6546F", // Bent Over Row (Barbell)
@@ -88,7 +86,6 @@ internal object HevyExerciseMapping {
             "bodyweight-walking-lunge" to "5E1A7777", // Lunge
             "box-squat" to "F2FCE72D", // Box Squat
             "box-squat-with-bands" to "F1258206", // Squat (Band)
-            "box-squat-with-chains" to "38FC1AB9", // Box Squat (Barbell)
             "brachialis-smr" to "527DA061", // Stretching
             "butt-lift-bridge" to "CDA23948", // Glute Bridge
             "butterfly" to "9DCE2D64", // Butterfly (Pec Deck)
@@ -148,7 +145,6 @@ internal object HevyExerciseMapping {
             "dancers-stretch" to "527DA061", // Stretching
             "dead-bug" to "D8911FC4", // Dead Bug
             "deadlift-with-bands" to "99507114", // Deadlift (Band)
-            "deadlift-with-chains" to "C6272009", // Deadlift (Barbell)
             "decline-barbell-bench-press" to "DA0F0470", // Decline Bench Press (Barbell)
             "decline-crunch" to "BC10A922", // Decline Crunch
             "decline-dumbbell-bench-press" to "18487FA7", // Decline Bench Press (Dumbbell)
@@ -209,7 +205,6 @@ internal object HevyExerciseMapping {
             "flat-bench-lying-leg-raise" to "09C9F635", // Lying Leg Raise
             "flexor-incline-dumbbell-curls" to "8BAB2735", // Seated Incline Curl (Dumbbell)
             "floor-press" to "D53F2886", // Floor Press (Barbell)
-            "floor-press-with-chains" to "D53F2886", // Floor Press (Barbell)
             "flutter-kicks" to "2FA77B28", // Flutter Kicks
             "foot-smr" to "527DA061", // Stretching
             "frankenstein-squat" to "5046D0A9", // Front Squat
@@ -353,6 +348,16 @@ internal object HevyExerciseMapping {
             "wide-grip-push-up" to "392887AA", // Push Up
         )
 
+    // LEGACY: Keep the Hevy templates for saved workouts that use retired exercises.
+    private val retiredTemplateIds =
+        mapOf(
+            "bench-press-powerlifting" to "79D0BB3A",
+            "bench-press-with-chains" to "79D0BB3A",
+            "box-squat-with-chains" to "38FC1AB9",
+            "deadlift-with-chains" to "C6272009",
+            "floor-press-with-chains" to "D53F2886",
+        )
+
     private val aliases =
         mapOf(
             "back-squat" to "Squat (Barbell)",
@@ -388,7 +393,8 @@ internal object HevyExerciseMapping {
         templates: List<HevyTemplate>,
     ): HevyTemplate? {
         val expectedType = type(exercise)
-        defaultTemplateIds[exercise.id]?.let { id ->
+        val templateId = defaultTemplateIds[exercise.id] ?: retiredTemplateIds[exercise.id]
+        templateId?.let { id ->
             templates
                 .firstOrNull { !it.custom && it.id == id && compatible(it, expectedType, sets) }
                 ?.let {

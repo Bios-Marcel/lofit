@@ -50,6 +50,16 @@ class HevyExerciseMappingTest {
     }
 
     @Test
+    fun retiredChainExerciseKeepsItsTemplateForSavedWorkouts() {
+        val bench =
+            exercise("bench-press-with-chains", "Bench Press with Chains").copy(retired = true)
+        val template = HevyTemplate("79D0BB3A", "Bench Press (Barbell)", "weight_reps")
+
+        assertFalse(ExerciseCatalog.exercises().any { it.id == bench.id })
+        assertEquals(template, HevyExerciseMapping.find(bench, listOf(set(60.0)), listOf(template)))
+    }
+
+    @Test
     fun staticMatchesChooseMovementAndEquipmentOverSimilarNames() {
         val templates =
             listOf(
