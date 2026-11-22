@@ -1,6 +1,7 @@
 package lofit
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -116,13 +117,16 @@ class NutritionLabelTest {
     }
 
     @Test
-    fun declinesValuesOnlyGivenPer100Millilitres() {
-        val label =
-            NutritionLabelParser.parse(
-                row(0, 230 to "100 ml") + row(30, 5 to "Zucker", 234 to "9,5 g")
-            )
-        assertTrue(label.volumeOnly)
-        assertTrue(label.amounts.isEmpty())
+    fun readsPer100MillilitresTheSameAsPer100Grams() {
+        val values =
+            row(30, 5 to "Zucker", 230 to "4,8 g", 420 to "9,5 g") +
+                row(60, 5 to "Salz", 230 to "0,1 g", 420 to "0,2 g")
+        for (unit in listOf("g", "ml")) {
+            val headings = row(0, 230 to "pro Portion", 420 to "100 $unit")
+            val label = NutritionLabelParser.parse(headings + values)
+            assertEquals(mapOf(FoodMetric.SUGAR to 9.5, FoodMetric.SALT to 0.2), label.amounts)
+            assertFalse(label.basisUnconfirmed)
+        }
     }
 
     @Test

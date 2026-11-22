@@ -45,18 +45,16 @@ internal object NutritionLabelScanner {
     }
 
     private fun needsSecondPass(label: NutritionLabel): Boolean =
-        !label.volumeOnly &&
-            (label.basisUnconfirmed ||
-                !label.amounts.keys.containsAll(commonFields) ||
-                label.weakReadings.isNotEmpty() ||
-                label.lowConfidenceReadings.isNotEmpty() ||
-                label.sugarExceedsCarbs() ||
-                label.amounts[FoodMetric.SALT]?.let { it > 0.0 && it % 1.0 == 0.0 } == true ||
-                label.energyGap() > 1.0)
+        label.basisUnconfirmed ||
+            !label.amounts.keys.containsAll(commonFields) ||
+            label.weakReadings.isNotEmpty() ||
+            label.lowConfidenceReadings.isNotEmpty() ||
+            label.sugarExceedsCarbs() ||
+            label.amounts[FoodMetric.SALT]?.let { it > 0.0 && it % 1.0 == 0.0 } == true ||
+            label.energyGap() > 1.0
 
     internal fun merge(original: NutritionLabel, retry: NutritionLabel): NutritionLabel {
         if (original.amounts.isEmpty()) return retry
-        if (retry.volumeOnly) return if (original.basisUnconfirmed) retry else original
         if (original.basisUnconfirmed != retry.basisUnconfirmed) {
             return if (retry.amounts.isNotEmpty() && !retry.basisUnconfirmed) retry else original
         }

@@ -14,8 +14,6 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
-import androidx.viewpager.widget.PagerAdapter
-import androidx.viewpager.widget.ViewPager
 import java.text.DateFormat
 import java.time.DayOfWeek
 import java.time.Instant
@@ -38,110 +36,22 @@ internal class TrainingStatsView(
     private var calendarPage = 0
     private var muscleSpanDays = 28L
 
-    fun workoutCalendar(): View = ui.card {
-        val names = listOf("Calendar", "Weekly rhythm", "Muscle balance")
-        val factories: List<() -> View> =
-            listOf(::calendarGrid, ::weeklyRhythmPage, ::muscleBalancePage)
-        val pages = names.map { FrameLayout(activityContext) }
-        fun loadPage(position: Int) {
-            val page = pages[position]
-            if (page.childCount == 0)
-                page.addView(
-                    factories[position](),
-                    FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                    ),
-                )
-        }
-        loadPage(calendarPage)
-        val pager =
-            ViewPager(activityContext).apply {
-                contentDescription = "Calendar and training stats"
-                offscreenPageLimit = 2
-                adapter =
-                    object : PagerAdapter() {
-                        override fun getCount() = pages.size
-
-                        override fun isViewFromObject(view: View, item: Any) = view === item
-
-                        override fun instantiateItem(container: ViewGroup, position: Int): Any =
-                            pages[position].also { container.addView(it) }
-
-                        override fun destroyItem(
-                            container: ViewGroup,
-                            position: Int,
-                            item: Any,
-                        ) {
-                            container.removeView(item as View)
-                        }
-
-                        override fun getPageTitle(position: Int) = names[position]
-                    }
-                currentItem = calendarPage
-            }
-        addView(
-            pager,
+    fun workoutCalendar(): View =
+        ui.pagedCard(
+            "Calendar and training stats",
+            listOf(
+                "Calendar" to ::calendarGrid,
+                "Weekly rhythm" to ::weeklyRhythmPage,
+                "Muscle balance" to ::muscleBalancePage,
+            ),
+            calendarPage,
             LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ui.dp(304 + (16 * activityContext.resources.configuration.fontScale).toInt()),
             ),
-        )
-        val dots = names.mapIndexed { index, name ->
-            FrameLayout(activityContext).apply {
-                contentDescription = "$name, page ${index + 1} of ${names.size}"
-                isFocusable = true
-                setOnClickListener { pager.setCurrentItem(index, true) }
-                addView(
-                    View(activityContext).apply {
-                        background = GradientDrawable().apply { shape = GradientDrawable.OVAL }
-                    },
-                    FrameLayout.LayoutParams(ui.dp(8), ui.dp(8), Gravity.CENTER),
-                )
-            }
+        ) {
+            calendarPage = it
         }
-        fun selectPage(position: Int) {
-            loadPage(position)
-            calendarPage = position
-            pager.stateDescription = "Page ${position + 1} of ${names.size}"
-            dots.forEachIndexed { index, dot ->
-                dot.isSelected = index == position
-                (dot.getChildAt(0).background as GradientDrawable).setColor(
-                    ui.color(if (dot.isSelected) R.color.coral else R.color.sage)
-                )
-                dot.getChildAt(0).alpha = if (dot.isSelected) 1f else 0.4f
-            }
-        }
-        addView(
-            LinearLayout(activityContext).apply {
-                gravity = Gravity.CENTER
-                dots.forEach { addView(it, LinearLayout.LayoutParams(ui.dp(48), ui.dp(40))) }
-            },
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ),
-        )
-        pager.addOnPageChangeListener(
-            object : ViewPager.SimpleOnPageChangeListener() {
-                override fun onPageSelected(position: Int) = selectPage(position)
-
-                override fun onPageScrolled(
-                    position: Int,
-                    positionOffset: Float,
-                    positionOffsetPixels: Int,
-                ) {
-                    // A neighboring page needs content only once a swipe actually reveals it.
-                    if (positionOffsetPixels > 0) {
-                        loadPage(position)
-                        if (position < pages.lastIndex) loadPage(position + 1)
-                    }
-                }
-            }
-        )
-        selectPage(calendarPage)
-        setPadding(paddingLeft, paddingTop, paddingRight, ui.dp(6))
-    }
 
     private fun weeklyRhythmPage(): View {
         val rhythm = data().history.weeklyRhythm()

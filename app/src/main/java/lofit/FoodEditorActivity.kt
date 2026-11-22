@@ -8,7 +8,11 @@ import android.graphics.Rect
 import android.graphics.RectF
 import android.net.Uri
 import android.os.Bundle
+import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
+import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -508,8 +512,6 @@ internal class FoodEditorActivity : AppCompatActivity() {
             val label = result.getOrNull()
             when {
                 label == null -> toast("Could not scan label")
-                label.volumeOnly ->
-                    toast("This label gives values per 100 ml. Enter values per 100 g.")
                 label.amounts.keys.none { it != FoodMetric.CALORIES } ->
                     toast("No nutrition values found. Crop to the table and try again.")
                 else -> {
@@ -563,7 +565,7 @@ internal class FoodEditorActivity : AppCompatActivity() {
                     draft.putString(
                         "labelCheck",
                         if (label.basisUnconfirmed)
-                            "Column heading unreadable. Verify values are per 100 g. $message"
+                            "Column heading unreadable. Verify values are per 100 g or 100 ml. $message"
                                 .trimEnd()
                         else message,
                     )
@@ -672,8 +674,9 @@ internal class FoodEditorActivity : AppCompatActivity() {
             val name = if (cooking) null else field(body, "Recipe name", "name")
             if (cooking) {
                 val date = LocalDate.parse(draft.getString("day"))
+                val dateLabel = if (date == LocalDate.now()) "Today" else date.toString()
                 body.addView(
-                    ui.smallButton("Cooked on $date") {
+                    ui.smallButton("Meal date · $dateLabel") {
                         DatePickerDialog(
                                 this,
                                 { _, year, month, day ->
@@ -733,16 +736,28 @@ internal class FoodEditorActivity : AppCompatActivity() {
                                 .apply { contentDescription = "Replace ${ingredient.name}" }
                         )
                         addView(ui.fieldLabel("Weight (g)"))
-                        addView(input)
                         addView(
-                            ui.smallButton("Remove") {
-                                    rows.remove(item)
-                                    render()
-                                }
-                                .apply {
-                                    contentDescription = "Remove ${ingredient.name}"
-                                },
-                            ui.foodSpacing(),
+                            LinearLayout(this@FoodEditorActivity).apply {
+                                orientation = LinearLayout.HORIZONTAL
+                                gravity = Gravity.CENTER_VERTICAL
+                                addView(input, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+                                addView(
+                                    ui.smallButton("") {
+                                            rows.remove(item)
+                                            render()
+                                        }
+                                        .apply {
+                                            contentDescription = "Remove ${ingredient.name}"
+                                            setIconResource(R.drawable.ic_close)
+                                            iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+                                            iconPadding = 0
+                                            setPadding(0, 0, 0, 0)
+                                        },
+                                    LinearLayout.LayoutParams(ui.dp(48), ui.dp(48)).apply {
+                                        marginStart = ui.dp(8)
+                                    },
+                                )
+                            }
                         )
                     }
                 )
@@ -758,7 +773,7 @@ internal class FoodEditorActivity : AppCompatActivity() {
                 ui.foodSpacing(),
             )
             updateTotals()
-            body.addView(summary.view, ui.foodSpacing())
+            body.addView(summary.card(), ui.foodSpacing())
             body.addView(
                 ui.actionButton(if (cooking) "Save meal" else "Save recipe") {
                     val recipeName = draft.getString("name").orEmpty().trim()
@@ -805,9 +820,30 @@ internal class FoodEditorActivity : AppCompatActivity() {
             toast("Add an ingredient in Ingredients first")
             return
         }
+        val adapter =
+            object : ArrayAdapter<Ingredient>(this, android.R.layout.simple_list_item_1, choices) {
+                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                    val ingredient = choices[position]
+                    return LinearLayout(this@FoodEditorActivity).apply {
+                        gravity = Gravity.CENTER_VERTICAL
+                        setPadding(ui.dp(20), ui.dp(6), ui.dp(20), ui.dp(6))
+                        addView(
+                            ui.foodImage(
+                                context,
+                                pictures,
+                                ingredient.name,
+                                ingredient.image,
+                                54,
+                                ingredient.crop,
+                            )
+                        )
+                        addView(ui.titleText(ingredient.name))
+                    }
+                }
+            }
         AlertDialog.Builder(this)
             .setTitle("Choose ingredient")
-            .setItems(choices.map { it.name }.toTypedArray()) { _, index -> select(choices[index]) }
+            .setAdapter(adapter) { _, index -> select(choices[index]) }
             .setNegativeButton("Cancel", null)
             .show()
     }

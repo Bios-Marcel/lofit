@@ -160,13 +160,16 @@ internal class FoodStore(context: Context) : SQLiteOpenHelper(context, "food.db"
     fun dailyTotals(
         span: FoodSpan,
         today: LocalDate = LocalDate.now(),
-    ): Map<LocalDate, FoodAmounts> {
+    ): Map<LocalDate, FoodAmounts> = dailyTotalsBetween(span.firstDay(today), today)
+
+    fun dailyTotals(day: LocalDate): FoodAmounts? = dailyTotalsBetween(day, day)[day]
+
+    private fun dailyTotalsBetween(start: LocalDate?, end: LocalDate): Map<LocalDate, FoodAmounts> {
         val sums = metrics.joinToString { "SUM(${it.name}) AS ${it.name}" }
-        val start = span.firstDay(today)?.toString().orEmpty()
         return rows(
                 "SELECT day, $sums FROM meals JOIN meal_items ON meal = id WHERE day BETWEEN ? AND ? GROUP BY day ORDER BY day",
-                start,
-                today.toString(),
+                start?.toString().orEmpty(),
+                end.toString(),
             ) {
                 LocalDate.parse(getString(0)) to amounts()
             }

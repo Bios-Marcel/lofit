@@ -30,6 +30,8 @@ import androidx.appcompat.widget.PopupMenu
 import androidx.core.content.ContextCompat
 import androidx.core.view.doOnPreDraw
 import androidx.core.widget.doAfterTextChanged
+import androidx.viewpager.widget.PagerAdapter
+import androidx.viewpager.widget.ViewPager
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import java.util.Locale
@@ -45,9 +47,9 @@ internal class LofitViews(
         subtitle: String? = null,
         headerEnd: View? = null,
         onTitleChange: ((String) -> Unit)? = null,
+        scrollable: Boolean = true,
         build: (LinearLayout) -> Unit,
     ): View {
-        val scroll = ScrollView(activityContext).apply { isFillViewport = true }
         val body =
             LinearLayout(activityContext).apply {
                 orientation = LinearLayout.VERTICAL
@@ -91,8 +93,12 @@ internal class LofitViews(
             }
         )
         build(body)
-        scroll.addView(body)
-        return scroll
+        return if (scrollable) {
+            ScrollView(activityContext).apply {
+                isFillViewport = true
+                addView(body)
+            }
+        } else body
     }
 
     private fun editableTitle(value: String, onChange: (String) -> Unit): View =
@@ -206,6 +212,104 @@ internal class LofitViews(
                     )
                     .apply { bottomMargin = dp(8) }
         }
+
+    fun pagedCard(
+        description: String,
+        items: List<Pair<String, () -> View>>,
+        selectedPage: Int,
+        pagerLayout: LinearLayout.LayoutParams,
+        onPageChanged: (Int) -> Unit,
+    ): View = card {
+        val pages = items.map { FrameLayout(activityContext) }
+        fun loadPage(position: Int) {
+            val page = pages[position]
+            if (page.childCount == 0)
+                page.addView(
+                    items[position].second(),
+                    FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                    ),
+                )
+        }
+        val pager =
+            ViewPager(activityContext).apply {
+                contentDescription = description
+                offscreenPageLimit = pages.lastIndex
+                adapter =
+                    object : PagerAdapter() {
+                        override fun getCount() = pages.size
+
+                        override fun isViewFromObject(view: View, item: Any) = view === item
+
+                        override fun instantiateItem(container: ViewGroup, position: Int): Any =
+                            pages[position].also { container.addView(it) }
+
+                        override fun destroyItem(container: ViewGroup, position: Int, item: Any) {
+                            container.removeView(item as View)
+                        }
+
+                        override fun getPageTitle(position: Int) = items[position].first
+                    }
+                currentItem = selectedPage
+            }
+        addView(pager, pagerLayout)
+        val dots = items.mapIndexed { index, (name, _) ->
+            FrameLayout(activityContext).apply {
+                contentDescription = "$name, page ${index + 1} of ${items.size}"
+                isFocusable = true
+                setOnClickListener { pager.setCurrentItem(index, true) }
+                addView(
+                    View(activityContext).apply {
+                        background = GradientDrawable().apply { shape = GradientDrawable.OVAL }
+                    },
+                    FrameLayout.LayoutParams(dp(8), dp(8), Gravity.CENTER),
+                )
+            }
+        }
+        fun selectPage(position: Int) {
+            loadPage(position)
+            onPageChanged(position)
+            pager.stateDescription = "Page ${position + 1} of ${items.size}"
+            dots.forEachIndexed { index, dot ->
+                dot.isSelected = index == position
+                val indicator = dot.getChildAt(0)
+                (indicator.background as GradientDrawable).setColor(
+                    color(if (dot.isSelected) R.color.coral else R.color.sage)
+                )
+                indicator.alpha = if (dot.isSelected) 1f else 0.4f
+            }
+        }
+        addView(
+            LinearLayout(activityContext).apply {
+                gravity = Gravity.CENTER
+                dots.forEach { addView(it, LinearLayout.LayoutParams(dp(48), dp(40))) }
+            },
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+        pager.addOnPageChangeListener(
+            object : ViewPager.SimpleOnPageChangeListener() {
+                override fun onPageSelected(position: Int) = selectPage(position)
+
+                override fun onPageScrolled(
+                    position: Int,
+                    positionOffset: Float,
+                    positionOffsetPixels: Int,
+                ) {
+                    // Load the neighboring page once a swipe reveals it.
+                    if (positionOffsetPixels > 0) {
+                        loadPage(position)
+                        if (position < pages.lastIndex) loadPage(position + 1)
+                    }
+                }
+            }
+        )
+        selectPage(selectedPage)
+        setPadding(paddingLeft, paddingTop, paddingRight, dp(6))
+    }
 
     fun insetCardLayoutParams() =
         LinearLayout.LayoutParams(

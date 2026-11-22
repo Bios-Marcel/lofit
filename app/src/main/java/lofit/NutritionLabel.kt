@@ -22,7 +22,6 @@ internal data class LabelWord(
 
 internal data class NutritionLabel(
     val amounts: FoodAmounts,
-    val volumeOnly: Boolean = false,
     val basisUnconfirmed: Boolean = false,
     val weakReadings: Set<FoodMetric> = emptySet(),
     val lowConfidenceReadings: Set<FoodMetric> = emptySet(),
@@ -39,7 +38,8 @@ internal object NutritionLabelParser {
     private const val rowTolerance = 0.65
     private const val minimumConfidence = 0.5f
     private val ignoreCase = RegexOption.IGNORE_CASE
-    private val hundred = Regex("""(?<!\d)[1Il][0O]{2}\s*(m[lI1]|g(?:r)?|9)(?!\p{L})""", ignoreCase)
+    private val hundred =
+        Regex("""(?<!\d)[1Il][0O]{2}\s*(?:m[lI1]|g(?:r)?|9)(?!\p{L})""", ignoreCase)
     private val serving = Regex("""\b(?:portion|serving|stück)\b""", ignoreCase)
     private val amount =
         Regex(
@@ -69,9 +69,9 @@ internal object NutritionLabelParser {
 
     fun parse(words: List<LabelWord>, slope: Double = 0.0): NutritionLabel {
         val rows = groupRows(words, slope)
-        // LEGACY: Keep the OCR angle when it yields nutrients or identifies a volume-only label.
+        // LEGACY: Keep the OCR angle when it already yields nutrients.
         val label = parseRows(rows)
-        if (label.volumeOnly || label.amounts.keys.any { it != FoodMetric.CALORIES }) return label
+        if (label.amounts.keys.any { it != FoodMetric.CALORIES }) return label
 
         val correctedSlope = estimateTableSlope(rows, slope) ?: return label
         val recovered = parseRows(groupRows(words, correctedSlope))
@@ -87,33 +87,23 @@ internal object NutritionLabelParser {
         val firstValue = candidates.firstOrNull()?.source
         val headers = rows.takeWhile { it !== firstValue }
         val bases = headers.flatMap { row ->
-            hundred
-                .findAll(row.text)
-                .map { match ->
-                    match.groupValues[1].startsWith("m", ignoreCase = true) to
-                        row.rightAt(match.range.last)
-                }
-                .toList()
+            hundred.findAll(row.text).map { row.rightAt(it.range.last) }.toList()
         }
-        val grams = bases.firstOrNull { !it.first }?.second
-        val volumes = bases.filter { it.first }.map { it.second }
-        if (grams == null && volumes.isNotEmpty())
-            return NutritionLabel(emptyMap(), volumeOnly = true)
-
+        val basis = bases.firstOrNull()
         val portions = headers.flatMap { row ->
             serving.findAll(row.text).map { row.rightAt(it.range.last) }.toList()
         }
-        if (grams == null && portions.isNotEmpty()) return NutritionLabel(emptyMap())
+        if (basis == null && portions.isNotEmpty()) return NutritionLabel(emptyMap())
 
         // Real values can be right-aligned well past the text in a wide column heading.
         val columns = valueColumns(candidates)
         val target =
             when {
-                columns.isEmpty() -> grams
-                grams == null -> columns.first()
-                else -> columns.minByOrNull { abs(it - grams) }
+                columns.isEmpty() -> basis
+                basis == null -> columns.first()
+                else -> columns.minByOrNull { abs(it - basis) }
             }
-        val otherColumns = columns.filter { it != target } + volumes + portions
+        val otherColumns = columns.filter { it != target } + bases.drop(1) + portions
         val values = candidates.mapNotNull { row ->
             val cell =
                 if (target == null) {
@@ -138,7 +128,7 @@ internal object NutritionLabelParser {
                 .toMap()
         return NutritionLabel(
             readings.mapValues { (_, cell) -> requireNotNull(cell.value) },
-            basisUnconfirmed = grams == null,
+            basisUnconfirmed = basis == null,
             weakReadings = readings.filterValues { !it.hasUnit }.keys,
             lowConfidenceReadings = readings.filterValues { it.lowConfidence }.keys,
             valuesWithoutDecimal =

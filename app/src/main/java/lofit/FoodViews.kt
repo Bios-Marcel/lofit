@@ -14,24 +14,30 @@ internal fun LofitViews.foodSpacing() =
         bottomMargin = dp(4)
     }
 
-internal class FoodSummary(context: Context, ui: LofitViews) {
+internal class FoodSummary(context: Context, private val ui: LofitViews) {
     private val values = mutableMapOf<FoodMetric, TextView>()
-    val view = ui.card {
-        addView(ui.titleText("Totals"))
-        FoodMetric.entries.forEach { metric ->
-            addView(
-                LinearLayout(context).apply {
-                    gravity = Gravity.CENTER_VERTICAL
-                    addView(
-                        ui.metaText(metric.label),
-                        LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f),
-                    )
-                    val value = ui.titleText("").apply { textSize = 15f }
-                    values[metric] = value
-                    addView(value)
-                }
-            )
+    val view =
+        LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            FoodMetric.entries.forEach { metric ->
+                addView(
+                    LinearLayout(context).apply {
+                        gravity = Gravity.CENTER_VERTICAL
+                        addView(
+                            ui.metaText(metric.label),
+                            LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f),
+                        )
+                        val value = ui.titleText("").apply { textSize = 15f }
+                        values[metric] = value
+                        addView(value)
+                    }
+                )
+            }
         }
+
+    fun card() = ui.card {
+        addView(ui.titleText("Totals"))
+        addView(view)
     }
 
     fun update(amounts: FoodAmounts) {

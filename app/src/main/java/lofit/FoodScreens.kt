@@ -1,10 +1,12 @@
 package lofit
 
+import android.app.DatePickerDialog
 import android.content.Context
 import android.content.res.ColorStateList
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.widget.CheckBox
 import android.widget.LinearLayout
@@ -12,6 +14,8 @@ import android.widget.ScrollView
 import androidx.appcompat.app.AlertDialog
 import androidx.core.widget.doAfterTextChanged
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 
 internal class FoodScreens(
     private val context: Context,
@@ -24,12 +28,16 @@ internal class FoodScreens(
     private var query = ""
     private var span = FoodSpan.THREE_MONTHS
     private var selected = mutableSetOf(FoodMetric.CARBS)
+    private var statisticsPage = 0
+    private var statisticsDay: LocalDate? = null
 
     fun saveState() =
         Bundle().apply {
             putString("query", query)
             putString("span", span.name)
             putStringArrayList("metrics", ArrayList(selected.map { it.name }))
+            putInt("statisticsPage", statisticsPage)
+            putString("statisticsDay", statisticsDay?.toString())
         }
 
     fun restoreState(state: Bundle) {
@@ -37,6 +45,8 @@ internal class FoodScreens(
         // LEGACY: Restored screens can contain a timeframe from the exercise graph.
         span = FoodSpan.entries.find { it.name == state.getString("span") } ?: FoodSpan.THREE_MONTHS
         selected = state.getStringArrayList("metrics")!!.map(FoodMetric::valueOf).toMutableSet()
+        statisticsPage = state.getInt("statisticsPage")
+        statisticsDay = state.getString("statisticsDay")?.let(LocalDate::parse)
     }
 
     fun page(section: FoodSection): View =
@@ -190,7 +200,7 @@ internal class FoodScreens(
                         )
                     )
                 }
-                addView(FoodSummary(context, ui).apply { update(totals) }.view, ui.foodSpacing())
+                addView(FoodSummary(context, ui).apply { update(totals) }.card(), ui.foodSpacing())
             }
         AlertDialog.Builder(context)
             .setTitle(meal.name)
@@ -211,51 +221,139 @@ internal class FoodScreens(
     }
 
     private fun statistics() =
-        ui.page("Statistics") { body ->
-            val today = LocalDate.now()
-            val totals = store.dailyTotals(span, today)
-            val start = span.firstDay(today) ?: totals.keys.firstOrNull() ?: today
+        ui.page("Statistics", scrollable = false) { body ->
             body.addView(
-                ui.trendSpanSelector(FoodSpan.entries, span) {
-                    span = it
-                    refresh()
-                }
+                ui.pagedCard(
+                    "Nutrition statistics",
+                    listOf("Daily totals" to ::dailyPage, "Trends" to ::trendsPage),
+                    statisticsPage,
+                    LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f),
+                ) {
+                    statisticsPage = it
+                },
+                LinearLayout.LayoutParams(MATCH_PARENT, 0, 1f).apply { topMargin = ui.dp(8) },
             )
-            val plot = column()
-            body.addView(plot)
-            fun draw() {
-                plot.removeAllViews()
-                plot.addView(
-                    when {
-                        selected.isEmpty() -> ui.emptyText("Select a value to graph.")
-                        totals.isEmpty() -> ui.emptyText("No meals in this span.")
-                        else -> FoodGraphView(context, totals, start, today, selected.toSet())
-                    }
-                )
+        }
+
+    private fun dailyPage() =
+        ScrollView(context).apply {
+            val today = LocalDate.now()
+            val day = statisticsDay?.coerceAtMost(today) ?: today
+            val title =
+                if (day == today) "Today"
+                else day.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM))
+            fun selectDay(date: LocalDate) {
+                statisticsDay = date.takeUnless { it == today }
+                refresh()
             }
-            FoodMetric.entries.chunked(2).forEach { pair ->
-                body.addView(
-                    LinearLayout(context).apply {
-                        for (metric in pair) {
+            fun dayArrow(symbol: String, label: String, date: LocalDate) =
+                ui.smallButton(symbol) { selectDay(date) }
+                    .apply {
+                        contentDescription = label
+                        isEnabled = date <= today
+                        textSize = 20f
+                        setPadding(0, 0, 0, 0)
+                    }
+            addView(
+                column().apply {
+                    addView(ui.titleText("Daily totals"))
+                    addView(
+                        LinearLayout(context).apply {
+                            gravity = Gravity.CENTER_VERTICAL
                             addView(
-                                CheckBox(context).apply {
-                                    text = metric.label
-                                    setTextColor(ui.color(R.color.cream))
-                                    buttonTintList = ColorStateList.valueOf(metric.graphColor)
-                                    minHeight = ui.dp(48)
-                                    isChecked = metric in selected
-                                    setOnCheckedChangeListener { _, checked ->
-                                        if (checked) selected.add(metric)
-                                        else selected.remove(metric)
-                                        draw()
-                                    }
+                                ui.smallButton(title) {
+                                    DatePickerDialog(
+                                            context,
+                                            { _, year, month, dayOfMonth ->
+                                                selectDay(LocalDate.of(year, month + 1, dayOfMonth))
+                                            },
+                                            day.year,
+                                            day.monthValue - 1,
+                                            day.dayOfMonth,
+                                        )
+                                        .apply { datePicker.maxDate = System.currentTimeMillis() }
+                                        .show()
                                 },
                                 LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f),
                             )
+                            addView(
+                                dayArrow("‹", "Previous day", day.minusDays(1)),
+                                LinearLayout.LayoutParams(ui.dp(48), ui.dp(48)).apply {
+                                    marginStart = ui.dp(8)
+                                },
+                            )
+                            addView(
+                                dayArrow("›", "Next day", day.plusDays(1)),
+                                LinearLayout.LayoutParams(ui.dp(48), ui.dp(48)).apply {
+                                    marginStart = ui.dp(8)
+                                },
+                            )
+                        },
+                        ui.foodSpacing(),
+                    )
+                    val totals = store.dailyTotals(day)
+                    addView(
+                        if (totals == null) ui.emptyText("No meals logged for this day.")
+                        else FoodSummary(context, ui).apply { update(totals) }.view,
+                        ui.foodSpacing(),
+                    )
+                }
+            )
+        }
+
+    private fun trendsPage() =
+        ScrollView(context).apply {
+            addView(
+                column().apply {
+                    val today = LocalDate.now()
+                    val totals = store.dailyTotals(span, today)
+                    val start = span.firstDay(today) ?: totals.keys.firstOrNull() ?: today
+                    addView(ui.titleText("Trends"))
+                    addView(
+                        ui.trendSpanSelector(FoodSpan.entries, span) {
+                            span = it
+                            refresh()
                         }
+                    )
+                    val plot = column()
+                    addView(plot)
+                    fun draw() {
+                        plot.removeAllViews()
+                        plot.addView(
+                            when {
+                                selected.isEmpty() -> ui.emptyText("Select a value to graph.")
+                                totals.isEmpty() -> ui.emptyText("No meals in this span.")
+                                else ->
+                                    FoodGraphView(context, totals, start, today, selected.toSet())
+                            }
+                        )
                     }
-                )
-            }
-            draw()
+                    FoodMetric.entries.chunked(2).forEach { pair ->
+                        addView(
+                            LinearLayout(context).apply {
+                                for (metric in pair) {
+                                    addView(
+                                        CheckBox(context).apply {
+                                            text = metric.label
+                                            setTextColor(ui.color(R.color.cream))
+                                            buttonTintList =
+                                                ColorStateList.valueOf(metric.graphColor)
+                                            minHeight = ui.dp(48)
+                                            isChecked = metric in selected
+                                            setOnCheckedChangeListener { _, checked ->
+                                                if (checked) selected.add(metric)
+                                                else selected.remove(metric)
+                                                draw()
+                                            }
+                                        },
+                                        LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f),
+                                    )
+                                }
+                            }
+                        )
+                    }
+                    draw()
+                }
+            )
         }
 }

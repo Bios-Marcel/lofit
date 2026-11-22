@@ -8,6 +8,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.net.Uri
@@ -16,20 +17,28 @@ import android.text.Spanned
 import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
 import android.util.AtomicFile
+import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.CheckBox
+import android.widget.DatePicker
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.Espresso.pressBack
+import androidx.test.espresso.UiController
+import androidx.test.espresso.ViewAction
 import androidx.test.espresso.action.ViewActions.*
+import androidx.test.espresso.assertion.PositionAssertions.isCompletelyRightOf
 import androidx.test.espresso.assertion.ViewAssertions.*
 import androidx.test.espresso.matcher.ViewMatchers.*
 import androidx.test.espresso.util.TreeIterables
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.time.LocalDate
 import java.util.UUID
@@ -298,7 +307,7 @@ class FoodFlowTest {
                         }
                     Canvas(bitmap).apply {
                         drawText("Fett 99 g", 220f, 80f, paint)
-                        drawText("Nährwerte pro 100 g", 220f, 195f, paint)
+                        drawText("Nährwerte pro 100 ml", 220f, 195f, paint)
                         val rows =
                             listOf(
                                 "Energie" to "179 kcal",
@@ -387,11 +396,21 @@ class FoodFlowTest {
 
     @Test
     fun recipeRowsUpdateTotalsAndSave() {
+        val picture = ByteArrayOutputStream()
+        val bitmap = Bitmap.createBitmap(16, 16, Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(Color.BLUE)
+        bitmap.compress(Bitmap.CompressFormat.PNG, 100, picture)
+        bitmap.recycle()
+        val image = ingredientPictures(context).importPicture(picture.toByteArray())
+        store.save(oats.copy(image = image, crop = Rect(2, 2, 14, 14)))
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             open(scenario, "Recipes", expand = true)
             onView(withText("Add recipe")).perform(click())
             onView(withHint("Recipe name")).perform(replaceText(porridge))
             onView(withText("Add ingredient")).perform(scrollTo(), click())
+            onView(withContentDescription("${oats.name} illustration"))
+                .perform(waitUntil("ingredient photo") { (it as ImageView).drawable != null })
+                .check(matches(isDisplayed()))
             onView(withText(oats.name)).perform(click())
             onView(withContentDescription("${oats.name} weight (g)")).perform(replaceText("120"))
             onView(withText("240 kcal")).perform(scrollTo()).check(matches(isDisplayed()))
@@ -406,39 +425,84 @@ class FoodFlowTest {
     }
 
     @Test
-    fun cookedSubstitutionChangesTodayOnlyAndStatisticsRetainFilters() {
-        val template = FoodRecipe("porridge-$suffix", porridge, listOf(RecipeItem(oats.id, 200.0)))
+    fun mealDateAndIngredientsSaveAndStatisticsRetainFilters() {
+        val template =
+            FoodRecipe(
+                "porridge-$suffix",
+                porridge,
+                listOf(RecipeItem(oats.id, 200.0), RecipeItem(rice.id, 100.0)),
+            )
         store.save(template)
+        val day = LocalDate.now().minusDays(1)
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             open(scenario, "Meals", expand = true)
             onView(withText("Log meal")).perform(click())
             onView(withText(porridge)).perform(click())
+            onView(withText("Meal date · Today")).perform(click())
+            onView(isAssignableFrom(DatePicker::class.java))
+                .perform(
+                    object : ViewAction {
+                        override fun getConstraints() = isAssignableFrom(DatePicker::class.java)
+
+                        override fun getDescription() = "Choose the previous day"
+
+                        override fun perform(uiController: UiController, view: View) {
+                            (view as DatePicker).updateDate(
+                                day.year,
+                                day.monthValue - 1,
+                                day.dayOfMonth,
+                            )
+                        }
+                    }
+                )
+            onView(withText("OK")).perform(click())
+            onView(withText("Meal date · $day")).check(matches(isDisplayed()))
             onView(withContentDescription("${oats.name} weight (g)"))
                 .check(matches(withText("200")))
-            onView(withContentDescription("Replace ${oats.name}")).perform(click())
+            val riceWeight = withContentDescription("${rice.name} weight (g)")
+            onView(withContentDescription("Remove ${rice.name}"))
+                .perform(scrollTo())
+                .check(isCompletelyRightOf(riceWeight))
+                .perform(click())
+            onView(riceWeight).check(doesNotExist())
+            onView(withContentDescription("Replace ${oats.name}")).perform(scrollTo(), click())
             onView(withText(rice.name)).perform(click())
-            onView(withContentDescription("${rice.name} weight (g)")).perform(replaceText("60"))
+            onView(riceWeight).perform(replaceText("60"))
             onView(withText("Save meal")).perform(scrollTo(), click())
             onView(withText(porridge)).check(matches(isDisplayed()))
             val meal = store.meals().first { it.name == template.name }
-            assertEquals(LocalDate.now(), meal.day)
+            assertEquals(day, meal.day)
             assertEquals(rice.name, meal.items.single().name)
             assertEquals(30.0, meal.items.single().amounts.getValue(FoodMetric.CARBS), 0.0)
             assertEquals(template, store.recipes().first { it.id == template.id })
             open(scenario, "Statistics")
-            onView(withContentDescription("Daily food totals")).check(matches(isDisplayed()))
-            onView(withText("Carbs")).check(matches(isChecked()))
-            onView(withText("Price")).check(matches(not(isChecked()))).perform(click())
-            onView(withText("Calories"))
+            val daily = withContentDescription("Daily totals, page 1 of 2")
+            onView(daily).check(matches(isSelected()))
+            onView(withText("Today")).check(matches(isDisplayed()))
+            onView(withContentDescription("Previous day")).perform(click())
+            onView(withText("120 kcal")).perform(scrollTo()).check(matches(isDisplayed()))
+            onView(withContentDescription("Nutrition statistics")).perform(swipeLeft())
+            onView(withContentDescription("Daily food totals"))
+                .perform(waitForStableLayout())
+                .check(matches(isDisplayed()))
+            fun metric(label: String) =
+                allOf(withText(label), isAssignableFrom(CheckBox::class.java))
+            onView(metric("Carbs")).check(matches(isChecked()))
+            onView(metric("Price"))
                 .check(matches(not(isChecked())))
                 .perform(scrollTo(), click())
+                .check(matches(isChecked()))
+            onView(metric("Calories"))
+                .check(matches(not(isChecked())))
+                .perform(scrollTo(), click())
+                .check(matches(isChecked()))
             listOf("7D", "2W", "1M", "3M", "All").forEach { label ->
                 onView(withText(label)).perform(scrollTo()).check(matches(isDisplayed()))
             }
             onView(withContentDescription("2 weeks")).perform(click())
             scenario.recreate()
             onView(withContentDescription("2 weeks")).check(matches(isSelected()))
-            onView(withText("Price")).check(matches(isChecked()))
+            onView(metric("Price")).check(matches(isChecked()))
             onView(withContentDescription("Daily food totals")).check { view, _ ->
                 assertTrue("Carbs" in view.stateDescription.toString())
                 assertTrue("Price" in view.stateDescription.toString())
@@ -447,6 +511,12 @@ class FoodFlowTest {
                         "kcal" in view.stateDescription.toString()
                 )
             }
+            onView(daily).perform(click())
+            onView(withText("120 kcal"))
+                .perform(waitForStableLayout(), scrollTo())
+                .check(matches(isDisplayed()))
+            onView(withContentDescription("Next day")).perform(scrollTo(), click())
+            onView(withText("Today")).check(matches(isDisplayed()))
         }
     }
 }
