@@ -1,12 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Padding maps the approved artwork into Android's adaptive icon mask. -->
-<inset xmlns:android="http://schemas.android.com/apk/res/android"
-    android:insetLeft="20.3704%"
-    android:insetTop="20.3704%"
-    android:insetRight="20.3704%"
-    android:insetBottom="20.3704%">
-    <bitmap
-        android:src="@drawable/lofit_launcher_debug"
-        android:gravity="fill"
-        android:filter="true" />
-</inset>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android"
+    android:paddingMode="stack">
+    <item>
+        <!-- Scale the mark to eight ninths to leave room for the badge. -->
+        <inset
+            android:drawable="@drawable/lofit_mark"
+            android:inset="5.5556%" />
+    </item>
+    <item>
+        <vector
+            android:width="108dp"
+            android:height="108dp"
+            android:viewportWidth="108"
+            android:viewportHeight="108">
+            <!-- The letter cutouts show the adaptive icon background. -->
+            <path
+                android:fillColor="#F2EDE1"
+                android:fillType="evenOdd"
+                android:pathData="
+                    M59.45,68.6 H78.9 A3.2,3.2 0,0 1,82.1,71.8 V73.1 A3.2,3.2 0,0 1,78.9,76.3 H59.45 A3.2,3.2 0,0 1,56.25,73.1 V71.8 A3.2,3.2 0,0 1,59.45,68.6 Z
+                    M59.45,70.35 H60.88 C62.29,70.35 63.2,71.2 63.2,72.46 C63.2,73.72 62.29,74.58 60.88,74.58 H59.45 Z
+                    M60.53,71.36 V73.56 H60.91 C61.67,73.56 62.1,73.12 62.1,72.46 C62.1,71.8 61.67,71.36 60.91,71.36 Z
+                    M63.75,70.35 H66.6 V71.32 H64.82 V71.96 H66.44 V72.88 H64.82 V73.61 H66.62 V74.58 H63.75 Z
+                    M67.32,70.35 H69.17 C70.03,70.35 70.48,70.83 70.48,71.46 Q70.48,71.99 69.97,72.38 Q70.64,72.62 70.64,73.38 C70.64,74.12 70.08,74.58 69.21,74.58 H67.32 Z
+                    M68.37,71.25 V72.02 H69.02 Q69.43,72.02 69.43,71.63 Q69.43,71.25 69.02,71.25 Z
+                    M68.37,72.82 V73.68 H69.06 Q69.55,73.68 69.55,73.25 Q69.55,72.82 69.06,72.82 Z
+                    M71.16,70.35 H72.23 V72.96 Q72.23,73.67 72.88,73.67 Q73.54,73.67 73.54,72.96 V70.35 H74.59 V73 C74.59,74.06 73.94,74.67 72.88,74.67 C71.82,74.67 71.16,74.06 71.16,73 Z
+                    M78.99,71.48 L78,71.82 Q77.71,71.27 77.18,71.27 C76.57,71.27 76.19,71.73 76.19,72.46 C76.19,73.18 76.57,73.67 77.2,73.67 Q77.85,73.67 78.02,73.08 H77.2 V72.22 H79.08 V72.8 C79.08,73.99 78.29,74.67 77.18,74.67 C75.91,74.67 75.09,73.74 75.09,72.46 C75.09,71.18 75.91,70.25 77.18,70.25 Q78.49,70.25 78.99,71.48 Z" />
+        </vector>
+    </item>
+</layer-list>
