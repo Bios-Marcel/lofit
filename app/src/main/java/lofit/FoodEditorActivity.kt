@@ -21,6 +21,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.text.buildSpannedString
 import androidx.core.text.color
+import androidx.core.text.scale
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -42,6 +43,15 @@ internal class FoodEditorActivity : AppCompatActivity() {
     private lateinit var draft: Bundle
     private lateinit var root: FrameLayout
     private val pictureWorker = Executors.newSingleThreadExecutor()
+    private val nutritionFields =
+        listOf(
+            FoodMetric.FAT,
+            FoodMetric.CARBS,
+            FoodMetric.SUGAR,
+            FoodMetric.FIBER,
+            FoodMetric.PROTEIN,
+            FoodMetric.SALT,
+        )
     private val cancelCrop =
         object : OnBackPressedCallback(false) {
             override fun handleOnBackPressed() = closeCrop()
@@ -220,7 +230,7 @@ internal class FoodEditorActivity : AppCompatActivity() {
             if (labelCheck.text.isEmpty()) labelCheck.visibility = View.GONE
             body.addView(labelCheck)
             val fields =
-                FoodMetric.inputs.associateWith {
+                (listOf(FoodMetric.WEIGHT, FoodMetric.PRICE) + nutritionFields).associateWith {
                     field(body, it.ingredientLabel, it.name, decimal = true)
                 }
             val energy = FoodMetric.CALORIES
@@ -233,26 +243,43 @@ internal class FoodEditorActivity : AppCompatActivity() {
                         fields.getValue(it).text.toString().foodNumber() ?: 0.0
                     }
                 val estimate = energy.format(energy.valueIn(macros))
+                val scanned = draft.getString("scannedCalories")?.let { "$it kcal" }
                 val confirmed = draft.getBoolean("caloriesConfirmed")
-                calories.text =
-                    if (confirmed) {
-                        buildSpannedString {
-                            append(estimate)
-                            append('\u00A0')
-                            color(ui.color(R.color.target_green)) { append('✓') }
+                calories.text = buildSpannedString {
+                    append(estimate)
+                    if (scanned != null) {
+                        append(' ')
+                        color(ui.color(android.R.color.darker_gray)) {
+                            scale(0.78f) { append("($scanned)") }
                         }
-                    } else estimate
-                calories.contentDescription =
-                    if (confirmed) "$estimate. Matches scanned calories within 1 kcal." else null
-            }
-            fields.forEach { (metric, input) ->
-                input.doAfterTextChanged {
-                    if (metric != FoodMetric.WEIGHT && metric != FoodMetric.PRICE) {
-                        draft.remove("labelCheck")
-                        draft.remove("caloriesConfirmed")
-                        labelCheck.visibility = View.GONE
-                        updateCalories()
                     }
+                    if (confirmed) {
+                        append('\u00A0')
+                        color(ui.color(R.color.target_green)) { append('✓') }
+                    }
+                }
+                calories.contentDescription =
+                    if (scanned != null || confirmed) {
+                        buildString {
+                            append(estimate)
+                            if (scanned != null) append(". Scanned $scanned")
+                            if (confirmed) append(". Matches scanned calories within 1 kcal.")
+                        }
+                    } else null
+            }
+            val warnings = draft.getBundle("nutritionWarnings")
+            nutritionFields.forEach { metric ->
+                val input = fields.getValue(metric)
+                warnings?.getString(metric.name)?.let { input.error = it }
+                input.doAfterTextChanged {
+                    if (warnings?.containsKey(metric.name) == true) {
+                        warnings.remove(metric.name)
+                        input.error = null
+                    }
+                    draft.remove("labelCheck")
+                    draft.remove("caloriesConfirmed")
+                    labelCheck.visibility = View.GONE
+                    updateCalories()
                 }
             }
             updateCalories()
@@ -490,7 +517,26 @@ internal class FoodEditorActivity : AppCompatActivity() {
                         if (metric != FoodMetric.CALORIES)
                             draft.putString(metric.name, formatWeight(value))
                     }
+                    draft.putBundle(
+                        "nutritionWarnings",
+                        Bundle().apply {
+                            for (metric in nutritionFields) {
+                                val message =
+                                    when {
+                                        metric !in label.amounts -> "Value not found on label"
+                                        metric in label.lowConfidenceReadings ->
+                                            "Check scanned value"
+                                        else -> continue
+                                    }
+                                putString(metric.name, message)
+                            }
+                        },
+                    )
                     val energy = FoodMetric.CALORIES
+                    draft.putString(
+                        "scannedCalories",
+                        label.amounts[energy]?.let { formatWeight(it) },
+                    )
                     val macros =
                         FoodMetric.energySources
                             .mapNotNull { metric ->

@@ -48,6 +48,74 @@ class NutritionLabelTest {
     }
 
     @Test
+    fun readsCaloriesWhenOneRowHasAnExtraNumber() {
+        val label =
+            NutritionLabelParser.parse(
+                row(0, 510 to "pro 100 g") +
+                    row(30, 5 to "Energie", 550 to "179 kcal") +
+                    row(60, 5 to "Fett", 550 to "6 g") +
+                    row(90, 5 to "Salz", 550 to "0,8", 605 to "8")
+            )
+        assertEquals(179.0, label.amounts[FoodMetric.CALORIES] ?: Double.NaN, 0.0)
+    }
+
+    @Test
+    fun flagsLowConfidenceWithinTheSelectedValue() {
+        val words =
+            row(0, 400 to "pro 100 g") +
+                row(30, 5 to "Fett", 400 to "1 , 5 g") +
+                row(60, 5 to "Eiweiß", 400 to "2 g")
+        val scored = words.map { word ->
+            val confidence =
+                when (word.text) {
+                    ",",
+                    "Eiweiß" -> 0.4f
+                    "2" -> 0.5f
+                    else -> 0.9f
+                }
+            word.copy(confidence = confidence)
+        }
+        val label = NutritionLabelParser.parse(scored)
+        assertEquals(mapOf(FoodMetric.FAT to 1.5, FoodMetric.PROTEIN to 2.0), label.amounts)
+        assertEquals(setOf(FoodMetric.FAT), label.lowConfidenceReadings)
+    }
+
+    @Test
+    fun readsDecimalWhenTheLeadingZeroIsMissingOrLooksLikeTheLetterO() {
+        val label =
+            NutritionLabelParser.parse(
+                row(0, 400 to "pro 100 g") +
+                    row(30, 5 to "Zucker", 400 to ",5 g") +
+                    row(60, 5 to "Salz", 400 to "O , 81 g")
+            )
+        assertEquals(mapOf(FoodMetric.SUGAR to 0.5, FoodMetric.SALT to 0.81), label.amounts)
+    }
+
+    @Test
+    fun infersADecimalInsideACellAndKeepsSeparateColumnsApart() {
+        val label =
+            NutritionLabelParser.parse(
+                row(0, 230 to "pro 100 g", 425 to "pro Portion") +
+                    row(30, 5 to "Fett", 230 to "1 9 g", 425 to "4 g") +
+                    row(60, 5 to "Kohlenhydrate", 230 to "3", 425 to "8 g")
+            )
+        assertEquals(mapOf(FoodMetric.FAT to 1.9, FoodMetric.CARBS to 3.0), label.amounts)
+        assertEquals(setOf(FoodMetric.FAT), label.lowConfidenceReadings)
+    }
+
+    @Test
+    fun preservesTrailingZerosWhenComparingDecimalReadings() {
+        val heading = row(0, 400 to "pro 100 g")
+        val missingComma = NutritionLabelParser.parse(heading + row(30, 5 to "Salz", 400 to "40 g"))
+        val inferred = NutritionLabelParser.parse(heading + row(30, 5 to "Salz", 400 to "0 40 g"))
+        val explicit = NutritionLabelParser.parse(heading + row(30, 5 to "Salz", 400 to "0,40 g"))
+        assertEquals(explicit, NutritionLabelScanner.merge(missingComma, explicit))
+        assertEquals(explicit, NutritionLabelScanner.merge(explicit, missingComma))
+        assertEquals(setOf(FoodMetric.SALT), inferred.lowConfidenceReadings)
+        assertEquals(explicit, NutritionLabelScanner.merge(inferred, explicit))
+    }
+
+    @Test
     fun declinesValuesOnlyGivenPer100Millilitres() {
         val label =
             NutritionLabelParser.parse(
@@ -68,11 +136,7 @@ class NutritionLabelTest {
                 row(132, 5 to "- davon Zucker", 185 to "12 9", 365 to "6g") +
                 row(158, 5 to "Ballaststoffe", 192 to "7,39", 365 to "3,65g") +
                 row(184, 5 to "Eiweiß", 198 to "18g", 375 to "9g")
-        val tilted = words.map { word ->
-            val shift = (word.centerX * 0.15).toInt()
-            word.copy(top = word.top + shift, bottom = word.bottom + shift)
-        }
-        val label = NutritionLabelParser.parse(tilted, slope = 0.15)
+        val label = NutritionLabelParser.parse(tilt(words, 0.15), slope = 0.15)
         assertEquals(
             mapOf(
                 FoodMetric.CALORIES to 332.0,
@@ -85,6 +149,33 @@ class NutritionLabelTest {
             label.amounts,
         )
         assertEquals(setOf(FoodMetric.FIBER), label.weakReadings)
+    }
+
+    @Test
+    fun recoversThePer100GramColumnWhenOcrMissesTheTableTilt() {
+        val words =
+            row(0, 390 to "pro Portion", 520 to "pro 100 g") +
+                row(45, 5 to "Fett", 390 to "3 g", 520 to "6 g") +
+                row(90, 5 to "Kohlenhydrate", 382 to "10,5 g", 513 to "21 g") +
+                row(135, 5 to "Eiweiß", 390 to "4 g", 520 to "8 g")
+        for (slope in listOf(-0.035, 0.035)) {
+            val label = NutritionLabelParser.parse(tilt(words, slope))
+            assertEquals(
+                mapOf(FoodMetric.FAT to 6.0, FoodMetric.CARBS to 21.0, FoodMetric.PROTEIN to 8.0),
+                label.amounts,
+            )
+        }
+    }
+
+    @Test
+    fun doesNotRecoverTiltedValuesFromAPortionOnlyTable() {
+        val words =
+            row(0, 520 to "pro Portion") +
+                row(45, 5 to "Fett", 520 to "6 g") +
+                row(90, 5 to "Kohlenhydrate", 513 to "21 g") +
+                row(135, 5 to "Eiweiß", 520 to "8 g")
+        val label = NutritionLabelParser.parse(tilt(words, 0.035))
+        assertTrue(label.amounts.isEmpty())
     }
 
     @Test
@@ -103,6 +194,11 @@ class NutritionLabelTest {
         assertEquals(false, label.caloriesMatch(101.01))
         assertNull(NutritionLabel(amounts - FoodMetric.FAT).caloriesMatch(100.0))
         assertNull(NutritionLabel(amounts - FoodMetric.CALORIES).caloriesMatch(100.0))
+    }
+
+    private fun tilt(words: List<LabelWord>, slope: Double) = words.map { word ->
+        val shift = (word.centerX * slope).toInt()
+        word.copy(top = word.top + shift, bottom = word.bottom + shift)
     }
 
     private fun row(top: Int, vararg cells: Pair<Int, String>): List<LabelWord> =

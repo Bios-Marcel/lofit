@@ -32,7 +32,10 @@ internal object NutritionLabelScanner {
 
             val enhanced = retry(original, threshold = false)
             val best =
-                if (needsSecondPass(enhanced) && enhanced.energyGap() > 12.0)
+                if (
+                    needsSecondPass(enhanced) &&
+                        (enhanced.energyGap() > 12.0 || enhanced.sugarExceedsCarbs())
+                )
                     retry(enhanced, threshold = true)
                 else enhanced
             return discardImpossibleValues(best)
@@ -46,9 +49,12 @@ internal object NutritionLabelScanner {
             (label.basisUnconfirmed ||
                 !label.amounts.keys.containsAll(commonFields) ||
                 label.weakReadings.isNotEmpty() ||
+                label.lowConfidenceReadings.isNotEmpty() ||
+                label.sugarExceedsCarbs() ||
+                label.amounts[FoodMetric.SALT]?.let { it > 0.0 && it % 1.0 == 0.0 } == true ||
                 label.energyGap() > 1.0)
 
-    private fun merge(original: NutritionLabel, retry: NutritionLabel): NutritionLabel {
+    internal fun merge(original: NutritionLabel, retry: NutritionLabel): NutritionLabel {
         if (original.amounts.isEmpty()) return retry
         if (retry.volumeOnly) return if (original.basisUnconfirmed) retry else original
         if (original.basisUnconfirmed != retry.basisUnconfirmed) {
@@ -63,8 +69,12 @@ internal object NutritionLabelScanner {
             secondary.amounts.filter { (metric, value) ->
                 val first = primary.amounts[metric] ?: return@filter true
                 when {
-                    retainsDecimal(first, value) -> false
-                    retainsDecimal(value, first) -> true
+                    first == value &&
+                        metric in secondary.valuesWithoutDecimal &&
+                        metric in primary.lowConfidenceReadings &&
+                        metric !in secondary.lowConfidenceReadings -> true
+                    retainsDecimal(primary, secondary, metric) -> false
+                    retainsDecimal(secondary, primary, metric) -> true
                     else -> metric in primary.weakReadings && metric !in secondary.weakReadings
                 }
             }
@@ -73,20 +83,28 @@ internal object NutritionLabelScanner {
             weakReadings =
                 (primary.weakReadings - missingOrWeaker.keys) +
                     secondary.weakReadings.intersect(missingOrWeaker.keys),
+            lowConfidenceReadings =
+                (primary.lowConfidenceReadings - missingOrWeaker.keys) +
+                    secondary.lowConfidenceReadings.intersect(missingOrWeaker.keys),
+            valuesWithoutDecimal =
+                (primary.valuesWithoutDecimal - missingOrWeaker.keys) +
+                    secondary.valuesWithoutDecimal.filterKeys { it in missingOrWeaker },
         )
     }
 
-    private fun retainsDecimal(decimal: Double, whole: Double): Boolean =
-        decimal % 1 != 0.0 &&
-            whole % 1 == 0.0 &&
-            decimal.toBigDecimal().stripTrailingZeros().unscaledValue().toDouble() == whole
+    private fun retainsDecimal(
+        decimal: NutritionLabel,
+        whole: NutritionLabel,
+        metric: FoodMetric,
+    ): Boolean {
+        val withoutDecimal = decimal.valuesWithoutDecimal[metric] ?: return false
+        return metric !in whole.valuesWithoutDecimal && withoutDecimal == whole.amounts[metric]
+    }
 
     private fun discardImpossibleValues(label: NutritionLabel): NutritionLabel {
         val amounts = label.amounts
         val invalid = mutableSetOf<FoodMetric>()
-        val sugar = amounts[FoodMetric.SUGAR]
-        val carbs = amounts[FoodMetric.CARBS]
-        if (sugar != null && carbs != null && sugar > carbs) invalid.add(FoodMetric.SUGAR)
+        if (label.sugarExceedsCarbs()) invalid.add(FoodMetric.SUGAR)
 
         val kcal = amounts[FoodMetric.CALORIES]
         if (kcal != null) {
@@ -96,7 +114,18 @@ internal object NutritionLabelScanner {
                 if ((amounts[metric] ?: 0.0) * metric.kcalPerGram > limit) invalid.add(metric)
             }
         }
-        return label.copy(amounts = amounts - invalid, weakReadings = label.weakReadings - invalid)
+        return label.copy(
+            amounts = amounts - invalid,
+            weakReadings = label.weakReadings - invalid,
+            lowConfidenceReadings = label.lowConfidenceReadings - invalid,
+            valuesWithoutDecimal = label.valuesWithoutDecimal - invalid,
+        )
+    }
+
+    private fun NutritionLabel.sugarExceedsCarbs(): Boolean {
+        val sugar = amounts[FoodMetric.SUGAR] ?: return false
+        val carbs = amounts[FoodMetric.CARBS] ?: return false
+        return sugar > carbs
     }
 
     private fun NutritionLabel.energyGap(): Double {
@@ -136,7 +165,14 @@ internal object NutritionLabelScanner {
         val words = lines.flatMap { line ->
             line.elements.mapNotNull { element ->
                 element.boundingBox?.let {
-                    LabelWord(element.text, it.left, it.top, it.right, it.bottom)
+                    LabelWord(
+                        element.text,
+                        it.left,
+                        it.top,
+                        it.right,
+                        it.bottom,
+                        element.confidence.takeIf { confidence -> confidence in 0f..1f },
+                    )
                 }
             }
         }

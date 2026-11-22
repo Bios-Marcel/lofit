@@ -12,9 +12,13 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
+import android.text.style.RelativeSizeSpan
 import android.util.AtomicFile
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.TextView
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.test.core.app.ActivityScenario
@@ -297,13 +301,13 @@ class FoodFlowTest {
                         drawText("Nährwerte pro 100 g", 220f, 195f, paint)
                         val rows =
                             listOf(
-                                "Energie" to "178 kcal",
+                                "Energie" to "179 kcal",
                                 "Fett" to "6 g",
                                 "Kohlenhydrate" to "21 g",
-                                "davon Zucker" to "4 g",
+                                "davon Zucker" to "",
                                 "Ballaststoffe" to "4 g",
                                 "Eiweiß" to "8 g",
-                                "Salz" to "0,8 g",
+                                "Salz" to "0,8",
                             )
                         rows.forEachIndexed { index, (label, amount) ->
                             val y = 255f + index * 62f
@@ -330,7 +334,7 @@ class FoodFlowTest {
             val editor =
                 Intent(context, FoodEditorActivity::class.java)
                     .putExtra("section", FoodSection.INGREDIENTS.name)
-            ActivityScenario.launch<FoodEditorActivity>(editor).use {
+            ActivityScenario.launch<FoodEditorActivity>(editor).use { scenario ->
                 onView(withText("Scan nutrition label")).perform(scrollTo(), click())
                 onView(isRoot())
                     .perform(
@@ -340,9 +344,40 @@ class FoodFlowTest {
                             }
                         }
                     )
-                onView(withText(startsWith("178 kcal"))).check(matches(isEnabled()))
-                onView(allOf(withContentDescription(FoodMetric.FAT.ingredientLabel), withText("6")))
-                    .check(matches(isEnabled()))
+                onView(withText(startsWith("178 kcal"))).check { view, failure ->
+                    if (failure != null) throw failure
+                    val text = (view as TextView).text as Spanned
+                    assertEquals("178 kcal (179 kcal)\u00A0✓", text.toString())
+                    val start = text.indexOf('(')
+                    val end = text.indexOf(')') + 1
+                    val size = text.getSpans(start, end, RelativeSizeSpan::class.java).single()
+                    val color = text.getSpans(start, end, ForegroundColorSpan::class.java).single()
+                    assertTrue(size.sizeChange < 1f)
+                    assertEquals(
+                        view.context.getColor(android.R.color.darker_gray),
+                        color.foregroundColor,
+                    )
+                }
+                onView(withContentDescription(FoodMetric.FAT.ingredientLabel))
+                    .check(matches(withText("6")))
+                    .perform(scrollTo(), replaceText("7"))
+                onView(withText("187 kcal (179 kcal)")).check(matches(isEnabled()))
+                val sugars = onView(withContentDescription(FoodMetric.SUGAR.ingredientLabel))
+                val salt = onView(withContentDescription(FoodMetric.SALT.ingredientLabel))
+                val protein = onView(withContentDescription(FoodMetric.PROTEIN.ingredientLabel))
+                val missing = hasErrorText("Value not found on label")
+                val uncertain = hasErrorText("Check scanned value")
+                onView(withContentDescription(FoodMetric.CARBS.ingredientLabel))
+                    .check(matches(not(uncertain)))
+                onView(withContentDescription(FoodMetric.FIBER.ingredientLabel))
+                    .check(matches(not(uncertain)))
+                protein.check(matches(uncertain))
+                sugars.check(matches(allOf(withText(""), missing)))
+                salt.check(matches(allOf(withText(formatWeight(0.8)), not(uncertain))))
+                sugars.perform(scrollTo(), replaceText("4"))
+                scenario.recreate()
+                sugars.check(matches(allOf(withText("4"), not(missing))))
+                protein.check(matches(uncertain))
                 assertFalse(output.exists())
             }
         } finally {
