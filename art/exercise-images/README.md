@@ -21,7 +21,10 @@ View: {{FRONT, SIDE, REAR, OR THREE-QUARTER}}
 
 Create one polished instructional illustration of the reference athlete doing
 the exercise. Keep his face, hair, build, off-white T-shirt, deep green shorts,
-white socks, and gray shoes unchanged. Use the same near-black charcoal card
+and white socks. Render the shirt and shorts with smooth color, broad shading,
+and only the folds needed for the pose. Match the seed's plain, solid light warm
+gray slip-ons with smooth uppers and flat soles in the same color. Omit laces,
+eyelets, seams, stripes, logos, tread, and texture. Use the same near-black charcoal card
 background and softly cel-shaded 2D finish as the reference. Show the whole
 body and all equipment, centered with generous padding, on a wide 2:1 canvas.
 Choose a clear, anatomically correct key position.
@@ -87,7 +90,9 @@ Use `style-seed.png` as the first reference, `style-seed-female.png` as the
 female character reference, and the original exercise illustration as the
 pose and equipment reference. Preserve the exercise, view, outfit, background,
 and rendering style. The female athlete has dark brown hair in a ponytail,
-an off-white T-shirt, deep green shorts, white socks, and gray shoes.
+an off-white T-shirt, deep green shorts, white socks, and the same plain gray
+slip-ons. Match the female seed's smooth fabric and plain shoes. Keep only the
+folds needed for the pose.
 
 `female-variants.json` records every source, destination, exercise name, and
 full prompt from the built-in `image_gen` generation run. Normalize female
