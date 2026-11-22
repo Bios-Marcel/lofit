@@ -71,7 +71,7 @@ class HevyExerciseMappingTest {
         assertEquals(
             "D04AC939",
             HevyExerciseMapping.find(
-                    exercises.getValue("back-squat"),
+                    exercises.getValue("barbell-squat"),
                     listOf(set(60.0)),
                     templates,
                 )

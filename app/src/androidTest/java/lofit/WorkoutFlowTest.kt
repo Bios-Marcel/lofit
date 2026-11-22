@@ -1033,9 +1033,9 @@ class WorkoutFlowTest {
             .check(matches(isDisplayed()))
         onView(withText("Add exercise")).perform(scrollTo(), click())
         onView(withHint("Search name or muscle")).perform(replaceText("squat"))
-        onView(withContentDescription("Back squat illustration")).check(matches(isDisplayed()))
-        onView(withContentDescription("Add Back squat")).perform(scrollTo(), click())
-        onView(withText("Back squat")).check(matches(isDisplayed()))
+        onView(withContentDescription("Barbell Squat illustration")).check(matches(isDisplayed()))
+        onView(withContentDescription("Add Barbell Squat")).perform(scrollTo(), click())
+        onView(withText("Barbell Squat")).check(matches(isDisplayed()))
         awaitWorkoutNotification {
             it.extras.getCharSequence(Notification.EXTRA_TEXT).toString() ==
                 "Add a set to continue" && it.actions.isNullOrEmpty()
@@ -1093,7 +1093,7 @@ class WorkoutFlowTest {
                 "Set 1 of 1 · 7 kg × 8 reps"
         }
         assertEquals(
-            "Back squat",
+            "Barbell Squat",
             activeNotification.extras.getCharSequence(Notification.EXTRA_TITLE).toString(),
         )
         assertEquals(
@@ -1416,8 +1416,8 @@ class WorkoutFlowTest {
 
         onView(withText(R.string.start_workout)).perform(click())
         onView(withText("Add exercise")).perform(scrollTo(), click())
-        onView(withHint("Search name or muscle")).perform(replaceText("SqUa BACK"))
-        onView(withContentDescription("Add Back squat")).check(matches(isDisplayed()))
+        onView(withHint("Search name or muscle")).perform(replaceText("SqUa BARB"))
+        onView(withContentDescription("Add Barbell Squat")).check(matches(isDisplayed()))
         onView(withHint("Search name or muscle")).perform(replaceText("weighted push"))
         onView(withContentDescription("Add Weighted Push-up"))
             .perform(scrollTo())
@@ -1432,7 +1432,7 @@ class WorkoutFlowTest {
         // The tall workout is setup; keep one add-set check per card and the final picker action.
         seedWorkout(
             WorkoutExercise(
-                exerciseId = "back-squat",
+                exerciseId = "barbell-squat",
                 plannedSets = MutableList(7) { PlannedSet() },
             ),
             WorkoutExercise(exerciseId = "plank", plannedSets = MutableList(7) { PlannedSet() }),
@@ -1443,7 +1443,7 @@ class WorkoutFlowTest {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         val activity = instrumentation.startActivitySync(intent)
 
-        listOf("Back squat", "Plank").forEach { name ->
+        listOf("Barbell Squat", "Plank").forEach { name ->
             val addSet =
                 allOf(
                     withText("Add set"),
@@ -1984,7 +1984,7 @@ class WorkoutFlowTest {
                     mutableListOf(
                         WorkoutExercise(exerciseId = "bench-press"),
                         WorkoutExercise(exerciseId = "plank"),
-                        WorkoutExercise(exerciseId = "back-squat"),
+                        WorkoutExercise(exerciseId = "barbell-squat"),
                     ),
             )
         repository.save()
@@ -2000,7 +2000,7 @@ class WorkoutFlowTest {
         onView(withContentDescription("Reorder Plank"))
             .perform(scrollTo(), dragExercise(-1, longPress = false))
         assertEquals(
-            listOf("bench-press", "plank", "back-squat"),
+            listOf("bench-press", "plank", "barbell-squat"),
             LofitRepository(instrumentation.targetContext).data.activeWorkout!!.exercises.map {
                 it.exerciseId
             },
@@ -2008,14 +2008,14 @@ class WorkoutFlowTest {
         onView(withContentDescription("Reorder Plank"))
             .perform(scrollTo(), dragExercise(-1, cancel = true))
         assertEquals(
-            listOf("bench-press", "plank", "back-squat"),
+            listOf("bench-press", "plank", "barbell-squat"),
             LofitRepository(instrumentation.targetContext).data.activeWorkout!!.exercises.map {
                 it.exerciseId
             },
         )
         onView(withContentDescription("Reorder Plank")).perform(scrollTo(), dragExercise(-1))
         assertEquals(
-            listOf("plank", "bench-press", "back-squat"),
+            listOf("plank", "bench-press", "barbell-squat"),
             LofitRepository(instrumentation.targetContext).data.activeWorkout!!.exercises.map {
                 it.exerciseId
             },
@@ -2026,7 +2026,7 @@ class WorkoutFlowTest {
         onView(withText("Plank")).check { view, _ -> assertSame(survivingHeading[0], view) }
         onView(withContentDescription("Reorder Plank")).perform(scrollTo(), dragExercise(1))
         assertEquals(
-            listOf("bench-press", "plank", "back-squat"),
+            listOf("bench-press", "plank", "barbell-squat"),
             LofitRepository(instrumentation.targetContext).data.activeWorkout!!.exercises.map {
                 it.exerciseId
             },
@@ -2093,7 +2093,7 @@ class WorkoutFlowTest {
                     mutableListOf(
                         RoutineExercise(exerciseId = "bench-press"),
                         RoutineExercise(exerciseId = "plank"),
-                        RoutineExercise(exerciseId = "back-squat"),
+                        RoutineExercise(exerciseId = "barbell-squat"),
                     ),
             )
         )
@@ -2132,7 +2132,7 @@ class WorkoutFlowTest {
         onView(withText("Plank")).check { view, _ -> assertSame(survivingHeading[0], view) }
         onView(withText("Save routine")).perform(scrollTo(), click())
         assertEquals(
-            listOf("plank", "back-squat"),
+            listOf("plank", "barbell-squat"),
             LofitRepository(instrumentation.targetContext).data.routines.single().exercises.map {
                 it.exerciseId
             },

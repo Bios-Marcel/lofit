@@ -51,7 +51,7 @@ class LockedWorkoutVoiceTest {
                     exercises =
                         mutableListOf(
                             WorkoutExercise(
-                                exerciseId = "back-squat",
+                                exerciseId = "barbell-squat",
                                 plannedSets =
                                     mutableListOf(
                                         PlannedSet(weightKg = 50.0, reps = 8),

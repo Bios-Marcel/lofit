@@ -17,7 +17,6 @@ internal object HevyExerciseMapping {
         mapOf(
             "archer-push-up" to "392887AA", // Push Up
             "back-extension" to "A05C064D", // Back Extension (Machine)
-            "back-squat" to "D04AC939", // Squat (Barbell)
             "bench-press" to "79D0BB3A", // Bench Press (Barbell)
             "cable-tricep-extension" to "21310F5F", // Triceps Extension (Cable)
             "clap-push-up" to "10D76E8F", // Clap Push Ups
@@ -51,7 +50,6 @@ internal object HevyExerciseMapping {
             "back-flyes-with-bands" to "E8D86EE8", // Band Pullaparts
             "barbell-bench-press-medium-grip" to "79D0BB3A", // Bench Press (Barbell)
             "barbell-curl" to "A5AC6449", // Bicep Curl (Barbell)
-            "barbell-deadlift" to "C6272009", // Deadlift (Barbell)
             "barbell-glute-bridge" to "49C922A1", // Glute Bridge (Barbell)
             "barbell-guillotine-bench-press" to "79D0BB3A", // Bench Press (Barbell)
             "barbell-hack-squat" to "AC5A4C58", // Hack Squat
@@ -351,6 +349,8 @@ internal object HevyExerciseMapping {
     // LEGACY: Keep the Hevy templates for saved workouts that use retired exercises.
     private val retiredTemplateIds =
         mapOf(
+            "back-squat" to "D04AC939",
+            "barbell-deadlift" to "C6272009",
             "bench-press-powerlifting" to "79D0BB3A",
             "bench-press-with-chains" to "79D0BB3A",
             "box-squat-with-chains" to "38FC1AB9",
@@ -360,6 +360,7 @@ internal object HevyExerciseMapping {
 
     private val aliases =
         mapOf(
+            // LEGACY: Match the retired Back squat by title on older template lists.
             "back-squat" to "Squat (Barbell)",
             "bench-press" to "Bench Press (Barbell)",
             "incline-dumbbell-bench-press" to "Incline Bench Press (Dumbbell)",

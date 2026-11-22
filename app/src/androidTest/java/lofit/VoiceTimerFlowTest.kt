@@ -96,7 +96,7 @@ class VoiceTimerFlowTest {
     @Test
     fun spokenDoneCompletesRepetitionSetAndSpokenSkipEndsRest() {
         LofitRepository(context).apply {
-            item = item.copy(exerciseId = "back-squat")
+            item = item.copy(exerciseId = "barbell-squat")
             data.activeWorkout!!.exercises[0] = item
             data.activeWorkout!!.defaultRestSeconds = 90
             save()
@@ -495,7 +495,7 @@ class VoiceTimerFlowTest {
                 .exercises
                 .add(
                     WorkoutExercise(
-                        exerciseId = "back-squat",
+                        exerciseId = "barbell-squat",
                         plannedSets = MutableList(20) { PlannedSet() },
                     )
                 )

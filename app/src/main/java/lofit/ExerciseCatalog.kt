@@ -6,12 +6,12 @@ object ExerciseCatalog {
         val baseExercises =
             listOf(
                     Exercise(
-                        "back-squat",
-                        "Back squat",
+                        "barbell-squat",
+                        "Barbell Squat",
                         ExerciseType.REPETITIONS,
                         false,
                         "Quadriceps",
-                        "Glutes, hamstrings",
+                        "Calves, Glutes, Hamstrings, Lower Back",
                         30,
                         imageResource = R.drawable.exercise_squat,
                     ),
@@ -2824,16 +2824,6 @@ object ExerciseCatalog {
                         imageName = "exercise_db_226",
                     ),
                     Exercise(
-                        "barbell-deadlift",
-                        "Barbell Deadlift",
-                        ExerciseType.REPETITIONS,
-                        false,
-                        "Lower Back",
-                        "Calves, Forearms, Glutes, Hamstrings, Lats, Middle Back, Quadriceps, Traps",
-                        30,
-                        imageName = "exercise_db_227",
-                    ),
-                    Exercise(
                         "barbell-glute-bridge",
                         "Barbell Glute Bridge",
                         ExerciseType.REPETITIONS,
@@ -2962,16 +2952,6 @@ object ExerciseCatalog {
                         "Lower Back",
                         30,
                         imageName = "exercise_db_241",
-                    ),
-                    Exercise(
-                        "barbell-squat",
-                        "Barbell Squat",
-                        ExerciseType.REPETITIONS,
-                        false,
-                        "Quadriceps",
-                        "Calves, Glutes, Hamstrings, Lower Back",
-                        30,
-                        imageName = "exercise_db_242",
                     ),
                     Exercise(
                         "barbell-squat-to-a-bench",
