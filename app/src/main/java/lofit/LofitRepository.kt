@@ -15,6 +15,8 @@ class LofitRepository(context: Context) {
     private companion object {
         const val SCHEMA_VERSION = 4
         private val writer = Executors.newSingleThreadExecutor()
+        // AtomicFile.openRead can remove the staging file of an in-progress write.
+        private val fileLock = Any()
     }
 
     private val stateFile = AtomicFile(File(context.filesDir, "lofit-data.json"))
@@ -86,33 +88,31 @@ class LofitRepository(context: Context) {
     }
 
     private fun load(): AppData {
-        if (!exists(stateFile)) {
-            return AppData().also {
-                write("[]", historyFile)
+        val (root, history) =
+            synchronized(fileLock) {
+                if (!exists(stateFile)) return AppData().also { write("[]", historyFile) }
+                val root = JSONObject(stateFile.readFully().toString(Charsets.UTF_8))
+                val version = root.optInt("schemaVersion", 0)
+                check(version == SCHEMA_VERSION) { "Unsupported data schema: $version" }
+                root to historyFile.readFully().toString(Charsets.UTF_8)
             }
-        }
-        val raw = stateFile.readFully().toString(Charsets.UTF_8)
-        val root = JSONObject(raw)
-        return when (val version = root.optInt("schemaVersion", 0)) {
-            SCHEMA_VERSION -> {
-                val history = historyFile.readFully().toString(Charsets.UTF_8)
-                decode(root, JSONArray(history).mapObjects(::decodeWorkout).toMutableList())
-            }
-            else -> error("Unsupported data schema: $version")
-        }
+        return decode(root, JSONArray(history).mapObjects(::decodeWorkout).toMutableList())
     }
 
     private fun exists(file: AtomicFile): Boolean =
         file.baseFile.exists() || File("${file.baseFile.path}.bak").exists()
 
     private fun write(raw: String, file: AtomicFile = stateFile) {
-        val stream = file.startWrite()
-        try {
-            stream.write(raw.toByteArray(Charsets.UTF_8))
-            file.finishWrite(stream)
-        } catch (failure: Throwable) {
-            file.failWrite(stream)
-            throw failure
+        val bytes = raw.toByteArray(Charsets.UTF_8)
+        synchronized(fileLock) {
+            val stream = file.startWrite()
+            try {
+                stream.write(bytes)
+                file.finishWrite(stream)
+            } catch (failure: Throwable) {
+                file.failWrite(stream)
+                throw failure
+            }
         }
     }
 

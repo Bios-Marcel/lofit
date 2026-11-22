@@ -7,6 +7,9 @@ import androidx.test.platform.app.InstrumentationRegistry
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.Random
+import java.util.concurrent.CyclicBarrier
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -29,6 +32,29 @@ class TimeKeywordDetectorTest {
             if (model.accept(samples.copyOfRange(offset, end)) != null) detections.add(end)
         }
         return detections
+    }
+
+    @Test
+    fun independentRecognizersCanLoadAndDecodeConcurrently() {
+        val audio = samples("time-natural")
+        val workers = Executors.newFixedThreadPool(2)
+        val start = CyclicBarrier(2)
+        try {
+            val results =
+                List(2) {
+                    workers.submit<List<Int>> {
+                        List(3) {
+                            start.await(15, TimeUnit.SECONDS)
+                            TimeKeywordDetector(instrumentation.targetContext).use { model ->
+                                detect(model, audio).size
+                            }
+                        }
+                    }
+                }
+            results.forEach { assertEquals(listOf(1, 1, 1), it.get(30, TimeUnit.SECONDS)) }
+        } finally {
+            workers.shutdownNow()
+        }
     }
 
     @Test

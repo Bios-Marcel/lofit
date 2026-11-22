@@ -25,37 +25,44 @@ internal class TimeKeywordDetector(context: Context) : VoiceKeywordDetector {
     // LEGACY: Keep number words as ignored competitors to reduce false controls from set phrases.
     private val grammar =
         context.assets.open("voice-time/grammar.json").bufferedReader().use { it.readText() }
-    private val model = Model(prepareModel(context).absolutePath)
+    private val model = synchronized(voskLock) { Model(prepareModel(context).absolutePath) }
     private var recognizer: Recognizer? = null
     private val commands = VoiceCommandGate()
 
-    override fun reset() {
-        // A capture may stop before even one decoder frame exists. Reusing Vosk's partial
-        // pipeline in that state can abort natively; retain the model, replace the decoder.
-        recognizer?.close()
-        recognizer = null
-        commands.reset()
-    }
+    override fun reset() =
+        synchronized(voskLock) {
+            // A capture may stop before even one decoder frame exists. Replace the decoder
+            // because reusing Vosk's partial pipeline in that state can abort natively.
+            recognizer?.close()
+            recognizer = null
+            commands.reset()
+        }
 
-    override fun accept(samples: ShortArray, count: Int): VoiceCommand? {
-        val recognizer = recognizer ?: Recognizer(model, 16_000f, grammar).also { recognizer = it }
-        val ended = recognizer.acceptWaveForm(samples, count)
-        val result = JSONObject(if (ended) recognizer.result else recognizer.partialResult)
-        val text = result.optString(if (ended) "text" else "partial")
-        return commands.accept(text, ended)
-    }
+    override fun accept(samples: ShortArray, count: Int): VoiceCommand? =
+        synchronized(voskLock) {
+            val recognizer =
+                recognizer ?: Recognizer(model, 16_000f, grammar).also { recognizer = it }
+            val ended = recognizer.acceptWaveForm(samples, count)
+            val result = JSONObject(if (ended) recognizer.result else recognizer.partialResult)
+            val text = result.optString(if (ended) "text" else "partial")
+            commands.accept(text, ended)
+        }
 
-    override fun close() {
-        recognizer?.close()
-        recognizer = null
-        model.close()
-    }
+    override fun close() =
+        synchronized(voskLock) {
+            recognizer?.close()
+            recognizer = null
+            model.close()
+        }
 
     private companion object {
         const val MODEL_NAME = "vosk-model-small-en-us-0.15"
 
+        // Vosk's Android OpenBLAS build shares scratch buffers across models without locking.
+        // Loading one model while another decodes can corrupt the decoder and abort the process.
+        val voskLock = Any()
+
         /** Extract once from the APK, never the network. A failed copy cannot become a model. */
-        @Synchronized
         fun prepareModel(context: Context): File {
             val directory = File(context.noBackupFilesDir, MODEL_NAME)
             if (File(directory, ".ready").isFile) return directory
