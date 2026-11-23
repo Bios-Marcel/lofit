@@ -6,11 +6,12 @@ import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import android.graphics.Rect
+import androidx.core.database.getDoubleOrNull
 import androidx.core.database.sqlite.transaction
 import java.time.LocalDate
 
 /** Food history is independent of the frequently saved workout state. */
-internal class FoodStore(context: Context) : SQLiteOpenHelper(context, "food.db", null, 2) {
+internal class FoodStore(context: Context) : SQLiteOpenHelper(context, "food.db", null, 3) {
     private val metrics = FoodMetric.inputs
     private val amountColumns = metrics.joinToString { "${it.name} REAL NOT NULL" }
 
@@ -20,7 +21,7 @@ internal class FoodStore(context: Context) : SQLiteOpenHelper(context, "food.db"
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
-            "CREATE TABLE ingredients (id TEXT PRIMARY KEY, name TEXT NOT NULL, image TEXT, $amountColumns, crop TEXT)"
+            "CREATE TABLE ingredients (id TEXT PRIMARY KEY, name TEXT NOT NULL, image TEXT, $amountColumns, crop TEXT, default_portion_grams REAL)"
         )
         db.execSQL("CREATE TABLE recipes (id TEXT PRIMARY KEY, name TEXT NOT NULL)")
         db.execSQL(
@@ -39,9 +40,10 @@ internal class FoodStore(context: Context) : SQLiteOpenHelper(context, "food.db"
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        if (oldVersion == 1 && newVersion == 2)
-            db.execSQL("ALTER TABLE ingredients ADD COLUMN crop TEXT")
-        else error("Unsupported food database upgrade $oldVersion to $newVersion")
+        // LEGACY: Version 1 ingredients need a crop column before the portion upgrade.
+        if (oldVersion < 2) db.execSQL("ALTER TABLE ingredients ADD COLUMN crop TEXT")
+        if (oldVersion < 3)
+            db.execSQL("ALTER TABLE ingredients ADD COLUMN default_portion_grams REAL")
     }
 
     private fun <T> rows(sql: String, vararg args: String, read: Cursor.() -> T): List<T> =
@@ -61,6 +63,7 @@ internal class FoodStore(context: Context) : SQLiteOpenHelper(context, "food.db"
                 getString(2),
                 amounts(),
                 getString(getColumnIndexOrThrow("crop"))?.let(Rect::unflattenFromString),
+                getDoubleOrNull(getColumnIndexOrThrow("default_portion_grams")),
             )
         }
 
@@ -76,6 +79,7 @@ internal class FoodStore(context: Context) : SQLiteOpenHelper(context, "food.db"
                 put("name", ingredient.name)
                 put("image", ingredient.image)
                 put("crop", ingredient.crop?.flattenToString())
+                put("default_portion_grams", ingredient.defaultPortionGrams)
             }
         writableDatabase.transaction {
             if (update("ingredients", values, "id = ?", arrayOf(ingredient.id)) == 0)

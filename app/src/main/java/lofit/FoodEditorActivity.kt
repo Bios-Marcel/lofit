@@ -122,6 +122,7 @@ internal class FoodEditorActivity : AppCompatActivity() {
                     putString("image", item.image)
                     putString("originalImage", item.image)
                     putParcelable("crop", item.crop)
+                    putString("defaultPortion", item.defaultPortionGrams?.let { formatWeight(it) })
                     item.product.forEach { (metric, value) ->
                         putString(metric.name, formatWeight(value))
                     }
@@ -233,10 +234,22 @@ internal class FoodEditorActivity : AppCompatActivity() {
             val labelCheck = ui.metaText(draft.getString("labelCheck").orEmpty())
             if (labelCheck.text.isEmpty()) labelCheck.visibility = View.GONE
             body.addView(labelCheck)
+            val weight =
+                field(
+                    body,
+                    FoodMetric.WEIGHT.ingredientLabel,
+                    FoodMetric.WEIGHT.name,
+                    decimal = true,
+                )
+            val price =
+                field(body, FoodMetric.PRICE.ingredientLabel, FoodMetric.PRICE.name, decimal = true)
+            val defaultPortion =
+                field(body, "Default portion size (g, optional)", "defaultPortion", decimal = true)
             val fields =
-                (listOf(FoodMetric.WEIGHT, FoodMetric.PRICE) + nutritionFields).associateWith {
-                    field(body, it.ingredientLabel, it.name, decimal = true)
-                }
+                mapOf(FoodMetric.WEIGHT to weight, FoodMetric.PRICE to price) +
+                    nutritionFields.associateWith {
+                        field(body, it.ingredientLabel, it.name, decimal = true)
+                    }
             val energy = FoodMetric.CALORIES
             body.addView(ui.fieldLabel(energy.ingredientLabel))
             val calories = ui.titleText("")
@@ -294,6 +307,12 @@ internal class FoodEditorActivity : AppCompatActivity() {
                             fail(name, "Enter an ingredient name")
                             return@actionButton
                         }
+                        val portionText = defaultPortion.text.toString()
+                        val portionGrams = portionText.foodNumber()?.takeIf { it > 0 }
+                        if (portionText.isNotBlank() && portionGrams == null) {
+                            fail(defaultPortion, "Enter a weight above zero")
+                            return@actionButton
+                        }
                         val amounts = mutableMapOf<FoodMetric, Double>()
                         for ((metric, input) in fields) {
                             val raw = input.text.toString()
@@ -329,6 +348,7 @@ internal class FoodEditorActivity : AppCompatActivity() {
                                 image,
                                 amounts,
                                 draft.getParcelable("crop", Rect::class.java),
+                                defaultPortionGrams = portionGrams,
                             )
                         )
                         val original = draft.getString("originalImage")
@@ -765,8 +785,10 @@ internal class FoodEditorActivity : AppCompatActivity() {
             }
             body.addView(
                 ui.smallButton("Add ingredient") {
-                    pickIngredient {
-                        rows.add(row(it.id, ""))
+                    pickIngredient { ingredient ->
+                        // LEGACY: Ingredients without a default portion start with a blank weight.
+                        val grams = ingredient.defaultPortionGrams?.let { formatWeight(it) }
+                        rows.add(row(ingredient.id, grams.orEmpty()))
                         render()
                     }
                 },

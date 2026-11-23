@@ -39,6 +39,7 @@ class FoodStoreTest {
         FoodStore(isolated).use { store ->
             val rice = store.ingredients().single()
             assertNull(rice.crop)
+            assertNull(rice.defaultPortionGrams)
             assertEquals("rice.webp", rice.image)
             assertEquals(78.0, rice.product.getValue(FoodMetric.CARBS), 0.0)
             store.save(rice.copy(crop = region))

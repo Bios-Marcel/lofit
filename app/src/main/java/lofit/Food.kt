@@ -85,6 +85,7 @@ internal data class Ingredient(
     val image: String?,
     val product: FoodAmounts,
     val crop: Rect? = null,
+    val defaultPortionGrams: Double? = null,
 ) {
     fun portion(grams: Double): FoodAmounts =
         FoodMetric.inputs.associateWith { metric ->
