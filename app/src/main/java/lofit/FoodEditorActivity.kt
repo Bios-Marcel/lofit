@@ -826,6 +826,7 @@ internal class FoodEditorActivity : AppCompatActivity() {
                                     val ingredient = ingredients.getValue(it.ingredientId)
                                     CookedItem(ingredient.name, ingredient.portion(it.grams))
                                 },
+                                recipeId = intent.getStringExtra("id"),
                             )
                         )
                     } else store.save(FoodRecipe(id, recipeName, items))

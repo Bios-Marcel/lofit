@@ -11,9 +11,11 @@ import androidx.core.database.sqlite.transaction
 import java.time.LocalDate
 
 /** Food history is independent of the frequently saved workout state. */
-internal class FoodStore(context: Context) : SQLiteOpenHelper(context, "food.db", null, 3) {
+internal class FoodStore(context: Context) : SQLiteOpenHelper(context, "food.db", null, 4) {
     private val metrics = FoodMetric.inputs
     private val amountColumns = metrics.joinToString { "${it.name} REAL NOT NULL" }
+    private val mealRecipeColumn = "recipe_id TEXT REFERENCES recipes(id) ON DELETE SET NULL"
+    private val mealRecipeIndex = "CREATE INDEX meal_recipe_day ON meals(recipe_id, day)"
 
     override fun onConfigure(db: SQLiteDatabase) {
         db.setForeignKeyConstraintsEnabled(true)
@@ -29,7 +31,7 @@ internal class FoodStore(context: Context) : SQLiteOpenHelper(context, "food.db"
         )
         db.execSQL("CREATE INDEX recipe_item_parent ON recipe_items(recipe)")
         db.execSQL(
-            "CREATE TABLE meals (id TEXT PRIMARY KEY, name TEXT NOT NULL, day TEXT NOT NULL)"
+            "CREATE TABLE meals (id TEXT PRIMARY KEY, name TEXT NOT NULL, day TEXT NOT NULL, $mealRecipeColumn)"
         )
         // Store the actual quantities and cost at cooking time, including substitutions.
         db.execSQL(
@@ -37,6 +39,7 @@ internal class FoodStore(context: Context) : SQLiteOpenHelper(context, "food.db"
         )
         db.execSQL("CREATE INDEX meal_item_parent ON meal_items(meal)")
         db.execSQL("CREATE INDEX meal_day ON meals(day)")
+        db.execSQL(mealRecipeIndex)
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -44,6 +47,19 @@ internal class FoodStore(context: Context) : SQLiteOpenHelper(context, "food.db"
         if (oldVersion < 2) db.execSQL("ALTER TABLE ingredients ADD COLUMN crop TEXT")
         if (oldVersion < 3)
             db.execSQL("ALTER TABLE ingredients ADD COLUMN default_portion_grams REAL")
+        if (oldVersion < 4) {
+            db.execSQL("ALTER TABLE meals ADD COLUMN $mealRecipeColumn")
+            // LEGACY: Meal snapshots stored only the name. Link exact, unambiguous matches.
+            db.execSQL(
+                """
+                UPDATE meals SET recipe_id = (
+                    SELECT MIN(id) FROM recipes WHERE recipes.name = meals.name HAVING COUNT(*) = 1
+                )
+                """
+                    .trimIndent()
+            )
+            db.execSQL(mealRecipeIndex)
+        }
     }
 
     private fun <T> rows(sql: String, vararg args: String, read: Cursor.() -> T): List<T> =
@@ -117,6 +133,22 @@ internal class FoodStore(context: Context) : SQLiteOpenHelper(context, "food.db"
         }
     }
 
+    fun mealChoices(): List<MealChoice> =
+        rows(
+            """
+            SELECT recipes.id, recipes.name, latest.day
+            FROM recipes
+            LEFT JOIN meals AS latest ON latest.rowid = (
+                SELECT rowid FROM meals WHERE recipe_id = recipes.id
+                ORDER BY day DESC, rowid DESC LIMIT 1
+            )
+            ORDER BY latest.day DESC, latest.rowid DESC, recipes.name COLLATE NOCASE, recipes.id
+            """
+                .trimIndent()
+        ) {
+            MealChoice(getString(0), getString(1), getString(2)?.let(LocalDate::parse))
+        }
+
     fun log(meal: CookedMeal) {
         writableDatabase.transaction {
             val values =
@@ -124,6 +156,7 @@ internal class FoodStore(context: Context) : SQLiteOpenHelper(context, "food.db"
                     put("id", meal.id)
                     put("name", meal.name)
                     put("day", meal.day.toString())
+                    put("recipe_id", meal.recipeId)
                 }
             // A restored editor can finish saving the same meal again.
             if (insertWithOnConflict("meals", null, values, SQLiteDatabase.CONFLICT_IGNORE) == -1L)
@@ -147,12 +180,13 @@ internal class FoodStore(context: Context) : SQLiteOpenHelper(context, "food.db"
                     getString(0) to CookedItem(getString(1), amounts())
                 }
                 .groupBy({ it.first }, { it.second })
-        return rows("SELECT id, name, day FROM meals ORDER BY day DESC, rowid DESC") {
+        return rows("SELECT id, name, day, recipe_id FROM meals ORDER BY day DESC, rowid DESC") {
             CookedMeal(
                 getString(0),
                 getString(1),
                 LocalDate.parse(getString(2)),
                 items[getString(0)].orEmpty(),
+                getString(3),
             )
         }
     }

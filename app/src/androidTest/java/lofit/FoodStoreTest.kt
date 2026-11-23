@@ -24,9 +24,17 @@ class FoodStoreTest {
         SQLiteDatabase.deleteDatabase(file)
     }
 
+    private fun createLegacyMealTables(db: SQLiteDatabase) {
+        db.execSQL("CREATE TABLE recipes (id TEXT PRIMARY KEY, name TEXT NOT NULL)")
+        db.execSQL(
+            "CREATE TABLE meals (id TEXT PRIMARY KEY, name TEXT NOT NULL, day TEXT NOT NULL)"
+        )
+    }
+
     @Test
     fun savedIngredientCanBeReframedAfterUpgrade() {
         SQLiteDatabase.openOrCreateDatabase(file, null).use { db ->
+            createLegacyMealTables(db)
             db.execSQL(
                 "CREATE TABLE ingredients (id TEXT PRIMARY KEY, name TEXT NOT NULL, image TEXT, WEIGHT REAL NOT NULL, PRICE REAL NOT NULL, PROTEIN REAL NOT NULL, FIBER REAL NOT NULL, CARBS REAL NOT NULL, SUGAR REAL NOT NULL, FAT REAL NOT NULL, SALT REAL NOT NULL)"
             )
@@ -45,6 +53,54 @@ class FoodStoreTest {
             store.save(rice.copy(crop = region))
         }
         FoodStore(isolated).use { store -> assertEquals(region, store.ingredients().single().crop) }
+    }
+
+    @Test
+    fun upgradeLinksOnlyUnambiguousMealNames() {
+        SQLiteDatabase.openOrCreateDatabase(file, null).use { db ->
+            createLegacyMealTables(db)
+            db.execSQL(
+                "INSERT INTO recipes VALUES ('soup', 'Soup'), ('bowl-1', 'Bowl'), ('bowl-2', 'Bowl')"
+            )
+            db.execSQL(
+                "INSERT INTO meals VALUES ('old-soup', 'Soup', '2026-03-30'), ('old-bowl', 'Bowl', '2026-03-31')"
+            )
+            db.version = 3
+        }
+        FoodStore(isolated).use { store ->
+            assertEquals(
+                listOf(
+                    MealChoice("soup", "Soup", LocalDate.of(2026, 3, 30)),
+                    MealChoice("bowl-1", "Bowl", null),
+                    MealChoice("bowl-2", "Bowl", null),
+                ),
+                store.mealChoices(),
+            )
+        }
+    }
+
+    @Test
+    fun mealRecencyFollowsRecipeIdAndLatestMealDate() {
+        val today = LocalDate.of(2026, 3, 31)
+        val soup = FoodRecipe("soup", "Soup", emptyList())
+        val bowl = FoodRecipe("bowl", "Bowl", emptyList())
+        FoodStore(isolated).use { store ->
+            store.save(soup)
+            store.save(bowl)
+            store.log(CookedMeal("lunch", soup.name, today, emptyList(), soup.id))
+            store.log(CookedMeal("dinner", bowl.name, today, emptyList(), bowl.id))
+            store.log(CookedMeal("earlier", soup.name, today.minusDays(1), emptyList(), soup.id))
+            store.save(soup.copy(name = "Tomato soup"))
+            assertEquals(
+                listOf(
+                    MealChoice(bowl.id, bowl.name, today),
+                    MealChoice(soup.id, "Tomato soup", today),
+                ),
+                store.mealChoices(),
+            )
+            store.deleteMeal("lunch")
+            assertEquals(today.minusDays(1), store.mealChoices().last().lastLogged)
+        }
     }
 
     @Test

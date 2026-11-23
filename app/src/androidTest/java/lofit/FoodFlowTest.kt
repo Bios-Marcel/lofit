@@ -25,6 +25,8 @@ import android.widget.DatePicker
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.core.view.GravityCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
@@ -32,8 +34,10 @@ import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.UiController
 import androidx.test.espresso.ViewAction
 import androidx.test.espresso.action.ViewActions.*
+import androidx.test.espresso.assertion.PositionAssertions.isCompletelyAbove
 import androidx.test.espresso.assertion.PositionAssertions.isCompletelyRightOf
 import androidx.test.espresso.assertion.ViewAssertions.*
+import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.*
 import androidx.test.espresso.util.TreeIterables
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -102,7 +106,7 @@ class FoodFlowTest {
             .forEach { ingredientPictures(context).delete(it) }
         val db = store.writableDatabase
         db.delete("meals", "name = ?", arrayOf(porridge))
-        db.delete("recipes", "name = ?", arrayOf(porridge))
+        db.delete("recipes", "name = ? OR id = ?", arrayOf(porridge, "apple-$suffix"))
         db.delete("ingredients", "id IN (?, ?) OR name = ?", arrayOf(oats.id, rice.id, yogurt))
         store.close()
     }
@@ -440,6 +444,46 @@ class FoodFlowTest {
     }
 
     @Test
+    fun mealPickerShowsRecentlyLoggedRecipeAndSearchesUnusedRecipes() {
+        val recent = FoodRecipe("porridge-$suffix", porridge, listOf(RecipeItem(oats.id, 200.0)))
+        val unused =
+            FoodRecipe("apple-$suffix", "Apple bowl $suffix", listOf(RecipeItem(rice.id, 90.0)))
+        store.save(recent)
+        store.save(unused)
+        store.log(
+            CookedMeal("picker-$suffix", recent.name, LocalDate.now(), emptyList(), recent.id)
+        )
+
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            open(scenario, "Meals", expand = true)
+            onView(withText("Log meal")).perform(click())
+            val search = onView(withHint("Search recipes")).inRoot(isDialog())
+            search.perform(replaceText(suffix))
+            onView(withText(recent.name))
+                .inRoot(isDialog())
+                .check(isCompletelyAbove(withText(unused.name)))
+            onView(withText(startsWith("Last logged ")))
+                .inRoot(isDialog())
+                .check(matches(isDisplayed()))
+
+            search.perform(
+                click(),
+                waitUntil("recipe search keyboard") {
+                    ViewCompat.getRootWindowInsets(it)?.isVisible(WindowInsetsCompat.Type.ime()) ==
+                        true
+                },
+            )
+            search.perform(replaceText("missing $suffix"))
+            onView(withText("No matching recipes."))
+                .inRoot(isDialog())
+                .check(matches(isDisplayed()))
+            search.perform(replaceText("BOWL apple"))
+            onView(withText(unused.name)).inRoot(isDialog()).perform(click())
+            onView(withContentDescription("${rice.name} weight (g)")).check(matches(withText("90")))
+        }
+    }
+
+    @Test
     fun mealDateAndIngredientsSaveAndStatisticsRetainFilters() {
         val template =
             FoodRecipe(
@@ -487,6 +531,7 @@ class FoodFlowTest {
             onView(withText(porridge)).check(matches(isDisplayed()))
             val meal = store.meals().first { it.name == template.name }
             assertEquals(day, meal.day)
+            assertEquals(template.id, meal.recipeId)
             assertEquals(rice.name, meal.items.single().name)
             assertEquals(30.0, meal.items.single().amounts.getValue(FoodMetric.CARBS), 0.0)
             assertEquals(template, store.recipes().first { it.id == template.id })

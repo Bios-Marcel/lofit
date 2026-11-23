@@ -5,12 +5,18 @@ import android.content.Context
 import android.content.res.ColorStateList
 import android.os.Bundle
 import android.view.Gravity
+import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+import android.widget.BaseAdapter
 import android.widget.CheckBox
+import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.ListView
 import android.widget.ScrollView
+import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.core.widget.doAfterTextChanged
 import java.time.LocalDate
@@ -155,19 +161,7 @@ internal class FoodScreens(
         ui.page("Meals") { body ->
             val meals = store.meals()
             body.addView(
-                ui.actionButton("Log meal") {
-                    val choices = store.recipes()
-                    val dialog = AlertDialog.Builder(context).setTitle("Choose recipe")
-                    if (choices.isEmpty())
-                        dialog.setMessage("Add a recipe first.").setPositiveButton("OK", null)
-                    else
-                        dialog
-                            .setItems(choices.map { it.name }.toTypedArray()) { _, index ->
-                                edit(FoodSection.MEALS, choices[index].id)
-                            }
-                            .setNegativeButton("Cancel", null)
-                    dialog.show()
-                },
+                ui.actionButton("Log meal", action = ::pickMeal),
                 ui.foodSpacing(),
             )
             if (meals.isEmpty()) body.addView(ui.emptyText("No meals logged."))
@@ -187,6 +181,87 @@ internal class FoodScreens(
                     }
                 }
         }
+
+    private fun pickMeal() {
+        val choices = store.mealChoices()
+        val builder =
+            AlertDialog.Builder(context).setTitle("Choose recipe").setNegativeButton("Cancel", null)
+        if (choices.isEmpty()) {
+            builder
+                .setMessage("No recipes yet.")
+                .setPositiveButton("Add recipe") { _, _ -> edit(FoodSection.RECIPES, null) }
+                .show()
+            return
+        }
+
+        val search = ui.textField("Search recipes")
+        val empty =
+            TextView(context).apply {
+                text = "No matching recipes."
+                textSize = 16f
+                gravity = Gravity.CENTER
+                setPadding(ui.dp(16), ui.dp(32), ui.dp(16), ui.dp(32))
+                accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+            }
+        val list = ListView(context)
+        val dateFormat = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
+        var matches = choices
+        val adapter =
+            object : BaseAdapter() {
+                override fun getCount() = matches.size
+
+                override fun getItem(position: Int) = matches[position]
+
+                override fun getItemId(position: Int) = position.toLong()
+
+                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                    val choice = getItem(position)
+                    val row =
+                        convertView
+                            ?: LayoutInflater.from(context)
+                                .inflate(android.R.layout.simple_list_item_2, parent, false)
+                    row.findViewById<TextView>(android.R.id.text1).text = choice.name
+                    row.findViewById<TextView>(android.R.id.text2).apply {
+                        visibility = if (choice.lastLogged == null) View.GONE else View.VISIBLE
+                        text = choice.lastLogged?.let { "Last logged ${it.format(dateFormat)}" }
+                    }
+                    return row
+                }
+            }
+        list.adapter = adapter
+        list.emptyView = empty
+        search.doAfterTextChanged {
+            val query = SearchQuery(it.toString())
+            matches = choices.filter { query.matches(it.name) }
+            adapter.notifyDataSetChanged()
+            list.setSelection(0)
+        }
+        val content =
+            column().apply {
+                isFocusableInTouchMode = true
+                addView(
+                    search,
+                    ui.foodSpacing().apply {
+                        marginStart = ui.dp(24)
+                        marginEnd = ui.dp(24)
+                    },
+                )
+                addView(
+                    FrameLayout(context).apply {
+                        addView(list, MATCH_PARENT, WRAP_CONTENT)
+                        addView(empty, MATCH_PARENT, WRAP_CONTENT)
+                    }
+                )
+                requestFocus()
+            }
+        val dialog = builder.setView(content).create()
+        list.setOnItemClickListener { _, _, position, _ ->
+            val recipeId = adapter.getItem(position).recipeId
+            dialog.dismiss()
+            edit(FoodSection.MEALS, recipeId)
+        }
+        dialog.show()
+    }
 
     private fun showMeal(meal: CookedMeal, totals: FoodAmounts) {
         val details =

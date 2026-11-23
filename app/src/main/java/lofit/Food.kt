@@ -102,6 +102,8 @@ internal data class RecipeItem(val ingredientId: String, val grams: Double)
 
 internal data class FoodRecipe(val id: String, val name: String, val items: List<RecipeItem>)
 
+internal data class MealChoice(val recipeId: String, val name: String, val lastLogged: LocalDate?)
+
 internal data class CookedItem(val name: String, val amounts: FoodAmounts)
 
 internal data class CookedMeal(
@@ -109,6 +111,7 @@ internal data class CookedMeal(
     val name: String,
     val day: LocalDate,
     val items: List<CookedItem>,
+    val recipeId: String? = null,
 )
 
 internal fun Iterable<FoodAmounts>.foodTotals(): FoodAmounts =
