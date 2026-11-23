@@ -12,6 +12,7 @@ import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.widget.BaseAdapter
 import android.widget.CheckBox
+import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ListView
@@ -331,7 +332,22 @@ internal class FoodScreens(
                     }
             addView(
                 column().apply {
-                    addView(ui.titleText("Daily totals"))
+                    addView(
+                        LinearLayout(context).apply {
+                            gravity = Gravity.CENTER_VERTICAL
+                            addView(
+                                ui.titleText("Daily totals"),
+                                LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f),
+                            )
+                            addView(
+                                ui.actionButton(
+                                    "Edit goals",
+                                    secondary = true,
+                                    action = ::editGoals,
+                                )
+                            )
+                        }
+                    )
                     addView(
                         LinearLayout(context).apply {
                             gravity = Gravity.CENTER_VERTICAL
@@ -366,15 +382,78 @@ internal class FoodScreens(
                         },
                         ui.foodSpacing(),
                     )
-                    val totals = store.dailyTotals(day)
                     addView(
-                        if (totals == null) ui.emptyText("No meals logged for this day.")
-                        else FoodSummary(context, ui).apply { update(totals) }.view,
+                        FoodDailyTotalsView(context, ui, store.dailyTotals(day), store.goals()),
                         ui.foodSpacing(),
                     )
                 }
             )
         }
+
+    private fun editGoals() {
+        val goals = store.goals()
+        val content =
+            column().apply {
+                setPadding(ui.dp(24), ui.dp(12), ui.dp(24), ui.dp(8))
+                isFocusableInTouchMode = true
+            }
+        fun addTarget(label: String, field: EditText, value: String) = field.apply {
+            id = View.generateViewId()
+            setText(value)
+            content.addView(
+                column().apply {
+                    addView(ui.metaText(label).apply { labelFor = field.id })
+                    addView(field)
+                },
+                ui.foodSpacing(),
+            )
+        }
+        val calories =
+            addTarget(
+                "Calories (kcal)",
+                ui.numberField("No goal"),
+                goals.calories?.toString().orEmpty(),
+            )
+        val protein =
+            addTarget("Protein (g)", ui.numberField("No goal"), goals.protein?.toString().orEmpty())
+        val defaultSalt = FoodGoals.DEFAULT_SALT_LIMIT
+        val salt =
+            addTarget(
+                "Salt limit (g)",
+                ui.decimalField("Default ${formatWeight(defaultSalt)} g"),
+                formatWeight(goals.saltLimit),
+            )
+        content.requestFocus()
+
+        fun readGoal(field: EditText): Int? {
+            val input = field.text.toString().trim()
+            val goal = input.toIntOrNull()?.takeIf { it > 0 }
+            field.error =
+                if (input.isNotEmpty() && goal == null) "Enter a positive whole number" else null
+            return goal
+        }
+
+        val dialog =
+            AlertDialog.Builder(context)
+                .setTitle("Daily goals and limits")
+                .setView(ScrollView(context).apply { addView(content) })
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Save", null)
+                .show()
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val calorieGoal = readGoal(calories)
+            val proteinGoal = readGoal(protein)
+            val input = salt.text.toString().trim()
+            val saltLimit =
+                if (input.isEmpty()) defaultSalt else input.foodNumber()?.takeIf { it > 0 }
+            salt.error = if (saltLimit == null) "Enter a positive number" else null
+            if (calories.error != null || protein.error != null || saltLimit == null)
+                return@setOnClickListener
+            store.saveGoals(FoodGoals(calorieGoal, proteinGoal, saltLimit))
+            dialog.dismiss()
+            refresh()
+        }
+    }
 
     private fun trendsPage() =
         ScrollView(context).apply {

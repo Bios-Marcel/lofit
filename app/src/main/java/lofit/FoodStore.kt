@@ -6,6 +6,7 @@ import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import android.graphics.Rect
+import androidx.core.content.edit
 import androidx.core.database.getDoubleOrNull
 import androidx.core.database.sqlite.transaction
 import java.time.LocalDate
@@ -16,6 +17,26 @@ internal class FoodStore(context: Context) : SQLiteOpenHelper(context, "food.db"
     private val amountColumns = metrics.joinToString { "${it.name} REAL NOT NULL" }
     private val mealRecipeColumn = "recipe_id TEXT REFERENCES recipes(id) ON DELETE SET NULL"
     private val mealRecipeIndex = "CREATE INDEX meal_recipe_day ON meals(recipe_id, day)"
+    private val goalPreferences by lazy {
+        context.getSharedPreferences("food_goals", Context.MODE_PRIVATE)
+    }
+
+    fun goals() =
+        FoodGoals(
+            calories = goalPreferences.getInt("calories", 0).takeIf { it > 0 },
+            protein = goalPreferences.getInt("protein", 0).takeIf { it > 0 },
+            saltLimit =
+                goalPreferences.getString("salt_limit", null)?.foodNumber()?.takeIf { it > 0 }
+                    ?: FoodGoals.DEFAULT_SALT_LIMIT,
+        )
+
+    fun saveGoals(goals: FoodGoals) {
+        goalPreferences.edit {
+            putInt("calories", goals.calories ?: 0)
+            putInt("protein", goals.protein ?: 0)
+            putString("salt_limit", goals.saltLimit.toString())
+        }
+    }
 
     override fun onConfigure(db: SQLiteDatabase) {
         db.setForeignKeyConstraintsEnabled(true)

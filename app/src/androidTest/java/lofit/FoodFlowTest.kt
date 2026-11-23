@@ -484,6 +484,82 @@ class FoodFlowTest {
     }
 
     @Test
+    fun dailyTotalsShowEveryMetricAndPersistGoalsAndSaltLimit() {
+        val originalGoals = store.goals()
+        try {
+            store.saveGoals(FoodGoals(null, null))
+            val amounts =
+                oats.portion(100.0) + mapOf(FoodMetric.PROTEIN to 50.0, FoodMetric.SALT to 4.0)
+            store.log(
+                CookedMeal(
+                    "goal-meal-$suffix",
+                    porridge,
+                    LocalDate.now(),
+                    listOf(CookedItem(oats.name, amounts)),
+                )
+            )
+            ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+                open(scenario, "Statistics", expand = true)
+                onView(withContentDescription("Previous day")).perform(click())
+                onView(withText("No meals logged for this day.")).check(matches(isDisplayed()))
+                for (metric in FoodMetric.entries) {
+                    onView(withText(metric.label)).perform(scrollTo()).check(matches(isDisplayed()))
+                }
+                onView(withContentDescription("Next day")).perform(scrollTo(), click())
+
+                val editGoals = onView(withText("Edit goals"))
+                val calories =
+                    onView(allOf(withHint("No goal"), hasSibling(withText("Calories (kcal)"))))
+                val protein =
+                    onView(allOf(withHint("No goal"), hasSibling(withText("Protein (g)"))))
+                val defaultSalt = onView(withText("Limit 5 g"))
+                val salt = onView(withHint("Default 5 g"))
+                val customSalt = formatWeight(3.5)
+                val save = onView(withText("Save"))
+                val noCalorieGoal =
+                    onView(allOf(withText("No goal"), hasSibling(withText("Calories"))))
+                noCalorieGoal.check(matches(isDisplayed()))
+                defaultSalt.perform(scrollTo()).check(matches(isDisplayed()))
+                onView(withText("80%")).check(matches(isDisplayed()))
+                editGoals.perform(scrollTo(), click())
+                calories.perform(replaceText("0"))
+                save.perform(click())
+                calories.check(matches(hasErrorText("Enter a positive whole number")))
+                calories.perform(replaceText("800"))
+                protein.perform(replaceText("40"))
+                salt.perform(scrollTo()).check(matches(withText("5"))).perform(replaceText("0"))
+                save.perform(click())
+                salt.check(matches(hasErrorText("Enter a positive number")))
+                salt.perform(replaceText(customSalt))
+                save.perform(click())
+                onView(withText("50%")).check(matches(isDisplayed()))
+                onView(withText("Over goal")).check(matches(isDisplayed()))
+                onView(withText("Over limit")).perform(scrollTo()).check(matches(isDisplayed()))
+
+                scenario.recreate()
+                onView(withText("Goal 800 kcal")).check(matches(isDisplayed()))
+                onView(withText("Goal 40 g")).check(matches(isDisplayed()))
+                onView(withText("Limit $customSalt g"))
+                    .perform(scrollTo())
+                    .check(matches(isDisplayed()))
+                editGoals.perform(scrollTo(), click())
+                calories.check(matches(withText("800"))).perform(replaceText(""))
+                protein.check(matches(withText("40")))
+                salt
+                    .perform(scrollTo())
+                    .check(matches(withText(customSalt)))
+                    .perform(replaceText(""))
+                save.perform(click())
+                noCalorieGoal.check(matches(isDisplayed()))
+                onView(withText("Over goal")).check(matches(isDisplayed()))
+                defaultSalt.perform(scrollTo()).check(matches(isDisplayed()))
+            }
+        } finally {
+            store.saveGoals(originalGoals)
+        }
+    }
+
+    @Test
     fun mealDateAndIngredientsSaveAndStatisticsRetainFilters() {
         val template =
             FoodRecipe(

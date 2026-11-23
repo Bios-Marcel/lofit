@@ -79,6 +79,16 @@ internal enum class FoodMetric(
 
 internal typealias FoodAmounts = Map<FoodMetric, Double>
 
+internal data class FoodGoals(
+    val calories: Int?,
+    val protein: Int?,
+    val saltLimit: Double = DEFAULT_SALT_LIMIT,
+) {
+    companion object {
+        const val DEFAULT_SALT_LIMIT = 5.0
+    }
+}
+
 internal data class Ingredient(
     val id: String,
     val name: String,
