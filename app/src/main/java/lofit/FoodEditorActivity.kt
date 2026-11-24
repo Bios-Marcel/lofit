@@ -40,6 +40,7 @@ import kotlin.math.roundToInt
 
 internal class FoodEditorActivity : AppCompatActivity() {
     private val section by lazy { FoodSection.valueOf(intent.getStringExtra("section")!!) }
+    private val mealItemId by lazy { intent.getStringExtra("mealItemId") }
     private val store by lazy { FoodStore(this) }
     private val ingredients by lazy { store.ingredients().associateBy { it.id } }
     private val pictures by lazy { ingredientPictures(this) }
@@ -128,14 +129,19 @@ internal class FoodEditorActivity : AppCompatActivity() {
                     }
                 }
             } else {
-                val recipe = sourceId?.let { id -> store.recipes().first { it.id == id } }
-                putString("name", recipe?.name.orEmpty())
                 putString("day", LocalDate.now().toString())
+                val item = mealItemId?.let { ingredients.getValue(it) }
+                val recipe = sourceId?.let { id -> store.recipes().first { it.id == id } }
+                putString("name", item?.name ?: recipe?.name.orEmpty())
+                val items =
+                    if (item != null) {
+                        val grams =
+                            item.defaultPortionGrams ?: item.product.getValue(FoodMetric.WEIGHT)
+                        listOf(RecipeItem(item.id, grams))
+                    } else recipe?.items.orEmpty()
                 putParcelableArrayList(
                     "rows",
-                    ArrayList(
-                        recipe?.items.orEmpty().map { row(it.ingredientId, formatWeight(it.grams)) }
-                    ),
+                    ArrayList(items.map { row(it.ingredientId, formatWeight(it.grams)) }),
                 )
             }
         }
@@ -185,7 +191,7 @@ internal class FoodEditorActivity : AppCompatActivity() {
     }
 
     private fun ingredientForm() =
-        ui.page(if (intent.hasExtra("id")) "Edit ingredient" else "Add ingredient") { body ->
+        ui.page(if (intent.hasExtra("id")) "Edit item" else "Add item") { body ->
             val image = draft.getString("image")
             val pending = draft.containsKey("pendingImage")
             if (image == null) {
@@ -225,7 +231,7 @@ internal class FoodEditorActivity : AppCompatActivity() {
                     },
                 )
             }
-            val name = field(body, "Ingredient name", "name")
+            val name = field(body, "Item name", "name")
             body.addView(
                 ui.smallButton("Scan nutrition label") { openCamera(scanLabel = true) }
                     .apply { isEnabled = !pending },
@@ -301,10 +307,10 @@ internal class FoodEditorActivity : AppCompatActivity() {
             }
             updateCalories()
             body.addView(
-                ui.actionButton("Save ingredient") {
+                ui.actionButton("Save item") {
                         val title = name.text.toString().trim()
                         if (title.isEmpty()) {
-                            fail(name, "Enter an ingredient name")
+                            fail(name, "Enter an item name")
                             return@actionButton
                         }
                         val portionText = defaultPortion.text.toString()
@@ -718,7 +724,7 @@ internal class FoodEditorActivity : AppCompatActivity() {
                     ui.foodSpacing(),
                 )
             }
-            body.addView(ui.sectionTitle("Ingredients"))
+            if (mealItemId == null) body.addView(ui.sectionTitle("Items"))
             val summary = FoodSummary(this, ui)
             fun updateTotals() {
                 val amounts =
@@ -744,67 +750,73 @@ internal class FoodEditorActivity : AppCompatActivity() {
                             updateTotals()
                         }
                     }
-                body.addView(
-                    ui.card {
-                        addView(
-                            ui.smallButton(ingredient.name) {
-                                    pickIngredient {
-                                        item.putString("ingredient", it.id)
-                                        render()
-                                    }
-                                }
-                                .apply { contentDescription = "Replace ${ingredient.name}" }
-                        )
-                        addView(ui.fieldLabel("Weight (g)"))
-                        addView(
-                            LinearLayout(this@FoodEditorActivity).apply {
-                                orientation = LinearLayout.HORIZONTAL
-                                gravity = Gravity.CENTER_VERTICAL
-                                addView(input, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
-                                addView(
-                                    ui.smallButton("") {
-                                            rows.remove(item)
+                if (mealItemId != null) {
+                    body.addView(ui.fieldLabel("Weight (g)"))
+                    body.addView(input, ui.foodSpacing())
+                } else
+                    body.addView(
+                        ui.card {
+                            addView(
+                                ui.smallButton(ingredient.name) {
+                                        pickIngredient {
+                                            item.putString("ingredient", it.id)
                                             render()
                                         }
-                                        .apply {
-                                            contentDescription = "Remove ${ingredient.name}"
-                                            setIconResource(R.drawable.ic_close)
-                                            iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
-                                            iconPadding = 0
-                                            setPadding(0, 0, 0, 0)
+                                    }
+                                    .apply { contentDescription = "Replace ${ingredient.name}" }
+                            )
+                            addView(ui.fieldLabel("Weight (g)"))
+                            addView(
+                                LinearLayout(this@FoodEditorActivity).apply {
+                                    orientation = LinearLayout.HORIZONTAL
+                                    gravity = Gravity.CENTER_VERTICAL
+                                    addView(input, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+                                    addView(
+                                        ui.smallButton("") {
+                                                rows.remove(item)
+                                                render()
+                                            }
+                                            .apply {
+                                                contentDescription = "Remove ${ingredient.name}"
+                                                setIconResource(R.drawable.ic_close)
+                                                iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
+                                                iconPadding = 0
+                                                setPadding(0, 0, 0, 0)
+                                            },
+                                        LinearLayout.LayoutParams(ui.dp(48), ui.dp(48)).apply {
+                                            marginStart = ui.dp(8)
                                         },
-                                    LinearLayout.LayoutParams(ui.dp(48), ui.dp(48)).apply {
-                                        marginStart = ui.dp(8)
-                                    },
-                                )
-                            }
-                        )
-                    }
-                )
+                                    )
+                                }
+                            )
+                        }
+                    )
                 input
             }
-            body.addView(
-                ui.smallButton("Add ingredient") {
-                    pickIngredient { ingredient ->
-                        // LEGACY: Ingredients without a default portion start with a blank weight.
-                        val grams = ingredient.defaultPortionGrams?.let { formatWeight(it) }
-                        rows.add(row(ingredient.id, grams.orEmpty()))
-                        render()
-                    }
-                },
-                ui.foodSpacing(),
-            )
+            if (mealItemId == null)
+                body.addView(
+                    ui.smallButton("Add item") {
+                        pickIngredient { ingredient ->
+                            // LEGACY: Ingredients without a default portion start with a blank
+                            // weight.
+                            val grams = ingredient.defaultPortionGrams?.let { formatWeight(it) }
+                            rows.add(row(ingredient.id, grams.orEmpty()))
+                            render()
+                        }
+                    },
+                    ui.foodSpacing(),
+                )
             updateTotals()
             body.addView(summary.card(), ui.foodSpacing())
             body.addView(
                 ui.actionButton(if (cooking) "Save meal" else "Save recipe") {
-                    val recipeName = draft.getString("name").orEmpty().trim()
-                    if (name != null && recipeName.isEmpty()) {
+                    val foodName = draft.getString("name").orEmpty().trim()
+                    if (name != null && foodName.isEmpty()) {
                         fail(name, "Enter a recipe name")
                         return@actionButton
                     }
                     if (rows.isEmpty()) {
-                        toast("Add an ingredient first")
+                        toast("Add an item first")
                         return@actionButton
                     }
                     val items = rows.mapIndexed { index, item ->
@@ -820,16 +832,17 @@ internal class FoodEditorActivity : AppCompatActivity() {
                         store.log(
                             CookedMeal(
                                 id,
-                                recipeName,
+                                foodName,
                                 LocalDate.parse(draft.getString("day")),
                                 items.map {
                                     val ingredient = ingredients.getValue(it.ingredientId)
                                     CookedItem(ingredient.name, ingredient.portion(it.grams))
                                 },
                                 recipeId = intent.getStringExtra("id"),
+                                itemId = mealItemId,
                             )
                         )
-                    } else store.save(FoodRecipe(id, recipeName, items))
+                    } else store.save(FoodRecipe(id, foodName, items))
                     saved()
                 },
                 ui.foodSpacing(),
@@ -840,7 +853,7 @@ internal class FoodEditorActivity : AppCompatActivity() {
     private fun pickIngredient(select: (Ingredient) -> Unit) {
         val choices = ingredients.values.toList()
         if (choices.isEmpty()) {
-            toast("Add an ingredient in Ingredients first")
+            toast("Add an item in Items first")
             return
         }
         val adapter =
@@ -865,7 +878,7 @@ internal class FoodEditorActivity : AppCompatActivity() {
                 }
             }
         AlertDialog.Builder(this)
-            .setTitle("Choose ingredient")
+            .setTitle("Choose item")
             .setAdapter(adapter) { _, index -> select(choices[index]) }
             .setNegativeButton("Cancel", null)
             .show()

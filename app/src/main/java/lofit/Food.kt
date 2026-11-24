@@ -5,7 +5,8 @@ import java.text.NumberFormat
 import java.time.LocalDate
 
 internal enum class FoodSection(val label: String) {
-    INGREDIENTS("Ingredients"),
+    // LEGACY: Existing editor intents and saved navigation use the INGREDIENTS name.
+    INGREDIENTS("Items"),
     RECIPES("Recipes"),
     MEALS("Meals"),
     STATISTICS("Statistics"),
@@ -114,7 +115,12 @@ internal data class RecipeItem(val ingredientId: String, val grams: Double)
 
 internal data class FoodRecipe(val id: String, val name: String, val items: List<RecipeItem>)
 
-internal data class MealChoice(val recipeId: String, val name: String, val lastLogged: LocalDate?)
+internal data class MealChoice(
+    val id: String,
+    val name: String,
+    val lastLogged: LocalDate?,
+    val isItem: Boolean,
+)
 
 internal data class CookedItem(val name: String, val amounts: FoodAmounts)
 
@@ -124,6 +130,7 @@ internal data class CookedMeal(
     val day: LocalDate,
     val items: List<CookedItem>,
     val recipeId: String? = null,
+    val itemId: String? = null,
 )
 
 internal fun Iterable<FoodAmounts>.foodTotals(): FoodAmounts =

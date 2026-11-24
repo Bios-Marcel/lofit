@@ -105,7 +105,7 @@ class FoodFlowTest {
             .mapNotNull { it.image }
             .forEach { ingredientPictures(context).delete(it) }
         val db = store.writableDatabase
-        db.delete("meals", "name = ?", arrayOf(porridge))
+        db.delete("meals", "name = ? OR item_id = ?", arrayOf(porridge, oats.id))
         db.delete("recipes", "name = ? OR id = ?", arrayOf(porridge, "apple-$suffix"))
         db.delete("ingredients", "id IN (?, ?) OR name = ?", arrayOf(oats.id, rice.id, yogurt))
         store.close()
@@ -128,9 +128,9 @@ class FoodFlowTest {
     @Test
     fun ingredientFormSavesAndSearchFindsProduct() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-            open(scenario, "Ingredients", expand = true)
-            onView(withText("Add ingredient")).perform(click())
-            onView(withHint("Ingredient name")).perform(replaceText(yogurt))
+            open(scenario, "Items", expand = true)
+            onView(withText("Add item")).perform(click())
+            onView(withHint("Item name")).perform(replaceText(yogurt))
             chooseImageFromPicker()
             pressBack()
             onView(withText("Add image")).check(matches(isDisplayed()))
@@ -146,8 +146,8 @@ class FoodFlowTest {
             onView(withHint("Carbs per 100 g")).perform(scrollTo(), replaceText("50"))
             onView(withHint("Of which sugars per 100 g")).perform(scrollTo(), replaceText("10"))
             onView(withText("200 kcal")).perform(scrollTo()).check(matches(isDisplayed()))
-            onView(withText("Save ingredient")).perform(scrollTo(), click())
-            onView(withHint("Search ingredients")).perform(replaceText("YOG"))
+            onView(withText("Save item")).perform(scrollTo(), click())
+            onView(withHint("Search items")).perform(replaceText("YOG"))
             onView(withText(yogurt)).check(matches(isDisplayed()))
             onView(withSubstring("200 kcal / 100 g")).check(matches(isDisplayed()))
             onView(withText(oats.name)).check(doesNotExist())
@@ -165,7 +165,7 @@ class FoodFlowTest {
             onView(withContentDescription("Remove picture")).perform(scrollTo(), click())
             portion.check(matches(withText(formatWeight(40.5))))
             portion.perform(scrollTo(), replaceText(""))
-            onView(withText("Save ingredient")).perform(scrollTo(), click())
+            onView(withText("Save item")).perform(scrollTo(), click())
             val updated = store.ingredients().single { it.id == product.id }
             assertNull(updated.image)
             assertNull(updated.defaultPortionGrams)
@@ -268,7 +268,7 @@ class FoodFlowTest {
                 onView(withText("Cancel")).perform(click())
                 onView(withContentDescription("Change picture")).perform(scrollTo(), click())
                 onView(withText("Take photo")).perform(click())
-                onView(withText("Save ingredient")).perform(scrollTo(), click())
+                onView(withText("Save item")).perform(scrollTo(), click())
                 val saved = store.ingredients().single { it.id == oats.id }
                 val image =
                     requireNotNull(ingredientPictures(context).thumbnail(saved.image!!, 320, 240))
@@ -418,7 +418,7 @@ class FoodFlowTest {
             open(scenario, "Recipes", expand = true)
             onView(withText("Add recipe")).perform(click())
             onView(withHint("Recipe name")).perform(replaceText(porridge))
-            val addIngredient = onView(withText("Add ingredient"))
+            val addIngredient = onView(withText("Add item"))
             addIngredient.perform(scrollTo(), click())
             onView(withText(rice.name)).perform(click())
             onView(withContentDescription("${rice.name} weight (g)")).check(matches(withText("")))
@@ -457,12 +457,12 @@ class FoodFlowTest {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             open(scenario, "Meals", expand = true)
             onView(withText("Log meal")).perform(click())
-            val search = onView(withHint("Search recipes")).inRoot(isDialog())
+            val search = onView(withHint("Search recipes and items")).inRoot(isDialog())
             search.perform(replaceText(suffix))
             onView(withText(recent.name))
                 .inRoot(isDialog())
                 .check(isCompletelyAbove(withText(unused.name)))
-            onView(withText(startsWith("Last logged ")))
+            onView(withText(startsWith("Recipe · Last logged ")))
                 .inRoot(isDialog())
                 .check(matches(isDisplayed()))
 
@@ -474,12 +474,55 @@ class FoodFlowTest {
                 },
             )
             search.perform(replaceText("missing $suffix"))
-            onView(withText("No matching recipes."))
+            onView(withText("No matching recipes or items."))
                 .inRoot(isDialog())
                 .check(matches(isDisplayed()))
             search.perform(replaceText("BOWL apple"))
             onView(withText(unused.name)).inRoot(isDialog()).perform(click())
             onView(withContentDescription("${rice.name} weight (g)")).check(matches(withText("90")))
+        }
+    }
+
+    @Test
+    fun logSingleItemScalesNutritionAndCostAndKeepsSnapshot() {
+        val pizza = oats.copy(name = "Pizza $suffix", defaultPortionGrams = 125.0)
+        store.save(pizza)
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            open(scenario, "Meals", expand = true)
+            onView(withText("Log meal")).perform(click())
+            onView(withHint("Search recipes and items")).perform(replaceText(pizza.name))
+            onView(withText("Item")).inRoot(isDialog()).check(matches(isDisplayed()))
+            onView(allOf(withId(android.R.id.text1), withText(pizza.name)))
+                .inRoot(isDialog())
+                .perform(click())
+            val weight = onView(withContentDescription("${pizza.name} weight (g)"))
+            weight.check(matches(withText("125"))).perform(replaceText("0"))
+            onView(withText("Save meal")).perform(scrollTo(), click())
+            weight.check(matches(hasErrorText("Enter a weight above zero")))
+            weight.perform(scrollTo(), replaceText("250"))
+            onView(withText("500 kcal")).perform(scrollTo()).check(matches(isDisplayed()))
+            onView(withText("Save meal")).perform(scrollTo(), click())
+            onView(withText(pizza.name)).check(matches(isDisplayed()))
+            store.save(
+                pizza.copy(name = "New pizza", product = pizza.product + (FoodMetric.PRICE to 8.0))
+            )
+            val meal = store.meals().single { it.itemId == pizza.id }
+            assertNull(meal.recipeId)
+            assertEquals(pizza.name, meal.name)
+            assertEquals(LocalDate.now(), meal.day)
+            assertEquals(listOf(CookedItem(pizza.name, pizza.portion(250.0))), meal.items)
+            assertEquals(
+                MealChoice(pizza.id, "New pizza", meal.day, isItem = true),
+                store.mealChoices().single { it.isItem && it.id == pizza.id },
+            )
+            onView(withText("Log meal")).perform(click())
+            onView(withHint("Search recipes and items")).perform(replaceText(rice.name))
+            onView(allOf(withId(android.R.id.text1), withText(rice.name)))
+                .inRoot(isDialog())
+                .perform(click())
+            onView(withContentDescription("${rice.name} weight (g)"))
+                .check(matches(withText("500")))
+            pressBack()
         }
     }
 
@@ -501,7 +544,8 @@ class FoodFlowTest {
             ActivityScenario.launch(MainActivity::class.java).use { scenario ->
                 open(scenario, "Statistics", expand = true)
                 onView(withContentDescription("Previous day")).perform(click())
-                onView(withText("No meals logged for this day.")).check(matches(isDisplayed()))
+                onView(withText("No meals logged for this day.")).check(doesNotExist())
+                onView(withText("0 kcal")).check(matches(isDisplayed()))
                 for (metric in FoodMetric.entries) {
                     onView(withText(metric.label)).perform(scrollTo()).check(matches(isDisplayed()))
                 }

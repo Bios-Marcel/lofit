@@ -34,9 +34,6 @@ internal class FoodDailyTotalsView(
         val salt = FoodMetric.SALT
         val sugar = FoodMetric.SUGAR
         val amounts = totals ?: emptyList<FoodAmounts>().foodTotals()
-        if (totals == null) {
-            addView(ui.metaText("No meals logged for this day."))
-        }
         addTileRow(
             listOf(
                 gauge(calories, calories.valueIn(amounts), goals.calories),

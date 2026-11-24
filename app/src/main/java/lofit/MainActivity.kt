@@ -205,14 +205,7 @@ class MainActivity : AppCompatActivity() {
             this,
             ui,
             foodStore.value,
-            { section, id ->
-                editFood.launch(
-                    Intent(this, FoodEditorActivity::class.java).apply {
-                        putExtra("section", section.name)
-                        if (id != null) putExtra("id", id)
-                    }
-                )
-            },
+            editFood::launch,
             { render() },
         )
     }

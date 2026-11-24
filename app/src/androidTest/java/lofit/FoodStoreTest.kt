@@ -59,6 +59,7 @@ class FoodStoreTest {
     fun upgradeLinksOnlyUnambiguousMealNames() {
         SQLiteDatabase.openOrCreateDatabase(file, null).use { db ->
             createLegacyMealTables(db)
+            db.execSQL("CREATE TABLE ingredients (id TEXT PRIMARY KEY, name TEXT NOT NULL)")
             db.execSQL(
                 "INSERT INTO recipes VALUES ('soup', 'Soup'), ('bowl-1', 'Bowl'), ('bowl-2', 'Bowl')"
             )
@@ -70,9 +71,9 @@ class FoodStoreTest {
         FoodStore(isolated).use { store ->
             assertEquals(
                 listOf(
-                    MealChoice("soup", "Soup", LocalDate.of(2026, 3, 30)),
-                    MealChoice("bowl-1", "Bowl", null),
-                    MealChoice("bowl-2", "Bowl", null),
+                    MealChoice("soup", "Soup", LocalDate.of(2026, 3, 30), isItem = false),
+                    MealChoice("bowl-1", "Bowl", null, isItem = false),
+                    MealChoice("bowl-2", "Bowl", null, isItem = false),
                 ),
                 store.mealChoices(),
             )
@@ -93,8 +94,8 @@ class FoodStoreTest {
             store.save(soup.copy(name = "Tomato soup"))
             assertEquals(
                 listOf(
-                    MealChoice(bowl.id, bowl.name, today),
-                    MealChoice(soup.id, "Tomato soup", today),
+                    MealChoice(bowl.id, bowl.name, today, isItem = false),
+                    MealChoice(soup.id, "Tomato soup", today, isItem = false),
                 ),
                 store.mealChoices(),
             )

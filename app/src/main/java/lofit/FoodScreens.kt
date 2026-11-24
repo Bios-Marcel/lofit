@@ -2,6 +2,7 @@ package lofit
 
 import android.app.DatePickerDialog
 import android.content.Context
+import android.content.Intent
 import android.content.res.ColorStateList
 import android.os.Bundle
 import android.view.Gravity
@@ -28,7 +29,7 @@ internal class FoodScreens(
     private val context: Context,
     private val ui: LofitViews,
     private val store: FoodStore,
-    private val edit: (FoodSection, String?) -> Unit,
+    private val launchEditor: (Intent) -> Unit,
     private val refresh: () -> Unit,
 ) {
     private val pictures = ingredientPictures(context)
@@ -66,14 +67,24 @@ internal class FoodScreens(
 
     private fun column() = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
 
+    private fun edit(section: FoodSection, id: String? = null, mealItemId: String? = null) {
+        launchEditor(
+            Intent(context, FoodEditorActivity::class.java).apply {
+                putExtra("section", section.name)
+                if (id != null) putExtra("id", id)
+                if (mealItemId != null) putExtra("mealItemId", mealItemId)
+            }
+        )
+    }
+
     private fun ingredients() =
-        ui.page("Ingredients") { body ->
+        ui.page(FoodSection.INGREDIENTS.label) { body ->
             val items = store.ingredients()
             body.addView(
-                ui.actionButton("Add ingredient") { edit(FoodSection.INGREDIENTS, null) },
+                ui.actionButton("Add item") { edit(FoodSection.INGREDIENTS) },
                 ui.foodSpacing(),
             )
-            val search = ui.textField("Search ingredients").apply { setText(query) }
+            val search = ui.textField("Search items").apply { setText(query) }
             body.addView(search, ui.foodSpacing())
             val results = column()
             body.addView(results, ui.foodSpacing())
@@ -83,10 +94,7 @@ internal class FoodScreens(
                 val matches = items.filter { searchQuery.matches(it.name) }
                 if (matches.isEmpty())
                     results.addView(
-                        ui.emptyText(
-                            if (query.isBlank()) "No ingredients yet."
-                            else "No matching ingredients."
-                        )
+                        ui.emptyText(if (query.isBlank()) "No items yet." else "No matching items.")
                     )
                 matches.forEach { item ->
                     results.addView(
@@ -139,7 +147,7 @@ internal class FoodScreens(
             val ingredients = store.ingredients().associateBy { it.id }
             val recipes = store.recipes()
             body.addView(
-                ui.actionButton("Add recipe") { edit(FoodSection.RECIPES, null) },
+                ui.actionButton("Add recipe") { edit(FoodSection.RECIPES) },
                 ui.foodSpacing(),
             )
             if (recipes.isEmpty()) body.addView(ui.emptyText("No recipes yet."))
@@ -186,19 +194,22 @@ internal class FoodScreens(
     private fun pickMeal() {
         val choices = store.mealChoices()
         val builder =
-            AlertDialog.Builder(context).setTitle("Choose recipe").setNegativeButton("Cancel", null)
+            AlertDialog.Builder(context)
+                .setTitle("Choose recipe or item")
+                .setNegativeButton("Cancel", null)
         if (choices.isEmpty()) {
             builder
-                .setMessage("No recipes yet.")
-                .setPositiveButton("Add recipe") { _, _ -> edit(FoodSection.RECIPES, null) }
+                .setMessage("No recipes or items yet.")
+                .setPositiveButton("Add item") { _, _ -> edit(FoodSection.INGREDIENTS) }
+                .setNeutralButton("Add recipe") { _, _ -> edit(FoodSection.RECIPES) }
                 .show()
             return
         }
 
-        val search = ui.textField("Search recipes")
+        val search = ui.textField("Search recipes and items")
         val empty =
             TextView(context).apply {
-                text = "No matching recipes."
+                text = "No matching recipes or items."
                 textSize = 16f
                 gravity = Gravity.CENTER
                 setPadding(ui.dp(16), ui.dp(32), ui.dp(16), ui.dp(32))
@@ -222,10 +233,10 @@ internal class FoodScreens(
                             ?: LayoutInflater.from(context)
                                 .inflate(android.R.layout.simple_list_item_2, parent, false)
                     row.findViewById<TextView>(android.R.id.text1).text = choice.name
-                    row.findViewById<TextView>(android.R.id.text2).apply {
-                        visibility = if (choice.lastLogged == null) View.GONE else View.VISIBLE
-                        text = choice.lastLogged?.let { "Last logged ${it.format(dateFormat)}" }
-                    }
+                    val type = if (choice.isItem) "Item" else "Recipe"
+                    row.findViewById<TextView>(android.R.id.text2).text =
+                        choice.lastLogged?.let { "$type · Last logged ${it.format(dateFormat)}" }
+                            ?: type
                     return row
                 }
             }
@@ -257,9 +268,10 @@ internal class FoodScreens(
             }
         val dialog = builder.setView(content).create()
         list.setOnItemClickListener { _, _, position, _ ->
-            val recipeId = adapter.getItem(position).recipeId
+            val choice = adapter.getItem(position)
             dialog.dismiss()
-            edit(FoodSection.MEALS, recipeId)
+            if (choice.isItem) edit(FoodSection.MEALS, mealItemId = choice.id)
+            else edit(FoodSection.MEALS, choice.id)
         }
         dialog.show()
     }
