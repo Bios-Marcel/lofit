@@ -14,6 +14,7 @@ import androidx.core.graphics.ColorUtils
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import java.math.RoundingMode
 import java.text.NumberFormat
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 internal class FoodDailyTotalsView(
@@ -31,6 +32,7 @@ internal class FoodDailyTotalsView(
         val calories = FoodMetric.CALORIES
         val protein = FoodMetric.PROTEIN
         val salt = FoodMetric.SALT
+        val sugar = FoodMetric.SUGAR
         val amounts = totals ?: emptyList<FoodAmounts>().foodTotals()
         if (totals == null) {
             addView(ui.metaText("No meals logged for this day."))
@@ -41,10 +43,11 @@ internal class FoodDailyTotalsView(
                 gauge(protein, protein.valueIn(amounts), goals.protein),
             )
         )
-        addTileRow(listOf(saltGauge(salt.valueIn(amounts), goals.saltLimit)))
+        addTileRow(listOf(limitGauge(salt, salt.valueIn(amounts), goals.saltLimit)))
+        addTileRow(listOf(limitGauge(sugar, sugar.valueIn(amounts), goals.sugarLimit)))
         addView(ui.sectionTitle("Other totals"))
         FoodMetric.entries
-            .filter { it != calories && it != protein && it != salt }
+            .filter { it != calories && it != protein && it != salt && it != sugar }
             .chunked(2)
             .forEach { row ->
                 addTileRow(
@@ -111,9 +114,8 @@ internal class FoodDailyTotalsView(
                         MATCH_PARENT,
                     )
                     if (progress != null) {
-                        val status = if (progress > 1) "Over goal" else percent.format(progress)
                         addView(
-                            ui.metaText(status).apply {
+                            ui.metaText(percent.format(progress)).apply {
                                 gravity = Gravity.CENTER
                                 setTextColor(metric.graphColor)
                             },
@@ -130,13 +132,29 @@ internal class FoodDailyTotalsView(
                         gravity = Gravity.CENTER
                     }
             )
+            if (goal != null) {
+                addView(
+                    ui.metaText(metric.balanceText(goal - amount, "Goal met")).apply {
+                        gravity = Gravity.CENTER
+                    }
+                )
+            }
         }
 
-    private fun saltGauge(amount: Double, limit: Double): View {
-        val metric = FoodMetric.SALT
+    private fun FoodMetric.balanceText(remaining: Double, atTarget: String): String {
+        if (remaining == 0.0) return atTarget
+        val amount = format(abs(remaining))
+        val quantity =
+            if (amount == format(0.0)) "<${format(if (this == FoodMetric.CALORIES) 1.0 else 0.01)}"
+            else amount
+        return if (remaining > 0) "$quantity left" else "$quantity over"
+    }
+
+    private fun limitGauge(metric: FoodMetric, amount: Double, limit: Double): View {
         val fraction = amount / limit
-        val over = fraction > 1
+        val over = amount > limit
         val accent = if (over) ui.color(R.color.coral) else metric.graphColor
+        val balance = metric.balanceText(limit - amount, "At limit")
         fun line(start: View, end: View) =
             LinearLayout(context).apply {
                 gravity = Gravity.CENTER_VERTICAL
@@ -166,9 +184,10 @@ internal class FoodDailyTotalsView(
             addView(
                 line(
                     ui.metaText("Limit ${formatWeight(limit)} g"),
-                    ui.metaText(if (over) "Over limit" else percent.format(fraction)).apply {
-                        setTextColor(accent)
-                    },
+                    ui.metaText(if (over) balance else "$balance · ${percent.format(fraction)}")
+                        .apply {
+                            setTextColor(accent)
+                        },
                 )
             )
         }

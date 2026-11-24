@@ -83,9 +83,11 @@ internal data class FoodGoals(
     val calories: Int?,
     val protein: Int?,
     val saltLimit: Double = DEFAULT_SALT_LIMIT,
+    val sugarLimit: Double = DEFAULT_SUGAR_LIMIT,
 ) {
     companion object {
         const val DEFAULT_SALT_LIMIT = 5.0
+        const val DEFAULT_SUGAR_LIMIT = 50.0
     }
 }
 

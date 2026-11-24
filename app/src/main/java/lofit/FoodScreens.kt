@@ -416,13 +416,14 @@ internal class FoodScreens(
             )
         val protein =
             addTarget("Protein (g)", ui.numberField("No goal"), goals.protein?.toString().orEmpty())
-        val defaultSalt = FoodGoals.DEFAULT_SALT_LIMIT
-        val salt =
+        fun addLimit(metric: FoodMetric, value: Double, default: Double) =
             addTarget(
-                "Salt limit (g)",
-                ui.decimalField("Default ${formatWeight(defaultSalt)} g"),
-                formatWeight(goals.saltLimit),
+                "${metric.label} limit (g)",
+                ui.decimalField("Default ${formatWeight(default)} g"),
+                formatWeight(value),
             )
+        val salt = addLimit(FoodMetric.SALT, goals.saltLimit, FoodGoals.DEFAULT_SALT_LIMIT)
+        val sugar = addLimit(FoodMetric.SUGAR, goals.sugarLimit, FoodGoals.DEFAULT_SUGAR_LIMIT)
         content.requestFocus()
 
         fun readGoal(field: EditText): Int? {
@@ -431,6 +432,13 @@ internal class FoodScreens(
             field.error =
                 if (input.isNotEmpty() && goal == null) "Enter a positive whole number" else null
             return goal
+        }
+
+        fun readLimit(field: EditText, default: Double): Double? {
+            val input = field.text.toString().trim()
+            val limit = if (input.isEmpty()) default else input.foodNumber()?.takeIf { it > 0 }
+            field.error = if (limit == null) "Enter a positive number" else null
+            return limit
         }
 
         val dialog =
@@ -443,13 +451,23 @@ internal class FoodScreens(
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
             val calorieGoal = readGoal(calories)
             val proteinGoal = readGoal(protein)
-            val input = salt.text.toString().trim()
-            val saltLimit =
-                if (input.isEmpty()) defaultSalt else input.foodNumber()?.takeIf { it > 0 }
-            salt.error = if (saltLimit == null) "Enter a positive number" else null
-            if (calories.error != null || protein.error != null || saltLimit == null)
+            val saltLimit = readLimit(salt, FoodGoals.DEFAULT_SALT_LIMIT)
+            val sugarLimit = readLimit(sugar, FoodGoals.DEFAULT_SUGAR_LIMIT)
+            if (
+                calories.error != null ||
+                    protein.error != null ||
+                    saltLimit == null ||
+                    sugarLimit == null
+            )
                 return@setOnClickListener
-            store.saveGoals(FoodGoals(calorieGoal, proteinGoal, saltLimit))
+            store.saveGoals(
+                FoodGoals(
+                    calories = calorieGoal,
+                    protein = proteinGoal,
+                    saltLimit = saltLimit,
+                    sugarLimit = sugarLimit,
+                )
+            )
             dialog.dismiss()
             refresh()
         }

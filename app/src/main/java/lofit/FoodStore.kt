@@ -25,16 +25,19 @@ internal class FoodStore(context: Context) : SQLiteOpenHelper(context, "food.db"
         FoodGoals(
             calories = goalPreferences.getInt("calories", 0).takeIf { it > 0 },
             protein = goalPreferences.getInt("protein", 0).takeIf { it > 0 },
-            saltLimit =
-                goalPreferences.getString("salt_limit", null)?.foodNumber()?.takeIf { it > 0 }
-                    ?: FoodGoals.DEFAULT_SALT_LIMIT,
+            saltLimit = readLimit("salt_limit", FoodGoals.DEFAULT_SALT_LIMIT),
+            sugarLimit = readLimit("sugar_limit", FoodGoals.DEFAULT_SUGAR_LIMIT),
         )
+
+    private fun readLimit(key: String, default: Double): Double =
+        goalPreferences.getString(key, null)?.foodNumber()?.takeIf { it > 0 } ?: default
 
     fun saveGoals(goals: FoodGoals) {
         goalPreferences.edit {
             putInt("calories", goals.calories ?: 0)
             putInt("protein", goals.protein ?: 0)
             putString("salt_limit", goals.saltLimit.toString())
+            putString("sugar_limit", goals.sugarLimit.toString())
         }
     }
 
