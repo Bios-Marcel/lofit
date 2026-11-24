@@ -1532,37 +1532,30 @@ class WorkoutFlowTest {
     @Test
     fun discardWorkout_multipleExercisesUsesModalAndKeepsWorkoutOnCancel() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        LofitRepository(context).apply {
-            data.routines.add(
-                Routine(
-                    name = "Strength",
-                    exercises =
-                        mutableListOf(
-                            RoutineExercise(
-                                exerciseId = "bench-press",
-                                plannedSets = mutableListOf(PlannedSet()),
-                            ),
-                            RoutineExercise(
-                                exerciseId = "plank",
-                                plannedSets = mutableListOf(PlannedSet()),
-                            ),
-                        ),
-                )
-            )
-            save()
-        }
+        seedWorkout(
+            WorkoutExercise(exerciseId = "bench-press"),
+            WorkoutExercise(exerciseId = "plank"),
+        )
+        val workoutId = LofitRepository(context).data.activeWorkout!!.id
         ActivityScenario.launch<MainActivity>(Intent(context, MainActivity::class.java)).use {
-            onView(withText("Start routine")).perform(scrollTo(), click())
-            val workoutId = LofitRepository(context).data.activeWorkout!!.id
-            onView(withText("Discard workout")).perform(scrollTo(), click())
-            onView(withText("Discard workout?")).inRoot(isDialog()).check(matches(isDisplayed()))
+            fun openDiscardDialog() {
+                onView(withText("Discard workout"))
+                    .inRoot(not(isDialog()))
+                    .perform(scrollTo(), waitForStableLayout(), click())
+                onView(withText("Discard workout?"))
+                    .inRoot(isDialog())
+                    .perform(waitForStableLayout())
+                    .check(matches(isDisplayed()))
+            }
+
+            openDiscardDialog()
             onView(withText("Cancel")).inRoot(isDialog()).perform(click())
             assertEquals(workoutId, LofitRepository(context).data.activeWorkout!!.id)
             onView(withText("Add exercise")).check(matches(isDisplayed()))
-            onView(withText("Discard workout")).perform(scrollTo(), click())
+            openDiscardDialog()
             pressBack()
             assertEquals(workoutId, LofitRepository(context).data.activeWorkout!!.id)
-            onView(withText("Discard workout")).perform(scrollTo(), click())
+            openDiscardDialog()
             onView(withText("Discard workout")).inRoot(isDialog()).perform(click())
             onView(withText(R.string.start_workout)).check(matches(isDisplayed()))
             assertEquals(null, LofitRepository(context).data.activeWorkout)
