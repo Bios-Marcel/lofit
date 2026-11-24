@@ -174,6 +174,29 @@ class RoutineWorkoutFlowTest {
     }
 
     @Test
+    fun searchFiltersRoutinesByNameAndClearingRestoresThem() {
+        LofitRepository(context).apply {
+            data.routines.add(Routine(name = "Upper Body"))
+            save()
+        }
+        launch().use { scenario ->
+            openRoutines(scenario)
+            val search = onView(withHint("Search routines"))
+            val strength = onView(withText("Strength"))
+            val upperBody = onView(withText("Upper Body"))
+            search.perform(replaceText("boD UPP"))
+            upperBody.check(matches(isDisplayed()))
+            strength.check(matches(withEffectiveVisibility(Visibility.GONE)))
+            search.perform(replaceText("missing"))
+            onView(withText("No matching routines.")).check(matches(isDisplayed()))
+            upperBody.check(matches(withEffectiveVisibility(Visibility.GONE)))
+            search.perform(replaceText(""))
+            strength.perform(scrollTo()).check(matches(isDisplayed()))
+            upperBody.perform(scrollTo()).check(matches(isDisplayed()))
+        }
+    }
+
+    @Test
     fun routineAutoStartMenuSavesAndWorkoutsInheritAnIndependentSetting() {
         launch().use { scenario ->
             editRoutine(scenario)

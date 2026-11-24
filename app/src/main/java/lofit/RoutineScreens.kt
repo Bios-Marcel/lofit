@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.appcompat.widget.PopupMenu
+import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
 
 internal class RoutineScreens(
@@ -35,12 +36,27 @@ internal class RoutineScreens(
                         bottomMargin = ui.dp(16)
                     },
             )
+            val search = ui.textField("Search routines")
+            body.addView(
+                search,
+                LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                    )
+                    .apply { bottomMargin = ui.dp(12) },
+            )
             val appData = data()
             val exercisesById = appData.exercises.associateBy(Exercise::id)
-            if (appData.routines.isEmpty()) body.addView(ui.emptyText("No routines saved."))
-            appData.routines.forEach { routine ->
-                body.addView(
-                    ui.card {
+            val empty =
+                ui.emptyText(
+                    if (appData.routines.isEmpty()) "No routines saved."
+                    else "No matching routines."
+                )
+            body.addView(empty)
+            empty.isVisible = appData.routines.isEmpty()
+            val cards =
+                appData.routines.map { routine ->
+                    val card = ui.card {
                         addView(ui.titleText(routine.name))
                         addView(
                             ui.estimatedWorkoutTime(routine.estimatedWorkoutSeconds(exercisesById))
@@ -62,7 +78,13 @@ internal class RoutineScreens(
                             )
                         )
                     }
-                )
+                    body.addView(card)
+                    routine.name to card
+                }
+            search.doAfterTextChanged { text ->
+                val query = SearchQuery(text.toString())
+                cards.forEach { (name, card) -> card.isVisible = query.matches(name) }
+                empty.isVisible = cards.none { (_, card) -> card.isVisible }
             }
         }
 
