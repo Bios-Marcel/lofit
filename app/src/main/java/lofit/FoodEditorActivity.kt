@@ -41,11 +41,12 @@ import kotlin.math.roundToInt
 internal class FoodEditorActivity : AppCompatActivity() {
     private val section by lazy { FoodSection.valueOf(intent.getStringExtra("section")!!) }
     private val mealItemId by lazy { intent.getStringExtra("mealItemId") }
+    private val loggedMealId by lazy { intent.getStringExtra("loggedMealId") }
     private val store by lazy { FoodStore(this) }
     private val ingredients by lazy { store.ingredients().associateBy { it.id } }
     private val pictures by lazy { ingredientPictures(this) }
     private val ui by lazy { LofitViews(this, pictures) { BiologicalGender.MALE } }
-    private lateinit var draft: Bundle
+    private var draft = Bundle()
     private lateinit var root: FrameLayout
     private val pictureWorker = Executors.newSingleThreadExecutor()
     private val nutritionFields =
@@ -89,7 +90,14 @@ internal class FoodEditorActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        draft = savedInstanceState?.getBundle("draft") ?: initialDraft()
+        draft =
+            savedInstanceState?.getBundle("draft")
+                ?: initialDraft()
+                ?: run {
+                    toast("Meal no longer exists")
+                    saved()
+                    return
+                }
         root =
             FrameLayout(this).apply {
                 setBackgroundColor(ui.color(R.color.charcoal))
@@ -109,8 +117,11 @@ internal class FoodEditorActivity : AppCompatActivity() {
         draft.getString("pendingImage")?.let { importImage(Uri.parse(it)) }
     }
 
-    private fun initialDraft() =
-        Bundle().apply {
+    private fun initialDraft(): Bundle? {
+        loggedMealId?.let { id ->
+            return store.meals(id).singleOrNull()?.let(::mealDraft)
+        }
+        return Bundle().apply {
             val sourceId = intent.getStringExtra("id")
             putString(
                 "id",
@@ -145,12 +156,42 @@ internal class FoodEditorActivity : AppCompatActivity() {
                 )
             }
         }
+    }
 
     private fun row(id: String, grams: String) =
         Bundle().apply {
             putString("ingredient", id)
             putString("grams", grams)
         }
+
+    private fun mealDraft(meal: CookedMeal) =
+        Bundle().apply {
+            putString("id", meal.id)
+            putString("name", meal.name)
+            putString("day", meal.day.toString())
+            putBoolean("singleItem", meal.itemId != null)
+            putParcelableArrayList("rows", ArrayList(meal.items.map(::loggedRow)))
+        }
+
+    private fun loggedRow(item: CookedItem) =
+        Bundle().apply {
+            putString("grams", formatWeight(item.amounts.getValue(FoodMetric.WEIGHT)))
+            putString("loggedName", item.name)
+            item.amounts.forEach { (metric, value) -> putDouble(metric.name, value) }
+        }
+
+    private fun Bundle.itemName() =
+        getString("loggedName") ?: ingredients.getValue(getString("ingredient")!!).name
+
+    private fun Bundle.portion(grams: Double): FoodAmounts {
+        getString("ingredient")?.let {
+            return ingredients.getValue(it).portion(grams)
+        }
+        val scale = grams / getDouble(FoodMetric.WEIGHT.name)
+        return FoodMetric.inputs.associateWith { metric ->
+            if (metric == FoodMetric.WEIGHT) grams else getDouble(metric.name) * scale
+        }
+    }
 
     private val rows
         get() = draft.getParcelableArrayList("rows", Bundle::class.java)!!
@@ -693,11 +734,18 @@ internal class FoodEditorActivity : AppCompatActivity() {
 
     private fun compositionForm(): View {
         val cooking = section == FoodSection.MEALS
+        val singleItem = mealItemId != null || draft.getBoolean("singleItem")
         val title =
-            if (cooking) draft.getString("name")!!
+            if (loggedMealId != null) "Edit meal"
+            else if (cooking) draft.getString("name")!!
             else if (intent.hasExtra("id")) "Edit recipe" else "Add recipe"
         return ui.page(title) { body ->
-            val name = if (cooking) null else field(body, "Recipe name", "name")
+            val name =
+                when {
+                    loggedMealId != null -> field(body, "Meal name", "name")
+                    cooking -> null
+                    else -> field(body, "Recipe name", "name")
+                }
             if (cooking) {
                 val date = LocalDate.parse(draft.getString("day"))
                 val dateLabel = if (date == LocalDate.now()) "Today" else date.toString()
@@ -724,46 +772,49 @@ internal class FoodEditorActivity : AppCompatActivity() {
                     ui.foodSpacing(),
                 )
             }
-            if (mealItemId == null) body.addView(ui.sectionTitle("Items"))
+            if (!singleItem) body.addView(ui.sectionTitle("Items"))
             val summary = FoodSummary(this, ui)
             fun updateTotals() {
                 val amounts =
                     rows
                         .map { item ->
-                            ingredients
-                                .getValue(item.getString("ingredient")!!)
-                                .portion(
-                                    item.getString("grams")?.foodNumber()?.takeIf { it > 0 } ?: 0.0
-                                )
+                            item.portion(
+                                item.getString("grams")?.foodNumber()?.takeIf { it > 0 } ?: 0.0
+                            )
                         }
                         .foodTotals()
                 summary.update(amounts)
             }
-            val weights = rows.map { item ->
-                val ingredient = ingredients.getValue(item.getString("ingredient")!!)
+            val weights = rows.mapIndexed { index, item ->
+                val itemName = item.itemName()
                 val input =
                     ui.decimalField("Weight (g)").apply {
-                        contentDescription = "${ingredient.name} weight (g)"
+                        contentDescription = "$itemName weight (g)"
                         setText(item.getString("grams"))
                         doAfterTextChanged {
                             item.putString("grams", it.toString())
                             updateTotals()
                         }
                     }
-                if (mealItemId != null) {
-                    body.addView(ui.fieldLabel("Weight (g)"))
+                if (singleItem) {
+                    body.addView(
+                        ui.fieldLabel(
+                            if (loggedMealId != null) "$itemName weight (g)" else "Weight (g)"
+                        )
+                    )
                     body.addView(input, ui.foodSpacing())
                 } else
                     body.addView(
                         ui.card {
                             addView(
-                                ui.smallButton(ingredient.name) {
+                                ui.smallButton(itemName) {
                                         pickIngredient {
-                                            item.putString("ingredient", it.id)
+                                            rows[index] =
+                                                row(it.id, item.getString("grams").orEmpty())
                                             render()
                                         }
                                     }
-                                    .apply { contentDescription = "Replace ${ingredient.name}" }
+                                    .apply { contentDescription = "Replace $itemName" }
                             )
                             addView(ui.fieldLabel("Weight (g)"))
                             addView(
@@ -777,7 +828,7 @@ internal class FoodEditorActivity : AppCompatActivity() {
                                                 render()
                                             }
                                             .apply {
-                                                contentDescription = "Remove ${ingredient.name}"
+                                                contentDescription = "Remove $itemName"
                                                 setIconResource(R.drawable.ic_close)
                                                 iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
                                                 iconPadding = 0
@@ -793,7 +844,7 @@ internal class FoodEditorActivity : AppCompatActivity() {
                     )
                 input
             }
-            if (mealItemId == null)
+            if (!singleItem)
                 body.addView(
                     ui.smallButton("Add item") {
                         pickIngredient { ingredient ->
@@ -812,37 +863,48 @@ internal class FoodEditorActivity : AppCompatActivity() {
                 ui.actionButton(if (cooking) "Save meal" else "Save recipe") {
                     val foodName = draft.getString("name").orEmpty().trim()
                     if (name != null && foodName.isEmpty()) {
-                        fail(name, "Enter a recipe name")
+                        fail(name, if (cooking) "Enter a meal name" else "Enter a recipe name")
                         return@actionButton
                     }
                     if (rows.isEmpty()) {
                         toast("Add an item first")
                         return@actionButton
                     }
-                    val items = rows.mapIndexed { index, item ->
+                    val weightsInGrams = rows.mapIndexed { index, item ->
                         val grams = item.getString("grams").orEmpty().foodNumber()
                         if (grams == null || grams <= 0) {
                             fail(weights[index], "Enter a weight above zero")
                             return@actionButton
                         }
-                        RecipeItem(item.getString("ingredient")!!, grams)
+                        grams
                     }
                     val id = draft.getString("id")!!
                     if (cooking) {
-                        store.log(
-                            CookedMeal(
-                                id,
-                                foodName,
-                                LocalDate.parse(draft.getString("day")),
-                                items.map {
-                                    val ingredient = ingredients.getValue(it.ingredientId)
-                                    CookedItem(ingredient.name, ingredient.portion(it.grams))
-                                },
-                                recipeId = intent.getStringExtra("id"),
-                                itemId = mealItemId,
+                        val day = LocalDate.parse(draft.getString("day"))
+                        val items = rows.mapIndexed { index, item ->
+                            CookedItem(item.itemName(), item.portion(weightsInGrams[index]))
+                        }
+                        if (loggedMealId != null) {
+                            if (!store.updateMeal(id, foodName, day, items))
+                                toast("Meal no longer exists")
+                        } else {
+                            store.log(
+                                CookedMeal(
+                                    id,
+                                    foodName,
+                                    day,
+                                    items,
+                                    recipeId = intent.getStringExtra("id"),
+                                    itemId = mealItemId,
+                                )
                             )
-                        )
-                    } else store.save(FoodRecipe(id, foodName, items))
+                        }
+                    } else {
+                        val items = rows.mapIndexed { index, item ->
+                            RecipeItem(item.getString("ingredient")!!, weightsInGrams[index])
+                        }
+                        store.save(FoodRecipe(id, foodName, items))
+                    }
                     saved()
                 },
                 ui.foodSpacing(),

@@ -67,12 +67,18 @@ internal class FoodScreens(
 
     private fun column() = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
 
-    private fun edit(section: FoodSection, id: String? = null, mealItemId: String? = null) {
+    private fun edit(
+        section: FoodSection,
+        id: String? = null,
+        mealItemId: String? = null,
+        loggedMealId: String? = null,
+    ) {
         launchEditor(
             Intent(context, FoodEditorActivity::class.java).apply {
                 putExtra("section", section.name)
                 if (id != null) putExtra("id", id)
                 if (mealItemId != null) putExtra("mealItemId", mealItemId)
+                if (loggedMealId != null) putExtra("loggedMealId", loggedMealId)
             }
         )
     }
@@ -294,6 +300,7 @@ internal class FoodScreens(
             .setTitle(meal.name)
             .setView(ScrollView(context).apply { addView(details) })
             .setPositiveButton("Done", null)
+            .setNegativeButton("Edit") { _, _ -> edit(FoodSection.MEALS, loggedMealId = meal.id) }
             .setNeutralButton("Delete") { _, _ ->
                 AlertDialog.Builder(context)
                     .setTitle("Delete this meal?")

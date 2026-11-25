@@ -515,6 +515,15 @@ class FoodFlowTest {
                 MealChoice(pizza.id, "New pizza", meal.day, isItem = true),
                 store.mealChoices().single { it.isItem && it.id == pizza.id },
             )
+            onView(withText(pizza.name)).perform(click())
+            onView(withText("Edit")).inRoot(isDialog()).perform(click())
+            weight.check(matches(withText("250"))).perform(replaceText("125"))
+            onView(withText("Save meal")).perform(scrollTo(), click())
+            onView(withText(pizza.name)).check(matches(isDisplayed()))
+            assertEquals(
+                meal.copy(items = listOf(CookedItem(pizza.name, pizza.portion(125.0)))),
+                store.meals().single { it.itemId == pizza.id },
+            )
             onView(withText("Log meal")).perform(click())
             onView(withHint("Search recipes and items")).perform(replaceText(rice.name))
             onView(allOf(withId(android.R.id.text1), withText(rice.name)))
@@ -523,6 +532,68 @@ class FoodFlowTest {
             onView(withContentDescription("${rice.name} weight (g)"))
                 .check(matches(withText("500")))
             pressBack()
+        }
+    }
+
+    @Test
+    fun editLoggedMealPreservesSnapshotsAndUpdatesDailyTotals() {
+        val today = LocalDate.now()
+        val oldDay = today.minusDays(1)
+        val oldDayTotals = store.dailyTotals(oldDay)
+        val todayTotals = store.dailyTotals(today)
+        val template = FoodRecipe("recipe-$suffix", porridge, listOf(RecipeItem(rice.id, 90.0)))
+        store.save(template)
+        val topping = CookedItem("Old topping", oats.portion(25.0))
+        val original =
+            CookedMeal(
+                "lunch-$suffix",
+                "Old meal $suffix",
+                oldDay,
+                listOf(topping, CookedItem("Old base", rice.portion(125.0))),
+                template.id,
+            )
+        store.log(original)
+        try {
+            ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+                open(scenario, "Meals", expand = true)
+                fun editMeal() {
+                    onView(withText(original.name)).perform(scrollTo(), click())
+                    onView(withText("Edit")).inRoot(isDialog()).perform(click())
+                }
+                editMeal()
+                val name = onView(withHint("Meal name"))
+                name.check(matches(withText(original.name))).perform(replaceText(porridge))
+                pressBack()
+                assertEquals(original, store.meals(original.id).single())
+
+                editMeal()
+                name.check(matches(withText(original.name))).perform(replaceText(porridge))
+                onView(withText("Meal date · $oldDay")).perform(scrollTo(), click())
+                selectMealDate(today)
+                onView(withContentDescription("Old topping weight (g)"))
+                    .perform(scrollTo())
+                    .check(matches(withText("25")))
+                onView(withContentDescription("Replace Old base")).perform(scrollTo(), click())
+                onView(withText(rice.name)).inRoot(isDialog()).perform(click())
+                onView(withContentDescription("${rice.name} weight (g)"))
+                    .check(matches(withText("125")))
+                    .perform(replaceText("50"))
+                onView(withText("Save meal")).perform(scrollTo(), click())
+                onView(withText(porridge)).check(matches(isDisplayed()))
+                val items = listOf(topping, CookedItem(rice.name, rice.portion(50.0)))
+                assertEquals(
+                    original.copy(name = porridge, day = today, items = items),
+                    store.meals().single { it.recipeId == template.id },
+                )
+                assertEquals(oldDayTotals, store.dailyTotals(oldDay))
+                assertEquals(
+                    (listOfNotNull(todayTotals) + items.map { it.amounts }).foodTotals(),
+                    store.dailyTotals(today),
+                )
+                assertEquals(template, store.recipes().single { it.id == template.id })
+            }
+        } finally {
+            store.deleteMeal(original.id)
         }
     }
 
@@ -640,23 +711,7 @@ class FoodFlowTest {
             onView(withText("Log meal")).perform(click())
             onView(withText(porridge)).perform(click())
             onView(withText("Meal date · Today")).perform(click())
-            onView(isAssignableFrom(DatePicker::class.java))
-                .perform(
-                    object : ViewAction {
-                        override fun getConstraints() = isAssignableFrom(DatePicker::class.java)
-
-                        override fun getDescription() = "Choose the previous day"
-
-                        override fun perform(uiController: UiController, view: View) {
-                            (view as DatePicker).updateDate(
-                                day.year,
-                                day.monthValue - 1,
-                                day.dayOfMonth,
-                            )
-                        }
-                    }
-                )
-            onView(withText("OK")).perform(click())
+            selectMealDate(day)
             onView(withText("Meal date · $day")).check(matches(isDisplayed()))
             onView(withContentDescription("${oats.name} weight (g)"))
                 .check(matches(withText("200")))
@@ -720,5 +775,25 @@ class FoodFlowTest {
             onView(withContentDescription("Next day")).perform(scrollTo(), click())
             onView(withText("Today")).check(matches(isDisplayed()))
         }
+    }
+
+    private fun selectMealDate(day: LocalDate) {
+        onView(isAssignableFrom(DatePicker::class.java))
+            .perform(
+                object : ViewAction {
+                    override fun getConstraints() = isAssignableFrom(DatePicker::class.java)
+
+                    override fun getDescription() = "Choose $day"
+
+                    override fun perform(uiController: UiController, view: View) {
+                        (view as DatePicker).updateDate(
+                            day.year,
+                            day.monthValue - 1,
+                            day.dayOfMonth,
+                        )
+                    }
+                }
+            )
+        onView(withText("OK")).perform(click())
     }
 }

@@ -207,27 +207,48 @@ internal class FoodStore(context: Context) : SQLiteOpenHelper(context, "food.db"
             // A restored editor can finish saving the same meal again.
             if (insertWithOnConflict("meals", null, values, SQLiteDatabase.CONFLICT_IGNORE) == -1L)
                 return@transaction
-            meal.items.forEach { item ->
-                insertOrThrow(
-                    "meal_items",
-                    null,
-                    item.amounts.values().apply {
-                        put("meal", meal.id)
-                        put("name", item.name)
-                    },
-                )
-            }
+            insertMealItems(meal.id, meal.items)
         }
     }
 
-    fun meals(): List<CookedMeal> {
+    fun updateMeal(id: String, name: String, day: LocalDate, items: List<CookedItem>): Boolean =
+        writableDatabase.transaction {
+            val values =
+                ContentValues().apply {
+                    put("name", name)
+                    put("day", day.toString())
+                }
+            if (update("meals", values, "id = ?", arrayOf(id)) == 0) return@transaction false
+            delete("meal_items", "meal = ?", arrayOf(id))
+            insertMealItems(id, items)
+            true
+        }
+
+    private fun SQLiteDatabase.insertMealItems(id: String, items: List<CookedItem>) {
+        items.forEach { item ->
+            insertOrThrow(
+                "meal_items",
+                null,
+                item.amounts.values().apply {
+                    put("meal", id)
+                    put("name", item.name)
+                },
+            )
+        }
+    }
+
+    fun meals(id: String? = null): List<CookedMeal> {
+        val args = listOfNotNull(id).toTypedArray()
+        val itemFilter = if (id == null) "" else "WHERE meal = ?"
+        val mealFilter = if (id == null) "" else "WHERE id = ?"
         val items =
-            rows("SELECT * FROM meal_items ORDER BY rowid") {
+            rows("SELECT * FROM meal_items $itemFilter ORDER BY rowid", *args) {
                     getString(0) to CookedItem(getString(1), amounts())
                 }
                 .groupBy({ it.first }, { it.second })
         return rows(
-            "SELECT id, name, day, recipe_id, item_id FROM meals ORDER BY day DESC, rowid DESC"
+            "SELECT id, name, day, recipe_id, item_id FROM meals $mealFilter ORDER BY day DESC, rowid DESC",
+            *args,
         ) {
             CookedMeal(
                 getString(0),
