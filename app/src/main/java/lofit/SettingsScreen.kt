@@ -27,6 +27,14 @@ internal class SettingsScreen(
     private val craneScaleSettings: () -> View,
     private val onRefresh: () -> Unit,
 ) {
+    private fun settingsSwitch() =
+        Switch(activityContext).apply {
+            showText = false
+            thumbTintList = ColorStateList.valueOf(ui.color(R.color.cream))
+            trackDrawable = ContextCompat.getDrawable(activityContext, R.drawable.switch_track)
+            trackTintList = ui.toggleTint()
+        }
+
     fun genderChoice(
         selected: BiologicalGender,
         onChange: (BiologicalGender) -> Unit,
@@ -52,18 +60,10 @@ internal class SettingsScreen(
                     LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
                 )
                 addView(
-                    Switch(activityContext).apply {
+                    settingsSwitch().apply {
                         isChecked = enabled
-                        showText = false
                         minWidth = ui.dp(72)
                         minHeight = ui.dp(48)
-                        thumbTintList = ColorStateList.valueOf(ui.color(R.color.cream))
-                        trackDrawable =
-                            ContextCompat.getDrawable(
-                                activityContext,
-                                R.drawable.switch_track,
-                            )
-                        trackTintList = ui.toggleTint()
                         contentDescription = "Android health integration"
                         setOnCheckedChangeListener { _, checked -> onChange(checked) }
                     }
@@ -85,15 +85,10 @@ internal class SettingsScreen(
                     },
                 )
                 addView(
-                    Switch(activityContext).apply {
+                    settingsSwitch().apply {
                         isChecked = enabled
-                        showText = false
                         minWidth = ui.dp(72)
                         minHeight = ui.dp(48)
-                        thumbTintList = ColorStateList.valueOf(ui.color(R.color.cream))
-                        trackDrawable =
-                            ContextCompat.getDrawable(activityContext, R.drawable.switch_track)
-                        trackTintList = ui.toggleTint()
                         contentDescription = "Record celebrations"
                         setOnCheckedChangeListener { _, checked -> onChange(checked) }
                     }
@@ -137,9 +132,8 @@ internal class SettingsScreen(
                                     },
                             )
                             addView(
-                                Switch(activityContext).apply {
+                                settingsSwitch().apply {
                                     isChecked = data().soundCuesEnabled
-                                    showText = false
                                     textOn = "On"
                                     textOff = "Off"
                                     isClickable = true
@@ -147,13 +141,6 @@ internal class SettingsScreen(
                                     minWidth = ui.dp(72)
                                     textSize = 14f
                                     setTextColor(ui.color(R.color.cream))
-                                    thumbTintList = ColorStateList.valueOf(ui.color(R.color.cream))
-                                    trackDrawable =
-                                        ContextCompat.getDrawable(
-                                            activityContext,
-                                            R.drawable.switch_track,
-                                        )
-                                    trackTintList = ui.toggleTint()
                                     contentDescription = "Sound cues"
                                     setOnCheckedChangeListener { _, enabled ->
                                         data().soundCuesEnabled = enabled
@@ -177,11 +164,10 @@ internal class SettingsScreen(
             body.addView(
                 ui.card {
                     addView(
-                        Switch(activityContext).apply {
+                        settingsSwitch().apply {
                             text = "Suggested workouts"
                             setTextColor(ui.color(R.color.cream))
                             minHeight = ui.dp(48)
-                            trackTintList = ui.toggleTint()
                             isChecked = data().suggestedWorkoutsEnabled
                             setOnCheckedChangeListener { _, enabled ->
                                 onSuggestedWorkoutsChanged(enabled)
@@ -197,11 +183,10 @@ internal class SettingsScreen(
             body.addView(
                 ui.card {
                     addView(
-                        Switch(activityContext).apply {
+                        settingsSwitch().apply {
                             text = "Debug mode"
                             setTextColor(ui.color(R.color.cream))
                             minHeight = ui.dp(48)
-                            trackTintList = ui.toggleTint()
                             isChecked = data().debugMode
                             setOnCheckedChangeListener { _, enabled ->
                                 data().debugMode = enabled
@@ -388,14 +373,9 @@ internal class SettingsScreen(
                     },
                 )
                 addView(
-                    Switch(activityContext).apply {
+                    settingsSwitch().apply {
                         isChecked = data().mcpEnabled
-                        showText = false
                         minWidth = ui.dp(72)
-                        thumbTintList = ColorStateList.valueOf(ui.color(R.color.cream))
-                        trackDrawable =
-                            ContextCompat.getDrawable(activityContext, R.drawable.switch_track)
-                        trackTintList = ui.toggleTint()
                         contentDescription = "MCP server"
                         setOnCheckedChangeListener { _, enabled ->
                             data().mcpEnabled = enabled
