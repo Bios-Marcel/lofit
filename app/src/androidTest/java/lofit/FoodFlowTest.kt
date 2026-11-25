@@ -602,6 +602,10 @@ class FoodFlowTest {
         val originalGoals = store.goals()
         try {
             store.saveGoals(FoodGoals(null, null))
+            LofitRepository(context).apply {
+                data.latestBodyWeight = BodyWeightMeasurement(100, 60.0)
+                save()
+            }
             val amounts =
                 oats.portion(100.0) + mapOf(FoodMetric.PROTEIN to 50.0, FoodMetric.SALT to 4.0)
             store.log(
@@ -625,8 +629,7 @@ class FoodFlowTest {
                 val editGoals = onView(withText("Edit goals"))
                 val calories =
                     onView(allOf(withHint("No goal"), hasSibling(withText("Calories (kcal)"))))
-                val protein =
-                    onView(allOf(withHint("No goal"), hasSibling(withText("Protein (g)"))))
+                val protein = onView(withHint("Default 120 g"))
                 val defaultSalt = onView(withText("Limit 5 g"))
                 val salt = onView(withHint("Default 5 g"))
                 val customSalt = formatWeight(3.5)
@@ -637,6 +640,7 @@ class FoodFlowTest {
                 val noCalorieGoal =
                     onView(allOf(withText("No goal"), hasSibling(withText("Calories"))))
                 noCalorieGoal.check(matches(isDisplayed()))
+                onView(withText("Goal 120 g")).check(matches(isDisplayed()))
                 defaultSalt.perform(scrollTo()).check(matches(isDisplayed()))
                 onView(withText("1 g left · 80%")).check(matches(isDisplayed()))
                 defaultSugar.perform(scrollTo()).check(matches(isDisplayed()))
@@ -690,6 +694,11 @@ class FoodFlowTest {
                 onView(withText("Goal met")).check(matches(isDisplayed()))
                 defaultSalt.perform(scrollTo()).check(matches(isDisplayed()))
                 defaultSugar.perform(scrollTo()).check(matches(isDisplayed()))
+                editGoals.perform(scrollTo(), click())
+                protein.perform(replaceText(""))
+                save.perform(click())
+                onView(withText("Goal 120 g")).check(matches(isDisplayed()))
+                assertNull(store.goals().protein)
             }
         } finally {
             store.saveGoals(originalGoals)

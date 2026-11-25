@@ -296,9 +296,14 @@ class RepositoryPersistenceTest {
     @Test
     fun bodyWeight_survivesRestartFinishAndResume() {
         val repository = LofitRepository(context)
-        repository.data.activeWorkout = WorkoutSession(name = "Weighted", bodyWeightKg = 72.25)
-        repository.save()
+        val active = WorkoutSession(name = "Weighted")
+        repository.data.activeWorkout = active
+        repository.saveBodyWeight(active, 72.25)
         val restarted = LofitRepository(context)
+        assertEquals(
+            BodyWeightMeasurement(active.startedAt, 72.25),
+            restarted.data.latestBodyWeight,
+        )
         val workout = restarted.data.activeWorkout!!
         assertEquals(72.25, workout.bodyWeightKg!!, 0.0)
         workout.finish()
@@ -310,6 +315,31 @@ class RepositoryPersistenceTest {
         val saved = LofitRepository(context)
         assertEquals(72.25, saved.data.history.single().bodyWeightKg!!, 0.0)
         assertEquals(72.25, saved.data.resumeWorkout(workout.id)!!.bodyWeightKg!!, 0.0)
+    }
+
+    @Test
+    fun latestBodyWeight_backfillsOnceAndKeepsNewestReadingWhenHistoryIsRefreshed() {
+        val repository = LofitRepository(context)
+        val newest = WorkoutSession(name = "Recent", startedAt = 300, bodyWeightKg = 60.0)
+        val older = WorkoutSession(name = "Older", startedAt = 100, bodyWeightKg = 80.0)
+        repository.data.history.addAll(listOf(newest, older))
+        repository.data.activeWorkout = WorkoutSession(name = "Active", startedAt = 400)
+        repository.saveHistory()
+        repository.save()
+        store(JSONObject(stored()).apply { remove("latestBodyWeight") }.toString())
+
+        val migrated = LofitRepository(context)
+        assertEquals(BodyWeightMeasurement(300, 60.0), migrated.data.latestBodyWeight)
+        assertTrue(JSONObject(stored()).has("latestBodyWeight"))
+        migrated.saveBodyWeight(migrated.data.history.last(), 79.0)
+        assertEquals(BodyWeightMeasurement(300, 60.0), migrated.data.latestBodyWeight)
+        migrated.saveBodyWeight(migrated.data.history.first(), 60.25)
+        migrated.data.history.clear()
+        migrated.saveHistory()
+        assertEquals(
+            BodyWeightMeasurement(300, 60.25),
+            LofitRepository(context).data.latestBodyWeight,
+        )
     }
 
     @Test

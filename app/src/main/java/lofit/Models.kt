@@ -345,7 +345,23 @@ data class AppData(
     var suggestedWorkoutLookback: String = DEFAULT_SUGGESTED_WORKOUT_LOOKBACK,
     var suggestedWorkoutSets: Int = DEFAULT_SUGGESTED_WORKOUT_SETS,
     var suggestedWorkoutsEnabled: Boolean = false,
+    var latestBodyWeight: BodyWeightMeasurement? = null,
 ) {
+    internal fun rememberBodyWeight(workout: WorkoutSession): Boolean {
+        val kilograms = workout.bodyWeightKg ?: return false
+        val previous = latestBodyWeight
+        if (
+            !kilograms.isFinite() ||
+                kilograms <= 0 ||
+                (previous != null && workout.startedAt < previous.time)
+        )
+            return false
+        val weight = BodyWeightMeasurement(workout.startedAt, kilograms)
+        if (weight == previous) return false
+        latestBodyWeight = weight
+        return true
+    }
+
     fun resumeWorkout(
         workoutId: String,
         resumedAt: Long = System.currentTimeMillis(),

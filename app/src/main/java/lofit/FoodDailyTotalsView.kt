@@ -22,6 +22,7 @@ internal class FoodDailyTotalsView(
     private val ui: LofitViews,
     totals: FoodAmounts?,
     goals: FoodGoals,
+    defaultProteinGoal: Double?,
 ) : LinearLayout(context) {
     private val surface = ui.color(R.color.charcoal_light)
     private val percent =
@@ -36,8 +37,12 @@ internal class FoodDailyTotalsView(
         val amounts = totals ?: emptyList<FoodAmounts>().foodTotals()
         addTileRow(
             listOf(
-                gauge(calories, calories.valueIn(amounts), goals.calories),
-                gauge(protein, protein.valueIn(amounts), goals.protein),
+                gauge(calories, calories.valueIn(amounts), goals.calories?.toDouble()),
+                gauge(
+                    protein,
+                    protein.valueIn(amounts),
+                    goals.protein?.toDouble() ?: defaultProteinGoal,
+                ),
             )
         )
         addTileRow(listOf(limitGauge(salt, salt.valueIn(amounts), goals.saltLimit)))
@@ -92,7 +97,7 @@ internal class FoodDailyTotalsView(
     private fun trackColor(metric: FoodMetric) =
         ColorUtils.blendARGB(surface, metric.graphColor, 0.28f)
 
-    private fun gauge(metric: FoodMetric, amount: Double, goal: Int?) =
+    private fun gauge(metric: FoodMetric, amount: Double, goal: Double?) =
         tile(metric).apply {
             val progress = goal?.let { amount / it }
             gravity = Gravity.CENTER_HORIZONTAL
@@ -124,10 +129,9 @@ internal class FoodDailyTotalsView(
             )
             addView(ui.titleText(metric.format(amount)).apply { gravity = Gravity.CENTER })
             addView(
-                ui.metaText(goal?.let { "Goal ${metric.format(it.toDouble())}" } ?: "No goal")
-                    .apply {
-                        gravity = Gravity.CENTER
-                    }
+                ui.metaText(goal?.let { "Goal ${metric.format(it)}" } ?: "No goal").apply {
+                    gravity = Gravity.CENTER
+                }
             )
             if (goal != null) {
                 addView(

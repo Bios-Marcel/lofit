@@ -29,6 +29,7 @@ internal class FoodScreens(
     private val context: Context,
     private val ui: LofitViews,
     private val store: FoodStore,
+    private val latestBodyWeightKg: () -> Double?,
     private val launchEditor: (Intent) -> Unit,
     private val refresh: () -> Unit,
 ) {
@@ -38,6 +39,8 @@ internal class FoodScreens(
     private var selected = mutableSetOf(FoodMetric.CARBS)
     private var statisticsPage = 0
     private var statisticsDay: LocalDate? = null
+    private val defaultProteinGoal: Double?
+        get() = latestBodyWeightKg()?.times(2)
 
     fun saveState() =
         Bundle().apply {
@@ -402,7 +405,13 @@ internal class FoodScreens(
                         ui.foodSpacing(),
                     )
                     addView(
-                        FoodDailyTotalsView(context, ui, store.dailyTotals(day), store.goals()),
+                        FoodDailyTotalsView(
+                            context,
+                            ui,
+                            store.dailyTotals(day),
+                            store.goals(),
+                            defaultProteinGoal,
+                        ),
                         ui.foodSpacing(),
                     )
                 }
@@ -434,7 +443,14 @@ internal class FoodScreens(
                 goals.calories?.toString().orEmpty(),
             )
         val protein =
-            addTarget("Protein (g)", ui.numberField("No goal"), goals.protein?.toString().orEmpty())
+            addTarget(
+                "Protein (g)",
+                ui.numberField(
+                    defaultProteinGoal?.let { "Default ${FoodMetric.PROTEIN.format(it)}" }
+                        ?: "No goal"
+                ),
+                goals.protein?.toString().orEmpty(),
+            )
         fun addLimit(metric: FoodMetric, value: Double, default: Double) =
             addTarget(
                 "${metric.label} limit (g)",

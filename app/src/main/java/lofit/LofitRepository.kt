@@ -77,6 +77,13 @@ class LofitRepository(context: Context) {
         write(encodeHistory(data.history).toString(), historyFile)
     }
 
+    fun saveBodyWeight(workout: WorkoutSession, kilograms: Double) {
+        workout.bodyWeightKg = kilograms
+        val latestChanged = data.rememberBodyWeight(workout)
+        if (latestChanged || workout === data.activeWorkout) save()
+        if (workout !== data.activeWorkout) saveHistory()
+    }
+
     // LEGACY: Keep the internal reset API after removing the reset action from settings.
     fun reset() {
         flushPendingSave()
@@ -87,17 +94,30 @@ class LofitRepository(context: Context) {
         data = fresh
     }
 
-    private fun load(): AppData {
-        val (root, history) =
-            synchronized(fileLock) {
-                if (!exists(stateFile)) return AppData().also { write("[]", historyFile) }
-                val root = JSONObject(stateFile.readFully().toString(Charsets.UTF_8))
-                val version = root.optInt("schemaVersion", 0)
-                check(version == SCHEMA_VERSION) { "Unsupported data schema: $version" }
-                root to historyFile.readFully().toString(Charsets.UTF_8)
+    private fun load(): AppData =
+        synchronized(fileLock) {
+            if (!exists(stateFile)) return AppData().also { write("[]", historyFile) }
+            val root = JSONObject(stateFile.readFully().toString(Charsets.UTF_8))
+            val version = root.optInt("schemaVersion", 0)
+            check(version == SCHEMA_VERSION) { "Unsupported data schema: $version" }
+            val history = JSONArray(historyFile.readFully().toString(Charsets.UTF_8))
+            val loaded = decode(root, history.mapObjects(::decodeWorkout).toMutableList())
+            // LEGACY: Older saves kept body weight only on workouts. Backfill the cache once.
+            if (!root.has("latestBodyWeight")) {
+                loaded.history.forEach { loaded.rememberBodyWeight(it) }
+                loaded.activeWorkout?.let(loaded::rememberBodyWeight)
+                write(
+                    root
+                        .put("latestBodyWeight", encodeBodyWeight(loaded.latestBodyWeight))
+                        .toString()
+                )
             }
-        return decode(root, JSONArray(history).mapObjects(::decodeWorkout).toMutableList())
-    }
+            loaded
+        }
+
+    private fun encodeBodyWeight(weight: BodyWeightMeasurement?) =
+        weight?.let { JSONObject().put("time", it.time).put("kilograms", it.kilograms) }
+            ?: JSONObject.NULL
 
     private fun exists(file: AtomicFile): Boolean =
         file.baseFile.exists() || File("${file.baseFile.path}.bak").exists()
@@ -164,6 +184,7 @@ class LofitRepository(context: Context) {
                 } ?: JSONObject.NULL,
             )
             put("bodyMetricsEnabled", data.bodyMetricsEnabled ?: JSONObject.NULL)
+            put("latestBodyWeight", encodeBodyWeight(data.latestBodyWeight))
             put("biologicalGender", data.biologicalGender.name)
             put("onboardingComplete", data.onboardingComplete)
             put("exerciseLastSelectedAt", JSONObject(data.exerciseLastSelectedAt))
@@ -350,6 +371,10 @@ class LofitRepository(context: Context) {
                 }
         val exercises = (defaults + savedExtras).toMutableList()
         return AppData(
+            latestBodyWeight =
+                root.optJSONObject("latestBodyWeight")?.let {
+                    BodyWeightMeasurement(it.getLong("time"), it.getDouble("kilograms"))
+                },
             bodyMeasurements =
                 root
                     .optJSONArray("bodyMeasurements")

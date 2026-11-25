@@ -205,6 +205,7 @@ class MainActivity : AppCompatActivity() {
             this,
             ui,
             foodStore.value,
+            { repository.data.latestBodyWeight?.kilograms },
             editFood::launch,
             { render() },
         )
@@ -3754,10 +3755,9 @@ class MainActivity : AppCompatActivity() {
                     )
                         false
                     else {
-                        savedWorkout.bodyWeightKg = weight
-                        if (savedWorkout === activeWorkout) repository.save()
-                        else repository.saveHistory()
-                        refreshHealthHistory()
+                        repository.saveBodyWeight(savedWorkout, weight)
+                        if (currentScreen == Screen.FOOD_STATISTICS) render()
+                        else refreshHealthHistory()
                         true
                     }
                 }
