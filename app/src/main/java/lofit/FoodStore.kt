@@ -70,28 +70,7 @@ internal class FoodStore(context: Context) : SQLiteOpenHelper(context, "food.db"
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        // LEGACY: Version 1 ingredients need a crop column before the portion upgrade.
-        if (oldVersion < 2) db.execSQL("ALTER TABLE ingredients ADD COLUMN crop TEXT")
-        if (oldVersion < 3)
-            db.execSQL("ALTER TABLE ingredients ADD COLUMN default_portion_grams REAL")
-        if (oldVersion < 4) {
-            db.execSQL("ALTER TABLE meals ADD COLUMN $mealRecipeColumn")
-            // LEGACY: Meal snapshots stored only the name. Link exact, unambiguous matches.
-            db.execSQL(
-                """
-                UPDATE meals SET recipe_id = (
-                    SELECT MIN(id) FROM recipes WHERE recipes.name = meals.name HAVING COUNT(*) = 1
-                )
-                """
-                    .trimIndent()
-            )
-            db.execSQL(mealRecipeIndex)
-        }
-        if (oldVersion < 5) {
-            // LEGACY: Earlier meals were logged from recipes and have no single-item source.
-            db.execSQL("ALTER TABLE meals ADD COLUMN $mealItemColumn")
-            db.execSQL(mealItemIndex)
-        }
+        error("Unsupported food database schema: $oldVersion")
     }
 
     private fun <T> rows(sql: String, vararg args: String, read: Cursor.() -> T): List<T> =
