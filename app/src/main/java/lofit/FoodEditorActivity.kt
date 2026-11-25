@@ -10,9 +10,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
-import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
-import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -918,11 +916,17 @@ internal class FoodEditorActivity : AppCompatActivity() {
             toast("Add an item in Items first")
             return
         }
-        val adapter =
-            object : ArrayAdapter<Ingredient>(this, android.R.layout.simple_list_item_1, choices) {
-                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                    val ingredient = choices[position]
-                    return LinearLayout(this@FoodEditorActivity).apply {
+        AlertDialog.Builder(this)
+            .setTitle("Choose item")
+            .setNegativeButton("Cancel", null)
+            .showFoodPicker(
+                ui,
+                choices,
+                Ingredient::name,
+                searchHint = "Search items",
+                emptyMessage = "No matching items.",
+                rowView = { ingredient, _, parent ->
+                    LinearLayout(parent.context).apply {
                         gravity = Gravity.CENTER_VERTICAL
                         setPadding(ui.dp(20), ui.dp(6), ui.dp(20), ui.dp(6))
                         addView(
@@ -937,13 +941,9 @@ internal class FoodEditorActivity : AppCompatActivity() {
                         )
                         addView(ui.titleText(ingredient.name))
                     }
-                }
-            }
-        AlertDialog.Builder(this)
-            .setTitle("Choose item")
-            .setAdapter(adapter) { _, index -> select(choices[index]) }
-            .setNegativeButton("Cancel", null)
-            .show()
+                },
+                select = select,
+            )
     }
 
     private fun fail(input: EditText, message: String) {

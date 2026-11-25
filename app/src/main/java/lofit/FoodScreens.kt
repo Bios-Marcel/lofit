@@ -8,15 +8,11 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
-import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
-import android.widget.BaseAdapter
 import android.widget.CheckBox
 import android.widget.EditText
-import android.widget.FrameLayout
 import android.widget.LinearLayout
-import android.widget.ListView
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
@@ -215,74 +211,29 @@ internal class FoodScreens(
             return
         }
 
-        val search = ui.textField("Search recipes and items")
-        val empty =
-            TextView(context).apply {
-                text = "No matching recipes or items."
-                textSize = 16f
-                gravity = Gravity.CENTER
-                setPadding(ui.dp(16), ui.dp(32), ui.dp(16), ui.dp(32))
-                accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
-            }
-        val list = ListView(context)
         val dateFormat = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
-        var matches = choices
-        val adapter =
-            object : BaseAdapter() {
-                override fun getCount() = matches.size
-
-                override fun getItem(position: Int) = matches[position]
-
-                override fun getItemId(position: Int) = position.toLong()
-
-                override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                    val choice = getItem(position)
-                    val row =
-                        convertView
-                            ?: LayoutInflater.from(context)
-                                .inflate(android.R.layout.simple_list_item_2, parent, false)
-                    row.findViewById<TextView>(android.R.id.text1).text = choice.name
-                    val type = if (choice.isItem) "Item" else "Recipe"
-                    row.findViewById<TextView>(android.R.id.text2).text =
-                        choice.lastLogged?.let { "$type · Last logged ${it.format(dateFormat)}" }
-                            ?: type
-                    return row
-                }
-            }
-        list.adapter = adapter
-        list.emptyView = empty
-        search.doAfterTextChanged {
-            val query = SearchQuery(it.toString())
-            matches = choices.filter { query.matches(it.name) }
-            adapter.notifyDataSetChanged()
-            list.setSelection(0)
-        }
-        val content =
-            column().apply {
-                isFocusableInTouchMode = true
-                addView(
-                    search,
-                    ui.foodSpacing().apply {
-                        marginStart = ui.dp(24)
-                        marginEnd = ui.dp(24)
-                    },
-                )
-                addView(
-                    FrameLayout(context).apply {
-                        addView(list, MATCH_PARENT, WRAP_CONTENT)
-                        addView(empty, MATCH_PARENT, WRAP_CONTENT)
-                    }
-                )
-                requestFocus()
-            }
-        val dialog = builder.setView(content).create()
-        list.setOnItemClickListener { _, _, position, _ ->
-            val choice = adapter.getItem(position)
-            dialog.dismiss()
+        builder.showFoodPicker(
+            ui,
+            choices,
+            MealChoice::name,
+            searchHint = "Search recipes and items",
+            emptyMessage = "No matching recipes or items.",
+            rowView = { choice, convertView, parent ->
+                val row =
+                    convertView
+                        ?: LayoutInflater.from(context)
+                            .inflate(android.R.layout.simple_list_item_2, parent, false)
+                row.findViewById<TextView>(android.R.id.text1).text = choice.name
+                val type = if (choice.isItem) "Item" else "Recipe"
+                row.findViewById<TextView>(android.R.id.text2).text =
+                    choice.lastLogged?.let { "$type · Last logged ${it.format(dateFormat)}" }
+                        ?: type
+                row
+            },
+        ) { choice ->
             if (choice.isItem) edit(FoodSection.MEALS, mealItemId = choice.id)
             else edit(FoodSection.MEALS, choice.id)
         }
-        dialog.show()
     }
 
     private fun showMeal(meal: CookedMeal, totals: FoodAmounts) {

@@ -420,7 +420,21 @@ class FoodFlowTest {
             onView(withHint("Recipe name")).perform(replaceText(porridge))
             val addIngredient = onView(withText("Add item"))
             addIngredient.perform(scrollTo(), click())
-            onView(withText(rice.name)).perform(click())
+            val search = onView(withHint("Search items")).inRoot(isDialog())
+            search.perform(
+                click(),
+                waitUntil("item search keyboard") {
+                    ViewCompat.getRootWindowInsets(it)?.isVisible(WindowInsetsCompat.Type.ime()) ==
+                        true
+                },
+            )
+            search.perform(replaceText("missing $suffix"))
+            onView(withText("No matching items.")).inRoot(isDialog()).check(matches(isDisplayed()))
+            search.perform(replaceText(""))
+            onView(withText(oats.name)).inRoot(isDialog()).check(matches(isDisplayed()))
+            search.perform(replaceText("$suffix RIC"))
+            onView(withText(oats.name)).inRoot(isDialog()).check(doesNotExist())
+            onView(withText(rice.name)).inRoot(isDialog()).perform(waitForStableLayout(), click())
             onView(withContentDescription("${rice.name} weight (g)")).check(matches(withText("")))
             onView(withContentDescription("Remove ${rice.name}")).perform(scrollTo(), click())
             addIngredient.perform(scrollTo(), click())
@@ -574,7 +588,12 @@ class FoodFlowTest {
                     .perform(scrollTo())
                     .check(matches(withText("25")))
                 onView(withContentDescription("Replace Old base")).perform(scrollTo(), click())
-                onView(withText(rice.name)).inRoot(isDialog()).perform(click())
+                onView(withHint("Search items"))
+                    .inRoot(isDialog())
+                    .perform(replaceText("ric $suffix"))
+                onView(withText(rice.name))
+                    .inRoot(isDialog())
+                    .perform(waitForStableLayout(), click())
                 onView(withContentDescription("${rice.name} weight (g)"))
                     .check(matches(withText("125")))
                     .perform(replaceText("50"))
