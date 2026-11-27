@@ -456,8 +456,10 @@ class LiveWorkoutMeasurementFlowTest {
             onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
             onView(withContentDescription("Set 1 weight")).check(matches(withText("21.75")))
             onView(withContentDescription("Rest timer overlay")).check(matches(isDisplayed()))
-            val saved =
-                LofitRepository(context).data.activeWorkout!!.exercises.single().sets.single()
+            val workout = LofitRepository(context).data.activeWorkout!!
+            val saved = workout.exercises.single().sets.single()
+            assertEquals(saved.completedAt, workout.firstSetLoggedTime)
+            assertEquals(saved.completedAt, workout.lastSetLoggedTime)
             assertEquals(21.75, saved.weightKg, 0.0)
             assertTrue(saved.holdSeconds >= 1)
             onView(withContentDescription("Set 1 Active time in seconds"))

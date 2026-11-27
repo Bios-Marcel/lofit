@@ -107,10 +107,11 @@ internal class WorkoutVoiceSession(
     }
 
     private fun record(item: WorkoutExercise, set: PlannedSet, exercise: Exercise) {
+        val workout = data().activeWorkout ?: return
         item.sets
             .firstOrNull { it.plannedSetId == set.id }
             ?.let { syncLoggedSet(it, set, exercise) }
-            ?: item.sets.add(loggedSetFrom(set, exercise))
+            ?: workout.addLoggedSet(item, loggedSetFrom(set, exercise))
     }
 
     fun startRest(item: WorkoutExercise, exercise: Exercise) {

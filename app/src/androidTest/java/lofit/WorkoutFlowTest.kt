@@ -1106,6 +1106,10 @@ class WorkoutFlowTest {
         onView(withContentDescription("Set 1 Repetitions")).perform(replaceText("10"))
         onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
         onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
+        val active = LofitRepository(instrumentation.targetContext).data.activeWorkout!!
+        val setTime = active.exercises.single().sets.single().completedAt
+        assertEquals(setTime, active.firstSetLoggedTime)
+        assertEquals(setTime, active.lastSetLoggedTime)
         val restNotification = awaitWorkoutNotification {
             it.extras.getCharSequence(Notification.EXTRA_TEXT).toString().contains("Rest")
         }
@@ -1147,6 +1151,9 @@ class WorkoutFlowTest {
         onView(withContentDescription("Set 2 Repetitions")).check(matches(withText("10")))
         onView(withText("Finish workout")).perform(scrollTo(), click())
         onView(withText("Finish and save")).perform(click())
+        val finished = LofitRepository(instrumentation.targetContext).data.history.single()
+        assertEquals(maxOf(active.startedAt, setTime - 120_000), finished.startedAt)
+        assertEquals(setTime, finished.completedAt)
         assertEquals(
             0,
             activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
@@ -1220,9 +1227,11 @@ class WorkoutFlowTest {
             scenario.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
             onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
             onView(withContentDescription("Set 2 done")).check(matches(not(isChecked())))
-            val logged =
-                LofitRepository(context).data.activeWorkout!!.exercises.single().sets.single()
+            val active = LofitRepository(context).data.activeWorkout!!
+            val logged = active.exercises.single().sets.single()
             assertEquals(first.id, logged.plannedSetId)
+            assertEquals(logged.completedAt, active.firstSetLoggedTime)
+            assertEquals(logged.completedAt, active.lastSetLoggedTime)
             assertEquals(62.5, logged.weightKg, 0.0)
             assertEquals(6, logged.reps)
             assertEquals(SetType.WARMUP, logged.type)
@@ -1245,6 +1254,12 @@ class WorkoutFlowTest {
                     "All 2 sets done" && it.actions.isNullOrEmpty()
             }
             onView(withContentDescription("Set 2 done")).check(matches(isChecked()))
+            val updated = LofitRepository(context).data.activeWorkout!!
+            assertEquals(logged.completedAt, updated.firstSetLoggedTime)
+            assertEquals(
+                updated.exercises.single().sets.last().completedAt,
+                updated.lastSetLoggedTime,
+            )
         }
     }
 

@@ -133,17 +133,19 @@ internal class LiveWorkoutMeasurement(private val data: () -> AppData) {
         val seconds = elapsed(pull, atMillis)
         pull.set.actualHoldSeconds = seconds
         seriesFor(pull.item.id).lastPullAverageKg = pull.average(release)
+        val workout = data().activeWorkout ?: return Change(pull)
         // LEGACY: Early releases and interrupted pulls still leave the set unfinished.
         val completed = complete && seconds >= pull.set.holdSeconds
         if (completed) {
-            pull.item.sets.add(
+            workout.addLoggedSet(
+                pull.item,
                 LoggedSet(
                     type = pull.set.type,
                     weightKg = pull.set.weightKg,
                     holdSeconds = seconds,
                     side = pull.set.side,
                     plannedSetId = pull.set.id,
-                )
+                ),
             )
         }
         return Change(pull, completed = completed)

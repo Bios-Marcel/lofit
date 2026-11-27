@@ -46,6 +46,33 @@ class RepositoryPersistenceTest {
     }
 
     @Test
+    fun activeWorkoutRecoversSetTimesFromOlderData() {
+        val repository = LofitRepository(context)
+        val item = WorkoutExercise(exerciseId = "bench-press")
+        val workout =
+            WorkoutSession(name = "Strength", startedAt = 100_000, exercises = mutableListOf(item))
+        val first =
+            LoggedSet(type = SetType.NORMAL, weightKg = 60.0, reps = 8, completedAt = 300_000)
+        workout.addLoggedSet(item, first)
+        workout.addLoggedSet(item, first.copy(id = "second", completedAt = 400_000))
+        repository.data.activeWorkout = workout
+        repository.save()
+
+        val root = JSONObject(stored())
+        root.getJSONObject("activeWorkout").apply {
+            remove("firstSetLoggedTime")
+            remove("lastSetLoggedTime")
+        }
+        store(root.toString())
+
+        val loaded = LofitRepository(context).data.activeWorkout!!
+        loaded.finish(500_000)
+        assertEquals(300_000L, loaded.firstSetLoggedTime)
+        assertEquals(400_000L, loaded.lastSetLoggedTime)
+        assertEquals(listOf(WorkoutInterval(180_000, 400_000)), loaded.intervals)
+    }
+
+    @Test
     fun cardioPersistsAndDefaultsOffForExistingExercises() {
         val repository = LofitRepository(context)
         assertTrue(repository.data.exercises.all { !it.cardio })

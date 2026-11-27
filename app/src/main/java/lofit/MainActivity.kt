@@ -4405,35 +4405,27 @@ class MainActivity : AppCompatActivity() {
             updatingHoldTimer = false
             updateWorkoutNotification()
         }
-        val item = repository.data.activeWorkout?.exercises?.firstOrNull { it.id == itemId }
-        if (item?.plannedSets?.none { it.id == setId } != false) {
+        val workout = repository.data.activeWorkout
+        val item = workout?.exercises?.firstOrNull { it.id == itemId }
+        val plannedSet = item?.plannedSets?.firstOrNull { it.id == setId }
+        if (workout == null || item == null || plannedSet == null) {
             clearActiveHold()
             return
         }
-        val plannedSet = item?.plannedSets?.firstOrNull { it.id == setId }
-        val movement = item?.let { exercise(it.exerciseId) }
-        if (
-            !holdCuePlayed &&
-                plannedSet != null &&
-                movement != null &&
-                elapsed >= plannedSet.holdSeconds
-        ) {
+        val movement = exercise(item.exerciseId)
+        if (!holdCuePlayed && movement != null && elapsed >= plannedSet.holdSeconds) {
             holdCuePlayed = true
             plannedSet.actualHoldSeconds = elapsed
             loggedSetFor(item, plannedSet)?.let { syncLoggedSet(it, plannedSet, movement) }
                 // LEGACY: Failure sets still mark done at the goal while continuing to run.
-                ?: item.sets.add(loggedSetFrom(plannedSet, movement))
+                ?: workout.addLoggedSet(item, loggedSetFrom(plannedSet, movement))
             repository.save()
             completingHoldAutomatically = true
             holdDoneCheckBox?.isChecked = true
             completingHoldAutomatically = false
             playCue()
         }
-        if (
-            plannedSet != null &&
-                elapsed >= plannedSet.holdSeconds &&
-                plannedSet.type != SetType.FAILURE
-        ) {
+        if (elapsed >= plannedSet.holdSeconds && plannedSet.type != SetType.FAILURE) {
             stopActiveHold()
             if (workoutVoice.session.startFollowingCardio(item, plannedSet)) {
                 if (currentScreen == Screen.WORKOUT && route == Route.Root) {
@@ -4478,7 +4470,7 @@ class MainActivity : AppCompatActivity() {
         if (isActiveHold(item, plannedSet) && !completingHoldAutomatically) stopActiveHold()
         val loggedSet = loggedSetFor(item, plannedSet)
         if (loggedSet == null) {
-            item.sets.add(loggedSetFrom(plannedSet, movement, workout.completedAt))
+            workout.addLoggedSet(item, loggedSetFrom(plannedSet, movement, workout.completedAt))
         } else {
             syncLoggedSet(loggedSet, plannedSet, movement)
         }

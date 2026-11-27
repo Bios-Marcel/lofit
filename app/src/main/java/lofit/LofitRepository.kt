@@ -274,6 +274,8 @@ class LofitRepository(context: Context) {
             put("id", workout.id)
             put("name", workout.name)
             put("note", workout.note)
+            put("firstSetLoggedTime", workout.firstSetLoggedTime ?: JSONObject.NULL)
+            put("lastSetLoggedTime", workout.lastSetLoggedTime ?: JSONObject.NULL)
             workout.startWifiName?.let { put("startWifiName", it) }
             workout.startLocation?.let {
                 put("latitude", it.latitude)
@@ -394,7 +396,7 @@ class LofitRepository(context: Context) {
             activeWorkout =
                 if (root.isNull("activeWorkout")) null
                 else
-                    decodeWorkout(root.getJSONObject("activeWorkout")).apply {
+                    decodeActiveWorkout(root.getJSONObject("activeWorkout")).apply {
                         // LEGACY: Removing the global switch must not enable a previously muted
                         // workout.
                         if (
@@ -525,6 +527,17 @@ class LofitRepository(context: Context) {
                     .toMutableList(),
         )
 
+    private fun decodeActiveWorkout(value: JSONObject) =
+        decodeWorkout(value).apply {
+            // LEGACY: Recover timing from surviving sets in workouts already in progress.
+            if (completedAt == null && !value.has("firstSetLoggedTime")) {
+                val loggedTimes = exercises.flatMap { item -> item.sets.map { it.completedAt } }
+                firstSetLoggedTime = loggedTimes.filter { it >= startedAt }.minOrNull()
+                lastSetLoggedTime =
+                    loggedTimes.filter { it >= intervals.last().startedAt }.maxOrNull()
+            }
+        }
+
     private fun decodeWorkout(value: JSONObject) =
         WorkoutSession(
             id = value.getString("id"),
@@ -538,6 +551,11 @@ class LofitRepository(context: Context) {
                 if (value.isNull("startWifiName")) null else value.getString("startWifiName"),
             // LEGACY: Workouts saved before workout notes have no note.
             note = value.optString("note", ""),
+            firstSetLoggedTime =
+                if (value.isNull("firstSetLoggedTime")) null
+                else value.getLong("firstSetLoggedTime"),
+            lastSetLoggedTime =
+                if (value.isNull("lastSetLoggedTime")) null else value.getLong("lastSetLoggedTime"),
             bodyWeightKg =
                 if (value.isNull("bodyWeightKg")) null
                 else roundBodyWeight(value.getDouble("bodyWeightKg")),
@@ -561,7 +579,8 @@ class LofitRepository(context: Context) {
                     }
                     .toMutableList(),
             defaultRestSeconds = value.getInt("defaultRestSeconds"),
-            // LEGACY: Workouts saved before this switch keep automatic cardio transitions enabled.
+            // LEGACY: Workouts saved before this switch keep automatic cardio transitions
+            // enabled.
             autoStartCardio = value.optBoolean("autoStartCardio", true),
             // LEGACY: Workouts without a saved voice choice remain opted out.
             voiceCommandsEnabled = value.optBoolean("voiceCommandsEnabled", false),

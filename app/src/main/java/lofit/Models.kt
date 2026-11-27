@@ -144,6 +144,8 @@ data class WorkoutSession(
     var note: String = "",
     var startLocation: WorkoutLocation? = null,
     var startWifiName: String? = null,
+    var firstSetLoggedTime: Long? = null,
+    var lastSetLoggedTime: Long? = null,
 ) {
     constructor(
         id: String = UUID.randomUUID().toString(),
@@ -189,13 +191,36 @@ data class WorkoutSession(
         it.durationMillis(now)
     }
 
+    internal fun addLoggedSet(item: WorkoutExercise, set: LoggedSet) {
+        item.sets.add(set)
+        if (completedAt != null) return
+        if (firstSetLoggedTime == null) firstSetLoggedTime = set.completedAt
+        lastSetLoggedTime = set.completedAt
+    }
+
     fun finish(completedAt: Long = System.currentTimeMillis()) {
         if (this.completedAt != null) return
         exercises.forEach { item ->
             item.note = item.effectiveNote
             item.previousNote = ""
         }
-        intervals[intervals.lastIndex] = intervals.last().copy(endedAt = completedAt)
+        val lastIndex = intervals.lastIndex
+        val interval = intervals.last()
+        val lastSetTime = lastSetLoggedTime
+        if (
+            lastIndex > 0 && lastSetTime != null && lastSetTime == intervals[lastIndex - 1].endedAt
+        ) {
+            // Nothing was logged after resuming, so there is no new training interval.
+            intervals.removeAt(lastIndex)
+            return
+        }
+        val firstSetTime = firstSetLoggedTime
+        val start =
+            if (lastIndex == 0 && firstSetTime != null) {
+                maxOf(interval.startedAt, firstSetTime - 120_000L)
+            } else interval.startedAt
+        // LEGACY: Workouts without a logged time for this interval still end when finished.
+        intervals[lastIndex] = WorkoutInterval(start, lastSetTime ?: completedAt)
     }
 
     fun moveExercise(from: Int, to: Int) {

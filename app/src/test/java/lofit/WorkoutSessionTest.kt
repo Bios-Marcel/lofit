@@ -230,6 +230,64 @@ class WorkoutSessionTest {
     }
 
     @Test
+    fun finishingWorkout_usesFirstLogAndLatestLogEvenIfTheirSetsWereRemoved() {
+        val item = WorkoutExercise(exerciseId = "bench")
+        val workout =
+            WorkoutSession(name = "Bench", startedAt = 100_000, exercises = mutableListOf(item))
+        val set = LoggedSet(type = SetType.NORMAL, weightKg = 60.0, reps = 8, completedAt = 400_000)
+
+        workout.addLoggedSet(item, set)
+        item.sets.clear()
+        workout.addLoggedSet(item, set.copy(id = "second", completedAt = 500_000))
+        workout.addLoggedSet(item, set.copy(id = "third", completedAt = 600_000))
+        item.sets.removeAt(item.sets.lastIndex)
+        workout.finish(900_000)
+
+        assertEquals(400_000L, workout.firstSetLoggedTime)
+        assertEquals(600_000L, workout.lastSetLoggedTime)
+        assertEquals(listOf(WorkoutInterval(280_000, 600_000)), workout.intervals)
+        assertEquals(320_000L, workout.durationMillis())
+    }
+
+    @Test
+    fun finishingContinuedWorkout_trimsEachEndAndDropsAContinuationWithNoNewSets() {
+        val start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val item = WorkoutExercise(exerciseId = "bench")
+        val workout =
+            WorkoutSession(name = "Bench", startedAt = start, exercises = mutableListOf(item))
+        val set =
+            LoggedSet(
+                type = SetType.NORMAL,
+                weightKg = 60.0,
+                reps = 8,
+                completedAt = start + 60_000,
+            )
+        workout.addLoggedSet(item, set)
+        workout.finish(start + 100_000)
+        assertEquals(listOf(WorkoutInterval(start, start + 60_000)), workout.intervals)
+
+        val data = AppData(history = mutableListOf(workout))
+        val resumed = data.resumeWorkout(workout.id, start + 200_000)!!
+        resumed.addLoggedSet(item, set.copy(id = "second", completedAt = start + 250_000))
+        resumed.finish(start + 300_000)
+        assertEquals(
+            listOf(
+                WorkoutInterval(start, start + 60_000),
+                WorkoutInterval(start + 200_000, start + 250_000),
+            ),
+            resumed.intervals,
+        )
+
+        data.activeWorkout = null
+        data.history.add(resumed)
+        val resumedAgain = data.resumeWorkout(workout.id, start + 400_000)!!
+        resumedAgain.finish(start + 500_000)
+        assertEquals(resumed.intervals, resumedAgain.intervals)
+        assertEquals(start + 60_000, resumedAgain.firstSetLoggedTime)
+        assertEquals(start + 250_000, resumedAgain.lastSetLoggedTime)
+    }
+
+    @Test
     fun finishedWorkout_cannotResumeAcrossLocalMidnight() {
         val midnight =
             LocalDate.of(2026, 10, 24)
