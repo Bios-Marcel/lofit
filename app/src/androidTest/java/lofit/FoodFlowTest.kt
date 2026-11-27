@@ -656,7 +656,7 @@ class FoodFlowTest {
                 editMeal()
                 name.check(matches(withText(original.name))).perform(replaceText(porridge))
                 onView(withText("Meal date · $oldDay")).perform(scrollTo(), click())
-                selectMealDate(today)
+                selectDate(today)
                 onView(withContentDescription("Old topping weight (g)"))
                     .perform(scrollTo())
                     .check(matches(withText("25")))
@@ -692,6 +692,13 @@ class FoodFlowTest {
     @Test
     fun dailyTotalsShowEveryMetricAndPersistGoalsAndLimits() {
         val originalGoals = store.goals()
+        val today = LocalDate.now()
+        val loggedDays = store.meals().mapTo(mutableSetOf()) { it.day }
+        val day =
+            generateSequence(today) { it.minusDays(1) }
+                .first {
+                    it !in loggedDays && it.minusDays(1) !in loggedDays
+                }
         try {
             store.saveGoals(FoodGoals(null, null))
             LofitRepository(context).apply {
@@ -704,12 +711,16 @@ class FoodFlowTest {
                 CookedMeal(
                     "goal-meal-$suffix",
                     porridge,
-                    LocalDate.now(),
+                    day,
                     listOf(CookedItem(oats.name, amounts)),
                 )
             )
             ActivityScenario.launch(MainActivity::class.java).use { scenario ->
                 open(scenario, "Statistics", expand = true)
+                if (day != today) {
+                    onView(withText("Today")).perform(click())
+                    selectDate(day)
+                }
                 onView(withContentDescription("Previous day")).perform(click())
                 onView(withText("No meals logged for this day.")).check(doesNotExist())
                 onView(withText("0 kcal")).check(matches(isDisplayed()))
@@ -812,7 +823,7 @@ class FoodFlowTest {
             onView(withText("Log meal")).perform(click())
             onView(withText(porridge)).perform(click())
             onView(withText("Meal date · Today")).perform(click())
-            selectMealDate(day)
+            selectDate(day)
             onView(withText("Meal date · $day")).check(matches(isDisplayed()))
             onView(withContentDescription("${oats.name} weight (g)"))
                 .check(matches(withText("200")))
@@ -878,7 +889,7 @@ class FoodFlowTest {
         }
     }
 
-    private fun selectMealDate(day: LocalDate) {
+    private fun selectDate(day: LocalDate) {
         onView(isAssignableFrom(DatePicker::class.java))
             .perform(
                 object : ViewAction {
