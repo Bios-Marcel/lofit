@@ -10,10 +10,19 @@
         <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.Lofit.Flat</item>
         <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.Lofit.Flat</item>
         <item name="android:fontFamily">sans</item>
+        <item name="android:switchStyle">@style/Widget.Lofit.Switch</item>
         <item name="android:windowAnimationStyle">@null</item>
         <item name="android:navigationBarColor">@color/charcoal</item>
         <item name="android:statusBarColor">@color/charcoal</item>
         <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <style name="Widget.Lofit.Switch" parent="@android:style/Widget.Material.CompoundButton.Switch">
+        <item name="android:showText">false</item>
+        <item name="android:textColor">@color/cream</item>
+        <item name="android:thumbTint">@color/cream</item>
+        <item name="android:track">@drawable/switch_track</item>
+        <item name="android:trackTint">@color/toggle_tint</item>
     </style>
 
     <style name="ShapeAppearance.Lofit.Flat" parent="">

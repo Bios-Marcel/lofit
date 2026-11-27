@@ -36,6 +36,8 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import java.util.Locale
 
+private const val MAX_REST_SECONDS = 3_600
+
 /** Shared view styling and reusable controls. Does not own navigation or app data. */
 internal class LofitViews(
     private val activityContext: Context,
@@ -481,14 +483,12 @@ internal class LofitViews(
                 LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
             )
             addView(
-                numberField("Seconds").apply {
-                    setText(formatInteger(value.coerceIn(0, 3_600)))
-                    contentDescription = "Rest duration in seconds"
-                    gravity = Gravity.CENTER
-                    setPadding(dp(6), 0, dp(6), 0)
-                    doAfterTextChanged { text ->
-                        text.toString().toIntOrNull()?.let { onChange(it.coerceIn(0, 3_600)) }
-                    }
+                restField(
+                    value.coerceIn(0, MAX_REST_SECONDS),
+                    "Rest duration",
+                    allowEmpty = false,
+                ) {
+                    it?.let(onChange)
                 },
                 LinearLayout.LayoutParams(dp(82), dp(42)),
             )
@@ -509,18 +509,32 @@ internal class LofitViews(
                 LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
             )
             addView(
-                numberField("Seconds").apply {
-                    setText(value?.let(::formatInteger).orEmpty())
-                    contentDescription = "Rest override in seconds"
-                    gravity = Gravity.CENTER
-                    setPadding(dp(6), 0, dp(6), 0)
-                    doAfterTextChanged { text ->
-                        onChange(text.toString().toIntOrNull()?.coerceIn(0, 3_600))
-                    }
-                },
+                restField(value, "Rest override", allowEmpty = true, onChange = onChange),
                 LinearLayout.LayoutParams(dp(82), dp(42)),
             )
         }
+
+    private fun restField(
+        value: Int?,
+        description: String,
+        allowEmpty: Boolean,
+        onChange: (Int?) -> Unit,
+    ): EditText {
+        var seconds = value
+        val hint = if (allowEmpty) "Default" else ""
+        return durationField(hint, { seconds?.let { formatRestTime(it) }.orEmpty() }) {
+                if (it != null || allowEmpty) {
+                    // LEGACY: Rest edits are capped at one hour.
+                    seconds = it?.coerceAtMost(MAX_REST_SECONDS)
+                    onChange(seconds)
+                }
+            }
+            .apply {
+                contentDescription = description
+                gravity = Gravity.CENTER
+                setPadding(dp(6), 0, dp(6), 0)
+            }
+    }
 
     fun choiceGroup(values: List<String>, selected: Int): RadioGroup =
         RadioGroup(activityContext).apply {
@@ -900,6 +914,60 @@ internal class LofitViews(
             setOnClickListener { selectAll() }
         }
 
+    fun exerciseTimeField(
+        hint: String,
+        seconds: () -> Int,
+        minimumSeconds: Int,
+        isUpdating: () -> Boolean,
+        onChange: (Int) -> Unit,
+    ): EditText =
+        durationField(hint, { formatExerciseTime(seconds()) }, isUpdating) {
+            it?.takeIf { it >= minimumSeconds }?.let(onChange)
+        }
+
+    private fun durationField(
+        hint: String,
+        displayValue: () -> String,
+        isUpdating: () -> Boolean = { false },
+        onChange: (Int?) -> Unit,
+    ): EditText =
+        textField(hint).apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            imeOptions = EditorInfo.IME_ACTION_DONE
+            setSelectAllOnFocus(true)
+            setOnClickListener { selectAll() }
+            setText(displayValue())
+
+            var normalizing = false
+            fun normalize() {
+                val formatted = displayValue()
+                if (text.toString() == formatted) return
+                normalizing = true
+                try {
+                    setText(formatted)
+                    setSelection(formatted.length)
+                } finally {
+                    normalizing = false
+                }
+            }
+
+            doAfterTextChanged { value ->
+                if (normalizing || isUpdating()) return@doAfterTextChanged
+                val input = value.toString()
+                if (input.isBlank()) onChange(null) else parseDurationInput(input)?.let(onChange)
+                // Leave room to type more digits before rewriting the input.
+                if (!hasFocus()) normalize()
+            }
+            setOnFocusChangeListener { _, focused ->
+                background = fieldBackground(focused)
+                if (!focused && !isUpdating()) normalize()
+            }
+            setOnEditorActionListener { _, action, _ ->
+                if (action == EditorInfo.IME_ACTION_DONE) normalize()
+                false
+            }
+        }
+
     fun decimalField(hint: String): EditText =
         textField(hint).apply {
             inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
@@ -915,14 +983,7 @@ internal class LofitViews(
             if (focused) setStroke(dp(1), color(R.color.coral))
         }
 
-    fun toggleTint() =
-        ColorStateList(
-            arrayOf(
-                intArrayOf(android.R.attr.state_checked),
-                intArrayOf(),
-            ),
-            intArrayOf(color(R.color.coral), color(R.color.sage)),
-        )
+    fun toggleTint() = activityContext.getColorStateList(R.color.toggle_tint)
 
     fun sizedButtonDrawable(drawable: android.graphics.drawable.Drawable?, sizeDp: Int) =
         drawable?.let {

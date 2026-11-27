@@ -91,7 +91,7 @@ class ActiveWorkoutTitleTest {
             assertTrue("Timer below title and menu", position[1] > maxOf(titleBottom, menuBottom))
             timerBottom = position[1] + view.height
         }
-        onView(withContentDescription("Rest duration in seconds")).check { view, error ->
+        onView(withContentDescription("Rest duration")).check { view, error ->
             if (error != null) throw error
             val position = IntArray(2)
             view.getLocationOnScreen(position)

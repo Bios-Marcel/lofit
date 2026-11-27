@@ -1,6 +1,7 @@
 package lofit
 
 import android.content.Context
+import android.graphics.Paint
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -52,6 +53,11 @@ internal class PlannedSetViews(
     ): View {
         var currentSetIndex = setIndex
         var updatingValues = false
+        val tracksDuration = exercise.type.tracksDuration
+        val isUpdating = { updatingValues || isUpdatingHoldTimer() }
+        fun formatAmount(): String =
+            if (tracksDuration) formatExerciseTime(plannedSet.holdSeconds)
+            else ui.formatInteger(plannedSet.reps)
         return LinearLayout(activityContext).apply {
             orientation = LinearLayout.VERTICAL
             if (completed) setBackgroundColor(ui.color(R.color.done_green))
@@ -113,8 +119,7 @@ internal class PlannedSetViews(
                             contentDescription = "Set ${currentSetIndex + 1} weight"
                             setPadding(ui.dp(6), 0, ui.dp(6), 0)
                             doAfterTextChanged { value ->
-                                if (updatingValues || isUpdatingHoldTimer())
-                                    return@doAfterTextChanged
+                                if (isUpdating()) return@doAfterTextChanged
                                 parseWeight(value.toString())
                                     ?.takeIf { it >= 0 }
                                     ?.let {
@@ -126,68 +131,72 @@ internal class PlannedSetViews(
                 } else null
             val amountLabel =
                 when {
-                    !exercise.type.tracksDuration -> "Repetitions"
-                    showActiveHold -> "Goal time in seconds"
-                    else -> "Hold duration in seconds"
+                    !tracksDuration -> "Repetitions"
+                    showActiveHold -> "Goal time"
+                    else -> "Hold duration"
                 }
-            val amountValue =
-                if (!exercise.type.tracksDuration) plannedSet.reps else plannedSet.holdSeconds
             val amount =
-                if (readOnly)
-                    readOnlySetField(
-                        ui.formatInteger(amountValue),
-                        "Set ${setIndex + 1} $amountLabel",
-                    )
-                else
-                    ui.numberField(amountLabel).apply {
-                        setText(ui.formatInteger(amountValue))
+                when {
+                    readOnly -> readOnlySetField(formatAmount(), "Set ${setIndex + 1} $amountLabel")
+                    tracksDuration ->
+                        ui.exerciseTimeField(
+                            amountLabel,
+                            { plannedSet.holdSeconds },
+                            1,
+                            isUpdating,
+                        ) {
+                            plannedSet.holdSeconds = it
+                            onChanged()
+                        }
+                    else ->
+                        ui.numberField(amountLabel).apply {
+                            setText(formatAmount())
+                            doAfterTextChanged { value ->
+                                if (isUpdating()) return@doAfterTextChanged
+                                value
+                                    .toString()
+                                    .toIntOrNull()
+                                    ?.takeIf { it > 0 }
+                                    ?.let {
+                                        plannedSet.reps = it
+                                        onChanged()
+                                    }
+                            }
+                        }
+                }.apply {
+                    if (tracksDuration) fitDurationText()
+                    if (this is EditText) {
                         contentDescription = "Set ${currentSetIndex + 1} $amountLabel"
                         setPadding(ui.dp(6), 0, ui.dp(6), 0)
-                        doAfterTextChanged { value ->
-                            if (updatingValues || isUpdatingHoldTimer()) return@doAfterTextChanged
-                            value
-                                .toString()
-                                .toIntOrNull()
-                                ?.takeIf { it > 0 }
-                                ?.let {
-                                    if (!exercise.type.tracksDuration) plannedSet.reps = it
-                                    else plannedSet.holdSeconds = it
-                                    onChanged()
-                                }
-                        }
+                        onAmountReady(this)
                     }
-            if (amount is EditText) onAmountReady(amount)
+                }
             val activeAmount =
-                if (exercise.type.tracksDuration && showActiveHold) {
+                if (tracksDuration && showActiveHold) {
                     if (readOnly)
                         readOnlySetField(
-                            ui.formatInteger(plannedSet.actualHoldSeconds ?: 0),
-                            "Set ${setIndex + 1} Active time in seconds",
+                            formatExerciseTime(plannedSet.actualHoldSeconds ?: 0),
+                            "Set ${setIndex + 1} Active time",
                         )
                     else
-                        ui.numberField("Active time in seconds")
+                        ui.exerciseTimeField(
+                                "Active time",
+                                { plannedSet.actualHoldSeconds ?: 0 },
+                                0,
+                                isUpdating,
+                            ) {
+                                plannedSet.actualHoldSeconds = it
+                                onChanged()
+                            }
                             .apply {
-                                setText(ui.formatInteger(plannedSet.actualHoldSeconds ?: 0))
-                                contentDescription =
-                                    "Set ${currentSetIndex + 1} Active time in seconds"
+                                contentDescription = "Set ${currentSetIndex + 1} Active time"
                                 setPadding(ui.dp(6), 0, ui.dp(6), 0)
                                 // LEGACY: Running timers keep active time read-only.
                                 isEnabled = !activeHoldRunning
-                                doAfterTextChanged { value ->
-                                    if (updatingValues || isUpdatingHoldTimer())
-                                        return@doAfterTextChanged
-                                    value
-                                        .toString()
-                                        .toIntOrNull()
-                                        ?.takeIf { it >= 0 }
-                                        ?.let {
-                                            plannedSet.actualHoldSeconds = it
-                                            onChanged()
-                                        }
-                                }
                             }
                             .also(onActiveAmountReady)
                 } else null
+            activeAmount?.fitDurationText()
             val fields =
                 GridLayout(activityContext).apply {
                     val activeGrid = activeAmount != null
@@ -400,7 +409,7 @@ internal class PlannedSetViews(
                 setNumber.contentDescription = "Set ${newIndex + 1} type: ${plannedSet.type.label}"
                 weight?.contentDescription = "Set ${newIndex + 1} weight"
                 amount.contentDescription = "Set ${newIndex + 1} $amountLabel"
-                activeAmount?.contentDescription = "Set ${newIndex + 1} Active time in seconds"
+                activeAmount?.contentDescription = "Set ${newIndex + 1} Active time"
                 swipeRow?.contentDescription = "Set ${newIndex + 1} row"
                 deleteButton?.contentDescription = "Delete set ${newIndex + 1}"
                 deleteBelowButton?.contentDescription = "Delete set ${newIndex + 1} and all below"
@@ -412,11 +421,7 @@ internal class PlannedSetViews(
                 updatingValues = true
                 try {
                     weight?.text = formatWeight(plannedSet.weightKg)
-                    amount.text =
-                        ui.formatInteger(
-                            if (exercise.type.tracksDuration) plannedSet.holdSeconds
-                            else plannedSet.reps
-                        )
+                    amount.text = formatAmount()
                 } finally {
                     updatingValues = false
                 }
@@ -442,6 +447,20 @@ internal class PlannedSetViews(
             setPadding(ui.dp(6), 0, ui.dp(6), 0)
             contentDescription = description
         }
+
+    private fun TextView.fitDurationText() {
+        maxLines = 1
+        val unscaledPaint = Paint(paint)
+        fun fit() {
+            val available = width - compoundPaddingLeft - compoundPaddingRight
+            if (available <= 0) return
+            val measured = unscaledPaint.measureText(text.toString())
+            val scale = if (measured > available) available / measured else 1f
+            if (textScaleX != scale) textScaleX = scale
+        }
+        addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> fit() }
+        doAfterTextChanged { fit() }
+    }
 
     private fun swipeDeleteButton(
         label: String,

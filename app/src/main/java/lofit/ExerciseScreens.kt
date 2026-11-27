@@ -396,8 +396,9 @@ internal class ExerciseScreens(
         val set = data().exerciseRecords[exercise.id]?.lastOrNull()?.set ?: return null
         return when {
             exercise.type.tracksDuration && exercise.weighted ->
-                "Best: ${set.holdSeconds}s hold · ${formatWeight(set.weightKg)} kg"
-            exercise.type.tracksDuration -> "Best: ${set.holdSeconds}s hold"
+                "Best: ${formatExerciseTime(set.holdSeconds, showSecondsUnit = true)} hold · ${formatWeight(set.weightKg)} kg"
+            exercise.type.tracksDuration ->
+                "Best: ${formatExerciseTime(set.holdSeconds, showSecondsUnit = true)} hold"
             exercise.weighted -> "Best: ${formatWeight(set.weightKg)} kg · ${set.reps} reps"
             else -> "Best: ${set.reps} reps"
         }

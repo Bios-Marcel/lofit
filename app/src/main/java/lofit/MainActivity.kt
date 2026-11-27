@@ -2627,7 +2627,10 @@ class MainActivity : AppCompatActivity() {
                         workout.defaultRestSeconds = seconds
                     }
                 )
-            } else body.addView(ui.metaText("Set Rest: ${workout.defaultRestSeconds}s"))
+            } else {
+                val rest = formatRestTime(workout.defaultRestSeconds, showSecondsUnit = true)
+                body.addView(ui.metaText("Set Rest: $rest"))
+            }
             val exerciseCards = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
             val reorder =
                 ExerciseReorderController(exerciseCards) { from, to ->
@@ -2727,12 +2730,12 @@ class MainActivity : AppCompatActivity() {
                                 item.plannedSets.forEachIndexed { index, set ->
                                     addSet(set, loggedSetFor(item, set), index)
                                 }
-                                addView(
-                                    ui.metaText(
-                                        "Set Rest: ${item.restSeconds(workout.defaultRestSeconds)}s"
-                                    ),
-                                    ui.insetCardLayoutParams(),
-                                )
+                                val rest =
+                                    formatRestTime(
+                                        item.restSeconds(workout.defaultRestSeconds),
+                                        showSecondsUnit = true,
+                                    )
+                                addView(ui.metaText("Set Rest: $rest"), ui.insetCardLayoutParams())
                             }
                         )
                     }
@@ -3469,10 +3472,9 @@ class MainActivity : AppCompatActivity() {
         val body =
             dialogBody().apply {
                 addView(ui.titleText(plan.routine.name))
+                val rest = formatRestTime(plan.routine.defaultRestSeconds, showSecondsUnit = true)
                 addView(
-                    ui.metaText(
-                        "${plan.routine.exercises.size} exercises · ${plan.routine.defaultRestSeconds}s default rest"
-                    )
+                    ui.metaText("${plan.routine.exercises.size} exercises · $rest default rest")
                 )
                 addView(
                     ScrollView(this@MainActivity).apply {
@@ -4115,7 +4117,7 @@ class MainActivity : AppCompatActivity() {
             updateWorkoutNotification(force = true)
             return
         }
-        val label = "Rest ${formatSeconds(remaining)}"
+        val label = "Rest ${formatRestTime(remaining)}"
         if (restTimeText.text.toString() != label) restTimeText.text = label
         restBar.visibility = View.VISIBLE
     }
@@ -4288,7 +4290,7 @@ class MainActivity : AppCompatActivity() {
         updatingHoldTimer = true
         liveTimeViews[set.id]?.let { view ->
             view.isEnabled = liveWorkoutMeasurement.active?.set?.id != set.id
-            val value = (set.actualHoldSeconds ?: 0).toString()
+            val value = formatExerciseTime(set.actualHoldSeconds ?: 0)
             if (view.text.toString() != value) view.setText(value)
         }
         updatingHoldTimer = false
@@ -4318,7 +4320,7 @@ class MainActivity : AppCompatActivity() {
         holdTimerButton = button
         holdDoneCheckBox = done
         updatingHoldTimer = true
-        amount.setText("0")
+        amount.setText(formatExerciseTime(0))
         updatingHoldTimer = false
         amount.isEnabled = false
         button.setImageResource(R.drawable.ic_timer_stop)
@@ -4357,7 +4359,7 @@ class MainActivity : AppCompatActivity() {
             syncLoggedSet(loggedSet, plannedSet, movement)
         }
         updatingHoldTimer = true
-        holdTimerText?.setText(elapsed.toString())
+        holdTimerText?.setText(formatExerciseTime(elapsed))
         updatingHoldTimer = false
         holdTimerText?.isEnabled = true
         holdTimerButton?.apply {
@@ -4398,7 +4400,7 @@ class MainActivity : AppCompatActivity() {
         val setId = activeHoldPlannedSetId ?: return
         if (holdStartedAt == 0L) return
         val elapsed = max(0, ((SystemClock.elapsedRealtime() - holdStartedAt) / 1_000).toInt())
-        val elapsedText = elapsed.toString()
+        val elapsedText = formatExerciseTime(elapsed)
         if (holdTimerText?.text?.toString() != elapsedText) {
             updatingHoldTimer = true
             holdTimerText?.setText(elapsedText)
@@ -4607,7 +4609,8 @@ class MainActivity : AppCompatActivity() {
                 buildList {
                         if (movement.weighted) add("${formatWeight(plannedSet.weightKg)} kg")
                         add(
-                            if (movement.type.tracksDuration) "${plannedSet.holdSeconds}s"
+                            if (movement.type.tracksDuration)
+                                formatExerciseTime(plannedSet.holdSeconds, showSecondsUnit = true)
                             else "${plannedSet.reps} reps"
                         )
                     }
@@ -4630,9 +4633,10 @@ class MainActivity : AppCompatActivity() {
             } else 0
         val detail =
             when {
-                restSeconds > 0 -> "$setText · Rest ${formatSeconds(restSeconds)}"
+                restSeconds > 0 ->
+                    "$setText · Rest ${formatRestTime(restSeconds, showSecondsUnit = true)}"
                 activeHoldWorkoutExerciseId != null || livePull != null ->
-                    "$setText · Hold ${formatSeconds(holdSeconds)}"
+                    "$setText · Hold ${formatExerciseTime(holdSeconds, showSecondsUnit = true)}"
                 else -> setText
             }
         val canComplete =

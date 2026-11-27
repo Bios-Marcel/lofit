@@ -24,7 +24,10 @@ internal class RecordScreens(
                             val value =
                                 when {
                                     record.exercise.type.tracksDuration ->
-                                        "${record.set.holdSeconds}s"
+                                        formatExerciseTime(
+                                            record.set.holdSeconds,
+                                            showSecondsUnit = true,
+                                        )
                                     record.exercise.weighted ->
                                         "${formatWeight(record.set.weightKg)} kg"
                                     else -> "${record.set.reps} reps"
@@ -76,9 +79,15 @@ internal class RecordScreens(
                         body.addView(
                             ui.card {
                                 addView(ui.titleText(series.metric.label))
+                                val value = series.points.last().value
                                 addView(
                                     ui.accentText(
-                                        "${formatWeight(series.points.last().value)} ${series.metric.unit}"
+                                        if (series.metric == TrendMetric.HOLD)
+                                            formatExerciseTime(
+                                                value.toInt(),
+                                                showSecondsUnit = true,
+                                            )
+                                        else "${formatWeight(value)} ${series.metric.unit}"
                                     )
                                 )
                                 addView(

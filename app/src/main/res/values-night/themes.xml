@@ -10,6 +10,7 @@
         <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.Lofit.Flat</item>
         <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.Lofit.Flat</item>
         <item name="android:fontFamily">sans</item>
+        <item name="android:switchStyle">@style/Widget.Lofit.Switch</item>
         <item name="android:windowAnimationStyle">@null</item>
         <item name="android:navigationBarColor">@color/charcoal</item>
         <item name="android:statusBarColor">@color/charcoal</item>

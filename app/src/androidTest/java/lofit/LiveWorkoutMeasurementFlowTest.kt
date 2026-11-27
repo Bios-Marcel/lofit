@@ -393,7 +393,7 @@ class LiveWorkoutMeasurementFlowTest {
                 .perform(scrollTo())
                 .check(matches(isDisplayed()))
             onView(withContentDescription("Start set 1 hold")).check(doesNotExist())
-            onView(withContentDescription("Set 1 Active time in seconds"))
+            onView(withContentDescription("Set 1 Active time"))
                 .check(matches(isEnabled()))
                 .perform(
                     replaceText("7"),
@@ -428,9 +428,9 @@ class LiveWorkoutMeasurementFlowTest {
                 0.0,
             )
             scenario.onActivity { scanner.reading(selected, 1.1) }
-            onView(withContentDescription("Set 1 Active time in seconds"))
+            onView(withContentDescription("Set 1 Active time"))
                 .check(matches(not(isEnabled())))
-                .check(matches(withText("0")))
+                .check(matches(withText("00")))
             onView(withContentDescription("Set 1 weight"))
                 .check(matches(withText("20.5")))
                 .perform(replaceText("21.75"))
@@ -440,14 +440,12 @@ class LiveWorkoutMeasurementFlowTest {
                 scanner.reading(selected, 15.133)
             }
             scenario.onActivity { scaleTimeMillis += 1_100 }
-            onView(withContentDescription("Set 1 Active time in seconds"))
-                .perform(waitUntilMatches(withText("1")))
+            onView(withContentDescription("Set 1 Active time"))
+                .perform(waitUntilMatches(withText("01")))
             onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
-            onView(withContentDescription("Set 1 Active time in seconds"))
-                .check(matches(isEnabled()))
+            onView(withContentDescription("Set 1 Active time")).check(matches(isEnabled()))
             scenario.onActivity { scaleTimeMillis += 2_000 }
-            onView(withContentDescription("Set 1 Active time in seconds"))
-                .check(matches(withText("1")))
+            onView(withContentDescription("Set 1 Active time")).check(matches(withText("01")))
             scenario.onActivity {
                 scanner.reading(CraneScaleDevice("AA:BB:CC:DD:EE:02", "Other"), 99.0)
                 scanner.reading(selected, 2.0)
@@ -462,7 +460,7 @@ class LiveWorkoutMeasurementFlowTest {
             assertEquals(saved.completedAt, workout.lastSetLoggedTime)
             assertEquals(21.75, saved.weightKg, 0.0)
             assertTrue(saved.holdSeconds >= 1)
-            onView(withContentDescription("Set 1 Active time in seconds"))
+            onView(withContentDescription("Set 1 Active time"))
                 .check(matches(isEnabled()))
                 .perform(
                     replaceText("3"),
@@ -531,9 +529,9 @@ class LiveWorkoutMeasurementFlowTest {
             }
             onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
             onView(withContentDescription("Set 1 weight")).check(matches(withText("16.5")))
-            onView(withContentDescription("Set 1 Active time in seconds"))
+            onView(withContentDescription("Set 1 Active time"))
                 .check(matches(isEnabled()))
-                .check(matches(withText("3")))
+                .check(matches(withText("03")))
         }
     }
 
@@ -548,11 +546,11 @@ class LiveWorkoutMeasurementFlowTest {
             scenario.onActivity {
                 scanner = fakeScanner(it)
                 scanner.reading(selected, 20.0)
-                scaleTimeMillis += 2_000
+                scaleTimeMillis += 99_000
                 scanner.reading(selected, 20.0)
             }
-            onView(withContentDescription("Set 1 Active time in seconds"))
-                .perform(waitUntilMatches(withText("2")))
+            onView(withContentDescription("Set 1 Active time"))
+                .perform(waitUntilMatches(withText("99")))
                 .check(matches(not(isEnabled())))
             onView(withContentDescription("Set 1 done")).check(matches(not(isChecked())))
             onView(withContentDescription("Rest timer overlay")).check(matches(not(isDisplayed())))
@@ -560,19 +558,18 @@ class LiveWorkoutMeasurementFlowTest {
                 scaleTimeMillis += 1_000
                 scanner.reading(selected, 2.0)
             }
-            onView(withContentDescription("Set 1 Active time in seconds"))
-                .perform(waitUntilMatches(withText("3")))
+            onView(withContentDescription("Set 1 Active time"))
+                .perform(waitUntilMatches(withText("1m40")))
             onView(withContentDescription("Set 1 done")).check(matches(not(isChecked())))
             scenario.onActivity { scanner.reading(selected, 1.0) }
             onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
-            onView(withContentDescription("Set 1 Active time in seconds"))
-                .check(matches(isEnabled()))
+            onView(withContentDescription("Set 1 Active time")).check(matches(isEnabled()))
             onView(withContentDescription("Set 1 weight")).check(matches(withText("50")))
             onView(withContentDescription("Rest timer overlay")).check(matches(isDisplayed()))
             val logged =
                 LofitRepository(context).data.activeWorkout!!.exercises.single().sets.single()
             assertEquals(SetType.FAILURE, logged.type)
-            assertEquals(3, logged.holdSeconds)
+            assertEquals(100, logged.holdSeconds)
             assertEquals(50.0, logged.weightKg, 0.0)
             onView(withContentDescription("Scale Pull live weight graph"))
                 .perform(waitUntilMatches(withLastPullAverage(20.0)))
@@ -593,7 +590,7 @@ class LiveWorkoutMeasurementFlowTest {
             }
             scenario.onActivity { scaleTimeMillis += 150 }
             scenario.onActivity { scanner.reading(selected, 0.0) }
-            onView(withContentDescription("Set 1 Active time in seconds"))
+            onView(withContentDescription("Set 1 Active time"))
                 .check(matches(isEnabled()))
                 .perform(replaceText("8"))
             onView(withContentDescription("Set 1 done"))
@@ -607,9 +604,9 @@ class LiveWorkoutMeasurementFlowTest {
             assertEquals(50.0, logged.weightKg, 0.0)
             assertEquals(8, logged.holdSeconds)
             scenario.recreate()
-            onView(withContentDescription("Set 1 Active time in seconds"))
+            onView(withContentDescription("Set 1 Active time"))
                 .check(matches(isEnabled()))
-                .check(matches(withText("8")))
+                .check(matches(withText("08")))
             onView(withContentDescription("Set 1 done"))
                 .check(matches(isChecked()))
                 .perform(scrollTo(), click())
@@ -637,13 +634,10 @@ class LiveWorkoutMeasurementFlowTest {
             }
             scenario.onActivity { scaleTimeMillis += 1_100 }
             scenario.onActivity { scanner.reading(selected, 20.0) }
-            onView(withContentDescription("Set 1 Active time in seconds"))
-                .check(matches(not(isEnabled())))
-            onView(withContentDescription("Set 2 Active time in seconds"))
-                .check(matches(isEnabled()))
+            onView(withContentDescription("Set 1 Active time")).check(matches(not(isEnabled())))
+            onView(withContentDescription("Set 2 Active time")).check(matches(isEnabled()))
             onView(withContentDescription("Set 1 done")).perform(scrollTo(), click())
-            onView(withContentDescription("Set 1 Active time in seconds"))
-                .check(matches(isEnabled()))
+            onView(withContentDescription("Set 1 Active time")).check(matches(isEnabled()))
             val first =
                 LofitRepository(context).data.activeWorkout!!.exercises.single().sets.single()
             assertEquals(50.0, first.weightKg, 0.0)
@@ -655,8 +649,7 @@ class LiveWorkoutMeasurementFlowTest {
             scenario.onActivity { scanner.reading(selected, 0.0) }
             onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
             onView(withContentDescription("Set 2 done")).check(matches(not(isChecked())))
-            onView(withContentDescription("Set 2 Active time in seconds"))
-                .check(matches(withText("0")))
+            onView(withContentDescription("Set 2 Active time")).check(matches(withText("00")))
             assertEquals(
                 listOf(first),
                 LofitRepository(context).data.activeWorkout!!.exercises.single().sets,
@@ -708,8 +701,7 @@ class LiveWorkoutMeasurementFlowTest {
             )
             onView(withContentDescription("Scale Pull scale status"))
                 .check(matches(withText("Scale unavailable")))
-            onView(withContentDescription("Set 1 Active time in seconds"))
-                .check(matches(isEnabled()))
+            onView(withContentDescription("Set 1 Active time")).check(matches(isEnabled()))
             openScaleOption(checked = true)
             onView(withText("Use crane scale")).perform(click())
             assertTrue(

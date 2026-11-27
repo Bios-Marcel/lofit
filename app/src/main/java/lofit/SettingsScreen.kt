@@ -3,7 +3,6 @@ package lofit
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.content.res.ColorStateList
 import android.text.InputType
 import android.view.Gravity
 import android.view.View
@@ -11,7 +10,6 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.Switch
 import android.widget.Toast
-import androidx.core.content.ContextCompat
 import androidx.core.widget.doAfterTextChanged
 
 internal class SettingsScreen(
@@ -27,14 +25,6 @@ internal class SettingsScreen(
     private val craneScaleSettings: () -> View,
     private val onRefresh: () -> Unit,
 ) {
-    private fun settingsSwitch() =
-        Switch(activityContext).apply {
-            showText = false
-            thumbTintList = ColorStateList.valueOf(ui.color(R.color.cream))
-            trackDrawable = ContextCompat.getDrawable(activityContext, R.drawable.switch_track)
-            trackTintList = ui.toggleTint()
-        }
-
     fun genderChoice(
         selected: BiologicalGender,
         onChange: (BiologicalGender) -> Unit,
@@ -60,7 +50,7 @@ internal class SettingsScreen(
                     LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
                 )
                 addView(
-                    settingsSwitch().apply {
+                    Switch(activityContext).apply {
                         isChecked = enabled
                         minWidth = ui.dp(72)
                         minHeight = ui.dp(48)
@@ -85,7 +75,7 @@ internal class SettingsScreen(
                     },
                 )
                 addView(
-                    settingsSwitch().apply {
+                    Switch(activityContext).apply {
                         isChecked = enabled
                         minWidth = ui.dp(72)
                         minHeight = ui.dp(48)
@@ -132,7 +122,7 @@ internal class SettingsScreen(
                                     },
                             )
                             addView(
-                                settingsSwitch().apply {
+                                Switch(activityContext).apply {
                                     isChecked = data().soundCuesEnabled
                                     textOn = "On"
                                     textOff = "Off"
@@ -140,7 +130,6 @@ internal class SettingsScreen(
                                     isFocusable = true
                                     minWidth = ui.dp(72)
                                     textSize = 14f
-                                    setTextColor(ui.color(R.color.cream))
                                     contentDescription = "Sound cues"
                                     setOnCheckedChangeListener { _, enabled ->
                                         data().soundCuesEnabled = enabled
@@ -164,9 +153,8 @@ internal class SettingsScreen(
             body.addView(
                 ui.card {
                     addView(
-                        settingsSwitch().apply {
+                        Switch(activityContext).apply {
                             text = "Suggested workouts"
-                            setTextColor(ui.color(R.color.cream))
                             minHeight = ui.dp(48)
                             isChecked = data().suggestedWorkoutsEnabled
                             setOnCheckedChangeListener { _, enabled ->
@@ -183,9 +171,8 @@ internal class SettingsScreen(
             body.addView(
                 ui.card {
                     addView(
-                        settingsSwitch().apply {
+                        Switch(activityContext).apply {
                             text = "Debug mode"
-                            setTextColor(ui.color(R.color.cream))
                             minHeight = ui.dp(48)
                             isChecked = data().debugMode
                             setOnCheckedChangeListener { _, enabled ->
@@ -373,7 +360,7 @@ internal class SettingsScreen(
                     },
                 )
                 addView(
-                    settingsSwitch().apply {
+                    Switch(activityContext).apply {
                         isChecked = data().mcpEnabled
                         minWidth = ui.dp(72)
                         contentDescription = "MCP server"

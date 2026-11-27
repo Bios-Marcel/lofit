@@ -27,6 +27,7 @@ import androidx.test.espresso.UiController
 import androidx.test.espresso.ViewAction
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.closeSoftKeyboard
+import androidx.test.espresso.action.ViewActions.pressImeActionButton
 import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.action.ViewActions.scrollTo
 import androidx.test.espresso.action.ViewActions.swipeLeft
@@ -1269,12 +1270,12 @@ class WorkoutFlowTest {
         seedWorkout(
             WorkoutExercise(
                 exerciseId = "plank",
-                plannedSets = mutableListOf(PlannedSet(holdSeconds = 60)),
+                plannedSets = mutableListOf(PlannedSet(holdSeconds = 100)),
             )
         )
         launchNotificationWorkout().use {
             awaitWorkoutNotification {
-                it.extras.getCharSequence(Notification.EXTRA_TEXT).toString() == "Set 1 of 1 · 60s"
+                it.extras.getCharSequence(Notification.EXTRA_TEXT).toString() == "Set 1 of 1 · 1m40"
             }
             onView(withContentDescription("Start set 1 hold")).perform(scrollTo(), click())
             val holding = awaitWorkoutNotification {
@@ -1772,19 +1773,16 @@ class WorkoutFlowTest {
             onView(withText("Edit")).perform(click())
             onView(withContentDescription("Set 1 row")).perform(swipeLeft())
             onView(withContentDescription("Delete set 1")).perform(click())
-            onView(withContentDescription("Set 1 Hold duration in seconds"))
-                .perform(replaceText("55"))
+            onView(withContentDescription("Set 1 Hold duration")).perform(replaceText("55"))
             onView(withContentDescription("Set 1 row")).perform(swipeLeft())
             onView(withContentDescription("Override down set 1")).perform(click())
-            onView(withContentDescription("Set 2 Hold duration in seconds"))
-                .check(matches(withText("55")))
+            onView(withContentDescription("Set 2 Hold duration")).check(matches(withText("55")))
             onView(withText("Save routine")).perform(scrollTo(), click())
             val saved =
                 LofitRepository(context).data.routines.single().exercises.single().plannedSets
             assertEquals(sets.drop(1).map { it.copy(holdSeconds = 55) }, saved)
             onView(withText("Edit")).perform(click())
-            onView(withContentDescription("Set 2 Hold duration in seconds"))
-                .check(matches(withText("55")))
+            onView(withContentDescription("Set 2 Hold duration")).check(matches(withText("55")))
         }
     }
 
@@ -1837,10 +1835,8 @@ class WorkoutFlowTest {
             onView(withContentDescription("Edit Past holds")).perform(scrollTo(), click())
             onView(withContentDescription("Set 1 row")).perform(scrollTo(), swipeLeft())
             onView(withContentDescription("Override down set 1")).perform(click())
-            onView(withContentDescription("Set 2 Goal time in seconds"))
-                .check(matches(withText("45")))
-            onView(withContentDescription("Set 2 Active time in seconds"))
-                .check(matches(withText("23")))
+            onView(withContentDescription("Set 2 Goal time")).check(matches(withText("45")))
+            onView(withContentDescription("Set 2 Active time")).check(matches(withText("23")))
             onView(withContentDescription("Set 2 done")).check(matches(isChecked()))
             onView(withContentDescription("Set 3 done")).check(matches(not(isChecked())))
             onView(withText("Save changes")).perform(scrollTo(), click())
@@ -2222,7 +2218,7 @@ class WorkoutFlowTest {
                 )
             onView(allOf(withContentDescription("Set 3 Repetitions"), inCard("Bench press")))
                 .check(matches(withText("1")))
-            onView(allOf(withContentDescription("Set 1 Goal time in seconds"), inCard("Plank")))
+            onView(allOf(withContentDescription("Set 1 Goal time"), inCard("Plank")))
                 .check(matches(withText("20")))
             onView(allOf(withContentDescription("Set 2 row"), inCard("Plank")))
                 .check(doesNotExist())
@@ -2434,7 +2430,7 @@ class WorkoutFlowTest {
                                     LoggedSet(
                                         type = SetType.NORMAL,
                                         weightKg = 0.0,
-                                        holdSeconds = 65,
+                                        holdSeconds = 125,
                                     ),
                                 ),
                         ),
@@ -2456,7 +2452,9 @@ class WorkoutFlowTest {
         onView(withText("82.5 kg")).perform(scrollTo()).check(matches(isDisplayed()))
         onView(withText("480 kg")).perform(scrollTo()).check(matches(isDisplayed()))
         onView(withText("Highest set volume")).perform(scrollTo()).check(matches(isDisplayed()))
-        onView(withText("65s")).perform(scrollTo()).check(matches(isDisplayed()))
+        onView(withText("2m05")).perform(scrollTo()).check(matches(isDisplayed()))
+        onView(withContentDescription("View Plank trend")).perform(scrollTo(), click())
+        onView(withText("2m05")).check(matches(isDisplayed()))
     }
 
     @Test
@@ -2622,7 +2620,7 @@ class WorkoutFlowTest {
                                     PlannedSet(
                                         weightKg = 10.0,
                                         holdSeconds = 45,
-                                        actualHoldSeconds = 46,
+                                        actualHoldSeconds = 6_000,
                                     )
                                 ),
                         )
@@ -2636,9 +2634,14 @@ class WorkoutFlowTest {
             onView(withContentDescription("Set 1 weight")).check(matches(isDisplayed()))
             onView(withContentDescription("Set 1 side: Both")).check(matches(withText("B")))
             onView(withText("Goal")).check(matches(isDisplayed()))
-            onView(withContentDescription("Set 1 Goal time in seconds"))
-                .check(matches(isDisplayed()))
-            onView(withContentDescription("Set 1 Active time in seconds")).check { field, _ ->
+            onView(withContentDescription("Set 1 Goal time")).check(matches(isDisplayed()))
+            onView(withContentDescription("Set 1 Active time")).check { field, _ ->
+                val time = field as android.widget.TextView
+                assertEquals("100m00", time.text.toString())
+                assertTrue(
+                    time.paint.measureText(time.text.toString()) <=
+                        time.width - time.compoundPaddingLeft - time.compoundPaddingRight + 1
+                )
                 val control = field.parent as ViewGroup
                 assertEquals(1, control.childCount)
                 val row = control.parent as ViewGroup
@@ -2671,12 +2674,10 @@ class WorkoutFlowTest {
                 assertEquals(1, actions.childCount)
                 assertEquals(view.minimumWidth, actions.width)
             }
-            onView(withContentDescription("Set 1 Active time in seconds"))
-                .perform(replaceText("20"))
+            onView(withContentDescription("Set 1 Active time")).perform(replaceText("20"))
             assertSetDoneState(1, "Done")
             assertWorkoutTotals("1/1 sets · 20 kg volume")
-            onView(withContentDescription("Set 1 Active time in seconds"))
-                .perform(replaceText("46"))
+            onView(withContentDescription("Set 1 Active time")).perform(replaceText("46"))
             assertSetDoneState(1, "Done, record")
             onView(withContentDescription("Set 1 weight")).perform(replaceText("15"))
             assertWorkoutTotals("1/1 sets · 30 kg volume", records = 1)
@@ -2972,7 +2973,7 @@ class WorkoutFlowTest {
         onView(withContentDescription("Workout duration")).check(matches(withText("2:00")))
         onView(
                 allOf(
-                    withText("Set Rest: 90s"),
+                    withText("Set Rest: 1m30"),
                     not(isDescendantOfA(isAssignableFrom(MaterialCardView::class.java))),
                 )
             )
@@ -2999,11 +3000,9 @@ class WorkoutFlowTest {
         onView(benchField("Set 2 done")).check(doesNotExist())
         onView(benchField("Set 2 record")).check(doesNotExist())
         onView(benchField("Set 2 weight")).check(matches(withText("50")))
-        onView(withText("Set Rest: 75s")).perform(scrollTo()).check(matches(isDisplayed()))
-        onView(holdField("Set 1 Goal time in seconds"))
-            .perform(scrollTo())
-            .check(matches(withText("45")))
-        onView(holdField("Set 1 Active time in seconds")).check(matches(withText("42")))
+        onView(withText("Set Rest: 1m15")).perform(scrollTo()).check(matches(isDisplayed()))
+        onView(holdField("Set 1 Goal time")).perform(scrollTo()).check(matches(withText("45")))
+        onView(holdField("Set 1 Active time")).check(matches(withText("42")))
         onView(withContentDescription("Set 1 side: Left"))
             .perform(scrollTo())
             .check(matches(withText("L")))
@@ -3227,18 +3226,24 @@ class WorkoutFlowTest {
         onView(withContentDescription("Options for Past workout")).perform(click())
         onView(withText("Edit")).perform(click())
         onView(withContentDescription("Workout duration")).check(matches(withText("2:00")))
+        onView(withContentDescription("Rest duration"))
+            .perform(scrollTo(), replaceText("1m"))
+            .check(matches(withText("1m00")))
         onView(withText("Add exercise")).perform(scrollTo(), click())
         onView(withContentDescription("Add Plank")).perform(scrollTo(), click())
         val plankCard =
             allOf(isAssignableFrom(MaterialCardView::class.java), hasDescendant(withText("Plank")))
         onView(allOf(withText("Add set"), isDescendantOfA(plankCard))).perform(scrollTo(), click())
-        onView(
-                allOf(
-                    withContentDescription("Set 1 Active time in seconds"),
-                    isDescendantOfA(plankCard),
-                )
-            )
-            .perform(scrollTo(), replaceText("45"))
+        val goal =
+            onView(allOf(withContentDescription("Set 1 Goal time"), isDescendantOfA(plankCard)))
+        val active =
+            onView(allOf(withContentDescription("Set 1 Active time"), isDescendantOfA(plankCard)))
+        goal.perform(scrollTo(), replaceText("100")).check(matches(withText("1m40")))
+        active.perform(scrollTo(), replaceText("2m05")).check(matches(withText("2m05")))
+        val restOverride =
+            onView(allOf(withContentDescription("Rest override"), isDescendantOfA(plankCard)))
+        restOverride.perform(scrollTo(), replaceText("59")).check(matches(withText("59")))
+        restOverride.perform(replaceText("65")).check(matches(withText("1m05")))
         onView(allOf(withContentDescription("Set 1 done"), isDescendantOfA(plankCard)))
             .perform(scrollTo(), click())
 
@@ -3252,12 +3257,20 @@ class WorkoutFlowTest {
         val saved = LofitRepository(context).data
         val edited = saved.history.single { it.id == workout.id }
         assertEquals(originalIntervals, edited.intervals)
+        assertEquals(60, edited.defaultRestSeconds)
         assertEquals(activeId, saved.activeWorkout?.id)
-        assertEquals(1, edited.exercises.single { it.exerciseId == "plank" }.sets.size)
+        val plank = edited.exercises.single { it.exerciseId == "plank" }
+        assertEquals(65, plank.restSecondsOverride)
+        assertEquals(100, plank.plannedSets.single().holdSeconds)
+        assertEquals(125, plank.plannedSets.single().actualHoldSeconds)
+        assertEquals(125, plank.sets.single().holdSeconds)
         assertEquals(finishedAt, edited.exercises.last().sets.single().completedAt)
         onView(withContentDescription("View Past workout")).perform(scrollTo(), click())
         onView(withContentDescription("Workout duration")).check(matches(withText("2:00")))
         onView(withText("Plank")).perform(scrollTo()).check(matches(isDisplayed()))
+        goal.check(matches(withText("1m40")))
+        active.check(matches(withText("2m05")))
+        onView(withText("Set Rest: 1m05")).perform(scrollTo()).check(matches(isDisplayed()))
         instrumentation.runOnMainSync { activity.finish() }
     }
 
@@ -3503,17 +3516,25 @@ class WorkoutFlowTest {
             )
             .perform(click())
         onView(withText("Start")).perform(scrollTo(), click())
-        onView(withContentDescription("Set 1 Goal time in seconds")).check(matches(withText("45")))
-        onView(withContentDescription("Set 1 Active time in seconds")).check(matches(withText("0")))
+        onView(withContentDescription("Set 1 Goal time")).check(matches(withText("45")))
+        onView(withContentDescription("Set 1 Active time")).check(matches(withText("00")))
         onView(withContentDescription("Start set 1 hold")).perform(scrollTo(), click())
         onView(withContentDescription("Stop set 1 hold")).check(matches(isDisplayed()))
         onView(withContentDescription("Stop set 1 hold")).perform(click())
         onView(withContentDescription("Start set 1 hold")).check(matches(isDisplayed()))
-        onView(withContentDescription("Set 1 Goal time in seconds")).check(matches(withText("45")))
-        onView(withContentDescription("Set 1 Active time in seconds"))
+        onView(withContentDescription("Set 1 Goal time")).check(matches(withText("45")))
+        onView(withContentDescription("Set 1 Active time"))
             .check(matches(isEnabled()))
-            .perform(replaceText("12"))
-            .check(matches(withText("12")))
+            .perform(
+                click(),
+                waitUntil("duration keyboard opens") {
+                    ViewCompat.getRootWindowInsets(it)?.isVisible(WindowInsetsCompat.Type.ime()) ==
+                        true
+                },
+                replaceText("2m"),
+                pressImeActionButton(),
+            )
+            .check(matches(withText("2m00")))
             .perform(
                 waitUntil("edited hold duration saved") {
                     LofitRepository(instrumentation.targetContext)
@@ -3523,11 +3544,11 @@ class WorkoutFlowTest {
                         ?.single()
                         ?.plannedSets
                         ?.single()
-                        ?.actualHoldSeconds == 12
+                        ?.actualHoldSeconds == 120
                 }
             )
         assertEquals(
-            12,
+            120,
             LofitRepository(instrumentation.targetContext)
                 .data
                 .activeWorkout
@@ -3589,14 +3610,13 @@ class WorkoutFlowTest {
         onView(withContentDescription("Set 1 done")).check(matches(isChecked()))
         if (type != SetType.FAILURE) {
             onView(withContentDescription("Start set 1 hold")).check(matches(isDisplayed()))
-            onView(withContentDescription("Set 1 Active time in seconds"))
-                .check(matches(withText("1")))
+            onView(withContentDescription("Set 1 Active time")).check(matches(withText("01")))
         } else {
             onView(withContentDescription("Stop set 1 hold"))
                 .check(matches(isDisplayed()))
                 .perform(click())
         }
-        onView(withContentDescription("Set 1 Active time in seconds")).check(matches(isEnabled()))
+        onView(withContentDescription("Set 1 Active time")).check(matches(isEnabled()))
         val savedSet =
             LofitRepository(instrumentation.targetContext)
                 .data

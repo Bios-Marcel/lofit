@@ -350,7 +350,7 @@ class VoiceTimerFlowTest {
             scenario.onActivity { it.onTimerVoiceCommand(item.plannedSets[0].id) }
             onView(withContentDescription("Stop set 1 hold")).check(matches(isDisplayed()))
             awaitMicrophone(true)
-            onView(withContentDescription("Set 1 Active time in seconds"))
+            onView(withContentDescription("Set 1 Active time"))
                 .perform(
                     waitUntil("timer has advanced") {
                         (it as android.widget.TextView).text.toString().toInt() > 0
@@ -360,7 +360,7 @@ class VoiceTimerFlowTest {
                 it.onTimerVoiceCommand(item.plannedSets[1].id)
             }
             onView(withContentDescription("Stop set 1 hold")).check(matches(isDisplayed()))
-            onView(withContentDescription("Set 1 Active time in seconds")).check { view, error ->
+            onView(withContentDescription("Set 1 Active time")).check { view, error ->
                 if (error != null) throw error
                 assertTrue((view as android.widget.TextView).text.toString().toInt() > 0)
             }

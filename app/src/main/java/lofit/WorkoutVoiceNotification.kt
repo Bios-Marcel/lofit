@@ -24,6 +24,15 @@ internal fun WorkoutVoiceSession.notificationState(
             ?: workout?.exercises?.lastOrNull()
     val set = item?.plannedSets?.firstOrNull { it.id == target?.done?.setId }
     val exercise = data.exercises.firstOrNull { it.id == item?.exerciseId }
+    val rest =
+        target?.restEndsAt?.let {
+            val remaining = ((it - now + 999) / 1000).toInt().coerceAtLeast(0)
+            formatRestTime(remaining, showSecondsUnit = true)
+        }
+    val hold = activeHoldPlannedSetId?.let {
+        val elapsed = ((now - holdStartedAt) / 1000).toInt().coerceAtLeast(0)
+        formatExerciseTime(elapsed, showSecondsUnit = true)
+    }
     val detail =
         if (!voiceEnabled) {
             val setText =
@@ -35,7 +44,8 @@ internal fun WorkoutVoiceSession.notificationState(
                         val values = buildList {
                             if (exercise.weighted) add("${formatWeight(set.weightKg)} kg")
                             add(
-                                if (exercise.type.tracksDuration) "${set.holdSeconds}s"
+                                if (exercise.type.tracksDuration)
+                                    formatExerciseTime(set.holdSeconds, showSecondsUnit = true)
                                 else "${set.reps} reps"
                             )
                         }
@@ -44,10 +54,8 @@ internal fun WorkoutVoiceSession.notificationState(
                     }
                 }
             when {
-                target?.restEndsAt != null ->
-                    "$setText · Rest ${formatSeconds(((target.restEndsAt - now + 999) / 1000).toInt().coerceAtLeast(0))}"
-                activeHoldPlannedSetId != null ->
-                    "$setText · Hold ${formatSeconds(((now - holdStartedAt) / 1000).toInt().coerceAtLeast(0))}"
+                rest != null -> "$setText · Rest $rest"
+                hold != null -> "$setText · Hold $hold"
                 else -> setText
             }
         } else
@@ -57,15 +65,13 @@ internal fun WorkoutVoiceSession.notificationState(
                         add("Set ${item!!.plannedSets.indexOf(set) + 1}")
                         if (exercise.weighted) add("${formatWeight(set.weightKg)} kg")
                         add(
-                            if (exercise.type.tracksDuration) "${set.holdSeconds}s"
+                            if (exercise.type.tracksDuration)
+                                formatExerciseTime(set.holdSeconds, showSecondsUnit = true)
                             else "${set.reps} reps"
                         )
                     } else add("All sets done")
-                    target?.restEndsAt?.let {
-                        add("Rest ${((it - now + 999) / 1000).coerceAtLeast(0)}s")
-                    }
-                    if (activeHoldPlannedSetId != null)
-                        add("Hold ${((now - holdStartedAt) / 1000).coerceAtLeast(0)}s")
+                    if (rest != null) add("Rest $rest")
+                    if (hold != null) add("Hold $hold")
                 }
                 .joinToString(" · ")
     return WorkoutVoiceNotificationState(

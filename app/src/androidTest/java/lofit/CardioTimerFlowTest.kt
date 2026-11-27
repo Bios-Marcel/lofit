@@ -99,7 +99,7 @@ class CardioTimerFlowTest {
             .perform(waitUntilMatches(hasDescendant(control("Cycle", "Stop set 1 hold"))))
         onView(control("Run", "Set 1 done")).check(matches(isChecked()))
         onView(control("Cycle", "Set 1 done")).check(matches(not(isChecked())))
-        onView(control("Cycle", "Set 1 Active time in seconds")).check(matches(not(isEnabled())))
+        onView(control("Cycle", "Set 1 Active time")).check(matches(not(isEnabled())))
         onView(withContentDescription("Rest timer overlay")).check(matches(not(isDisplayed())))
     }
 
@@ -199,7 +199,7 @@ class CardioTimerFlowTest {
             onView(isRoot())
                 .perform(waitUntilMatches(hasDescendant(control("Run", "Stop set 2 hold"))))
             onView(control("Run", "Set 1 done")).check(matches(isChecked()))
-            onView(control("Run", "Set 2 Active time in seconds")).check(matches(not(isEnabled())))
+            onView(control("Run", "Set 2 Active time")).check(matches(not(isEnabled())))
             onView(control("Cycle", "Start set 1 hold")).check(matches(isEnabled()))
             onView(control("Run", "Stop set 2 hold")).perform(scrollTo(), click())
         }
@@ -213,8 +213,8 @@ class CardioTimerFlowTest {
             onView(control("Run", "Set 1 done")).perform(waitUntilMatches(isChecked()))
             onView(withContentDescription("Rest timer overlay")).check(matches(isDisplayed()))
             onView(control("Cycle", "Start set 1 hold")).perform(scrollTo())
-            onView(control("Cycle", "Set 1 Active time in seconds"))
-                .check(matches(allOf(isEnabled(), withText("0"))))
+            onView(control("Cycle", "Set 1 Active time"))
+                .check(matches(allOf(isEnabled(), withText("00"))))
             awaitCycleStarted()
         }
     }
@@ -230,11 +230,11 @@ class CardioTimerFlowTest {
             startRun()
             onView(control("Run", "Set 1 done")).perform(waitUntilMatches(isChecked()))
             onView(withContentDescription("Rest timer overlay")).check(matches(isDisplayed()))
-            onView(control("Run", "Set 2 Active time in seconds"))
-                .check(matches(allOf(isEnabled(), withText("0"))))
+            onView(control("Run", "Set 2 Active time"))
+                .check(matches(allOf(isEnabled(), withText("00"))))
             onView(isRoot())
                 .perform(waitUntilMatches(hasDescendant(control("Run", "Stop set 2 hold"))))
-            onView(control("Run", "Set 2 Active time in seconds")).check(matches(not(isEnabled())))
+            onView(control("Run", "Set 2 Active time")).check(matches(not(isEnabled())))
             onView(control("Cycle", "Start set 1 hold")).check(matches(isEnabled()))
             onView(withContentDescription("Rest timer overlay")).check(matches(not(isDisplayed())))
         }
@@ -267,8 +267,8 @@ class CardioTimerFlowTest {
             startRun()
             onView(control("Run", "Set 1 done")).perform(click())
             onView(control("Cycle", "Start set 1 hold")).perform(scrollTo())
-            onView(control("Cycle", "Set 1 Active time in seconds"))
-                .check(matches(allOf(isEnabled(), withText("0"))))
+            onView(control("Cycle", "Set 1 Active time"))
+                .check(matches(allOf(isEnabled(), withText("00"))))
         }
     }
 
