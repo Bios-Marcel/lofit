@@ -131,6 +131,7 @@ internal data class CookedMeal(
     val items: List<CookedItem>,
     val recipeId: String? = null,
     val itemId: String? = null,
+    val singleItem: Boolean = itemId != null,
 )
 
 internal fun Iterable<FoodAmounts>.foodTotals(): FoodAmounts =

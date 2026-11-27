@@ -481,6 +481,7 @@ class FoodFlowTest {
                 .check(matches(isDisplayed()))
 
             search.perform(
+                waitForStableLayout(),
                 click(),
                 waitUntil("recipe search keyboard") {
                     ViewCompat.getRootWindowInsets(it)?.isVisible(WindowInsetsCompat.Type.ime()) ==
@@ -492,7 +493,7 @@ class FoodFlowTest {
                 .inRoot(isDialog())
                 .check(matches(isDisplayed()))
             search.perform(replaceText("BOWL apple"))
-            onView(withText(unused.name)).inRoot(isDialog()).perform(click())
+            onView(withText(unused.name)).inRoot(isDialog()).perform(waitForStableLayout(), click())
             onView(withContentDescription("${rice.name} weight (g)")).check(matches(withText("90")))
         }
     }
@@ -508,7 +509,7 @@ class FoodFlowTest {
             onView(withText("Item")).inRoot(isDialog()).check(matches(isDisplayed()))
             onView(allOf(withId(android.R.id.text1), withText(pizza.name)))
                 .inRoot(isDialog())
-                .perform(click())
+                .perform(waitForStableLayout(), click())
             val weight = onView(withContentDescription("${pizza.name} weight (g)"))
             weight.check(matches(withText("125"))).perform(replaceText("0"))
             onView(withText("Save meal")).perform(scrollTo(), click())
@@ -542,10 +543,82 @@ class FoodFlowTest {
             onView(withHint("Search recipes and items")).perform(replaceText(rice.name))
             onView(allOf(withId(android.R.id.text1), withText(rice.name)))
                 .inRoot(isDialog())
-                .perform(click())
+                .perform(waitForStableLayout(), click())
             onView(withContentDescription("${rice.name} weight (g)"))
                 .check(matches(withText("500")))
             pressBack()
+        }
+    }
+
+    @Test
+    fun deletingItemAndRecipeKeepsLoggedMeals() {
+        val day = LocalDate.now()
+        val recipe =
+            FoodRecipe(
+                "porridge-$suffix",
+                porridge,
+                listOf(RecipeItem(oats.id, 50.0), RecipeItem(rice.id, 90.0)),
+            )
+        val cookedOats = CookedItem(oats.name, oats.portion(50.0))
+        val itemMeal =
+            CookedMeal(
+                "item-$suffix",
+                "Breakfast $suffix",
+                day,
+                listOf(cookedOats),
+                itemId = oats.id,
+            )
+        val recipeMeal =
+            CookedMeal(
+                "recipe-$suffix",
+                "Lunch $suffix",
+                day,
+                listOf(cookedOats, CookedItem(rice.name, rice.portion(90.0))),
+                recipeId = recipe.id,
+            )
+        store.save(recipe)
+        store.log(itemMeal)
+        store.log(recipeMeal)
+        try {
+            val dailyTotals = store.dailyTotals(day)
+            ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+                open(scenario, "Items", expand = true)
+                onView(withHint("Search items")).perform(replaceText("oats $suffix"))
+                onView(withText(oats.name)).perform(scrollTo(), click())
+                val deleteItem = onView(withText("Delete item"))
+                deleteItem.perform(scrollTo(), click())
+                onView(withText("Cancel")).inRoot(isDialog()).perform(click())
+                assertTrue(store.ingredients().any { it.id == oats.id })
+                deleteItem.perform(click())
+                onView(withText("Delete")).inRoot(isDialog()).perform(click())
+                onView(withText(oats.name)).check(doesNotExist())
+                assertEquals(
+                    recipe.copy(items = listOf(RecipeItem(rice.id, 90.0))),
+                    store.recipes().single { it.id == recipe.id },
+                )
+
+                open(scenario, "Recipes")
+                onView(withText(recipe.name)).perform(scrollTo(), click())
+                onView(withText("Delete recipe")).perform(scrollTo(), click())
+                onView(withText("Delete")).inRoot(isDialog()).perform(click())
+                onView(withText(recipe.name)).check(doesNotExist())
+                assertFalse(store.mealChoices().any { it.id == recipe.id || it.id == oats.id })
+                assertEquals(itemMeal.copy(itemId = null), store.meals(itemMeal.id).single())
+                assertEquals(recipeMeal.copy(recipeId = null), store.meals(recipeMeal.id).single())
+                assertEquals(dailyTotals, store.dailyTotals(day))
+
+                open(scenario, "Meals")
+                onView(withText(recipeMeal.name)).perform(scrollTo()).check(matches(isDisplayed()))
+                onView(withText(itemMeal.name)).perform(scrollTo(), click())
+                onView(withText("Edit")).inRoot(isDialog()).perform(click())
+                onView(withContentDescription("${oats.name} weight (g)"))
+                    .check(matches(withText("50")))
+                onView(withText("Add item")).check(doesNotExist())
+                pressBack()
+            }
+        } finally {
+            store.deleteMeal(itemMeal.id)
+            store.deleteMeal(recipeMeal.id)
         }
     }
 

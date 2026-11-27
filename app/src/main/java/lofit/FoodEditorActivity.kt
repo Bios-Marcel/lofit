@@ -167,7 +167,7 @@ internal class FoodEditorActivity : AppCompatActivity() {
             putString("id", meal.id)
             putString("name", meal.name)
             putString("day", meal.day.toString())
-            putBoolean("singleItem", meal.itemId != null)
+            putBoolean("singleItem", meal.singleItem)
             putParcelableArrayList("rows", ArrayList(meal.items.map(::loggedRow)))
         }
 
@@ -404,6 +404,19 @@ internal class FoodEditorActivity : AppCompatActivity() {
                     .apply { isEnabled = !pending },
                 ui.foodSpacing(),
             )
+            intent.getStringExtra("id")?.let { id ->
+                body.addView(
+                    ui.actionButton("Delete item", secondary = true) {
+                        confirmDelete(
+                            "Delete item?",
+                            "The item will also be removed from any recipes that use it.",
+                        ) {
+                            store.deleteIngredient(id)?.let(pictures::delete)
+                        }
+                    },
+                    ui.foodSpacing(),
+                )
+            }
         }
 
     private fun showImageOptions(hasImage: Boolean) {
@@ -907,7 +920,29 @@ internal class FoodEditorActivity : AppCompatActivity() {
                 },
                 ui.foodSpacing(),
             )
+            if (!cooking) {
+                intent.getStringExtra("id")?.let { id ->
+                    body.addView(
+                        ui.actionButton("Delete recipe", secondary = true) {
+                            confirmDelete("Delete recipe?") { store.deleteRecipe(id) }
+                        },
+                        ui.foodSpacing(),
+                    )
+                }
+            }
         }
+    }
+
+    private fun confirmDelete(title: String, message: String? = null, delete: () -> Unit) {
+        AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage(message)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Delete") { _, _ ->
+                delete()
+                saved()
+            }
+            .show()
     }
 
     private fun pickIngredient(select: (Ingredient) -> Unit) {

@@ -65,6 +65,33 @@ class FoodStoreTest {
     }
 
     @Test
+    fun versionFiveMealsKeepSingleItemModeWhenSourceIsDeleted() {
+        val day = LocalDate.of(2026, 3, 31)
+        SQLiteDatabase.openOrCreateDatabase(file, null).use { db ->
+            db.execSQL("CREATE TABLE ingredients (id TEXT PRIMARY KEY)")
+            db.execSQL(
+                "CREATE TABLE meals (id TEXT PRIMARY KEY, name TEXT NOT NULL, day TEXT NOT NULL, recipe_id TEXT, item_id TEXT REFERENCES ingredients(id) ON DELETE SET NULL)"
+            )
+            db.execSQL("CREATE TABLE meal_items (meal TEXT, name TEXT)")
+            db.execSQL("INSERT INTO ingredients VALUES ('rice')")
+            db.execSQL("INSERT INTO meals VALUES ('lunch', 'Rice', '$day', NULL, 'rice')")
+            db.execSQL("INSERT INTO meals VALUES ('dinner', 'Bowl', '$day', 'bowl', NULL)")
+            db.version = 5
+        }
+        FoodStore(isolated).use { store ->
+            store.writableDatabase.delete("ingredients", "id = ?", arrayOf("rice"))
+            assertEquals(
+                CookedMeal("lunch", "Rice", day, emptyList(), singleItem = true),
+                store.meals("lunch").single(),
+            )
+            assertEquals(
+                CookedMeal("dinner", "Bowl", day, emptyList(), recipeId = "bowl"),
+                store.meals("dinner").single(),
+            )
+        }
+    }
+
+    @Test
     fun mealRecencyFollowsRecipeIdAndLatestMealDate() {
         val today = LocalDate.of(2026, 3, 31)
         val soup = FoodRecipe("soup", "Soup", emptyList())
